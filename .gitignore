@@ -1,0 +1,43 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# secrets
+.env
+.env.*
+!.env.example
+credentials.json
+**/credentials*
+
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+
+# logs / runtime
+*.log
+studio_boot.log
+logs/
+
+# model weights / HF cache
+*.safetensors
+*.bin
+*.pt
+*.gguf
+*.onnx
+.cache/
+huggingface/
+**/hf_cache/
+models/
+~/.cache/
+
+# local artifacts
+results/
+sweep-serving-*/
+.mxstudio/
