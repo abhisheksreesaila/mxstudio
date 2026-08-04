@@ -5,10 +5,10 @@ const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 const TAB_TITLES = {
   models: "Models",
-  chat: "Chat",
   notebooks: "Notebooks",
   bench: "Benchmark",
   learn: "Learn",
+  settings: "Settings",
 };
 
 let activeTab = "models";
@@ -30,15 +30,20 @@ async function api(path, opts = {}) {
   });
   if (!res.ok) {
     let detail = res.statusText;
+    let rawDetail = null;
     try {
       const body = await res.json();
+      rawDetail = body.detail;
       detail = body.detail;
       if (detail && typeof detail === "object") {
         detail = detail.message || JSON.stringify(detail);
       }
       detail = detail || res.statusText;
     } catch {}
-    throw new Error(detail);
+    const err = new Error(detail);
+    err.status = res.status;
+    err.detail = rawDetail;
+    throw err;
   }
   return res.json();
 }
@@ -90,9 +95,14 @@ $$(".nav-btn").forEach((btn) => {
     activeTab = btn.dataset.tab;
     $$(".nav-btn").forEach((b) => b.classList.toggle("active", b === btn));
     $$(".tab").forEach((t) => t.classList.toggle("active", t.id === "tab-" + activeTab));
-    $("#tab-title").textContent = TAB_TITLES[activeTab];
-    if (activeTab === "bench") loadHardware();
+    const title = $("#tab-title");
+    if (title) title.textContent = TAB_TITLES[activeTab] || activeTab;
+    if (activeTab === "bench") {
+      loadHardware();
+      loadBenchReadiness();
+    }
     if (activeTab === "notebooks") loadNotebooks();
+    if (activeTab === "settings") loadSettings();
   });
 });
 
@@ -118,11 +128,15 @@ $$(".nav-btn").forEach((btn) => {
 function renderServerStatus() {
   const s = serverStatus;
   const pill = $("#server-pill");
-  pill.className = "pill " + s.state;
   const label = s.model_id ? `${s.model_id.split("/")[1] || s.model_id}: ${s.state}` : "server: stopped";
-  pill.textContent = label + (s.state === "starting" ? ` (${s.uptime_s}s)` : "");
+  if (pill) {
+    pill.className = "pill " + s.state;
+    pill.textContent = label + (s.state === "starting" ? ` (${s.uptime_s}s)` : "");
+  }
   const mini = $("#mini-status");
-  mini.innerHTML = `<span class="dot ${s.state}"></span><span class="mini-text">${esc(label)}</span>`;
+  if (mini) {
+    mini.innerHTML = `<span class="dot ${s.state}"></span><span class="mini-text">${esc(label)}</span>`;
+  }
 }
 
 /* ---------- models tab ---------- */
@@ -154,39 +168,57 @@ function renderHfReport(report) {
   const box = $("#hf-report");
   const dlBtn = $("#hf-download");
   lastHfReport = report;
+  if (!box) return;
   if (!report) {
     box.hidden = true;
-    dlBtn.disabled = true;
+    if (dlBtn) dlBtn.disabled = true;
     return;
   }
   if (!report.ok) {
     box.hidden = false;
     box.innerHTML = `<div style="color:var(--err)">${esc(report.error || "check failed")}</div>
       <p class="tab-hint">${esc(report.hint || "")}</p>`;
-    dlBtn.disabled = true;
+    if (dlBtn) dlBtn.disabled = true;
     return;
   }
+  const hw = report.hardware || {};
+  const env = report.env || {};
   const compat = report.modular_compatible
     ? '<span class="badge installed">modular ok</span>'
     : '<span class="badge exp">compat unknown</span>';
+  const risk = report.risk || "ok";
+  const riskClass =
+    risk === "ok" ? "ok" : risk === "tight_vram" ? "warn" : "err";
   const warns = (report.warnings || [])
     .map((w) => `<li>${esc(w)}</li>`)
     .join("");
+  const steps = (report.steps || [])
+    .map((s) => `<li>${esc(s)}</li>`)
+    .join("");
+  const hfUrl = report.hf_url || `https://huggingface.co/${report.model_id}`;
   box.hidden = false;
   box.innerHTML = `
-    <div class="row"><span class="k">Model</span><span>${esc(report.model_id)}</span> ${compat}</div>
+    <div class="row"><span class="k">Model</span><span>
+      <a href="${esc(hfUrl)}" target="_blank" rel="noopener">${esc(report.model_id)}</a>
+    </span> ${compat}</div>
     <div class="row"><span class="k">Architecture</span><span>${esc(report.architecture || "?")}</span></div>
     <div class="row"><span class="k">Size</span><span>~${report.approx_gb ?? "?"} GB · safetensors ${report.has_safetensors ? "yes" : "no"}</span></div>
-    <div class="row"><span class="k">Gated</span><span>${report.gated ? "yes" : "no"} · token ${report.env?.hf_token_set ? "set" : "missing"}</span></div>
+    <div class="row"><span class="k">Gated</span><span>${report.gated ? "yes" : "no"} · token ${
+      env.hf_token_set ? `set (${esc(env.hf_token_source || "unknown")})` : "missing"
+    }</span></div>
+    <div class="row"><span class="k">VRAM fit</span><span>${esc(hw.level || "?")} — ${esc(hw.message || "")}</span></div>
     <div class="row"><span class="k">Docs</span>
-      <a href="${report.handbook}" target="_blank" rel="noopener">Handbook</a> ·
-      <a href="${report.models_docs}" target="_blank" rel="noopener">MAX models</a>
+      <a href="${report.handbook || "https://handbook.modular.com/"}" target="_blank" rel="noopener">Handbook</a> ·
+      <a href="${report.models_docs || "https://docs.modular.com/max/models/"}" target="_blank" rel="noopener">MAX models</a>
     </div>
+    <div class="risk-banner ${riskClass}">${esc(report.risk_message || risk)}</div>
     ${warns ? `<ul class="warn-list">${warns}</ul>` : ""}
-    <p class="tab-hint" style="margin:8px 0 0">Ready to download: <strong>${report.can_download ? "yes" : "no"}</strong>${
-      report.modular_compatible ? "" : " — Download will ask to force if architecture is unknown."
-    }</p>`;
-  dlBtn.disabled = !(report.can_download || !report.gated);
+    ${steps ? `<ol class="warn-list" style="list-style:decimal">${steps}</ol>` : ""}
+    <p class="tab-hint" style="margin:8px 0 0">
+      Can download: <strong>${report.can_download ? "yes" : "no"}</strong> ·
+      Recommend: <strong>${report.recommend_download ? "yes" : "no"}</strong>
+    </p>`;
+  if (dlBtn) dlBtn.disabled = !(report.can_download || !report.gated);
 }
 
 $("#hf-check")?.addEventListener("click", async () => {
@@ -211,14 +243,22 @@ $("#hf-check")?.addEventListener("click", async () => {
 });
 
 $("#hf-download")?.addEventListener("click", async () => {
-  const id = ($("#hf-id").value || "").trim();
+  const id = ($("#hf-id")?.value || "").trim();
   if (!id) return;
   try {
     $("#hf-download").disabled = true;
     let force = false;
-    if (lastHfReport && !lastHfReport.modular_compatible) {
+    const hwLevel = lastHfReport?.hardware?.level;
+    const needsForce =
+      lastHfReport &&
+      (!lastHfReport.modular_compatible ||
+        hwLevel === "slow" ||
+        hwLevel === "insufficient");
+    if (needsForce) {
       force = confirm(
-        `${id} may not be Modular-compatible.\nDownload anyway?`
+        (lastHfReport.risk_message ||
+          `${id} may not run well on this machine / MAX.`) +
+          "\n\nDownload anyway (force)?"
       );
       if (!force) {
         $("#hf-download").disabled = false;
@@ -233,7 +273,6 @@ $("#hf-download")?.addEventListener("click", async () => {
     pollModels();
     pollActivity();
   } catch (err) {
-    // FastAPI 409 detail may be an object
     const msg = typeof err.message === "string" ? err.message : JSON.stringify(err.message);
     toast("Download blocked", msg, "err");
   } finally {
@@ -316,7 +355,40 @@ async function handleModelAction(act, m, btn) {
   try {
     if (act === "download") {
       btn.disabled = true;
-      await api(`/api/models/${m.id}/download`, { method: "POST" });
+      let force = false;
+      try {
+        const report = await api("/api/models/check", {
+          method: "POST",
+          body: JSON.stringify({ model_id: m.id }),
+        });
+        if (report.ok) {
+          const hwLevel = report.hardware?.level;
+          const badVram = hwLevel === "slow" || hwLevel === "insufficient";
+          const unsupportedNoArch = !report.modular_compatible && !m.custom_arch;
+          const needsConfirm =
+            badVram ||
+            unsupportedNoArch ||
+            (!report.recommend_download &&
+              !(m.custom_arch && !report.modular_compatible));
+          if (needsConfirm) {
+            force = confirm(
+              (report.risk_message ||
+                `${m.name} may not download/serve cleanly.`) +
+                "\n\nDownload anyway (force)?"
+            );
+            if (!force) {
+              btn.disabled = false;
+              return;
+            }
+          }
+        }
+      } catch (checkErr) {
+        toast("Pre-check failed", checkErr.message, "warn");
+      }
+      await api(`/api/models/${m.id}/download`, {
+        method: "POST",
+        body: JSON.stringify({ force }),
+      });
       toast("Download started", `${m.name} is downloading in the background`, "warn");
       pollModels();
       pollActivity();
@@ -474,20 +546,89 @@ pollModels();
 pollActivity();
 loadEnvPill();
 
-/* ---------- chat tab ---------- */
+/* ---------- floating chat ---------- */
 
-$("#temperature").addEventListener("input", (e) => ($("#temp-out").textContent = e.target.value));
-$("#top_p").addEventListener("input", (e) => ($("#topp-out").textContent = e.target.value));
+function setChatOpen(open) {
+  const panel = $("#chat-panel");
+  const fab = $("#chat-fab");
+  if (!panel) return;
+  panel.hidden = !open;
+  fab?.classList.toggle("open", open);
+}
 
-$("#chat-clear").addEventListener("click", () => {
+$("#chat-fab")?.addEventListener("click", () => {
+  const panel = $("#chat-panel");
+  setChatOpen(!!panel?.hidden);
+});
+$("#chat-panel-close")?.addEventListener("click", () => setChatOpen(false));
+
+$("#temperature")?.addEventListener("input", (e) => {
+  const out = $("#temp-out");
+  if (out) out.textContent = e.target.value;
+});
+$("#top_p")?.addEventListener("input", (e) => {
+  const out = $("#topp-out");
+  if (out) out.textContent = e.target.value;
+});
+
+$("#chat-clear")?.addEventListener("click", () => {
   chatMessages = [];
   renderChat();
 });
 
+(function setupChatMic() {
+  const mic = $("#chat-mic");
+  if (!mic) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    mic.addEventListener("click", () => {
+      toast("Voice input unavailable", "SpeechRecognition is not supported in this browser", "warn");
+    });
+    return;
+  }
+  const recog = new SR();
+  recog.continuous = false;
+  recog.interimResults = false;
+  recog.lang = "en-US";
+  let listening = false;
+  mic.addEventListener("click", () => {
+    if (listening) {
+      try { recog.stop(); } catch {}
+      return;
+    }
+    try {
+      recog.start();
+    } catch (err) {
+      toast("Mic failed", err.message || String(err), "err");
+    }
+  });
+  recog.onstart = () => {
+    listening = true;
+    mic.classList.add("listening");
+  };
+  recog.onend = () => {
+    listening = false;
+    mic.classList.remove("listening");
+  };
+  recog.onerror = () => {
+    listening = false;
+    mic.classList.remove("listening");
+  };
+  recog.onresult = (ev) => {
+    const text = [...ev.results].map((r) => r[0].transcript).join(" ").trim();
+    const input = $("#chat-input");
+    if (input && text) {
+      input.value = (input.value ? input.value + " " : "") + text;
+      input.focus();
+    }
+  };
+})();
+
 function renderChat() {
   const box = $("#chat-messages");
+  if (!box) return;
   if (chatMessages.length === 0) {
-    box.innerHTML = '<div class="chat-empty">Serve a model from the Models tab, then say hello.</div>';
+    box.innerHTML = '<div class="chat-empty">Serve a model from Models, then say hello — or hold the mic.</div>';
     return;
   }
   box.innerHTML = chatMessages
@@ -503,7 +644,7 @@ function apiMessages() {
     .filter((m) => m.content); // drop the empty assistant placeholder
 }
 
-$("#chat-form").addEventListener("submit", async (ev) => {
+$("#chat-form")?.addEventListener("submit", async (ev) => {
   ev.preventDefault();
   if (chatBusy) return;
   if (serverStatus.state !== "running") {
@@ -515,6 +656,7 @@ $("#chat-form").addEventListener("submit", async (ev) => {
     return;
   }
   const input = $("#chat-input");
+  if (!input) return;
   const text = input.value.trim();
   if (!text) return;
   input.value = "";
@@ -532,9 +674,9 @@ $("#chat-form").addEventListener("submit", async (ev) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: apiMessages(),
-        temperature: parseFloat($("#temperature").value),
-        top_p: parseFloat($("#top_p").value),
-        max_tokens: parseInt($("#max_tokens").value, 10),
+        temperature: parseFloat($("#temperature")?.value || "0.7"),
+        top_p: parseFloat($("#top_p")?.value || "0.95"),
+        max_tokens: parseInt($("#max_tokens")?.value || "256", 10),
       }),
     });
     if (!res.ok) {
@@ -1048,6 +1190,34 @@ $("#nb-cells").addEventListener("keydown", (ev) => {
 
 /* ---------- benchmark tab ---------- */
 
+async function loadBenchReadiness() {
+  const el = $("#bench-prereqs");
+  if (!el) return;
+  try {
+    const ready = await api("/api/bench/readiness");
+    const warns = (ready.warnings || [])
+      .map((w) => `<li>${esc(w)}</li>`)
+      .join("");
+    const prereqs = (ready.prerequisites || [])
+      .map((p) => `<li>${esc(p)}</li>`)
+      .join("");
+    const server = ready.server || {};
+    const serving = server.serving
+      ? `Serving ${esc(server.model_id || "?")} (${esc(server.state || "running")})`
+      : `Not serving (state: ${esc(server.state || "stopped")})`;
+    el.className = "bench-prereqs " + (ready.ok ? "ok" : "warn");
+    el.innerHTML = `
+      <div class="prereq-title">Benchmark readiness</div>
+      <div>${serving}</div>
+      ${prereqs ? `<ul>${prereqs}</ul>` : ""}
+      ${warns ? `<ul class="warn-list">${warns}</ul>` : ""}`;
+  } catch (err) {
+    el.className = "bench-prereqs warn";
+    el.innerHTML = `<div class="prereq-title">Benchmark readiness</div>
+      <p style="color:var(--err)">Could not load: ${esc(err.message)}</p>`;
+  }
+}
+
 async function loadHardware() {
   try {
     const hw = await api("/api/hardware");
@@ -1076,13 +1246,16 @@ async function loadHardware() {
         <div class="v">${hw.disk.free_gb} GB free</div>
         <div class="sub">of ${hw.disk.total_gb} GB · ${hw.wsl ? "WSL2" : esc(hw.os)}</div>
       </div>`);
-    $("#hw-cards").innerHTML = cards.join("");
+    const host = $("#hw-cards");
+    if (host) host.innerHTML = cards.join("");
     renderBenchHistory();
   } catch {}
+  loadBenchReadiness();
 }
 
 function renderBenchResult(job) {
   const el = $("#bench-result");
+  if (!el) return;
   if (job.state === "idle") { el.innerHTML = ""; return; }
   if (job.state === "error") {
     el.innerHTML = `<p style="color:var(--err)">Benchmark failed: ${esc(job.error || "")}</p>`;
@@ -1094,13 +1267,23 @@ function renderBenchResult(job) {
     )
     .join("");
   let summary = "";
+  const backend = job.summary?.backend || job.backend || "";
+  const note = job.summary?.note || job.note || "";
+  const fallback =
+    backend === "openai_stream_fallback" || !!note;
   if (job.state === "running") {
-    summary = `<p class="bench-summary">Running Modular <code>max benchmark</code>… backend ${esc(job.backend || "max_benchmark")} · prompts ${job.num_prompts ?? "?"}</p>`;
+    summary = `<p class="bench-summary">Running Modular <code>max benchmark</code>… backend ${esc(backend || "max_benchmark")} · prompts ${job.num_prompts ?? "?"}</p>`;
   } else if (job.summary) {
-    const backend = job.summary.backend || job.backend || "";
     summary = `<p class="bench-summary">Mean: <strong>${job.summary.mean_tok_per_s ?? "?"} tok/s</strong> · TTFT <strong>${job.summary.mean_ttft_s ?? "?"}s</strong> on ${esc(job.model_id)} <span class="badge">${esc(backend)}</span></p>`;
   }
+  const warnBanner = fallback
+    ? `<div class="risk-banner warn">${esc(
+        note ||
+          "Fell back to OpenAI stream timing — max benchmark was unavailable."
+      )}</div>`
+    : "";
   el.innerHTML = `
+    ${warnBanner}
     ${summary}
     <table class="bench-table">
       <tr><th>Run</th><th>TTFT</th><th>Tokens</th><th>tok/s</th></tr>
@@ -1111,7 +1294,9 @@ function renderBenchResult(job) {
 async function renderBenchHistory() {
   try {
     const history = await api("/api/bench/history");
-    $("#bench-history").innerHTML = history.length
+    const host = $("#bench-history");
+    if (!host) return;
+    host.innerHTML = history.length
       ? `<table class="bench-table">
           <tr><th>When</th><th>Model</th><th>tok/s</th><th>TTFT</th><th>GPU</th></tr>
           ${history
@@ -1126,39 +1311,245 @@ async function renderBenchHistory() {
   } catch {}
 }
 
-$("#bench-btn").addEventListener("click", async () => {
+async function startBench(force = false) {
+  const btn = $("#bench-btn");
+  const num_prompts = parseInt($("#bench-prompts")?.value || "12", 10);
+  const max_concurrency = parseInt($("#bench-conc")?.value || "4", 10);
+  const max_tokens = parseInt($("#bench-tokens")?.value || "128", 10);
+  const payload = {
+    runs: 3,
+    num_prompts,
+    max_concurrency,
+    max_tokens,
+    use_max_benchmark: true,
+    force: !!force,
+  };
+  await api("/api/bench", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  toast(
+    "max benchmark started",
+    "Modular CLI running in the background — you can leave this tab",
+    "warn"
+  );
+  renderBenchResult({
+    state: "running",
+    runs: [],
+    runs_total: 3,
+    num_prompts,
+    backend: "max_benchmark",
+    model_id: serverStatus.model_id,
+  });
+  pollActivity();
+}
+
+$("#bench-btn")?.addEventListener("click", async () => {
   const btn = $("#bench-btn");
   try {
-    btn.disabled = true;
-    const num_prompts = parseInt($("#bench-prompts").value, 10);
-    const max_concurrency = parseInt($("#bench-conc").value, 10);
-    const max_tokens = parseInt($("#bench-tokens").value, 10);
-    await api("/api/bench", {
-      method: "POST",
-      body: JSON.stringify({
-        runs: 3,
-        num_prompts,
-        max_concurrency,
-        max_tokens,
-        use_max_benchmark: true,
-      }),
-    });
-    toast(
-      "max benchmark started",
-      "Modular CLI running in the background — you can leave this tab",
-      "warn"
-    );
-    renderBenchResult({
-      state: "running",
-      runs: [],
-      runs_total: 3,
-      num_prompts,
-      backend: "max_benchmark",
-      model_id: serverStatus.model_id,
-    });
-    pollActivity();
+    if (btn) btn.disabled = true;
+    await startBench(false);
   } catch (err) {
-    btn.disabled = false;
+    if (
+      err.status === 409 &&
+      err.detail &&
+      typeof err.detail === "object" &&
+      err.detail.readiness
+    ) {
+      const ok = confirm(
+        (err.detail.message || "Hardware/prerequisites look unsafe for benchmarking") +
+          "\n\nRun anyway with force?"
+      );
+      if (ok) {
+        try {
+          await startBench(true);
+          return;
+        } catch (err2) {
+          if (btn) btn.disabled = false;
+          toast("Benchmark could not start", err2.message, "err");
+          return;
+        }
+      }
+    }
+    if (btn) btn.disabled = false;
     toast("Benchmark could not start", err.message, "err");
+  }
+});
+
+/* ---------- settings ---------- */
+
+async function loadSettings() {
+  try {
+    const s = await api("/api/settings");
+    const status = $("#settings-token-status");
+    if (status) {
+      status.textContent = s.hf_token_set
+        ? `HF token set · ${s.hf_token_masked || ""} · source ${s.hf_token_source || "?"}`
+        : "HF token not set (ok for public models)";
+      status.className = "env-pill " + (s.hf_token_set ? "ok" : "warn");
+    }
+    const hint = $("#settings-path-hint");
+    if (hint) {
+      hint.textContent = s.secrets_path
+        ? `Stored at ${s.secrets_path}`
+        : "";
+    }
+    const notes = $("#settings-notes");
+    if (notes) {
+      notes.innerHTML = (s.notes || []).map((n) => `<li>${esc(n)}</li>`).join("");
+    }
+  } catch (err) {
+    const status = $("#settings-token-status");
+    if (status) {
+      status.textContent = "settings load failed: " + err.message;
+      status.className = "env-pill warn";
+    }
+  }
+}
+
+$("#settings-save-token")?.addEventListener("click", async () => {
+  const input = $("#settings-hf-token");
+  const token = (input?.value || "").trim();
+  if (!token) {
+    toast("Token required", "Paste an hf_… token first", "warn");
+    return;
+  }
+  try {
+    await api("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({ hf_token: token }),
+    });
+    if (input) input.value = "";
+    toast("Token saved", "Stored under ~/.mxstudio", "ok");
+    await loadSettings();
+    await loadEnvPill();
+  } catch (err) {
+    toast("Save failed", err.message, "err");
+  }
+});
+
+$("#settings-clear-token")?.addEventListener("click", async () => {
+  try {
+    await api("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({ clear_hf_token: true }),
+    });
+    toast("Token cleared", "", "ok");
+    await loadSettings();
+    await loadEnvPill();
+  } catch (err) {
+    toast("Clear failed", err.message, "err");
+  }
+});
+
+/* ---------- custom architecture wizard ---------- */
+
+let lastArchReport = null;
+
+function renderArchReport(data) {
+  const box = $("#arch-report");
+  const scaffoldBtn = $("#arch-scaffold");
+  lastArchReport = data;
+  if (!box) return;
+  if (!data || !data.ok) {
+    box.hidden = false;
+    box.innerHTML = `<div style="color:var(--err)">${esc(data?.error || "analyze failed")}</div>
+      <p class="tab-hint">${esc(data?.hint || "")}</p>`;
+    if (scaffoldBtn) scaffoldBtn.disabled = true;
+    return;
+  }
+  const mark = (status) =>
+    status === "missing" ? "!" : status === "builtin" ? "✓" : "•";
+  const gaps = (data.gaps || [])
+    .map(
+      (g) => `
+      <div class="gap-step ${esc(g.status || "missing")}">
+        <div class="mark">${mark(g.status)}</div>
+        <div>
+          <div class="gtitle">${esc(g.title || g.id || "")}</div>
+          <div class="gdetail">${esc(g.detail || "")}</div>
+          ${g.file ? `<div class="gfile">${esc(g.file)}</div>` : ""}
+        </div>
+      </div>`
+    )
+    .join("");
+  const docs = data.docs || {};
+  const docLinks = [
+    ["Custom architectures", docs.custom_arch],
+    ["Model bring-up", docs.bring_up],
+    ["Handbook", docs.handbook],
+    ["MAX models", docs.models],
+  ]
+    .filter(([, href]) => href)
+    .map(
+      ([label, href]) =>
+        `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(label)}</a>`
+    )
+    .join(" · ");
+  box.hidden = false;
+  box.innerHTML = `
+    <div class="summary">${esc(data.summary || "")}</div>
+    <div class="row"><span class="k">Architecture</span><span>${esc(data.architecture || "?")}</span></div>
+    <div class="row"><span class="k">Next</span><span>${esc(data.next_action || "")}${
+      data.package_path ? ` · ${esc(data.package_path)}` : ""
+    }</span></div>
+    <div class="gap-visual">${gaps}</div>
+    ${docLinks ? `<div class="links-row">${docLinks}</div>` : ""}`;
+  const canScaffold =
+    !data.modular_compatible &&
+    (data.next_action === "scaffold" || data.next_action === "edit_scaffold");
+  if (scaffoldBtn) scaffoldBtn.disabled = !canScaffold;
+}
+
+$("#arch-analyze")?.addEventListener("click", async () => {
+  const id = ($("#arch-id")?.value || "").trim();
+  if (!id) {
+    toast("Model id required", "Use org/name format", "warn");
+    return;
+  }
+  try {
+    $("#arch-analyze").disabled = true;
+    const data = await api("/api/architectures/analyze", {
+      method: "POST",
+      body: JSON.stringify({ model_id: id }),
+    });
+    renderArchReport(data);
+    toast(
+      data.ok ? "Gap analysis ready" : "Analyze failed",
+      data.architecture || id,
+      data.ok ? (data.modular_compatible ? "ok" : "warn") : "err"
+    );
+  } catch (err) {
+    toast("Analyze failed", err.message, "err");
+  } finally {
+    $("#arch-analyze").disabled = false;
+  }
+});
+
+$("#arch-scaffold")?.addEventListener("click", async () => {
+  const id = ($("#arch-id")?.value || "").trim();
+  if (!id) return;
+  try {
+    $("#arch-scaffold").disabled = true;
+    const data = await api("/api/architectures/scaffold", {
+      method: "POST",
+      body: JSON.stringify({ model_id: id }),
+    });
+    toast("Scaffold written", data.package_path || data.package_name || id, "ok");
+    const refreshed = await api("/api/architectures/analyze", {
+      method: "POST",
+      body: JSON.stringify({ model_id: id }),
+    });
+    renderArchReport(refreshed);
+  } catch (err) {
+    toast("Scaffold failed", err.message, "err");
+    if (lastArchReport) renderArchReport(lastArchReport);
+  } finally {
+    const can =
+      lastArchReport &&
+      !lastArchReport.modular_compatible &&
+      (lastArchReport.next_action === "scaffold" ||
+        lastArchReport.next_action === "edit_scaffold");
+    $("#arch-scaffold").disabled = !can;
   }
 });

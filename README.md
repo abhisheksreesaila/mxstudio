@@ -1,6 +1,6 @@
 # mxstudio
 
-**Version 0.1.0** — see [CHANGELOG.md](CHANGELOG.md).
+**Version 0.1.1** — see [CHANGELOG.md](CHANGELOG.md).
 
 
 A thin, fast LM Studio-style layer on top of [Modular MAX](https://www.modular.com/max).
@@ -34,10 +34,12 @@ all work.
 
 | Tab | What it does |
 |-----|--------------|
-| **Models** | Curated registry. Download with progress, one-click serve/stop, per-model details: innovation summary, paper/GitHub links, full HF model card. |
-| **Chat** | Streaming chat against the served model with temperature / top-p / max-tokens controls. |
-| **Notebooks** | Generates a per-model Jupyter notebook: model docs + links + runnable cells (chat, streaming, temperature sweep, mini benchmark) against the local API. |
-| **Benchmark** | Hardware summary (GPU/CPU/RAM/disk) + TTFT & tokens/sec benchmark with history. |
+| **Models** | Curated registry + HF import with MAX/token/VRAM gates. Download, serve, uninstall. |
+| **Chat** | Floating button (anytime). Streaming chat + browser voice input. |
+| **Notebooks** | Educational labs with **cited sources** (HF first) + runnable cells. |
+| **Benchmark** | Hardware + readiness checks; Modular `max benchmark` with history. |
+| **Learn** | Handbook links + **custom architecture wizard** (gap checklist → scaffold). |
+| **Settings** | Save Hugging Face token securely to `~/.mxstudio/secrets.json`. |
 | **Streaming** | Phase 5 preview: SSD expert streaming for MoE models (mxstream). |
 
 ## Architecture

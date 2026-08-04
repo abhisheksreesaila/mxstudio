@@ -76,6 +76,66 @@ _PREFERRED = (
 )
 
 
+def extract_citations(model_id: str) -> dict:
+    """Pull citation / paper text from the HF card; always include HF as source."""
+    card = get_model_card(model_id)
+    citation_text = None
+    paper_urls: list[str] = []
+    if card:
+        for heading, body in _split_sections(card):
+            h = re.sub(r"^#+\s*", "", heading).strip().lower()
+            if "citation" in h or h in ("bibtex", "citing", "cite"):
+                citation_text = _trim(body, 2000)
+                break
+        paper_urls = list(
+            dict.fromkeys(
+                re.findall(
+                    r"https?://(?:arxiv\.org|aclanthology\.org|openreview\.net)/\S+",
+                    card,
+                )
+            )
+        )[:8]
+    return {
+        "hf_url": f"https://huggingface.co/{model_id}",
+        "hf_card_url": f"https://huggingface.co/{model_id}#model-card",
+        "citation": citation_text,
+        "paper_urls": paper_urls,
+        "primary_source": "huggingface",
+    }
+
+
+def format_citations_markdown(model_id: str, extra_links: dict[str, str] | None = None) -> str:
+    """Markdown cell: cite HF first, then papers / registry links."""
+    cites = extract_citations(model_id)
+    lines = [
+        "## Sources & citations",
+        "",
+        "mxstudio prefers **Hugging Face** as the primary source for cards, configs, "
+        "and weight metadata. Papers and other links are secondary.",
+        "",
+        "### Primary",
+        f"- Hugging Face model page: [{model_id}]({cites['hf_url']})",
+        f"- Model card: [README]({cites['hf_card_url']})",
+        "",
+    ]
+    if cites["citation"]:
+        lines += ["### Citation (from Hugging Face card)", "", cites["citation"], ""]
+    if cites["paper_urls"]:
+        lines.append("### Papers found on the card")
+        for url in cites["paper_urls"]:
+            lines.append(f"- {url}")
+        lines.append("")
+    if extra_links:
+        lines.append("### Additional curated links")
+        for label, url in extra_links.items():
+            lines.append(f"- [{label}]({url})")
+        lines.append("")
+    lines.append(
+        "_If a fact is not on Hugging Face, treat it as secondary and verify against the paper._"
+    )
+    return "\n".join(lines)
+
+
 def summarize_model_card(model_id: str, max_chars: int = 3500) -> str | None:
     """Build a compact, notebook-friendly excerpt of the HF model card."""
     card = get_model_card(model_id)

@@ -67,7 +67,7 @@ def _bullets(items: tuple[str, ...] | list[str]) -> str:
 
 def build_notebook(entry: ModelEntry) -> dict:
     """Build an educational lab notebook: teach first, then run code."""
-    from mxstudio.modelinfo import summarize_model_card
+    from mxstudio.modelinfo import format_citations_markdown, summarize_model_card
 
     links = "\n".join(f"- [{label}]({url})" for label, url in entry.links.items())
     goals = _bullets(entry.learning_goals)
@@ -156,6 +156,8 @@ Read at least the abstract of the paper before you finish the lab.
 > paper (training data, post-training, or evaluation). That loop — **run → read →
 > re-prompt** — is the whole point of an educational notebook.
 """
+
+    citations = format_citations_markdown(entry.id, entry.links)
 
     hf_md = hf_section
 
@@ -328,6 +330,7 @@ You finished the lab when you can explain the **key ideas** list in your own wor
         _md(innovation),
         _md(architecture),
         _md(resources),
+        _md(citations),
         _md(hf_md),
         _md(lab_intro),
         _md(setup_md),
@@ -358,6 +361,8 @@ You finished the lab when you can explain the **key ideas** list in your own wor
             "mxstudio": {
                 "model_id": entry.id,
                 "kind": "educational_lab",
+                "primary_source": "huggingface",
+                "hf_url": f"https://huggingface.co/{entry.id}",
             },
         },
         "cells": cells,

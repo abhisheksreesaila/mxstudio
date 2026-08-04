@@ -12,14 +12,24 @@ from fastapi.staticfiles import StaticFiles
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
-from mxstudio import compat, downloads, fhsaas, hwinfo, modelinfo, notebooks, registry
+from mxstudio import (
+    architectures,
+    compat,
+    downloads,
+    fhsaas,
+    hwinfo,
+    modelinfo,
+    notebooks,
+    registry,
+    settings as studio_settings,
+)
 from mxstudio.bench import MANAGER as BENCH
 from mxstudio.downloads import MANAGER as DOWNLOADS
 from mxstudio.servers import MANAGER as SERVERS, MODEL_PORT
 
 WEB_DIR = Path(__file__).parent / "web"
 
-app = FastAPI(title="mxstudio", version="0.1.0")
+app = FastAPI(title="mxstudio", version="0.1.1")
 
 # fh-saas base: logging config + the additive /api/jobs job-state bridge.
 fhsaas.setup()
@@ -37,6 +47,26 @@ def _entry_or_404(model_id: str) -> registry.ModelEntry:
 def env_info() -> dict:
     """HF token / cache / disk readiness for downloads."""
     return compat.env_status()
+
+
+@app.get("/api/settings")
+def get_settings() -> dict:
+    return studio_settings.public_settings()
+
+
+class SettingsUpdate(BaseModel):
+    hf_token: str | None = None
+    clear_hf_token: bool = False
+
+
+@app.put("/api/settings")
+def update_settings(req: SettingsUpdate) -> dict:
+    """Save HF token to ~/.mxstudio/secrets.json (never echoed back raw)."""
+    if req.clear_hf_token:
+        return studio_settings.clear_hf_token()
+    if req.hf_token is None:
+        raise HTTPException(400, "provide hf_token or clear_hf_token=true")
+    return studio_settings.set_hf_token(req.hf_token)
 
 
 @app.get("/api/models")
@@ -98,7 +128,11 @@ class HfCheckRequest(BaseModel):
 
 class HfDownloadRequest(BaseModel):
     model_id: str
-    force: bool = False  # allow download even if modular_compatible is false
+    force: bool = False  # allow download even if modular_compatible / VRAM risk
+
+
+class CuratedDownloadRequest(BaseModel):
+    force: bool = False
 
 
 @app.post("/api/models/check")
@@ -127,7 +161,19 @@ def download_hf_model(req: HfDownloadRequest) -> dict:
             {
                 "message": (
                     "architecture may not be Modular-compatible; "
-                    "re-submit with force=true to download anyway"
+                    "re-submit with force=true to download anyway (use at your own risk)"
+                ),
+                "report": report,
+            },
+        )
+    hw_level = (report.get("hardware") or {}).get("level")
+    if hw_level in ("slow", "insufficient") and not req.force:
+        raise HTTPException(
+            409,
+            {
+                "message": (
+                    "hardware fit looks poor — serve will be extremely slow or may fail. "
+                    "Re-submit with force=true to download at your own risk."
                 ),
                 "report": report,
             },
@@ -138,10 +184,49 @@ def download_hf_model(req: HfDownloadRequest) -> dict:
 
 
 @app.post("/api/models/{model_id:path}/download")
-def download_model(model_id: str) -> dict:
+def download_model(
+    model_id: str, req: CuratedDownloadRequest = CuratedDownloadRequest()
+) -> dict:
     entry = _entry_or_404(model_id)
-    DOWNLOADS.total_size_bytes(entry.id)  # warm the size cache for progress %
-    return DOWNLOADS.start(entry.id)
+    force = bool(req.force)
+    report = compat.check_hf_model(entry.id)
+    if report.get("ok"):
+        if not report.get("can_download") and not force:
+            raise HTTPException(
+                409,
+                {
+                    "message": "not ready to download — set HF token in Settings if gated",
+                    "report": report,
+                },
+            )
+        hw_level = (report.get("hardware") or {}).get("level")
+        if hw_level in ("slow", "insufficient") and not force:
+            raise HTTPException(
+                409,
+                {
+                    "message": (
+                        "VRAM/RAM look insufficient for a good experience. "
+                        "Pass force=true to download at your own risk."
+                    ),
+                    "report": report,
+                },
+            )
+        # Custom-arch curated models (e.g. OLMoE) are expected — not a hard block.
+        if (
+            not report.get("modular_compatible")
+            and not entry.custom_arch
+            and not force
+        ):
+            raise HTTPException(
+                409,
+                {
+                    "message": "architecture may not be Modular-compatible; use force=true",
+                    "report": report,
+                },
+            )
+    DOWNLOADS.total_size_bytes(entry.id)
+    job = DOWNLOADS.start(entry.id)
+    return {"download": job, "report": report if report.get("ok") else None}
 
 
 @app.delete("/api/models/{model_id:path}")
@@ -349,12 +434,63 @@ def hardware() -> dict:
     return hwinfo.summary()
 
 
+@app.get("/api/bench/readiness")
+def bench_ready() -> dict:
+    """Prerequisites + hardware warnings before running max benchmark."""
+    status = SERVERS.status()
+    approx = None
+    mid = status.get("model_id")
+    if mid:
+        entry = registry.get(mid)
+        if entry:
+            approx = entry.approx_gb
+        else:
+            # Best-effort from a fresh HF check (may be slow); skip on failure.
+            try:
+                report = compat.check_hf_model(mid)
+                if report.get("ok"):
+                    approx = report.get("approx_gb")
+            except Exception:
+                pass
+    ready = compat.bench_readiness(approx)
+    ready["server"] = {
+        "state": status.get("state"),
+        "model_id": mid,
+        "serving": status.get("state") == "running",
+    }
+    if status.get("state") != "running":
+        ready["ok"] = False
+        ready["warnings"] = [
+            "Serve a model first — max benchmark needs a live endpoint on :8100.",
+            *ready.get("warnings", []),
+        ]
+    return ready
+
+
+class ArchAnalyzeRequest(BaseModel):
+    model_id: str
+
+
+@app.post("/api/architectures/analyze")
+def arch_analyze(req: ArchAnalyzeRequest) -> dict:
+    return architectures.analyze(req.model_id)
+
+
+@app.post("/api/architectures/scaffold")
+def arch_scaffold(req: ArchAnalyzeRequest) -> dict:
+    result = architectures.scaffold(req.model_id)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "scaffold failed")
+    return result
+
+
 class BenchRequest(BaseModel):
     runs: int = Field(3, ge=1, le=10)
     max_tokens: int = Field(128, ge=16, le=1024)
     num_prompts: int = Field(12, ge=4, le=200)
     max_concurrency: int = Field(4, ge=1, le=64)
     use_max_benchmark: bool = True
+    force: bool = False
 
 
 @app.post("/api/bench")
@@ -364,14 +500,28 @@ def bench_start(req: BenchRequest) -> dict:
         raise HTTPException(
             409, f"model server is not running (state: {status['state']})"
         )
-    return BENCH.start(
-        status["model_id"],
+    mid = status["model_id"]
+    entry = registry.get(mid)
+    approx = entry.approx_gb if entry else None
+    ready = compat.bench_readiness(approx)
+    if not ready.get("ok") and not req.force:
+        raise HTTPException(
+            409,
+            {
+                "message": "hardware/prerequisites look unsafe for benchmarking",
+                "readiness": ready,
+            },
+        )
+    job = BENCH.start(
+        mid,
         runs=req.runs,
         max_tokens=req.max_tokens,
         num_prompts=req.num_prompts,
         max_concurrency=req.max_concurrency,
         use_max_benchmark=req.use_max_benchmark,
     )
+    job["readiness"] = ready
+    return job
 
 
 @app.get("/api/bench")
