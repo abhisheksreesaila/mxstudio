@@ -14,6 +14,7 @@ Model serving often starts with scattered commands, architecture compatibility g
 
 - **Models:** discover curated or cached Hugging Face checkpoints and manage downloads.
 - **Serve and Chat:** run one managed `max serve` process with an OpenAI-compatible API.
+- **🧭 Local Agent:** let a served model inspect mxstudio through bounded, read-only tools with a visible trace.
 - **Notebooks and Slides:** generate editable, cited lessons for each model.
 - **Benchmark:** measure time to first token and generation throughput on this machine.
 - **Architectures:** inspect MAX support and guide custom architecture bring-up honestly.
@@ -35,6 +36,19 @@ mxstudio is intended for learners, MAX evaluators, and developers porting open m
 | Chat, run notebook inference cells, or benchmark generation | **Yes** |
 
 Generated notebook code calls the local OpenAI-compatible MAX endpoint only after you choose **Serve**. The static Learn material and GPU visualizers do not execute Mojo; they are explanatory assets. Custom MAX graph implementation remains engineering work for a person or coding agent.
+
+## 🧭 Local agent
+
+Open the floating chat panel and switch from **Chat** to **Agent**. The active local MAX model can gather evidence from mxstudio before answering:
+
+- 🔎 inspect the active MAX server and served model;
+- 🖥️ read the local CPU, GPU, memory, and disk summary;
+- 📊 read recent benchmark results;
+- 🧾 show every tool call and result inline before the final answer.
+
+The agent is deliberately bounded: tools are allowlisted and read-only, and a configurable maximum step count stops repeated tool calls. It cannot execute arbitrary commands, edit files, download models, or control the server.
+
+> **Model requirement:** Agent mode needs a served model and chat template that support OpenAI-style tool calls. Ordinary Chat mode remains available for models without tool support.
 
 ## Recommended first model
 
@@ -145,6 +159,7 @@ flowchart LR
 - A single managed `max serve` process runs on port 8100.
 - Slow work such as downloads and benchmarks runs as background jobs.
 - Browser chat proxies MAX's streaming OpenAI-compatible response.
+- Agent mode uses `/api/agent` and exposes each read-only tool call and result as an SSE trace.
 - Generated notebooks live under `notebooks/`; custom ports live under `ports/`.
 - Runtime state and logs live under `~/.mxstudio/`.
 
@@ -152,7 +167,8 @@ flowchart LR
 
 ```text
 notebooks/mxstudio/          Python package and static web UI
-├── api.py                   FastAPI routes and chat proxy
+├── api.py                   FastAPI routes, chat proxy, and agent endpoint
+├── agents.py                Bounded local agent loop and read-only tools
 ├── registry.py              Curated model metadata
 ├── downloads.py             Hugging Face cache and downloads
 ├── servers.py               Managed max serve lifecycle

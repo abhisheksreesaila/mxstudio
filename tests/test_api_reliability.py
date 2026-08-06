@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import unittest
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -96,6 +98,125 @@ class SetupApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertIn("Pixi", response.json()["detail"]["message"])
         acknowledge.assert_not_called()
+
+
+class AgentApiTests(unittest.TestCase):
+    @patch("notebooks.mxstudio.agents.dispatch_tool")
+    @patch("notebooks.mxstudio.api.AsyncOpenAI")
+    @patch("notebooks.mxstudio.api.SERVERS.status")
+    def test_agent_returns_tool_trace_and_final_answer(
+        self,
+        server_status,
+        openai_client,
+        dispatch_tool,
+    ) -> None:
+        server_status.return_value = {"state": "running", "model_id": "acme/demo"}
+        dispatch_tool.return_value = {"state": "running", "model_id": "acme/demo"}
+
+        tool_message = MagicMock()
+        tool_message.content = None
+        tool_message.tool_calls = [
+            SimpleNamespace(
+                id="call-1",
+                function=SimpleNamespace(name="get_server_status", arguments="{}"),
+            )
+        ]
+        tool_message.model_dump.return_value = {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "call-1",
+                    "type": "function",
+                    "function": {"name": "get_server_status", "arguments": "{}"},
+                }
+            ],
+        }
+        final_message = MagicMock()
+        final_message.content = "The local MAX server is running."
+        final_message.tool_calls = []
+
+        create = AsyncMock(
+            side_effect=[
+                SimpleNamespace(choices=[SimpleNamespace(message=tool_message)]),
+                SimpleNamespace(choices=[SimpleNamespace(message=final_message)]),
+            ]
+        )
+        openai_client.return_value.chat.completions.create = create
+
+        response = TestClient(app).post(
+            "/api/agent",
+            json={"messages": [{"role": "user", "content": "Is MAX running?"}]},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        events = [
+            json.loads(line.removeprefix("data: "))
+            for line in response.text.splitlines()
+            if line.startswith("data: ")
+        ]
+        self.assertEqual(
+            [event["type"] for event in events],
+            ["start", "step", "tool-call", "tool-result", "step", "delta", "finish"],
+        )
+        self.assertEqual(events[2]["name"], "get_server_status")
+        self.assertEqual(events[3]["result"]["state"], "running")
+        self.assertEqual(events[5]["delta"], "The local MAX server is running.")
+        second_messages = create.await_args_list[1].kwargs["messages"]
+        self.assertEqual(second_messages[-1]["role"], "tool")
+        self.assertEqual(second_messages[-1]["tool_call_id"], "call-1")
+
+    @patch("notebooks.mxstudio.agents.dispatch_tool", return_value={"state": "running"})
+    @patch("notebooks.mxstudio.api.AsyncOpenAI")
+    @patch("notebooks.mxstudio.api.SERVERS.status")
+    def test_agent_stops_repeated_tool_calls_at_step_limit(
+        self,
+        server_status,
+        openai_client,
+        _dispatch_tool,
+    ) -> None:
+        server_status.return_value = {"state": "running", "model_id": "acme/demo"}
+        tool_message = MagicMock()
+        tool_message.content = None
+        tool_message.tool_calls = [
+            SimpleNamespace(
+                id="call-loop",
+                function=SimpleNamespace(name="get_server_status", arguments="{}"),
+            )
+        ]
+        tool_message.model_dump.return_value = {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "call-loop",
+                    "type": "function",
+                    "function": {"name": "get_server_status", "arguments": "{}"},
+                }
+            ],
+        }
+        create = AsyncMock(
+            return_value=SimpleNamespace(
+                choices=[SimpleNamespace(message=tool_message)]
+            )
+        )
+        openai_client.return_value.chat.completions.create = create
+
+        response = TestClient(app).post(
+            "/api/agent",
+            json={
+                "messages": [{"role": "user", "content": "Keep checking."}],
+                "max_steps": 2,
+            },
+        )
+
+        events = [
+            json.loads(line.removeprefix("data: "))
+            for line in response.text.splitlines()
+            if line.startswith("data: ")
+        ]
+        self.assertEqual(create.await_count, 2)
+        self.assertEqual(events[-1]["type"], "finish")
+        self.assertEqual(events[-1]["reason"], "max_steps")
+        self.assertEqual(events[-1]["steps"], 2)
 
 
 class FolderApiReliabilityTests(unittest.TestCase):

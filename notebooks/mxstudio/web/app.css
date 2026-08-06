@@ -3000,6 +3000,40 @@ a.learn-v:hover { color: var(--accent-2); }
 }
 .chat-panel-title { font-weight: 600; font-size: 15px; }
 .chat-panel-actions { display: flex; align-items: center; gap: 8px; }
+.chat-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+}
+.chat-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(68px, 1fr));
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+}
+.chat-mode-btn {
+  min-height: 28px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  color: var(--muted);
+  font: 600 12px var(--sans);
+  cursor: pointer;
+}
+.chat-mode-btn.active {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+}
 .chat-icon-btn {
   width: 38px;
   height: 38px;
@@ -3033,6 +3067,49 @@ a.learn-v:hover { color: var(--accent-2); }
 }
 .chat-layout.floating .chat-messages::-webkit-scrollbar,
 .chat-layout.floating .chat-side::-webkit-scrollbar { display: none; }
+.msg.with-trace {
+  width: min(92%, 520px);
+  max-width: 92%;
+}
+.msg-content:empty { display: none; }
+.agent-event {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  white-space: normal;
+}
+.agent-event:first-child { padding-top: 0; }
+.agent-event:last-of-type { margin-bottom: 8px; }
+.agent-event-kind {
+  align-self: center;
+  padding: 3px 5px;
+  border: 1px solid var(--border-hi);
+  border-radius: 3px;
+  color: var(--accent-2);
+  font: 600 9px/1 var(--mono);
+  text-transform: uppercase;
+}
+.agent-event strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font: 600 11px/1.4 var(--mono);
+}
+.agent-event code {
+  grid-column: 1 / -1;
+  display: block;
+  max-height: 120px;
+  overflow: auto;
+  padding: 7px 8px;
+  border-left: 2px solid var(--border-hi);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  color: var(--text-mid);
+  font: 10px/1.45 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.agent-event.tool-result .agent-event-kind { color: var(--ok); }
 .chat-settings-backdrop {
   position: absolute;
   inset: 0;

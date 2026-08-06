@@ -18,6 +18,7 @@ let models = [];
 let serverStatus = { state: "stopped" };
 let chatMessages = [];
 let chatBusy = false;
+let chatMode = "chat";
 let lastActivityIds = new Set();
 let lastBenchState = "idle";
 let lastNbState = "idle";
@@ -1781,6 +1782,33 @@ function toggleChat() {
   setChatOpen(!isChatOpen());
 }
 
+function setChatMode(mode) {
+  if (chatBusy || !["chat", "agent"].includes(mode) || mode === chatMode) return;
+  chatMode = mode;
+  chatMessages = [];
+  $$("[data-chat-mode]").forEach((button) => {
+    const active = button.dataset.chatMode === mode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+  const agentMode = mode === "agent";
+  $("#chat-kicker").textContent = agentMode ? "Local agent" : "Chat";
+  $("#chat-panel-title").textContent = agentMode
+    ? "Ask with mxstudio tools"
+    : "Talk to the serving model";
+  $("#chat-mode-note").textContent = agentMode
+    ? "Read-only tools · visible trace"
+    : "Direct conversation";
+  $("#chat-input").placeholder = agentMode
+    ? "Ask about this model, hardware, or benchmarks…"
+    : "Message the model…";
+  $$(".agent-only").forEach((element) => { element.hidden = !agentMode; });
+  $("#chat-settings-note").textContent = agentMode
+    ? "Requires a model and chat template that support OpenAI tool calls. Tools cannot modify your system."
+    : "Mic uses browser speech (Chrome/Edge). Whisper via MAX can come later.";
+  renderChat();
+}
+
 // Event delegation so close/toggle still work even if nodes are re-rendered.
 document.addEventListener("click", (ev) => {
   const t = ev.target;
@@ -1793,6 +1821,12 @@ document.addEventListener("click", (ev) => {
   if (t.closest("#chat-panel-close")) {
     ev.preventDefault();
     setChatOpen(false);
+    return;
+  }
+  const modeButton = t.closest("[data-chat-mode]");
+  if (modeButton) {
+    ev.preventDefault();
+    setChatMode(modeButton.dataset.chatMode);
     return;
   }
   if (t.closest("#chat-settings-toggle")) {
@@ -1878,11 +1912,25 @@ function renderChat() {
   const box = $("#chat-messages");
   if (!box) return;
   if (chatMessages.length === 0) {
-    box.innerHTML = '<div class="chat-empty">Serve a model from Models, then say hello — or hold the mic.</div>';
+    box.innerHTML = chatMode === "agent"
+      ? '<div class="chat-empty">Serve a tool-capable model, then ask what mxstudio can see.</div>'
+      : '<div class="chat-empty">Serve a model from Models, then say hello — or hold the mic.</div>';
     return;
   }
   box.innerHTML = chatMessages
-    .map((m) => `<div class="msg ${m.role}">${esc(m.content)}</div>`)
+    .map((m) => {
+      const trace = (m.trace || []).map((event) => {
+        const value = event.type === "tool-call" ? event.arguments : event.result;
+        const serialized = JSON.stringify(value, null, 2);
+        const detail = serialized.length > 800 ? `${serialized.slice(0, 800)}\n…` : serialized;
+        return `<div class="agent-event ${esc(event.type)}">
+          <span class="agent-event-kind">${event.type === "tool-call" ? "call" : "result"}</span>
+          <strong>${esc(event.name)}</strong>
+          <code>${esc(detail)}</code>
+        </div>`;
+      }).join("");
+      return `<div class="msg ${m.role}${trace ? " with-trace" : ""}">${trace}<span class="msg-content">${esc(m.content)}</span></div>`;
+    })
     .join("");
   box.scrollTop = box.scrollHeight;
 }
@@ -1956,7 +2004,7 @@ $("#chat-form")?.addEventListener("submit", async (ev) => {
   chatBusy = true;
 
   try {
-    const res = await fetch("/api/chat", {
+    const res = await fetch(chatMode === "agent" ? "/api/agent" : "/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1964,6 +2012,7 @@ $("#chat-form")?.addEventListener("submit", async (ev) => {
         temperature: parseFloat($("#temperature")?.value || "0.7"),
         top_p: parseFloat($("#top_p")?.value || "0.95"),
         max_tokens: parseInt($("#max_tokens")?.value || "256", 10),
+        max_steps: parseInt($("#agent-max-steps")?.value || "4", 10),
       }),
     });
     if (!res.ok) {
@@ -1983,8 +2032,18 @@ $("#chat-form")?.addEventListener("submit", async (ev) => {
       for (const evt of events) {
         if (!evt.startsWith("data: ")) continue;
         const data = JSON.parse(evt.slice(6));
+        const assistant = chatMessages[chatMessages.length - 1];
+        if (data.type === "tool-call" || data.type === "tool-result") {
+          assistant.trace ||= [];
+          assistant.trace.push(data);
+          renderChat();
+        }
         if (data.delta) {
-          chatMessages[chatMessages.length - 1].content += data.delta;
+          assistant.content += data.delta;
+          renderChat();
+        }
+        if (data.type === "finish" && data.reason === "max_steps" && !assistant.content) {
+          assistant.content = data.message || "Agent stopped at its safety limit.";
           renderChat();
         }
         if (data.error) throw new Error(data.error);

@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from notebooks.mxstudio import architectures, compat, downloads, fhsaas, hwinfo, jobs, modelinfo, notebooks, registry, settings as studio_settings
+from notebooks.mxstudio import agents, architectures, compat, downloads, fhsaas, hwinfo, jobs, modelinfo, notebooks, registry, settings as studio_settings
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
@@ -469,6 +469,35 @@ async def chat(req: ChatRequest) -> StreamingResponse:
         yield f"data: {json.dumps({'done': True})}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+class AgentRequest(ChatRequest):
+    max_steps: int = Field(4, ge=1, le=8)
+
+
+@app.post("/api/agent")
+async def run_agent(req: AgentRequest) -> StreamingResponse:
+    status = SERVERS.status()
+    if status["state"] != "running":
+        raise HTTPException(
+            409, f"model server is not running (state: {status['state']})"
+        )
+    model_id = status["model_id"]
+    client = AsyncOpenAI(
+        base_url=f"http://127.0.0.1:{MODEL_PORT}/v1", api_key="EMPTY"
+    )
+    return StreamingResponse(
+        agents.agent_events(
+            client,
+            model_id=model_id,
+            messages=req.messages,
+            temperature=req.temperature,
+            top_p=req.top_p,
+            max_tokens=req.max_tokens,
+            max_steps=req.max_steps,
+        ),
+        media_type="text/event-stream",
+    )
 
 
 @app.get("/api/hardware")
