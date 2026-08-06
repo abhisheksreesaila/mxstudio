@@ -1,0 +1,188 @@
+{
+ "ok": true,
+ "schema_version": 4,
+ "model_id": "allenai/OLMoE-1B-7B-0125-Instruct",
+ "title": "OLMoE 1B-7B Instruct",
+ "hf_url": "https://huggingface.co/allenai/OLMoE-1B-7B-0125-Instruct",
+ "persona": {
+  "icon": "experts",
+  "title": "An expert relay",
+  "summary": "A router activates only the specialists needed for each token\u2014more knowledge without using every parameter at once."
+ },
+ "slides": [
+  {
+   "kind": "title",
+   "kicker": "OLMoE (Ai2)",
+   "title": "OLMoE 1B-7B Instruct",
+   "body": "Experimental custom MAX port for the fully open Ai2 mixture-of-experts model. Compile, strict weight loading, and local chat are verified on one GPU; numerical parity validation remains pending.",
+   "bullets": [
+    "7B total / 1B active (MoE) \u00b7 ~13.8 GB \u00b7 ctx 4,096",
+    "License: Apache 2.0"
+   ],
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "persona",
+   "kicker": "The short version",
+   "title": "An expert relay",
+   "body": "A router activates only the specialists needed for each token\u2014more knowledge without using every parameter at once.",
+   "persona": "experts",
+   "bullets": [
+    "7B total / 1B active (MoE) on ~13.8 GB",
+    "4,096-token context window"
+   ],
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "fit",
+   "kicker": "Fit",
+   "title": "When to pick it",
+   "body": "Same guidance as the model details drawer \u2014 pick it for the right job.",
+   "cards": [
+    {
+     "tone": "good",
+     "label": "Great for",
+     "text": "Learning MoE routing; experimenting with expert streaming; comparing sparse vs dense efficiency. Keep to one GPU while the full-projection Q/K normalization path remains intentionally non-sharded."
+    },
+    {
+     "tone": "caution",
+     "label": "Think twice for",
+     "text": "Simple demos where a smaller dense model starts faster."
+    }
+   ],
+   "animate": true
+  },
+  {
+   "kind": "evidence",
+   "kicker": "Local evidence",
+   "title": "This model on this machine",
+   "body": "An estimate helps you choose; a local benchmark tells you what users will feel.",
+   "cards": [
+    {
+     "tone": "good",
+     "label": "Estimated VRAM fit",
+     "text": "Fits comfortably: need ~17.25 GB (weights+headroom), 22.74 GB VRAM free of 24.0 GB total."
+    },
+    {
+     "tone": "",
+     "label": "Next measurement",
+     "text": "Serve the model, then run Benchmark to replace estimates with local evidence."
+    }
+   ],
+   "animate": true
+  },
+  {
+   "kind": "innovation",
+   "kicker": "Why it matters",
+   "title": "What's special?",
+   "body": "OLMoE showed that a sparse MoE with only ~1B active parameters can match much larger dense models \u2014 and released everything: weights, data, training code, and router analyses. Expert sparsity is exactly what makes streaming-from-disk viable: only the routed experts need to be resident in memory for each token.",
+   "bullets": [
+    "MoE = more parameters without paying the full dense FLOPs cost",
+    "Router decisions determine which expert weights must be loaded",
+    "Open MoE releases unlock systems research (caching, prefetch, SSD tiering)"
+   ],
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "architecture",
+   "kicker": "How it works",
+   "title": "Inside the model",
+    "body": "Mixture-of-Experts transformer: dense attention + MoE MLP blocks with 64 experts/layer and top-8 routing (~1B active / ~7B total params). Because most experts are idle on any given token, expert placement and caching are useful systems-research questions.",
+   "flow": {
+    "nodes": [
+     "Prompt",
+     "Router",
+     "Experts",
+     "Next token"
+    ],
+    "accent": "Router",
+    "caption": "The router chooses a small team of experts for each token, then merges their work.",
+    "steps": [
+     {
+      "label": "Prompt",
+      "text": "Tokens enter the model one sequence at a time."
+     },
+     {
+      "label": "Router",
+      "text": "A gate scores experts and picks the top few."
+     },
+     {
+      "label": "Experts",
+      "text": "Only the chosen MLPs run \u2014 the rest stay cold."
+     },
+     {
+      "label": "Next token",
+      "text": "Outputs combine; decoding continues."
+     }
+    ]
+   },
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "story",
+   "kicker": "Mental model",
+   "title": "One token through the experts",
+   "body": "Follow a single generated token: the router picks specialists, those experts run, then logits become the next piece of text.",
+   "bullets": [
+    "Most parameters stay idle; only routed experts burn FLOPs",
+    "That is why MoE can feel 'bigger than it runs'",
+    "Systems work (batching, expert placement) matters as much as the paper math"
+   ],
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "walkthrough",
+   "kicker": "Code walkthrough",
+   "title": "Talk to the local server",
+   "body": "After Serve shows running, the notebook uses the same OpenAI-compatible API that Chat uses \u2014 no cloud round-trip.",
+   "code": "from openai import OpenAI\n\nclient = OpenAI(\n    base_url=\"http://127.0.0.1:8100/v1\",\n    api_key=\"local\",  # ignored by max serve\n)\nstream = client.chat.completions.create(\n    model=\"allenai/OLMoE-1B-7B-0125-Instruct\",\n    messages=[{\"role\": \"user\", \"content\": \"Explain this model in one sentence.\"}],\n    stream=True,\n    max_tokens=64,\n)\nfor event in stream:\n    delta = event.choices[0].delta.content or \"\"\n    print(delta, end=\"\", flush=True)\n",
+   "code_lang": "python",
+   "steps": [
+    {
+     "label": "Point the client",
+     "text": "base_url is mxstudio's max serve port (8100)."
+    },
+    {
+     "label": "Send one chat turn",
+     "text": "Use the Hugging Face id as the model name."
+    },
+    {
+     "label": "Stream tokens",
+     "text": "Each event carries a tiny delta \u2014 that is generation you can feel."
+    }
+   ],
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "goals",
+   "kicker": "Learn",
+   "title": "Lab goals",
+   "body": "Finish the notebook when you can explain these in your own words.",
+   "bullets": [
+    "Explain top-k routing and why it enables SSD streaming",
+    "Contrast active vs total parameter counts",
+    "Read the OLMoE paper's motivation for fully open MoE research"
+   ],
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "sources",
+   "kicker": "Sources",
+   "title": "Cite & go deeper",
+   "body": "Hugging Face is the primary source; papers are secondary.",
+   "links": {
+    "Paper (OLMoE)": "https://arxiv.org/abs/2409.02060",
+    "GitHub": "https://github.com/allenai/OLMoE",
+    "Hugging Face": "https://huggingface.co/allenai/OLMoE-1B-7B-0125-Instruct"
+   },
+   "animate": true
+  }
+ ]
+}

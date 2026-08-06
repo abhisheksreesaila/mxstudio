@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Final Mojo GPU Execution Simulator</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0b0e14; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .grid-container { background: #161b22; padding: 20px; border-radius: 12px; border: 1px solid #30363d; margin-bottom: 20px; }
+        /* Grid arranged in 2 rows of 32 to clearly show the two tiles */
+        .grid { display: grid; grid-template-columns: repeat(32, 25px); gap: 5px; }
+        .cell { width: 25px; height: 25px; background: #21262d; border-radius: 3px; transition: all 0.2s; border: 1px solid #30363d; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #444;}
+
+        /* Stages */
+        /* Unrolled burst needs to be brighter and faster looking */
+        .active-burst { background: #ffff00 !important; transform: scale(1.2); box-shadow: 0 0 25px #ffff00; border-color: white; z-index: 100; transition: all 0.1s ease-out;}
+        .active-loop { background: #7c4dff; transform: scale(1.1); box-shadow: 0 0 15px #7c4dff; border-color: white; }
+        .processed { background: #238636; border-color: #2ea043; color: #888; }
+        .tile-marker { border: 2px dashed #58a6ff !important; background: #1c2128; }
+
+        .controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        button { padding: 12px 20px; font-size: 14px; cursor: pointer; border: none; border-radius: 6px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; transition: 0.2s; }
+        button:hover { background: #30363d; }
+        button.selected { background: #7c4dff; color: white; border-color: #7c4dff; font-weight: bold; }
+
+        .stats-display {
+            background: #0d1117; border: 1px solid #30363d; padding: 10px 20px;
+            border-radius: 6px; margin-bottom: 20px; font-family: 'Fira Code', monospace;
+            color: #58a6ff; font-weight: bold; display: flex; gap: 20px;
+        }
+
+        .instruction-stream { font-family: 'Fira Code', monospace; background: #000; padding: 15px; border-radius: 6px; width: 900px; color: #adbac7; font-size: 14px; min-height: 120px; border-left: 4px solid #30363d;}
+        .highlight-code { color: #ffff00; font-weight: bold; }
+        .loop-code { color: #7c4dff; }
+        .comment { color: #8b949e; }
+    </style>
+</head>
+<body>
+
+    <h1>🚀 Final Mojo Execution Simulator</h1>
+    <p style="color: #8b949e">64 Elements total | Arranged as two 32-element Tiles</p>
+
+    <div class="controls">
+        <button onclick="setMode('simd')" id="btn-simd">1. Native SIMD (Streaming)</button>
+        <button onclick="setMode('tiled')" id="btn-tiled">2. Tiled Neighborhoods (Looping)</button>
+        <button onclick="setMode('unrolled')" id="btn-unrolled">3. Unrolled Tiles (The BURST)</button>
+    </div>
+
+    <div class="stats-display">
+        <div id="threadStats">Execution Context: Idle</div>
+        <div id="tileStats">Tiles Processed: 0/2</div>
+    </div>
+
+    <div class="grid-container">
+        <div class="grid" id="grid"></div>
+    </div>
+
+    <div class="instruction-stream" id="codeBox">
+        <span class="comment">// Waiting for input... select a mode above.</span>
+    </div>
+
+    <script>
+        const gridCount = 64;
+        const grid = document.getElementById('grid');
+        const codeBox = document.getElementById('codeBox');
+        const threadStats = document.getElementById('threadStats');
+        const tileStats = document.getElementById('tileStats');
+        let isRunning = false;
+
+        // Init grid arranged as two rows of 32 for visual clarity
+        for (let i = 0; i < gridCount; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.id = `cell-${i}`;
+            cell.innerText = i;
+            grid.appendChild(cell);
+             // Add a line break after 32 elements to visually separate tiles
+            if (i === 31) {
+                grid.style.gridTemplateColumns = `repeat(32, 25px)`;
+            }
+        }
+
+        function reset() {
+            document.querySelectorAll('.cell').forEach(c => c.className = 'cell');
+            tileStats.innerText = "Tiles Processed: 0/2";
+        }
+
+        async function setMode(mode) {
+            if (isRunning) return;
+            isRunning = true;
+            reset();
+            document.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+            document.getElementById(`btn-${mode}`).classList.add('selected');
+
+            if (mode === 'simd') {
+                threadStats.innerText = "Execution Context: 1 Thread streaming linearly over all data";
+                codeBox.innerHTML = `<span class="comment">// The baseline stream. Moving across memory.</span><br>for i = 0 to 64 step 4:<br>  <span class="loop-code">V_LOAD [i, i+3]</span> -> V_ADD -> V_STORE`;
+                for (let i = 0; i < gridCount; i += 4) {
+                    if(i==32) tileStats.innerText = "Tiles Processed: 1/2 (Crossing boundary...)";
+                    highlight(i, 4, 'active-loop');
+                    await sleep(120);
+                    process(i, 4);
+                }
+                tileStats.innerText = "Tiles Processed: 2/2";
+            }
+            else if (mode === 'tiled') {
+                threadStats.innerText = "Execution Context: 1 Thread processing tiles sequentially using internal loops";
+                let tileCount = 0;
+                for (let t = 0; t < gridCount; t += 32) {
+                    tileCount++;
+                    tileStats.innerText = `Tiles Processed: ${tileCount-1}/2 (Working on Tile ${tileCount})`;
+                    markTile(t, 32);
+                    codeBox.innerHTML = `<span class="comment">// Processing Tile ${tileCount}. Data stays in L1 Cache neighborhood.</span><br><span class="loop-code">LOOP_START (8 iterations):</span><br>  V_ADD SIMD chunk<br>  Check loop counter & jump back`;
+                    for (let i = 0; i < 32; i += 4) {
+                        highlight(t + i, 4, 'active-loop');
+                        await sleep(150);
+                        process(t + i, 4);
+                    }
+                    await sleep(300); // Pause between tiles
+                }
+                tileStats.innerText = "Tiles Processed: 2/2";
+            }
+            else if (mode === 'unrolled') {
+                 threadStats.innerText = "Execution Context: 1 Thread issuing a MASSIVE BURST of parallel instructions per tile";
+                let tileCount = 0;
+                for (let t = 0; t < gridCount; t += 32) {
+                    tileCount++;
+                    tileStats.innerText = `Tiles Processed: ${tileCount-1}/2 (BURSTING Tile ${tileCount}!)`;
+                    markTile(t, 32);
+
+                    // THE BURST: Show straight line code and light up EVERYTHING at once
+                    codeBox.innerHTML = `<span class="comment">// ZERO LOOPS. STRAIGHT LINE EXECUTION.</span><br><span class="highlight-code">V_ADD [0-3]; V_ADD [4-7]; V_ADD [8-11]; V_ADD [12-15];<br>V_ADD [16-19]; V_ADD [20-23]; V_ADD [24-27]; V_ADD [28-31];</span><br><span class="comment">// All issued almost simultaneously to the hardware queues.</span>`;
+
+                    highlight(t, 32, 'active-burst'); // Light up all 32!
+                    await sleep(700); // Hold the burst for visual impact
+                    process(t, 32);
+                    await sleep(500); // Pause before next tile burst
+                }
+                 tileStats.innerText = "Tiles Processed: 2/2";
+            }
+            isRunning = false;
+            threadStats.innerText = "Execution Context: Finished";
+            codeBox.innerHTML = `<span class="comment">// Execution complete.</span>`;
+        }
+
+        function highlight(start, len, style) {
+            for(let i=0; i<len; i++) document.getElementById(`cell-${start+i}`)?.classList.add(style);
+        }
+        function process(start, len) {
+            for(let i=0; i<len; i++) {
+                const c = document.getElementById(`cell-${start+i}`);
+                if(c) { c.classList.remove('active-loop', 'active-burst'); c.classList.add('processed'); }
+            }
+        }
+        function markTile(start, len) {
+            for(let i=0; i<len; i++) document.getElementById(`cell-${start+i}`)?.classList.add('tile-marker');
+        }
+        function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+    </script>
+</body>
+</html>

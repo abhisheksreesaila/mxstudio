@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "model_id": "allenai/OLMoE-1B-7B-0125-Instruct",
+  "donor": "Qwen3 serving pipeline with custom OLMoE attention and sparse MoE routing",
+  "deltas": [
+    {
+      "id": "config",
+      "title": "Map OLMoE dimensions into MAX config",
+      "detail": "Derive head_dim and map intermediate_size to moe_intermediate_size.",
+      "file": "model_config.py",
+      "symbol": "OlmoeConfig"
+    },
+    {
+      "id": "attention",
+      "title": "Full-vector Q/K RMSNorm",
+      "detail": "Normalize complete projected Q and K vectors before RoPE and cache storage.",
+      "file": "layers/attention.py",
+      "symbol": "OlmoeAttention"
+    },
+    {
+      "id": "routing",
+      "title": "Non-renormalized top-k expert routing",
+      "detail": "Softmax all expert logits, select top eight, and preserve their original probabilities.",
+      "file": "layers/moe.py",
+      "symbol": "OlmoeMoEGate"
+    },
+    {
+      "id": "block",
+      "title": "OLMoE decoder block and sparse experts",
+      "detail": "Replace donor attention and MLP while retaining compatible Qwen3 serving and logits plumbing.",
+      "file": "model.py",
+      "symbol": "OlmoeTransformerBlock"
+    },
+    {
+      "id": "weights",
+      "title": "Checkpoint-to-graph weight mapping",
+      "detail": "Remove the model prefix and map the router gate weight to MAX MoE gate_score.",
+      "file": "weight_adapters.py",
+      "symbol": "convert_safetensor_state_dict"
+    },
+    {
+      "id": "strict_load",
+      "title": "Reject incomplete checkpoint coverage",
+      "detail": "Build the graph with strict state-dict loading; managed compile is the executable proof.",
+      "file": "model.py",
+      "symbol": "strict=True"
+    }
+  ]
+}

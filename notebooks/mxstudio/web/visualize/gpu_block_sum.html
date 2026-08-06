@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mojo Block Sum: Fitted Layout</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0b0e14; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+
+        /* MATCHED WIDTH to the Prefix Sum tool for consistency */
+        .block-container { background: #1c2128; border: 2px solid #00ff88; border-radius: 12px; padding: 30px; width: 1150px; box-sizing: border-box; }
+
+        /* Grid Adjustments to fit 128 lanes comfortably */
+        .threads-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 30px; }
+        .warp-group { background: #0d1117; border: 1px solid #30363d; padding: 10px; border-radius: 8px; box-sizing: border-box; }
+        .warp-label { font-size: 10px; color: #8b949e; text-transform: uppercase; margin-bottom: 8px; text-align: center; }
+
+        .lanes { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+        .lane {
+            width: 25px; height: 35px; background: #1a1a1a; border-radius: 3px; border: 1px solid #333;
+            display: flex; align-items: center; justify-content: center; font-size: 10px; color: #666; transition: 0.3s;
+        }
+
+        /* The Hardware Primitive "Funnel" - Now fits the grid width */
+        .primitive-box {
+            width: 100%; height: 80px; background: linear-gradient(180deg, rgba(0,255,136,0.1) 0%, rgba(0,255,136,0.02) 100%);
+            border: 2px dashed #00ff88; border-radius: 12px; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; position: relative; overflow: hidden;
+            box-sizing: border-box;
+        }
+        .primitive-label { font-weight: bold; color: #00ff88; letter-spacing: 2px; font-size: 16px; margin-bottom: 3px;}
+        .primitive-sub { font-size: 9px; color: #8b949e; text-transform: uppercase; }
+
+        /* Result Display */
+        .result-slot { margin-top: 30px; display: flex; flex-direction: column; align-items: center; }
+        .result-circle {
+            width: 80px; height: 80px; border: 3px solid #00ff88; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 24px;
+            font-weight: bold; color: #00ff88; background: #112a1e; box-shadow: 0 0 20px rgba(0,255,136,0.3);
+            opacity: 0; transform: scale(0.5); transition: 0.5s;
+        }
+
+        .status-box { background: #161b22; padding: 15px; border-radius: 8px; border-left: 4px solid #00ff88; margin-top: 25px; width: 100%; box-sizing: border-box; }
+
+        /* Animation States */
+        .lane-active { background: #00ff88; color: #000; border-color: #fff; transform: translateY(15px); opacity: 0; }
+        .show-result { opacity: 1; transform: scale(1); }
+
+        button { padding: 12px 30px; cursor: pointer; border: none; border-radius: 6px; background: #00ff88; color: black; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #33ffaa; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+
+    <div class="block-container">
+        <h2 style="text-align:center; color:#00ff88; margin-top:0; font-size: 22px;">🚀 Mojo Hardware Reduction</h2>
+        <p style="text-align:center; font-size:12px; color:#8b949e; margin-bottom:25px;">
+            Input: 128 Private Thread Values &nbsp;&nbsp;|&nbsp;&nbsp; Output: One Aggregate Result (delivered to Thread 0)
+        </p>
+
+        <div class="threads-grid">
+            <div class="warp-group"><div class="warp-label">Warp 0</div><div class="lanes" id="lanes-0"></div></div>
+            <div class="warp-group"><div class="warp-label">Warp 1</div><div class="lanes" id="lanes-1"></div></div>
+            <div class="warp-group"><div class="warp-label">Warp 2</div><div class="lanes" id="lanes-2"></div></div>
+            <div class="warp-group"><div class="warp-label">Warp 3</div><div class="lanes" id="lanes-3"></div></div>
+        </div>
+
+        <div class="primitive-box">
+            <div class="primitive-label">MOJO HARDWARE BUS</div>
+            <div class="primitive-sub">Automated Cross-Warp Coordination</div>
+        </div>
+
+        <div class="result-slot">
+            <div style="font-size: 9px; color: #8b949e; margin-bottom: 8px; text-transform: uppercase;">Register: Thread 0</div>
+            <div class="result-circle" id="final-result">0</div>
+        </div>
+
+        <div class="status-box">
+            <div id="step-title" style="font-weight: bold; color: #00ff88; margin-bottom: 5px;">Ready</div>
+            <div id="step-desc" style="font-size: 13px; color: #adbac7;">Each thread holds its value. Click to trigger <b>block.sum()</b>.</div>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center;">
+            <button id="startBtn" onclick="runReduction()">Run Reduction</button>
+        </div>
+    </div>
+
+    <script>
+        const values = [];
+        for (let w = 0; w < 4; w++) {
+            const container = document.getElementById(`lanes-${w}`);
+            for (let i = 0; i < 32; i++) {
+                const val = Math.floor(Math.random() * 10) + 1;
+                values.push(val);
+                const l = document.createElement('div');
+                l.className = 'lane';
+                l.id = `t-${w}-${i}`;
+                l.innerText = val;
+                container.appendChild(l);
+            }
+        }
+
+        async function runReduction() {
+            document.getElementById('startBtn').disabled = true;
+            const title = document.getElementById('step-title');
+            const desc = document.getElementById('step-desc');
+            const resultCircle = document.getElementById('final-result');
+
+            title.innerText = "Step 1: Pushing Values to Bus";
+            desc.innerText = "All 128 threads simultaneously offload their private values to the hardware pipeline.";
+
+            const total = values.reduce((a, b) => a + b, 0);
+
+            for (let i = 0; i < 128; i++) {
+                const w = Math.floor(i / 32);
+                const li = i % 32;
+                const lane = document.getElementById(`t-${w}-${li}`);
+                lane.classList.add('lane-active');
+                if (i % 8 === 0) await new Promise(r => setTimeout(r, 20));
+            }
+
+            await new Promise(r => setTimeout(r, 500));
+            title.innerText = "Step 2: Processing...";
+            desc.innerText = "The hardware resolves all 128 values using the internal block-level shuffles.";
+
+            await new Promise(r => setTimeout(r, 800));
+            title.innerText = "Step 3: Total Computed";
+            desc.innerText = "The reduction result is deposited back into the register of Thread 0.";
+
+            resultCircle.innerText = total;
+            resultCircle.classList.add('show-result');
+
+            desc.innerHTML = `Success! The final block sum is <b>${total}</b>. <button onclick="location.reload()" style="font-size:10px; padding:2px 10px; margin-left:20px;">Reset</button>`;
+        }
+    </script>
+</body>
+</html>

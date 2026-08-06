@@ -44,3 +44,5 @@ models/
 results/
 sweep-serving-*/
 .mxstudio/
+*.db
+jobs.db

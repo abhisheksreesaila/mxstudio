@@ -1,0 +1,60 @@
+{
+ "ok": true,
+ "model_id": "Qwen/Qwen2.5-3B-Instruct",
+ "title": "Qwen2.5 3B Instruct",
+ "hf_url": "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct",
+ "slides": [
+  {
+   "kicker": "Qwen2.5 (Alibaba)",
+   "title": "Qwen2.5 3B Instruct",
+   "body": "The model mxstudio was first benchmarked with (~35 tok/s on an RTX 3090). Strong general assistant quality while leaving VRAM to spare.",
+   "bullets": [
+    "3B \u00b7 ~6.2 GB \u00b7 ctx 32,768",
+    "License: Qwen Research"
+   ]
+  },
+  {
+   "kicker": "Innovation",
+   "title": "What's special?",
+   "body": "Qwen2.5's mid-size open checkpoint: the full 18T-token pretraining + SFT + staged RL stack, delivering near GPT-3.5-class chat quality for many everyday tasks on a single consumer GPU. It is the practical ceiling of the 'small but serious' Qwen2.5 line before you jump to 7B+.",
+   "bullets": [
+    "Post-training (SFT + RL) is a major share of perceived 'smartness'",
+    "3B is often enough for interactive assistants on consumer GPUs",
+    "License differences inside a family are easy to miss \u2014 always check"
+   ]
+  },
+  {
+   "kicker": "Architecture",
+   "title": "How it's built",
+   "body": "Dense Qwen2 decoder-only transformer (GQA, SwiGLU, RoPE). Instruct checkpoint uses the Qwen chat template. License is more restrictive than the Apache 2.0 0.5B/1.5B variants \u2014 check the card before shipping.",
+   "bullets": [
+    "Local coding help, longer answers, and demos where quality matters. Still small enough that MAX compile times stay reasonable on a 3090."
+   ]
+  },
+  {
+   "kicker": "Learn",
+   "title": "Lab goals",
+   "body": "Finish the notebook when you can explain these in your own words.",
+   "bullets": [
+    "Run a throughput benchmark and interpret TTFT vs tok/s",
+    "Read the Qwen2.5 report's discussion of data and post-training",
+    "Contrast open vs research licenses for deployment decisions"
+   ]
+  },
+  {
+   "kicker": "Sources",
+   "title": "Cite & go deeper",
+   "body": "Hugging Face is the primary source; papers are secondary.",
+   "bullets": [
+    "Paper (Qwen2.5 Technical Report): https://arxiv.org/abs/2412.15115",
+    "GitHub: https://github.com/QwenLM/Qwen2.5",
+    "Hugging Face: https://huggingface.co/Qwen/Qwen2.5-3B-Instruct"
+   ],
+   "links": {
+    "Paper (Qwen2.5 Technical Report)": "https://arxiv.org/abs/2412.15115",
+    "GitHub": "https://github.com/QwenLM/Qwen2.5",
+    "Hugging Face": "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct"
+   }
+  }
+ ]
+}

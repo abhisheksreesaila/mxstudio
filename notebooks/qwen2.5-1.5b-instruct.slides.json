@@ -1,0 +1,111 @@
+{
+ "ok": true,
+ "schema_version": 2,
+ "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+ "title": "Qwen2.5 1.5B Instruct",
+ "hf_url": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct",
+ "persona": {
+  "icon": "workbench",
+  "title": "A capable local workbench",
+  "summary": "A practical balance between responsiveness and useful instruction-following on local hardware."
+ },
+ "slides": [
+  {
+   "kind": "title",
+   "kicker": "Qwen2.5 (Alibaba)",
+   "title": "Qwen2.5 1.5B Instruct",
+   "body": "Sweet spot between speed and quality on a single consumer GPU. Noticeably better reasoning and coding than the 0.5B.",
+   "bullets": [
+    "1.5B \u00b7 ~3.1 GB \u00b7 ctx 32,768",
+    "License: Apache 2.0"
+   ]
+  },
+  {
+   "kind": "persona",
+   "kicker": "The short version",
+   "title": "A capable local workbench",
+   "body": "A practical balance between responsiveness and useful instruction-following on local hardware.",
+   "persona": "workbench",
+   "bullets": [
+    "1.5B on ~3.1 GB",
+    "32,768-token context window"
+   ]
+  },
+  {
+   "kind": "fit",
+   "kicker": "Fit",
+   "title": "When to pick it",
+   "body": "Same guidance as the model details drawer \u2014 pick it for the right job.",
+   "cards": [
+    {
+     "tone": "good",
+     "label": "Great for",
+     "text": "Good default for local assistants, light coding help, and notebook experiments where 0.5B feels too weak but 3B is more than you need."
+    },
+    {
+     "tone": "caution",
+     "label": "Think twice for",
+     "text": "Very large-context workloads or frontier-level reasoning expectations."
+    }
+   ]
+  },
+  {
+   "kind": "innovation",
+   "kicker": "Why it matters",
+   "title": "What's special?",
+   "body": "Same Qwen2.5 recipe as the flagship: ~18T-token pretraining, improved structured-output (JSON) generation, and multilingual coverage of 29+ languages \u2014 packed into a 1.5B checkpoint that typically fits in ~3GB of VRAM. It is often the best 'daily driver' small model when you want quality without a 7B download.",
+   "bullets": [
+    "Scaling laws still apply inside a family \u2014 1.5B sits on a steep part of the curve",
+    "Structured output (JSON) was an explicit Qwen2.5 training focus",
+    "Multilingual coverage is a first-class goal, not an afterthought"
+   ]
+  },
+  {
+   "kind": "architecture",
+   "kicker": "How it works",
+   "title": "Inside the model",
+   "body": "Dense Qwen2 decoder-only transformer with GQA, SwiGLU, RoPE, and the Qwen2.5 tokenizer/chat template. Same family design as 0.5B/3B \u2014 only width and depth scale.",
+   "flow": {
+    "nodes": [
+     "Prompt",
+     "Attention",
+     "MLP",
+     "Next token"
+    ],
+    "accent": "Attention",
+    "caption": "Attention gathers context; the feed-forward layers transform it; the cycle repeats one token at a time."
+   },
+   "bullets": [
+    "Trace one token through the flow above",
+    "Then open the notebook and measure the same idea in practice"
+   ]
+  },
+  {
+   "kind": "goals",
+   "kicker": "Learn",
+   "title": "Lab goals",
+   "body": "Finish the notebook when you can explain these in your own words.",
+   "bullets": [
+    "Compare 0.5B vs 1.5B qualitatively on the same prompts",
+    "Practice streaming and generation controls (temperature, top-p)",
+    "Skim the technical report sections on post-training"
+   ]
+  },
+  {
+   "kind": "sources",
+   "kicker": "Sources",
+   "title": "Cite & go deeper",
+   "body": "Hugging Face is the primary source; papers are secondary.",
+   "bullets": [
+    "Paper (Qwen2.5 Technical Report): https://arxiv.org/abs/2412.15115",
+    "GitHub: https://github.com/QwenLM/Qwen2.5",
+    "Hugging Face: https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct"
+   ],
+   "links": {
+    "Paper (Qwen2.5 Technical Report)": "https://arxiv.org/abs/2412.15115",
+    "GitHub": "https://github.com/QwenLM/Qwen2.5",
+    "Hugging Face": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct"
+   }
+  }
+ ]
+}

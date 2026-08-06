@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mojo Block Visualizer: block.broadcast()</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0b0e14; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .block-container { background: #1c2128; border: 2px solid #7c4dff; border-radius: 12px; padding: 20px; width: 950px; }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #30363d; padding-bottom: 10px; }
+        .mojo-purple { color: #7c4dff; font-weight: bold; }
+
+        .threads-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .warp-group { background: #0d1117; border: 1px solid #30363d; padding: 10px; border-radius: 8px; position: relative; }
+        .warp-label { font-size: 10px; color: #8b949e; text-transform: uppercase; margin-bottom: 8px; text-align: center; }
+
+        .lanes { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+        .lane { width: 22px; height: 22px; background: #222; border-radius: 2px; font-size: 9px; display: flex; align-items: center; justify-content: center; transition: 0.3s; color: #444; border: 1px solid #333; }
+
+        /* Shared Memory visualization */
+        .shmem-bus { width: 100%; height: 10px; background: #333; margin: 20px 0; border-radius: 5px; position: relative; overflow: hidden; }
+        .signal { position: absolute; width: 50px; height: 100%; background: #7c4dff; filter: blur(5px); animation: pulse 2s infinite; display: none;}
+
+        @keyframes pulse {
+            0% { left: -10%; }
+            100% { left: 110%; }
+        }
+
+        /* Animation Classes */
+        .source-thread { background: #7c4dff !important; color: white !important; transform: scale(1.3); border-color: white; box-shadow: 0 0 15px #7c4dff; z-index: 10; font-weight: bold; }
+        .received { background: rgba(124, 77, 255, 0.3) !important; color: #fff !important; border-color: #7c4dff !important; transform: scale(1.05); }
+
+        .status-box { background: #161b22; padding: 15px; border-radius: 8px; border-left: 4px solid #7c4dff; margin-top: 20px; width: 100%; box-sizing: border-box; }
+
+        button { padding: 10px 25px; cursor: pointer; border: none; border-radius: 5px; background: #7c4dff; color: white; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #9575cd; transform: translateY(-2px); }
+        button:disabled { background: #333; color: #666; }
+    </style>
+</head>
+<body>
+
+    <h1>📡 Mojo Block Broadcast: <code>block.broadcast()</code></h1>
+
+    <div class="block-container">
+        <div class="header">
+            <div><span class="mojo-purple">One → All Distribution</span> (128 Threads)</div>
+            <button id="startBtn" onclick="runBroadcast()">Execute block.broadcast()</button>
+        </div>
+
+        <div class="threads-grid">
+            <div class="warp-group" id="wg-0"><div class="warp-label">Warp 0</div><div class="lanes" id="l-0"></div></div>
+            <div class="warp-group" id="wg-1"><div class="warp-label">Warp 1</div><div class="lanes" id="l-1"></div></div>
+            <div class="warp-group" id="wg-2"><div class="warp-label">Warp 2</div><div class="lanes" id="l-2"></div></div>
+            <div class="warp-group" id="wg-3"><div class="warp-label">Warp 3</div><div class="lanes" id="l-3"></div></div>
+        </div>
+
+        <div class="shmem-bus" id="bus"><div class="signal" id="signal"></div></div>
+
+        <div class="status-box">
+            <div id="step-title" style="font-weight: bold; color: #7c4dff; margin-bottom: 5px;">Idle</div>
+            <div id="step-desc" style="font-size: 14px; color: #adbac7;">Thread 0 has a value in its register. No other threads have access to it yet.</div>
+        </div>
+    </div>
+
+    <script>
+        const BROADCAST_VALUE = "4.5";
+        for (let w = 0; w < 4; w++) {
+            const container = document.getElementById(`l-${w}`);
+            for (let i = 0; i < 32; i++) {
+                const l = document.createElement('div');
+                l.className = 'lane';
+                l.id = `t-${w}-${i}`;
+                l.innerText = "?";
+                container.appendChild(l);
+            }
+        }
+        // Mark Thread 0 as Source
+        const t0 = document.getElementById('t-0-0');
+        t0.innerText = BROADCAST_VALUE;
+        t0.classList.add('source-thread');
+
+        async function runBroadcast() {
+            const btn = document.getElementById('startBtn');
+            const title = document.getElementById('step-title');
+            const desc = document.getElementById('step-desc');
+            const signal = document.getElementById('signal');
+            btn.disabled = true;
+
+            // Phase 1: Upload to Shared Memory
+            title.innerText = "Step 1: Uploading to Shared Memory (LDS)";
+            desc.innerText = "Thread 0 writes its value to a dedicated slot in Shared Memory so it becomes visible to other warps.";
+            t0.style.boxShadow = "0 0 30px #7c4dff";
+            await new Promise(r => setTimeout(r, 800));
+
+            // Phase 2: Signal through the Bus
+            title.innerText = "Step 2: Cross-Warp Propagation";
+            desc.innerText = "The value is now available on the high-speed internal bus. All warps are preparing to load it into their local registers.";
+            signal.style.display = "block";
+            await new Promise(r => setTimeout(r, 1000));
+
+            // Phase 3: Global Reception
+            title.innerText = "Step 3: All Threads Receive Value";
+            desc.innerText = "Every thread in the block fetches the value simultaneously. Parallel execution resumes with the shared data.";
+
+            for (let w = 0; w < 4; w++) {
+                const wg = document.getElementById(`wg-${w}`);
+                wg.style.borderColor = "#7c4dff";
+                for (let i = 0; i < 32; i++) {
+                    if (w === 0 && i === 0) continue;
+                    const l = document.getElementById(`t-${w}-${i}`);
+                    l.innerText = BROADCAST_VALUE;
+                    l.classList.add('received');
+                }
+                await new Promise(r => setTimeout(r, 200));
+            }
+
+            title.innerText = "✅ block.broadcast() Complete";
+            desc.innerHTML = `All 128 threads are now synchronized with value <b>${BROADCAST_VALUE}</b>. <button onclick="location.reload()" style="font-size:10px; padding:2px 10px; margin-left:20px;">Reset</button>`;
+        }
+    </script>
+</body>
+</html>

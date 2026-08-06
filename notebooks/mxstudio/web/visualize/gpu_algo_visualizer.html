@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPU Architecture Lab</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/doodle.css/doodle.css">
+
+    <style>
+        body {
+            font-family: 'Patrick Hand', cursive;
+            background-color: #fdfdfd;
+            background-image: radial-gradient(#e5e5e5 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow-x: hidden;
+        }
+
+        .doodle-card {
+            border: 2px solid #2d3748;
+            border-radius: 2px 255px 3px 25px / 255px 25px 5px 255px;
+            box-shadow: 2px 3px 5px rgba(0,0,0,0.1);
+            background: white;
+            transition: all 0.3s ease;
+        }
+
+        .doodle-btn {
+            border: 2px solid #2d3748;
+            border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+            padding: 8px 16px;
+            background: white;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .doodle-btn:hover {
+            background: #edf2f7;
+            transform: scale(1.02) rotate(-1deg);
+        }
+
+        .doodle-btn:active {
+            transform: scale(0.98);
+        }
+
+        .memory-cell {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #4a5568;
+            margin: 2px;
+            font-size: 14px;
+            border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+            position: relative;
+            background: white;
+            z-index: 10;
+        }
+
+        .tiny-cell {
+            width: 28px;
+            height: 28px;
+            font-size: 10px;
+            border: 1px solid #cbd5e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            border-radius: 0px; /* Removed radius for grid cohesion */
+        }
+
+        .shared-cell {
+            width: 44px;
+            height: 44px;
+            font-size: 16px;
+            border: 2px solid #4299e1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            border-radius: 4px;
+            background-color: #ebf8ff;
+            font-weight: bold;
+        }
+
+        /* Safe Padding - Green */
+        .padded-cell {
+            background-image: repeating-linear-gradient(
+                45deg,
+                #F0FFF4 0px,
+                #F0FFF4 5px,
+                #fff 5px,
+                #fff 10px
+            );
+            color: #2F855A;
+            border-color: #48BB78;
+        }
+
+        .history-row-dimmed {
+            opacity: 0.4;
+            transform: scale(0.98);
+            filter: grayscale(0.5);
+        }
+
+        /* Dangerous Operation - Red */
+        .segfault-kernel {
+            border-style: dashed !important;
+            background-color: #FFF5F5 !important;
+            border-color: #F56565 !important;
+            color: #C53030 !important;
+        }
+
+        .matrix-grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 1px;
+            background-color: #e2e8f0;
+            padding: 1px;
+            border-radius: 4px;
+        }
+
+        /* Landing Page Hover Effects */
+        .landing-card:hover {
+            transform: translateY(-5px) rotate(1deg);
+            box-shadow: 5px 8px 15px rgba(0,0,0,0.1);
+            border-color: #4299e1;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+
+        const { useState, useEffect } = React;
+
+        // --- Constants & Data ---
+        const INITIAL_A = [1, 2, 3, 4, 1, 0, 1, 2];
+        const INITIAL_B = [2, 1, 2, 1, 4, 1, 2, 1];
+        const STATE_LOAD = [2, 2, 6, 4, 4, 0, 2, 2];
+        const STATE_STRIDE_4 = [6, 2, 8, 6, 4, 0, 2, 2];
+        const STATE_STRIDE_2 = [14, 8, 8, 6, 4, 0, 2, 2];
+        const STATE_STRIDE_1 = [22, 8, 8, 6, 4, 0, 2, 2];
+        const POOL_OUTPUT = [1, 3, 6, 9, 8, 5, 2, 3];
+        const CONV_A = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        const CONV_KERNEL = [1, 0, 1, 0];
+        const TILED_A = Array(81).fill(0).map((_, i) => {
+            const row = Math.floor(i / 9), col = i % 9;
+            if (row >= 3 && row <= 5) {
+                if (col < 3) return 1; if (col < 6) return 2; return 3;
+            }
+            return 0;
+        });
+        const TILED_B = Array(81).fill(0).map((_, i) => {
+            const col = i % 9;
+            return (col >= 3 && col <= 5) ? 1 : 0;
+        });
+
+        // --- Main App Component ---
+        const App = () => {
+            const [view, setView] = useState('home'); // 'home', 'dot_product', 'pool', 'conv', 'tiled'
+            const [step, setStep] = useState(0);
+
+            // Shared State
+            const [activeThreads, setActiveThreads] = useState([]);
+            const [stride, setStride] = useState(null);
+            const [logs, setLogs] = useState("Initializing...");
+            const [output, setOutput] = useState(null);
+            const [detailInfo, setDetailInfo] = useState(null);
+
+            // Module Specific States
+            const [poolOutput, setPoolOutput] = useState(Array(8).fill(null));
+            const [sharedA_0, setSharedA_0] = useState(Array(11).fill(null));
+            const [sharedA_1, setSharedA_1] = useState(Array(11).fill(null));
+            const [sharedB, setSharedB] = useState(Array(4).fill(null));
+            const [convOut_0, setConvOut_0] = useState(Array(8).fill(null));
+            const [convOut_1, setConvOut_1] = useState(Array(8).fill(null));
+
+            const [tiledSharedA, setTiledSharedA] = useState(Array(9).fill(null));
+            const [tiledSharedB, setTiledSharedB] = useState(Array(9).fill(null));
+            const [tiledC, setTiledC] = useState(Array(81).fill(0));
+            const [tiledPartial, setTiledPartial] = useState(null);
+            const [activeTileA, setActiveTileA] = useState(null);
+            const [activeTileB, setActiveTileB] = useState(null);
+
+            useEffect(() => {
+                setStep(0);
+                // Reset all visualization states
+                setActiveThreads([]); setStride(null); setOutput(null);
+                setPoolOutput(Array(8).fill(null));
+                setSharedA_0(Array(11).fill(null)); setSharedA_1(Array(11).fill(null)); setSharedB(Array(4).fill(null));
+                setConvOut_0(Array(8).fill(null)); setConvOut_1(Array(8).fill(null));
+                setDetailInfo(null);
+                setTiledSharedA(Array(9).fill(null)); setTiledSharedB(Array(9).fill(null));
+                setTiledC(Array(81).fill(0)); setTiledPartial(null); setActiveTileA(null); setActiveTileB(null);
+                setLogs("Initializing...");
+            }, [view]);
+
+            useEffect(() => {
+                if (view === 'dot_product') runDotProductLogic();
+                else if (view === 'pool') runPoolingLogic();
+                else if (view === 'conv') runConvLogic();
+                else if (view === 'tiled') runTiledLogic();
+            }, [step, view]);
+
+            // --- Logic Engines ---
+            const runDotProductLogic = () => { /* Logic identical to previous version, condensed for brevity */
+                 setDetailInfo(null);
+                 switch(step) {
+                    case 0: setActiveThreads([]); setStride(null); setOutput(null); setLogs("GPU Kernel launched."); break;
+                    case 1: setLogs("Allocating fast Shared Memory."); break;
+                    case 2: setActiveThreads([0,1,2,3,4,5,6,7]); setLogs("Threads fetch from Global Memory, multiply, and store in Shared."); break;
+                    case 3: setActiveThreads([]); setLogs("barrier(): Threads synced. Shared memory populated."); break;
+                    case 4: setStride(4); setLogs("Reduction begins. Stride = 4."); break;
+                    case 5: setActiveThreads([0,1,2,3]); setLogs("Threads 0-3 add values from index + 4."); break;
+                    case 6: setActiveThreads([]); setLogs("barrier(): Synced. First reduction level complete."); break;
+                    case 7: setStride(2); setActiveThreads([0,1]); setLogs("Stride = 2. Threads 0-1 add values from index + 2."); break;
+                    case 8: setActiveThreads([]); setLogs("barrier(): Synced. Second reduction level complete."); break;
+                    case 9: setStride(1); setActiveThreads([0]); setLogs("Stride = 1. Thread 0 final addition."); break;
+                    case 10: setOutput(22); setActiveThreads([0]); setLogs("Thread 0 writes final sum to Output."); break;
+                }
+            };
+
+            const runPoolingLogic = () => {
+                let pOut = Array(8).fill(null);
+                switch(step) {
+                    case 0: setPoolOutput(Array(8).fill(null)); setActiveThreads([]); setDetailInfo(null); setLogs("Start Pooling Kernel."); break;
+                    case 1: setLogs("Allocating Shared Memory."); break;
+                    case 2: setActiveThreads([0,1,2,3,4,5,6,7]); setLogs("Load Global A into Shared Memory."); break;
+                    case 3: setActiveThreads([]); setLogs("barrier(): Sync before reading neighbors."); break;
+                    case 4: pOut[0] = POOL_OUTPUT[0]; pOut[1] = POOL_OUTPUT[1]; setPoolOutput(pOut); setActiveThreads([0, 1]); setDetailInfo(null); setLogs("Calculate Boundary Cases (0 & 1)."); break;
+                    case 5: pOut[0]=POOL_OUTPUT[0]; pOut[1]=POOL_OUTPUT[1]; pOut[2]=POOL_OUTPUT[2]; setPoolOutput(pOut); setActiveThreads([2]); setDetailInfo({target: 2, inputIndices: [0, 1, 2], inputVals: [1, 2, 3], result: 6}); setLogs("Thread 2: Sum(i-2, i-1, i)."); break;
+                    case 6: pOut[0]=POOL_OUTPUT[0]; pOut[1]=POOL_OUTPUT[1]; pOut[2]=POOL_OUTPUT[2]; pOut[3]=POOL_OUTPUT[3]; setPoolOutput(pOut); setActiveThreads([3]); setDetailInfo({target: 3, inputIndices: [1, 2, 3], inputVals: [2, 3, 4], result: 9}); setLogs("Thread 3: Window slides right."); break;
+                    case 7: pOut[0]=POOL_OUTPUT[0]; pOut[1]=POOL_OUTPUT[1]; pOut[2]=POOL_OUTPUT[2]; pOut[3]=POOL_OUTPUT[3]; pOut[4]=POOL_OUTPUT[4]; setPoolOutput(pOut); setActiveThreads([4]); setDetailInfo({target: 4, inputIndices: [2, 3, 4], inputVals: [3, 4, 1], result: 8}); setLogs("Thread 4 computes sum."); break;
+                    case 8: setPoolOutput(POOL_OUTPUT); setActiveThreads([5,6,7]); setDetailInfo(null); setLogs("Remaining threads complete."); break;
+                }
+            };
+
+            const runConvLogic = () => {
+                const getG = (i) => (i < 15 ? CONV_A[i] : 0);
+                if (step < 7) { setConvOut_0(Array(8).fill(null)); setConvOut_1(Array(8).fill(null)); }
+                switch(step) {
+                    case 0: setSharedA_0(Array(11).fill(null)); setSharedA_1(Array(11).fill(null)); setSharedB(Array(4).fill(null)); setDetailInfo(null); setActiveThreads([]); setLogs(`Starting Convolution on Block 0 (Indices 0-7) and Block 1 (Indices 8-15).`); break;
+                    case 1: setLogs("Allocating Shared Memory: 11 slots (8 Main + 3 Halo) + 4 slots for Kernel."); break;
+                    case 2: setActiveThreads([]); setDetailInfo({targets: {0: 7, 1: 7}, result: "?", kernel: CONV_KERNEL, isConcept: true}); setLogs("CONCEPT (Why Halo?): If we compute now, T7 needs neighbors [8,9,10]. Accessing them without loading causes a SEGFAULT (Red). KEY INSIGHT!!"); break;
+                    case 3: setDetailInfo(null); let sA0 = Array(11).fill(null); let sA1 = Array(11).fill(null); for(let i=0; i<8; i++) { sA0[i] = getG(0 + i); sA1[i] = getG(8 + i); } setSharedA_0(sA0); setSharedA_1(sA1); setActiveThreads([0,1,2,3,4,5,6,7]); setLogs(`Threads 0-7 load their MAIN values in parallel. (Note: Halo is still empty/invalid).`); break;
+                    case 4: let h0 = [...sharedA_0]; let h1 = [...sharedA_1]; h0[8] = getG(8); h0[9] = getG(9); h0[10] = getG(10); h1[8] = getG(16); h1[9] = getG(17); h1[10] = getG(18); setSharedA_0(h0); setSharedA_1(h1); setActiveThreads([0,1,2]); setLogs("Threads 0-2 load the Halo (coalesced) to fix the boundary issue. Block 1 gets PADDING (0)."); break;
+                    case 5: setDetailInfo(null); setSharedB([...CONV_KERNEL]); setActiveThreads([0,1,2,3]); setLogs("Threads 0-3 load the Kernel (Real)."); break;
+                    case 6: setActiveThreads([]); setLogs("barrier(): Sync."); break;
+                    default: if (step >= 7 && step <= 14) { const tIdx = step - 7; setActiveThreads([tIdx]); let out0 = Array(8).fill(null); let out1 = Array(8).fill(null); for (let k=0; k<=tIdx; k++) { out0[k] = sharedA_0[k]*1 + sharedA_0[k+2]*1; out1[k] = sharedA_1[k]*1 + sharedA_1[k+2]*1; } setConvOut_0(out0); setConvOut_1(out1); setDetailInfo({target: tIdx, kernel: CONV_KERNEL, isConcept: false}); setLogs(`Thread ${tIdx}: Sliding Window [${tIdx}..${tIdx+3}] × Kernel.`); } else if (step === 15) { setActiveThreads([]); setDetailInfo(null); setLogs("All threads complete the convolution."); } break;
+                }
+            };
+
+            const runTiledLogic = () => {
+                if (step === 0) {
+                    setTiledSharedA(Array(9).fill(null)); setTiledSharedB(Array(9).fill(null)); setTiledC(Array(81).fill(0));
+                    setTiledPartial(null); setActiveTileA(null); setActiveTileB(null);
+                }
+                switch(step) {
+                    case 0: setLogs("Initialize Tiled Multiplication. We want to compute Output Block (1,1) [Center]."); break;
+                    case 1: setLogs("Target: Output C[Rows 3-5, Cols 3-5]. We will iterate k=0..2 (3 Phases)."); break;
+                    case 2: setTiledPartial(null); setActiveTileA({r:1, c:0}); setActiveTileB({r:0, c:1}); setLogs("Phase 0 (tile=0): Load A[Tile 0] and B[Tile 0] into Shared Memory."); break;
+                    case 3: setTiledSharedA(Array(9).fill(1)); setTiledSharedB(Array(9).fill(1)); setLogs("Shared Memory loaded. A=[1..], B=[1..]. barrier() called."); break;
+                    case 4: setTiledPartial(Array(9).fill(3)); let newC0 = [...tiledC]; for(let r=3; r<=5; r++) for(let c=3; c<=5; c++) newC0[r*9+c] = 3; setTiledC(newC0); setLogs("Compute Phase 0: C += Partial (3). New Acc = 3."); break;
+                    case 5: setTiledPartial(null); setActiveTileA({r:1, c:1}); setActiveTileB({r:1, c:1}); setLogs("Phase 1 (tile=1): Load A[Tile 1] and B[Tile 1] into Shared Memory."); break;
+                    case 6: setTiledSharedA(Array(9).fill(2)); setTiledSharedB(Array(9).fill(1)); setLogs("Shared Memory loaded. A=[2..], B=[1..]. barrier() called."); break;
+                    case 7: setTiledPartial(Array(9).fill(6)); let newC1 = [...tiledC]; for(let r=3; r<=5; r++) for(let c=3; c<=5; c++) newC1[r*9+c] = 9; setTiledC(newC1); setLogs("Compute Phase 1: C += Partial (6). New Acc = 9."); break;
+                    case 8: setTiledPartial(null); setActiveTileA({r:1, c:2}); setActiveTileB({r:2, c:1}); setLogs("Phase 2 (tile=2): Load A[Tile 2] and B[Tile 2] into Shared Memory."); break;
+                    case 9: setTiledSharedA(Array(9).fill(3)); setTiledSharedB(Array(9).fill(1)); setLogs("Shared Memory loaded. A=[3..], B=[1..]. barrier() called."); break;
+                    case 10: setTiledPartial(Array(9).fill(9)); let newC2 = [...tiledC]; for(let r=3; r<=5; r++) for(let c=3; c<=5; c++) newC2[r*9+c] = 18; setTiledC(newC2); setLogs("Compute Phase 2: C += Partial (9). New Acc = 18."); break;
+                    case 11: setLogs("Write Accumulators to Global Memory C."); break;
+                }
+            };
+
+            // --- Render Components ---
+
+            const renderMemoryCell = (val, idx, label, isActive = false, color="bg-white", isGhost = false, isPad = false) => (
+                <div key={idx} className={`flex flex-col items-center mx-1 transition-all duration-300 ${isGhost ? 'opacity-30' : 'opacity-100'}`}>
+                    <span className="text-[10px] text-gray-400 font-mono mb-1">{idx}</span>
+                    <div className={`memory-cell ${isActive ? 'bg-yellow-100 border-yellow-500 font-bold scale-110' : color} ${isPad ? 'padded-cell border-green-300' : ''} shadow-sm transition-all duration-300`}>
+                        {val !== null ? val : '-'}
+                        {isPad && <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[8px] font-bold text-green-700 bg-white px-1 border border-green-200 rounded">PAD</span>}
+                    </div>
+                </div>
+            );
+
+            // Tiled MatMul Grid Renderer
+            const renderMatrix = (data, title, highlightTile, isShared = false) => {
+                const gridClass = isShared ? "grid-cols-3" : "grid-cols-9";
+                return (
+                    <div className="flex flex-col items-center w-full">
+                        <span className="text-xs font-bold text-gray-500 mb-1">{title}</span>
+                        <div className={`grid ${gridClass} gap-0 bg-gray-400 border border-gray-400 p-[1px] rounded max-w-fit shadow-sm`}>
+                            {data.map((val, i) => {
+                                const r = Math.floor(i / (isShared ? 3 : 9));
+                                const c = i % (isShared ? 3 : 9);
+
+                                let isActive = false;
+                                if (!isShared && highlightTile) {
+                                    const tileR = Math.floor(r/3);
+                                    const tileC = Math.floor(c/3);
+                                    if (tileR === highlightTile.r && tileC === highlightTile.c) isActive = true;
+                                }
+
+                                let bg = 'bg-white';
+                                if (title.includes("Output") && r>=3 && r<=5 && c>=3 && c<=5) bg = val > 0 ? 'bg-green-100 font-bold text-green-800' : 'bg-gray-50';
+                                if (isActive) bg = 'bg-yellow-100 z-10';
+
+                                // Block Boundary Logic
+                                let extraBorders = "";
+                                if (!isShared) {
+                                    if (c === 2 || c === 5) extraBorders += " border-r-2 border-r-gray-600";
+                                    if (r === 2 || r === 5) extraBorders += " border-b-2 border-b-gray-600";
+                                }
+
+                                return isShared
+                                    ? <div key={i} className={`shared-cell ${val===null?'bg-gray-100':''} transition-all border border-gray-200`}>{val}</div>
+                                    : <div key={i} className={`tiny-cell ${bg} ${extraBorders} relative border border-gray-200`}>{val}</div>;
+                            })}
+                        </div>
+                    </div>
+                );
+            };
+
+            const SharedMemoryRowFull = ({ data, activeIndices, currentStride, title, isActivePhase, isPastPhase, isBarrier }) => { /* ... (Logic from before) ... */
+                let containerClass = "p-4 border-2 border-gray-200 rounded-xl bg-gray-50 flex flex-col items-center relative step-row mb-4";
+                if (isPastPhase) containerClass = "p-2 border-2 border-gray-200 rounded-xl bg-gray-50 flex flex-col items-center relative step-row mb-2 history-row-dimmed";
+                else if (isActivePhase) containerClass = "p-4 border-2 border-blue-400 rounded-xl bg-blue-50 flex flex-col items-center relative step-row mb-4 step-active";
+                return (
+                    <div className={containerClass}>
+                        <span className={`absolute -top-3 px-2 text-sm font-bold bg-white border rounded ${isActivePhase && !isPastPhase ? 'text-blue-600 border-blue-400' : 'text-gray-400 border-gray-200'}`}>{title}</span>
+                        {isBarrier && <span className="absolute top-1 right-2 bg-green-100 text-green-700 text-[10px] px-1 rounded border border-green-300 font-bold z-10">Synced</span>}
+                        <div className="flex mt-2">
+                            {data.map((v, i) => {
+                                const isActive = isActivePhase && activeIndices.includes(i) && !isBarrier;
+                                const isSource = isActivePhase && currentStride && activeIndices.includes(i - currentStride) && !isBarrier;
+                                let cellColor = "bg-white"; if (isActive) cellColor = "bg-green-100 border-green-500"; if (isSource) cellColor = "bg-gray-200 border-dashed text-gray-400";
+                                return (<div key={i} className="relative">{renderMemoryCell(v, i, 's', isActive, cellColor)}{isActive && currentStride && (i + currentStride < 8) && (<div className="absolute top-0 left-1/2 border-t-2 border-r-2 border-green-500 rounded-tr-xl z-10 pointer-events-none" style={{width: `${currentStride * 44}px`, height: '25px', top: '-12px', left: '20px'}}><div className="absolute -top-3 right-1/2 bg-white px-1 text-[10px] text-green-700 font-bold transform translate-x-1/2">+</div></div>)}</div>);
+                            })}
+                        </div>
+                    </div>
+                );
+            };
+
+            const DotProductView = () => {
+                const showGlobal = step <= 3; const phase1Active = step >= 2 && step < 5; const phase1Past = step >= 5; const isBarrier1 = step === 3; const phase2Active = step >= 5 && step < 7; const phase2Past = step >= 7; const isBarrier2 = step === 6; const phase3Active = step >= 7 && step < 9; const phase3Past = step >= 9; const isBarrier3 = step === 8; const phase4Active = step >= 9; const phase4Past = false;
+                return (<div className="w-full flex flex-col items-center mt-10"><h3 className="text-2xl font-bold mb-6 text-gray-700">Memory Trace: Dot Product</h3><div className="flex flex-col gap-4 items-center w-full max-w-4xl"><div className={`w-full flex flex-col items-center transition-all ${step<=3?'opacity-100':'opacity-0 h-0 overflow-hidden'}`}><div className="flex mb-2"><span className="w-16 text-right mr-2 text-sm font-bold">Global A</span>{INITIAL_A.map((v,i)=>renderMemoryCell(v,i,'a',step===2,'bg-red-50'))}</div><div className="flex"><span className="w-16 text-right mr-2 text-sm font-bold">Global B</span>{INITIAL_B.map((v,i)=>renderMemoryCell(v,i,'b',step===2,'bg-blue-50'))}</div></div><div className="flex flex-col gap-0 w-full items-center">{step >= 2 && <SharedMemoryRowFull title="Step 1: Loaded Data (A * B)" data={STATE_LOAD} activeIndices={phase1Active ? activeThreads : []} currentStride={null} isActivePhase={phase1Active} isPastPhase={phase1Past} isBarrier={isBarrier1}/>}{step >= 5 && <SharedMemoryRowFull title="Step 2: Stride 4 (Fold 8 → 4)" data={STATE_STRIDE_4} activeIndices={phase2Active ? activeThreads : []} currentStride={4} isActivePhase={phase2Active} isPastPhase={phase2Past} isBarrier={isBarrier2}/>}{step >= 7 && <SharedMemoryRowFull title="Step 3: Stride 2 (Fold 4 → 2)" data={STATE_STRIDE_2} activeIndices={phase3Active ? activeThreads : []} currentStride={2} isActivePhase={phase3Active} isPastPhase={phase3Past} isBarrier={isBarrier3}/>}{step >= 9 && <SharedMemoryRowFull title="Step 4: Stride 1 (Fold 2 → 1)" data={STATE_STRIDE_1} activeIndices={phase4Active ? activeThreads : []} currentStride={1} isActivePhase={phase4Active} isPastPhase={phase4Past} isBarrier={false}/>}</div><div className={`flex items-center gap-4 mt-4 ${output?'opacity-100':'opacity-0'}`}><span className="font-bold text-purple-600">Output:</span><div className="doodle-card w-16 h-16 flex items-center justify-center text-3xl font-bold bg-purple-100 border-purple-400">{output}</div></div></div></div>);
+            };
+
+            const PoolingView = () => {
+               return (<div className="w-full flex flex-col items-center mt-10"><h3 className="text-2xl font-bold mb-6 text-gray-700">Memory Trace: Pooling</h3><div className="flex flex-col gap-6 mt-6 items-center"><div className={`flex items-center ${step<=3?'opacity-100':'opacity-0 h-0 overflow-hidden'}`}><span className="w-16 text-right mr-2 text-sm font-bold">Global A</span>{INITIAL_A.map((v,i)=>renderMemoryCell(v,i,'a',step===2,'bg-red-50'))}</div><div className={`p-4 border-2 border-blue-400 rounded-xl bg-blue-50 flex items-center relative ${step>0?'':'opacity-0'}`}><span className="absolute -top-3 px-2 text-sm font-bold bg-white border border-blue-400 text-blue-600 rounded">Shared</span>{INITIAL_A.map((v,i)=>renderMemoryCell(v,i,'s',step===2||(detailInfo&&detailInfo.inputIndices.includes(i)),'bg-white'))}{detailInfo && (<div className="absolute -bottom-24 z-20 bg-yellow-50 border-2 border-yellow-400 rounded-lg p-3 shadow-lg detail-box-enter flex flex-col items-center w-64"><div className="text-xs font-bold text-yellow-800 uppercase mb-1">Thread {detailInfo.target}</div><div className="flex items-center gap-1 text-sm font-mono"><div className="bg-white border px-1">{detailInfo.inputVals[0]}</div>+<div className="bg-white border px-1">{detailInfo.inputVals[1]}</div>+<div className="bg-white border px-1">{detailInfo.inputVals[2]}</div>=<div className="bg-green-100 border border-green-500 px-1 font-bold">{detailInfo.result}</div></div><div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-yellow-50 border-t-2 border-l-2 border-yellow-400 rotate-45"></div></div>)}</div><div className={`p-4 border-2 border-purple-400 rounded-xl bg-purple-50 flex items-center relative ${step>=4?'':'opacity-30'}`}><span className="absolute -top-3 px-2 text-sm font-bold bg-white border border-purple-400 text-purple-600 rounded">Output</span>{poolOutput.map((v,i)=>renderMemoryCell(v,i,'o',activeThreads.includes(i),activeThreads.includes(i)?'bg-purple-100':'bg-gray-100'))}</div></div></div>);
+            };
+
+            const BlockRenderer = ({ blockId, sharedA, convOut }) => {
+                const currentTarget = (detailInfo && detailInfo.targets) ? detailInfo.targets[blockId] : (detailInfo ? detailInfo.target : null);
+                return (<div className="flex flex-col gap-2 w-full p-2 border border-gray-200 rounded-lg mb-4 bg-gray-50"><span className="text-xs font-bold text-gray-500 uppercase">Block {blockId} Memory</span><div className={`p-4 border-2 border-blue-400 rounded-xl bg-blue-50 flex flex-col items-center relative transition-all ${step>0?'':'opacity-0'}`}><span className="absolute -top-3 px-2 text-xs font-bold bg-white border border-blue-400 text-blue-600 rounded">Shared A ({blockId===0 ? 'Has Neighbors' : 'Has Padding'})</span><div className="flex mt-2 justify-center relative">{sharedA.map((v, i) => {let isActive = false; if (step === 3 && i < 8) isActive = true; if (step === 4 && i >= 8) isActive = true; let isPad = false; if (blockId === 1) { if (i === 7) isPad = true; if (i >= 8) isPad = true; } let bg = 'bg-white'; if (i >= 8) bg = 'bg-gray-100 border-dashed'; let showBadge = false; let badgeLabel = ""; if (step === 4 && i >= 8) { showBadge = true; badgeLabel = `T${i-8}`; } if (currentTarget !== null && i === currentTarget) { showBadge = true; badgeLabel = `T${i}`; } return (<div key={i} className="flex items-center relative flex-col">{i === 8 && <div className="h-10 w-px bg-blue-300 mx-1 absolute -left-1"></div>}<div className="relative flex flex-col items-center">{showBadge && (<div className="absolute -top-5 text-[9px] font-bold text-blue-600 bg-blue-100 px-1 rounded border border-blue-200 z-20 shadow-sm whitespace-nowrap">{badgeLabel}</div>)}{renderMemoryCell(v, i, 'sA', isActive, bg, false, isPad)}</div></div>); })}</div><div className="absolute right-2 -bottom-4 text-[10px] text-gray-500 font-bold uppercase">↑ Halo Region</div>{(currentTarget !== null && currentTarget !== undefined) && (<div className="flex mt-1 justify-center relative h-12">{sharedA.map((_, i) => {const kIdx = i - currentTarget; const showKernel = kIdx >= 0 && kIdx < 4; return (<div key={i} className="flex items-center relative flex-col">{i === 8 && <div className="h-10 w-px mx-1 absolute -left-1"></div>}<div className="relative flex flex-col items-center">{showKernel ? (<div className="relative flex flex-col items-center"><span className={`absolute font-bold transition-all ${detailInfo.isConcept ? '-top-10 text-5xl text-red-600 drop-shadow-md z-50' : '-top-6 text-xs text-gray-400'}`}>×</span>{renderMemoryCell(detailInfo.kernel[kIdx], kIdx, 'K', true, detailInfo.isConcept ? 'bg-white border-dashed border-red-400 text-red-600' : 'bg-gray-200')}</div>) : (<div className="flex flex-col items-center mx-1"><span className="text-[10px] mb-1 opacity-0">0</span><div className="w-[36px] h-[36px] m-[1px]"></div></div>)}</div></div>);})}{detailInfo.isConcept && (<div className="absolute top-24 left-1/2 transform -translate-x-1/2 bg-white border-4 border-red-600 text-gray-900 px-6 py-6 rounded-2xl shadow-2xl z-50 flex flex-col items-center w-96 animate-bounce"><span className="font-black text-3xl uppercase tracking-widest text-red-600 mb-2 drop-shadow-sm border-b-4 border-red-100 pb-2">⚠️ KEY INSIGHT!!</span><span className="text-sm text-center font-bold leading-snug">To know this will occur is the most important thing! <br/><span className="font-normal text-gray-500 mt-2 block text-xs">Without loading a Halo, accessing these neighbors causes a Segfault (Crash).</span></span><div className="absolute -top-3 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-white border-t-4 border-l-4 border-red-600 rotate-45"></div></div>)}</div>)}</div><div className="h-24"></div><div className={`p-2 border-2 border-purple-400 rounded-xl bg-purple-50 flex items-center relative ${step>=6?'':'opacity-30'}`}><span className="absolute -top-3 px-2 text-xs font-bold bg-white border border-purple-400 text-purple-600 rounded">Output</span>{convOut.map((v,i)=>renderMemoryCell(v,i,'o',activeThreads.includes(i),activeThreads.includes(i)?'bg-purple-100':'bg-gray-100'))}</div></div>);
+            };
+
+            const TiledMatMulView = () => (
+                <div className="w-full h-full bg-white p-4 relative flex flex-col items-center">
+
+                    {/* TOP: Code Context Panel (Compact) */}
+                    <div className="w-full max-w-4xl bg-slate-900 text-gray-300 p-3 rounded-xl mb-4 font-mono text-sm border-l-4 border-blue-500 shadow-md">
+                        {step >= 2 && step <= 10 ? (
+                            <div className="flex justify-between items-center">
+                                <div className="flex gap-4">
+                                    <span className={Math.floor((step-2)/3)===0?"text-yellow-400 font-bold":"opacity-40"}>tile=0</span>
+                                    <span className={Math.floor((step-2)/3)===1?"text-yellow-400 font-bold":"opacity-40"}>tile=1</span>
+                                    <span className={Math.floor((step-2)/3)===2?"text-yellow-400 font-bold":"opacity-40"}>tile=2</span>
+                                </div>
+                                <div className="text-xs text-blue-200">
+                                    {(step-2)%3 <= 1 ? "Shared Mem Load Phase" : "Compute Phase"}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-gray-500 italic text-xs">Code context inactive</div>
+                        )}
+                    </div>
+
+                    <h3 className="text-2xl font-bold mb-4 text-gray-700 text-center">Memory Trace: Tiled MatMul</h3>
+
+                    <div className="flex flex-row justify-center items-start gap-4 w-full max-w-6xl flex-1">
+
+                        {/* LEFT: Inputs */}
+                        <div className="flex flex-col items-center gap-4 p-4 bg-gray-50 rounded-xl border-2 border-gray-100 flex-1">
+                            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest border-b pb-2 mb-2 w-full text-center">Global Input</span>
+                            <div className="flex flex-col gap-4">
+                                {renderMatrix(TILED_A, "Matrix A", activeTileA)}
+                                {renderMatrix(TILED_B, "Matrix B", activeTileB)}
+                            </div>
+                        </div>
+
+                        {/* MIDDLE: Compute */}
+                        <div className="flex flex-col items-center gap-6 p-4 flex-[1.5] justify-center h-full relative">
+                            {/* Arrow from Left */}
+                            <div className={`absolute left-0 top-1/3 text-2xl text-blue-400 font-bold transition-opacity ${step%3===2 || step%3===0 && step>0 ? 'opacity-100' : 'opacity-20'}`}>
+                                ➡️
+                            </div>
+
+                            {/* Shared Memory Block */}
+                            <div className="flex flex-col items-center gap-2 p-6 border-2 border-blue-200 rounded-2xl bg-blue-50 shadow-lg transition-all transform hover:scale-105 w-full">
+                                <span className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">3x3 Tile Calculation</span>
+                                <div className="flex gap-4 items-center justify-center">
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[10px] text-gray-500 font-bold mb-1">Shared A</span>
+                                        {renderMatrix(tiledSharedA, "", null, true)}
+                                    </div>
+                                    <div className="text-2xl text-gray-400 font-bold">×</div>
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[10px] text-gray-500 font-bold mb-1">Shared B</span>
+                                        {renderMatrix(tiledSharedB, "", null, true)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Partial Result Arrow */}
+                            {tiledPartial && <div className="text-2xl text-orange-400 font-bold">⬇️</div>}
+
+                            {/* Partial Matrix */}
+                            <div className={`flex flex-col items-center gap-2 bg-orange-50 p-3 rounded-xl border-2 border-orange-200 shadow-md transition-all w-3/4 ${tiledPartial ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                                <span className="text-xs font-bold text-orange-600 uppercase tracking-wide">Partial</span>
+                                {renderMatrix(tiledPartial || Array(9).fill(0), "", null, true)}
+                            </div>
+
+                            {/* Accumulate Arrow */}
+                            <div className={`absolute right-0 bottom-1/3 text-2xl text-green-500 font-bold transition-opacity ${step >= 4 ? 'opacity-100' : 'opacity-20'}`}>
+                                ➡️
+                            </div>
+                        </div>
+
+                        {/* RIGHT: Output */}
+                        <div className="flex flex-col items-center gap-4 p-4 bg-gray-50 rounded-xl border-2 border-gray-100 flex-1 h-full justify-center">
+                            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest border-b pb-2 mb-2 w-full text-center">Global Output</span>
+
+                            {/* Equation Visual */}
+                            {tiledPartial && (
+                                <div className="flex flex-col items-center gap-1 mb-4 text-xs font-mono bg-white p-2 rounded border shadow-sm w-full">
+                                    <div className="flex items-center gap-2 justify-center">
+                                        <span className="text-gray-500">Acc</span>
+                                        <span className="text-green-600 font-bold">+ Partial</span>
+                                    </div>
+                                    <div className="w-full h-px bg-gray-200 my-1"></div>
+                                    <span className="text-green-700 font-bold text-center block">New Total</span>
+                                </div>
+                            )}
+
+                            {renderMatrix(tiledC, "Matrix C (Accumulator)", tiledPartial ? {r:1, c:1} : null)}
+                        </div>
+
+                    </div>
+                </div>
+            );
+
+            // --- Layout Components ---
+
+            const HomeView = ({ onSelect }) => (
+                <div className="flex flex-col items-center justify-center min-h-screen">
+                    <h1 className="text-6xl font-bold text-blue-900 mb-4 tracking-tighter">GPU Lab</h1>
+                    <p className="text-xl text-gray-500 mb-16 font-light">Interactive Parallel Computing Tutorials</p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl w-full px-8">
+                        {[
+                            { id: 'dot_product', title: 'Dot Product', icon: '🔢', desc: 'Parallel Reduction & Stride' },
+                            { id: 'pool', title: 'Pooling', icon: '🌊', desc: 'Sliding Window & Boundaries' },
+                            { id: 'conv', title: 'Convolution', icon: '🖼️', desc: 'Halos, Padding & Shared Mem' },
+                            { id: 'tiled', title: 'Tiled MatMul', icon: '🧱', desc: 'Matrix Tiling & Optimization' }
+                        ].map(item => (
+                            <button
+                                key={item.id}
+                                onClick={() => onSelect(item.id)}
+                                className="doodle-card p-8 flex flex-col items-center gap-4 hover:scale-105 hover:-translate-y-2 transition-all duration-300 landing-card bg-white border-2 border-gray-100 hover:border-blue-300"
+                            >
+                                <div className="text-6xl mb-2 filter drop-shadow-sm">{item.icon}</div>
+                                <h2 className="text-2xl font-bold text-gray-800">{item.title}</h2>
+                                <p className="text-sm text-gray-500 text-center leading-relaxed">{item.desc}</p>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            const LessonLayout = ({ title, children, onHome, step, setStep, maxSteps, logs }) => (
+                <div className="flex flex-col min-h-screen relative pb-20 bg-gray-50">
+                    {/* Minimal Header */}
+                    <div className="w-full bg-white/80 backdrop-blur-md border-b p-4 flex justify-between items-center sticky top-0 z-50">
+                        <div className="flex items-center gap-4">
+                            <button onClick={onHome} className="doodle-btn text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1">
+                                🏠 Home
+                            </button>
+                            <h1 className="text-lg font-bold text-gray-700 hidden md:block">{title}</h1>
+                        </div>
+                        <div className="text-sm bg-blue-50 px-4 py-2 rounded-full text-blue-800 font-mono shadow-sm border border-blue-100 max-w-2xl text-center truncate">
+                            {logs}
+                        </div>
+                        <div className="w-20"></div> {/* Spacer balance */}
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="flex-1 flex justify-center w-full p-4">
+                        {children}
+                    </div>
+
+                    {/* Floating Controls */}
+                    <div className="fixed bottom-8 right-8 flex gap-4 items-center bg-white p-2 pl-4 rounded-full shadow-2xl border border-gray-200 z-50">
+                        <span className="font-bold text-gray-400 font-mono text-lg">{step} / {maxSteps}</span>
+                        <div className="flex gap-2">
+                            <button
+                                className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors disabled:opacity-50"
+                                onClick={() => setStep(Math.max(0, step - 1))}
+                                disabled={step === 0}
+                            >
+                                ◀
+                            </button>
+                            <button
+                                className="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white shadow-lg shadow-blue-200 transition-all hover:scale-110"
+                                onClick={() => setStep(Math.min(maxSteps, step + 1))}
+                            >
+                                ▶
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // --- Root Render ---
+            if (view === 'home') return <HomeView onSelect={setView} />;
+
+            const maxSteps = view === 'dot_product' ? 10 : (view === 'conv' ? 15 : (view === 'tiled' ? 11 : 8));
+            const titles = { dot_product: 'Dot Product', pool: 'Pooling', conv: 'Convolution', tiled: 'Tiled Matrix Multiplication' };
+
+            return (
+                <LessonLayout
+                    title={titles[view]}
+                    onHome={() => setView('home')}
+                    step={step}
+                    setStep={setStep}
+                    maxSteps={maxSteps}
+                    logs={logs}
+                >
+                    {view === 'dot_product' && <DotProductView />}
+                    {view === 'pool' && <PoolingView />}
+                    {view === 'conv' && <ConvView />}
+                    {view === 'tiled' && <TiledMatMulView />}
+                </LessonLayout>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

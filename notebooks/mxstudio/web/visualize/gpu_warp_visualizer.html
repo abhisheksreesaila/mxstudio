@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mojo Dot Product: SIMD vs Warp Reduction</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0b0e14; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .controls { display: flex; gap: 15px; margin-bottom: 20px; background: #1c2128; padding: 15px; border-radius: 10px; border: 1px solid #30363d; }
+        .grid-label { color: #8b949e; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;}
+
+        /* 32 Elements Row */
+        .elements-grid { display: grid; grid-template-columns: repeat(32, 25px); gap: 4px; margin-bottom: 30px; }
+        .element { width: 25px; height: 25px; background: #222; border-radius: 3px; font-size: 10px; display: flex; align-items: center; justify-content: center; color: #666; transition: 0.3s; border: 1px solid #333; }
+
+        /* Threads / Warp Row */
+        .warp-row { display: grid; grid-template-columns: repeat(32, 25px); gap: 4px; width: auto; margin-bottom: 20px;}
+        .thread-box { width: 25px; height: 50px; border: 1px solid #444; border-radius: 4px; background: #0d1117; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; transition: 0.4s; }
+        .thread-val { font-weight: bold; font-family: monospace; color: #ffcc00; }
+
+        button { padding: 10px 20px; cursor: pointer; border: none; border-radius: 5px; background: #7c4dff; color: white; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #9575cd; }
+        button:disabled { background: #333; color: #666; cursor: not-allowed; }
+        .active-btn { background: #00ff88 !important; color: black; }
+
+        .status-box { background: #161b22; padding: 20px; border-radius: 8px; border-left: 4px solid #7c4dff; width: 850px; margin-top: 10px; }
+
+        /* Visual Effects */
+        .simd-grab { background: #ffcc00 !important; color: black !important; transform: scale(1.1); }
+        .warp-shuffle { background: #00ff88 !important; color: black !important; box-shadow: 0 0 15px #00ff88; }
+        .inactive { opacity: 0.2; }
+    </style>
+</head>
+<body>
+
+    <h1>🧠 Dot Product Reduction Hierarchy</h1>
+
+    <div class="controls">
+        <button id="mode-simd" onclick="setMode('simd')">Method 1: SIMD-Reduced (8 Threads)</button>
+        <button id="mode-warp" onclick="setMode('warp')">Method 2: Warp-All (32 Threads)</button>
+        <button onclick="location.reload()" style="background: #444;">Reset</button>
+    </div>
+
+    <div class="grid-label" id="grid-header">32 Elements (Global Memory)</div>
+    <div class="elements-grid" id="elements"></div>
+
+    <div class="grid-label">Warp Execution (32 Hardware Lanes)</div>
+    <div class="warp-row" id="warp-row"></div>
+
+    <div class="status-box">
+        <div id="statusTitle" style="font-weight: bold; font-size: 18px; color: #7c4dff;">Select a Method</div>
+        <p id="statusDesc" style="color: #adbac7;">Compare how the work is split between the individual thread and the warp team.</p>
+    </div>
+
+    <script>
+        const elementsGrid = document.getElementById('elements');
+        const warpRow = document.getElementById('warp-row');
+        const statusTitle = document.getElementById('statusTitle');
+        const statusDesc = document.getElementById('statusDesc');
+
+        // Setup 32 elements
+        const values = Array.from({length: 32}, () => Math.floor(Math.random() * 9) + 1);
+        values.forEach((v, i) => {
+            const el = document.createElement('div');
+            el.className = 'element';
+            el.id = `el-${i}`;
+            el.innerText = v;
+            elementsGrid.appendChild(el);
+        });
+
+        // Setup 32 Hardware Lanes
+        for (let i = 0; i < 32; i++) {
+            const box = document.createElement('div');
+            box.className = 'thread-box';
+            box.id = `lane-${i}`;
+            box.innerHTML = `<div style="font-size:8px; color:#555">L${i}</div><div class="thread-val" id="val-${i}">-</div>`;
+            warpRow.appendChild(box);
+        }
+
+        async function setMode(mode) {
+            resetUI();
+            if (mode === 'simd') {
+                statusTitle.innerText = "Method 1: SIMD-First (8 Active Threads)";
+                statusDesc.innerText = "Each thread handles 4 elements. The 'reduce_add()' happens locally in the thread's register. We only have 8 partial results to shuffle across the warp.";
+                document.getElementById('mode-simd').classList.add('active-btn');
+
+                // Show 8 threads grabbing 4 elements each
+                for (let t = 0; t < 8; t++) {
+                    const threadVal = values.slice(t*4, t*4+4).reduce((a,b) => a+b, 0);
+                    // Highlight 4 elements
+                    for(let j=0; j<4; j++) document.getElementById(`el-${t*4+j}`).classList.add('simd-grab');
+                    // Show thread working
+                    document.getElementById(`val-${t}`).innerText = threadVal;
+                    document.getElementById(`lane-${t}`).style.borderColor = "#ffcc00";
+                    await new Promise(r => setTimeout(r, 200));
+                }
+                // Dim unused lanes
+                for(let i=8; i<32; i++) document.getElementById(`lane-${i}`).classList.add('inactive');
+
+            } else {
+                statusTitle.innerText = "Method 2: Warp-Only (32 Active Threads)";
+                statusDesc.innerText = "One thread per element. No SIMD reduction inside the thread. All 32 products are thrown into the warp shuffle bus at once for a massive reduction.";
+                document.getElementById('mode-warp').classList.add('active-btn');
+
+                // Show 32 threads grabbing 1 element each
+                for (let t = 0; t < 32; t++) {
+                    document.getElementById(`el-${t}`).classList.add('simd-grab');
+                    document.getElementById(`val-${t}`).innerText = values[t];
+                    document.getElementById(`lane-${t}`).style.borderColor = "#00ff88";
+                    if(t % 4 == 0) await new Promise(r => setTimeout(r, 50)); // Fast burst
+                }
+            }
+
+            await new Promise(r => setTimeout(r, 800));
+            statusTitle.innerText = "Warp Shuffle in Progress...";
+            // Visual Shuffle
+            const limit = (mode === 'simd' ? 8 : 32);
+            for(let i=0; i<limit; i++) document.getElementById(`lane-${i}`).classList.add('warp-shuffle');
+
+            await new Promise(r => setTimeout(r, 800));
+            const total = values.reduce((a,b) => a+b, 0);
+            for(let i=0; i<limit; i++) document.getElementById(`val-${i}`).innerText = total;
+            statusTitle.innerText = "Reduction Complete!";
+        }
+
+        function resetUI() {
+            document.querySelectorAll('.element').forEach(el => el.className = 'element');
+            document.querySelectorAll('.thread-box').forEach(el => {
+                el.className = 'thread-box';
+                el.style.borderColor = '#444';
+            });
+            document.querySelectorAll('.thread-val').forEach(el => el.innerText = '-');
+            document.querySelectorAll('button').forEach(b => b.classList.remove('active-btn'));
+        }
+    </script>
+</body>
+</html>

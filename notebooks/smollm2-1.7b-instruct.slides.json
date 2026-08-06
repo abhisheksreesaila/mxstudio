@@ -1,0 +1,60 @@
+{
+ "ok": true,
+ "model_id": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+ "title": "SmolLM2 1.7B Instruct",
+ "hf_url": "https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct",
+ "slides": [
+  {
+   "kicker": "SmolLM2 (Hugging Face)",
+   "title": "SmolLM2 1.7B Instruct",
+   "body": "Hugging Face's fully-open small model (open data, open training recipe). A nice contrast to Qwen for side-by-side comparisons.",
+   "bullets": [
+    "1.7B \u00b7 ~3.4 GB \u00b7 ctx 8,192",
+    "License: Apache 2.0"
+   ]
+  },
+  {
+   "kicker": "Innovation",
+   "title": "What's special?",
+   "body": "SmolLM2 is a study in data-centric training: ~11T tokens with new curated datasets (FineMath, Stack-Edu, SmolTalk) and multi-stage data rebalancing. Unlike many 'open weights' releases, the paper and datasets document the full recipe \u2014 making it one of the most reproducible small models available.",
+   "bullets": [
+    "Open weights \u2260 open science \u2014 SmolLM2 aims for both",
+    "Dataset curation (math, education, chat) beats brute-force scraping alone",
+    "Side-by-side eval with Qwen teaches more than either model alone"
+   ]
+  },
+  {
+   "kicker": "Architecture",
+   "title": "How it's built",
+   "body": "Dense decoder-only transformer in the SmolLM lineage. The Instruct variant is tuned on SmolTalk and related chat/instruction mixtures. Context is 8K \u2014 shorter than Qwen2.5's 32K, which is a useful trade-off to discuss in class.",
+   "bullets": [
+    "Teaching openness and reproducibility; comparing data recipes against Qwen; Apache 2.0 deployments where you want a fully open stack."
+   ]
+  },
+  {
+   "kicker": "Learn",
+   "title": "Lab goals",
+   "body": "Finish the notebook when you can explain these in your own words.",
+   "bullets": [
+    "Articulate what 'fully open' means (weights, data, code, paper)",
+    "Compare SmolLM2 and Qwen2.5 on the same prompts",
+    "Skim the SmolLM2 paper's data mixture section"
+   ]
+  },
+  {
+   "kicker": "Sources",
+   "title": "Cite & go deeper",
+   "body": "Hugging Face is the primary source; papers are secondary.",
+   "bullets": [
+    "Paper (SmolLM2): https://arxiv.org/abs/2502.02737",
+    "GitHub: https://github.com/huggingface/smollm",
+    "Hugging Face: https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct"
+   ],
+   "links": {
+    "Paper (SmolLM2)": "https://arxiv.org/abs/2502.02737",
+    "GitHub": "https://github.com/huggingface/smollm",
+    "Hugging Face": "https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct"
+   }
+  }
+ ]
+}

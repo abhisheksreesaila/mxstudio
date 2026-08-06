@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPU Execution Model Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none;
+        }
+        .label { @apply text-[10px] font-bold text-gray-500 uppercase tracking-tight; }
+        .num-input {
+            @apply w-12 bg-gray-800 text-white text-xs font-semibold px-1 py-0.5 rounded border border-white/10 focus:border-blue-500 focus:outline-none transition-colors;
+        }
+        .pattern-input {
+            @apply w-full bg-gray-950 text-white text-xs font-mono px-2 py-1.5 rounded border border-white/10 focus:border-blue-500 focus:outline-none placeholder-gray-600 mb-3;
+        }
+        .slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 5px;
+            background: #4a5568;
+            outline: none;
+            transition: opacity .2s;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+        }
+        #tooltip {
+            position: absolute;
+            display: none;
+            padding: 12px;
+            background-color: rgba(15, 23, 42, 0.95);
+            color: white;
+            border-radius: 8px;
+            pointer-events: none;
+            font-size: 11px;
+            white-space: pre;
+            line-height: 1.5;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-white flex h-screen overflow-hidden">
+
+    <!-- Controls Panel -->
+    <div class="w-72 bg-gray-900 p-5 shadow-2xl overflow-y-auto space-y-6 flex-shrink-0 border-r border-white/5">
+        <div class="space-y-1">
+            <h1 class="text-xl font-bold">GPU Model</h1>
+            <p class="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Execution Hierarchy</p>
+        </div>
+
+        <!-- Back Button -->
+        <button id="backBtn" class="hidden w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition flex items-center justify-center gap-2 mb-4">
+            <span>&larr;</span> Back to Grid
+        </button>
+
+        <!-- Grid Section -->
+        <div class="space-y-2 bg-gray-800/30 p-3 rounded-lg border border-white/5">
+            <h2 class="text-xs font-bold text-blue-400 uppercase tracking-tighter mb-1">Grid (grid_dim)</h2>
+            <input type="text" id="gridPattern" class="pattern-input" placeholder="Pattern: e.g. 2, 2, 1">
+
+            <div class="space-y-3">
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center">
+                        <span class="label">X Blocks</span>
+                        <input type="number" id="gridX_num" min="1" max="16" value="2" class="num-input">
+                    </div>
+                    <input type="range" min="1" max="16" value="2" class="slider" id="gridX">
+                </div>
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center">
+                        <span class="label">Y Blocks</span>
+                        <input type="number" id="gridY_num" min="1" max="16" value="2" class="num-input">
+                    </div>
+                    <input type="range" min="1" max="16" value="2" class="slider" id="gridY">
+                </div>
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center">
+                        <span class="label">Z Blocks</span>
+                        <input type="number" id="gridZ_num" min="1" max="8" value="1" class="num-input">
+                    </div>
+                    <input type="range" min="1" max="8" value="1" class="slider" id="gridZ">
+                </div>
+            </div>
+        </div>
+
+        <!-- Block Section -->
+        <div class="space-y-2 bg-gray-800/30 p-3 rounded-lg border border-white/5">
+            <h2 class="text-xs font-bold text-green-400 uppercase tracking-tighter mb-1">Block (block_dim)</h2>
+            <input type="text" id="blockPattern" class="pattern-input" placeholder="Pattern: e.g. 4, 4, 2">
+
+            <div class="space-y-3">
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center">
+                        <span class="label">X Threads</span>
+                        <input type="number" id="blockX_num" min="1" max="16" value="4" class="num-input">
+                    </div>
+                    <input type="range" min="1" max="16" value="4" class="slider" id="blockX">
+                </div>
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center">
+                        <span class="label">Y Threads</span>
+                        <input type="number" id="blockY_num" min="1" max="16" value="4" class="num-input">
+                    </div>
+                    <input type="range" min="1" max="16" value="4" class="slider" id="blockY">
+                </div>
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center">
+                        <span class="label">Z Threads</span>
+                        <input type="number" id="blockZ_num" min="1" max="8" value="2" class="num-input">
+                    </div>
+                    <input type="range" min="1" max="8" value="2" class="slider" id="blockZ">
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="space-y-2 bg-black/40 p-3 rounded-lg text-xs border border-white/5">
+            <div class="flex justify-between">
+                <span class="text-gray-500">Total Blocks</span>
+                <span id="total_blocks" class="font-mono text-blue-300">4</span>
+            </div>
+            <div class="flex justify-between border-t border-white/5 pt-2 mt-1">
+                <span class="text-gray-400 font-bold uppercase text-[9px]">Total Threads</span>
+                <span id="total_threads" class="font-mono text-yellow-400 font-bold">128</span>
+            </div>
+        </div>
+
+        <div class="text-[10px] text-gray-500 italic leading-relaxed bg-black/20 p-2 rounded">
+            Use the <b>Pattern</b> box to type "3, 3, 1" for rapid adjustment. Coordinates start from Top-Left.
+        </div>
+    </div>
+
+    <!-- Main View -->
+    <div id="canvas-container" class="flex-grow relative bg-black">
+        <div id="tooltip"></div>
+        <div id="view-title" class="absolute top-4 left-4 bg-gray-900/80 backdrop-blur px-3 py-1 rounded text-xs font-bold uppercase tracking-wider text-gray-300 border border-white/10">
+            Grid View
+        </div>
+    </div>
+
+    <script type="module">
+        // --- Setup ---
+        const container = document.getElementById('canvas-container');
+        const tooltip = document.getElementById('tooltip');
+        const viewTitle = document.getElementById('view-title');
+        const backBtn = document.getElementById('backBtn');
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const sun = new THREE.DirectionalLight(0xffffff, 0.6);
+        sun.position.set(10, 20, 15);
+        scene.add(sun);
+
+        // --- State ---
+        let gridDim = { x: 2, y: 2, z: 1 };
+        let blockDim = { x: 4, y: 4, z: 2 };
+        let currentView = 'GRID';
+        let activeBlockIdx = { x: 0, y: 0, z: 0 };
+        let mouse = new THREE.Vector2();
+        let clientPos = { x: 0, y: 0 };
+        let hoveredObj = null;
+
+        // --- View Generation ---
+
+        function createGrid() {
+            clearScene();
+            currentView = 'GRID';
+            viewTitle.textContent = 'Grid View (All Blocks)';
+            backBtn.classList.add('hidden');
+
+            const group = new THREE.Group();
+            const spacing = 1.3;
+
+            for (let z = 0; z < gridDim.z; z++) {
+                for (let y = 0; y < gridDim.y; y++) {
+                    for (let x = 0; x < gridDim.x; x++) {
+                        const geometry = new THREE.BoxGeometry(1, 1, 1);
+                        const material = new THREE.MeshStandardMaterial({
+                            color: new THREE.Color().setHSL((x + y * 0.1) % 1, 0.6, 0.5),
+                            transparent: true,
+                            opacity: 0.8
+                        });
+                        const mesh = new THREE.Mesh(geometry, material);
+
+                        // Top-Left origin logic
+                        mesh.position.set(
+                            (x - (gridDim.x - 1) / 2) * spacing,
+                            ((gridDim.y - 1 - y) - (gridDim.y - 1) / 2) * spacing,
+                            (z - (gridDim.z - 1) / 2) * spacing
+                        );
+
+                        mesh.userData = { type: 'block', idx: { x, y, z } };
+                        const edges = new THREE.EdgesGeometry(geometry);
+                        mesh.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.2, transparent: true })));
+                        group.add(mesh);
+                    }
+                }
+            }
+            scene.add(group);
+            fitCamera(group);
+        }
+
+        function createBlock(blockIdx) {
+            clearScene();
+            currentView = 'BLOCK';
+            activeBlockIdx = blockIdx;
+            viewTitle.textContent = `Block View: block_idx(${blockIdx.x}, ${blockIdx.y}, ${blockIdx.z})`;
+            backBtn.classList.remove('hidden');
+
+            const group = new THREE.Group();
+            const spacing = 0.5;
+
+            // 1. Container Boundary
+            const boxGeo = new THREE.BoxGeometry(blockDim.x * spacing, blockDim.y * spacing, blockDim.z * spacing);
+            const boxMat = new THREE.MeshStandardMaterial({
+                color: 0x3b82f6,
+                transparent: true,
+                opacity: 0.08,
+                side: THREE.DoubleSide
+            });
+            const containerBox = new THREE.Mesh(boxGeo, boxMat);
+            const edges = new THREE.EdgesGeometry(boxGeo);
+            containerBox.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x3b82f6, opacity: 0.3, transparent: true })));
+            group.add(containerBox);
+
+            // 2. Individual Threads
+            for (let z = 0; z < blockDim.z; z++) {
+                for (let y = 0; y < blockDim.y; y++) {
+                    for (let x = 0; x < blockDim.x; x++) {
+                        const geometry = new THREE.SphereGeometry(0.12, 16, 16);
+                        const material = new THREE.MeshStandardMaterial({
+                            color: new THREE.Color().setHSL((x + y * 0.1) % 1, 0.7, 0.6)
+                        });
+                        const sphere = new THREE.Mesh(geometry, material);
+
+                        sphere.position.set(
+                            (x - (blockDim.x - 1) / 2) * spacing,
+                            ((blockDim.y - 1 - y) - (blockDim.y - 1) / 2) * spacing,
+                            (z - (blockDim.z - 1) / 2) * spacing
+                        );
+
+                        sphere.userData = {
+                            type: 'thread',
+                            thread_idx: { x, y, z },
+                            block_idx: blockIdx,
+                            global_idx: {
+                                x: blockDim.x * blockIdx.x + x,
+                                y: blockDim.y * blockIdx.y + y,
+                                z: blockDim.z * blockIdx.z + z
+                            }
+                        };
+                        group.add(sphere);
+                    }
+                }
+            }
+            scene.add(group);
+            fitCamera(group);
+        }
+
+        // --- Helpers ---
+
+        function clearScene() {
+            const meshes = [];
+            scene.traverse(o => { if(o.isMesh || o.isGroup && o !== scene) meshes.push(o); });
+            meshes.forEach(m => scene.remove(m));
+        }
+
+        function fitCamera(obj) {
+            const box = new THREE.Box3().setFromObject(obj);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z, 2);
+            camera.position.set(center.x + maxDim, center.y + maxDim, center.z + maxDim * 1.5);
+            controls.target.copy(center);
+            controls.update();
+        }
+
+        function updateTotals() {
+            const b = gridDim.x * gridDim.y * gridDim.z;
+            const t = blockDim.x * blockDim.y * blockDim.z;
+            document.getElementById('total_blocks').textContent = b;
+            document.getElementById('total_threads').textContent = b * t;
+        }
+
+        function onMouseMove(e) {
+            clientPos.x = e.clientX;
+            clientPos.y = e.clientY;
+            const rect = container.getBoundingClientRect();
+            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        }
+
+        function onMouseClick() {
+            if (hoveredObj && hoveredObj.userData.type === 'block') {
+                createBlock(hoveredObj.userData.idx);
+            }
+        }
+
+        const raycaster = new THREE.Raycaster();
+        function animate() {
+            requestAnimationFrame(animate);
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+            let hit = null;
+            for(let i=0; i<intersects.length; i++) {
+                if (intersects[i].object.userData.type) { hit = intersects[i].object; break; }
+            }
+
+            if (hit) {
+                if (hoveredObj !== hit) {
+                    if (hoveredObj && hoveredObj.material.emissive) hoveredObj.material.emissive.setHex(0);
+                    if (hoveredObj && hoveredObj.userData.type === 'thread') hoveredObj.scale.set(1,1,1);
+                    hoveredObj = hit;
+                    if (hit.material.emissive) hit.material.emissive.setHex(0x333333);
+                    if (hit.userData.type === 'thread') hit.scale.set(1.5, 1.5, 1.5);
+                    tooltip.style.display = 'block';
+                }
+                const data = hit.userData;
+                let text = data.type === 'block' ?
+                    `<b class="text-blue-400">Thread Block</b>\nblock_idx: (${data.idx.x}, ${data.idx.y}, ${data.idx.z})\n\nClick to drill down` :
+                    `<b class="text-green-400">Thread (Local)</b>\nthread_idx: (${data.thread_idx.x}, ${data.thread_idx.y}, ${data.thread_idx.z})\n\n` +
+                    `<b class="text-blue-400">Parent Block</b>\nblock_idx:  (${data.block_idx.x}, ${data.block_idx.y}, ${data.block_idx.z})\n\n` +
+                    `<b class="text-yellow-400">Global ID</b>\nglobal_idx: (${data.global_idx.x}, ${data.global_idx.y}, ${data.global_idx.z})`;
+                tooltip.innerHTML = text;
+                tooltip.style.left = `${clientPos.x + 20}px`;
+                tooltip.style.top = `${clientPos.y + 10}px`;
+            } else {
+                if (hoveredObj && hoveredObj.material.emissive) hoveredObj.material.emissive.setHex(0);
+                if (hoveredObj && hoveredObj.userData.type === 'thread') hoveredObj.scale.set(1,1,1);
+                hoveredObj = null;
+                tooltip.style.display = 'none';
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // --- Synchronization Logic ---
+
+        function updateUI(prefix, dimObj) {
+            ['x','y','z'].forEach(axis => {
+                const id = prefix + axis.toUpperCase();
+                document.getElementById(id).value = dimObj[axis];
+                document.getElementById(id + '_num').value = dimObj[axis];
+            });
+            if (currentView === 'GRID') createGrid();
+            else createBlock(activeBlockIdx);
+            updateTotals();
+        }
+
+        function handlePatternInput(id, dimObj, prefix) {
+            const el = document.getElementById(id);
+            el.addEventListener('input', () => {
+                // Parse numbers separated by anything not a digit (comma, space, etc)
+                const parts = el.value.split(/[^0-9]+/).filter(v => v !== "").map(Number);
+                if (parts.length >= 1) dimObj.x = Math.max(1, Math.min(16, parts[0]));
+                if (parts.length >= 2) dimObj.y = Math.max(1, Math.min(16, parts[1]));
+                if (parts.length >= 3) dimObj.z = Math.max(1, Math.min(8, parts[2]));
+                updateUI(prefix, dimObj);
+            });
+        }
+
+        ['gridX','gridY','gridZ','blockX','blockY','blockZ'].forEach(id => {
+            const slider = document.getElementById(id);
+            const numInput = document.getElementById(id + '_num');
+            const prefix = id.startsWith('grid') ? 'grid' : 'block';
+            const axis = id.slice(-1).toLowerCase();
+            const dimObj = prefix === 'grid' ? gridDim : blockDim;
+
+            const sync = (val) => {
+                val = Math.max(parseInt(slider.min), Math.min(parseInt(slider.max), val || 1));
+                dimObj[axis] = val;
+                updateUI(prefix, dimObj);
+            };
+            slider.addEventListener('input', e => sync(parseInt(e.target.value)));
+            numInput.addEventListener('input', e => sync(parseInt(e.target.value)));
+        });
+
+        handlePatternInput('gridPattern', gridDim, 'grid');
+        handlePatternInput('blockPattern', blockDim, 'block');
+
+        backBtn.addEventListener('click', createGrid);
+        container.addEventListener('mousemove', onMouseMove);
+        container.addEventListener('click', onMouseClick);
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        updateTotals();
+        createGrid();
+        animate();
+    </script>
+</body>
+</html>

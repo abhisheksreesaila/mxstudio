@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mojo GPU: Bin Filter & Prefix Sum</title>
+    <style>
+        /* General Layout Adjustments */
+        body { font-family: 'Inter', sans-serif; background: #0b0e14; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+
+        /* INCREASED WIDTH and added box-sizing for better fit */
+        .block-container { background: #1c2128; border: 2px solid #00ff88; border-radius: 12px; padding: 25px; width: 1150px; box-sizing: border-box; }
+
+        /* Logic Panel */
+        .logic-panel { background: #0d1117; border-radius: 8px; padding: 15px; margin-bottom: 20px; border: 1px solid #30363d; display: flex; justify-content: space-around; align-items: center; }
+        .logic-step { text-align: center; flex: 1; }
+        .logic-math { font-family: 'Fira Code', monospace; color: #00ff88; font-size: 13px; margin-top: 5px; }
+        .arrow { color: #8b949e; font-size: 18px; }
+
+        /* Grid adjustments for better fitting */
+        .threads-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; } /* Reduced gap slightly */
+        .warp-group { background: #0d1117; border: 1px solid #30363d; padding: 10px; border-radius: 8px; box-sizing: border-box; }
+        .warp-label { font-size: 10px; color: #8b949e; text-transform: uppercase; margin-bottom: 8px; text-align: center; }
+
+        .lanes { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+        .lane {
+            width: 25px; /* Slightly smaller width */
+            height: 85px; background: #1a1a1a; border-radius: 4px; border: 1px solid #333;
+            display: flex; flex-direction: column; align-items: center; transition: 0.3s; overflow: hidden;
+        }
+
+        /* The Workbench Registers */
+        .reg-data { font-size: 9px; color: #888; height: 30%; display: flex; align-items: center; justify-content: center; width: 100%; border-bottom: 1px solid #222; font-weight: bold; }
+        .reg-logic { font-size: 8px; color: #444; height: 30%; display: flex; align-items: center; justify-content: center; width: 100%; border-bottom: 1px solid #222; text-align: center; }
+        .reg-index { font-family: monospace; font-size: 10px; color: #ff4500; height: 40%; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; background: rgba(255,69,0,0.05); }
+        .idx-label { font-size: 6px; text-transform: uppercase; color: #ff4500; opacity: 0.6; }
+
+        /* Output Buffer */
+        .output-buffer { margin-top: 30px; padding: 20px; border-top: 1px solid #333; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
+        .cells { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; max-width: 900px; }
+        .cell { width: 28px; height: 28px; border: 1px solid #222; border-radius: 3px; background: #0d1117; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #00ff88; transition: 0.5s; opacity: 0.2; }
+
+        .status-box { background: #161b22; padding: 15px; border-radius: 8px; border-left: 4px solid #00ff88; margin-top: 20px; width: 100%; box-sizing: border-box; }
+
+        /* States */
+        .is-match { border-color: #00ff88 !important; background: #0d2118; }
+        .is-match .reg-data { color: #fff; }
+        .is-match .reg-logic { color: #00ff88; font-weight: bold; }
+        .active-cell { opacity: 1; border-color: #00ff88; transform: scale(1.1); background: #112a1e; }
+
+        button { padding: 12px 30px; cursor: pointer; border: none; border-radius: 6px; background: #00ff88; color: black; font-weight: bold; font-size: 14px; transition: 0.2s; margin-top: 20px;}
+        button:hover { background: #33ffaa; transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+
+    <div class="block-container">
+        <div class="logic-panel">
+            <div class="logic-step">
+                <div style="font-size: 11px; color: #8b949e;">1. CALCULATE BIN</div>
+                <div class="logic-math">val * num_bins</div>
+            </div>
+            <div class="arrow">→</div>
+            <div class="logic-step">
+                <div style="font-size: 11px; color: #8b949e;">2. FILTER TARGET (Bin 2)</div>
+                <div class="logic-math">my_bin == 2 ?</div>
+            </div>
+            <div class="arrow">→</div>
+            <div class="logic-step">
+                <div style="font-size: 11px; color: #8b949e;">3. SET FLAG</div>
+                <div class="logic-math">TRUE (1) / FALSE (0)</div>
+            </div>
+        </div>
+
+        <div class="threads-grid">
+            <div class="warp-group"><div class="warp-label">Warp 0</div><div class="lanes" id="lanes-0"></div></div>
+            <div class="warp-group"><div class="warp-label">Warp 1</div><div class="lanes" id="lanes-1"></div></div>
+            <div class="warp-group"><div class="warp-label">Warp 2</div><div class="lanes" id="lanes-2"></div></div>
+            <div class="warp-group"><div class="warp-label">Warp 3</div><div class="lanes" id="lanes-3"></div></div>
+        </div>
+
+        <div class="output-buffer">
+            <div style="font-size: 9px; color: #555; margin-bottom: 10px; text-transform: uppercase;">Extracted Data (Packed in Bin 2 Buffer)</div>
+            <div class="cells" id="cells"></div>
+        </div>
+
+        <div class="status-box">
+            <div id="step-title" style="font-weight: bold; color: #00ff88; margin-bottom: 5px;">Ready</div>
+            <div id="step-desc" style="font-size: 13px; color: #adbac7;">Each thread will determine if its value belongs to <b>Bin 2</b> and compute a write index.</div>
+        </div>
+
+        <div style="text-align: center;">
+            <button id="startBtn" onclick="runFilter()">Extract Bin 2 Elements</button>
+        </div>
+    </div>
+
+    <script>
+        const matches = [];
+        const threadData = [];
+        const num_bins = 3;
+        const target_bin = 2;
+
+        // Initialize 128 Threads
+        for (let w = 0; w < 4; w++) {
+            const container = document.getElementById(`lanes-${w}`);
+            for (let i = 0; i < 32; i++) {
+                const dataVal = (Math.random()).toFixed(2);
+                const myBin = Math.floor(dataVal * num_bins);
+                const isMatch = myBin === target_bin ? 1 : 0;
+
+                matches.push(isMatch);
+                threadData.push(dataVal);
+
+                const l = document.createElement('div');
+                l.className = 'lane';
+                l.id = `t-${w}-${i}`;
+                l.innerHTML = `
+                    <div class="reg-data">${dataVal}</div>
+                    <div class="reg-logic">${isMatch ? 'TRUE' : 'FALSE'}</div>
+                    <div class="reg-index"><span class="idx-label">ADDR</span><span id="idx-${w}-${i}">-</span></div>
+                `;
+                container.appendChild(l);
+            }
+        }
+
+        // Setup Output Cells
+        const cellContainer = document.getElementById('cells');
+        for(let i=0; i<64; i++) {
+            const c = document.createElement('div');
+            c.className = 'cell';
+            c.id = `c-${i}`;
+            c.innerText = '·';
+            cellContainer.appendChild(c);
+        }
+
+        async function runFilter() {
+            document.getElementById('startBtn').disabled = true;
+            const title = document.getElementById('step-title');
+            const desc = document.getElementById('step-desc');
+
+            title.innerText = "Phase 1: block.prefix_sum Calculation";
+            desc.innerHTML = "Hardware calculates the <span style='color:#ff4500;'>Destination Address</span> for every thread that matched Bin 2.";
+
+            let count = 0;
+            const activeThreads = [];
+
+            for (let i = 0; i < 128; i++) {
+                const w = Math.floor(i / 32);
+                const li = i % 32;
+                const idxEl = document.getElementById(`idx-${w}-${li}`);
+                const laneEl = document.getElementById(`t-${w}-${li}`);
+
+                idxEl.innerText = count;
+
+                if (matches[i] === 1) {
+                    laneEl.classList.add('is-match');
+                    activeThreads.push({globalIdx: i, writeIdx: count});
+                    count++;
+                }
+                if (i % 8 === 0) await new Promise(r => setTimeout(r, 30));
+            }
+
+            await new Promise(r => setTimeout(r, 600));
+
+            title.innerText = "Phase 2: Packing the Buffer";
+            desc.innerText = "The 'TRUE' threads use their calculated Orange index to write their data into the packed bin buffer.";
+
+            for (const t of activeThreads) {
+                const cell = document.getElementById(`c-${t.writeIdx}`);
+                cell.innerText = threadData[t.globalIdx];
+                cell.classList.add('active-cell');
+                await new Promise(r => setTimeout(r, 80));
+            }
+
+            title.innerText = "✅ Bin Extraction Complete";
+            desc.innerHTML = `Found <b>${count}</b> elements belonging to Bin 2. They are now packed sequentially. <button onclick="location.reload()" style="font-size:10px; padding:2px 10px; margin-left:20px;">Reset</button>`;
+        }
+    </script>
+</body>
+</html>

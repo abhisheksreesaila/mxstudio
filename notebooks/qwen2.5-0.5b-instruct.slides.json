@@ -1,0 +1,188 @@
+{
+ "ok": true,
+ "schema_version": 4,
+ "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+ "title": "Qwen2.5 0.5B Instruct",
+ "hf_url": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct",
+ "persona": {
+  "icon": "pocket",
+  "title": "A pocket laboratory",
+  "summary": "Small enough to experiment freely, fast enough to keep the feedback loop playful."
+ },
+ "slides": [
+  {
+   "kind": "title",
+   "kicker": "Qwen2.5 (Alibaba)",
+   "title": "Qwen2.5 0.5B Instruct",
+   "body": "The smallest member of the Qwen2.5 family. Downloads in seconds and compiles fast, making it the ideal smoke-test and demo model.",
+   "bullets": [
+    "0.5B \u00b7 ~1.0 GB \u00b7 ctx 32,768",
+    "License: Apache 2.0"
+   ],
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "persona",
+   "kicker": "The short version",
+   "title": "A pocket laboratory",
+   "body": "Small enough to experiment freely, fast enough to keep the feedback loop playful.",
+   "persona": "pocket",
+   "bullets": [
+    "0.5B on ~1.0 GB",
+    "32,768-token context window"
+   ],
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "fit",
+   "kicker": "Fit",
+   "title": "When to pick it",
+   "body": "Same guidance as the model details drawer \u2014 pick it for the right job.",
+   "cards": [
+    {
+     "tone": "good",
+     "label": "Great for",
+     "text": "Use this when you want a fast local sandbox: UI demos, notebook labs, API integration tests, or teaching the OpenAI chat protocol without waiting on a large download."
+    },
+    {
+     "tone": "caution",
+     "label": "Think twice for",
+     "text": "Do not expect strong multi-step reasoning or complex coding \u2014 graduate to 1.5B/3B for that."
+    }
+   ],
+   "animate": true
+  },
+  {
+   "kind": "evidence",
+   "kicker": "Local evidence",
+   "title": "This model on this machine",
+   "body": "An estimate helps you choose; a local benchmark tells you what users will feel.",
+   "cards": [
+    {
+     "tone": "good",
+     "label": "Estimated VRAM fit",
+     "text": "Fits comfortably: need ~1.25 GB (weights+headroom), 23.09 GB VRAM free of 24.0 GB total."
+    },
+    {
+     "tone": "good",
+     "label": "Measured here",
+     "text": "87.4 tok/s \u00b7 0.064s TTFT via max benchmark."
+    }
+   ],
+   "animate": true
+  },
+  {
+   "kind": "innovation",
+   "kicker": "Why it matters",
+   "title": "What's special?",
+   "body": "Qwen2.5 pushed small-model quality by pretraining on ~18T tokens with aggressive data filtering, then applying the same post-training recipe (supervised finetuning + multi-stage reinforcement learning) used by the flagship models. The surprising result: even a 0.5B checkpoint keeps 32K context and usable instruction following \u2014 proof that data quality and post-training transfer down the size ladder.",
+   "bullets": [
+    "Small models can inherit the post-training recipe of larger siblings",
+    "Long context (32K) is no longer reserved for huge models",
+    "Instruction tuning matters as much as raw parameter count at this size"
+   ],
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "architecture",
+   "kicker": "How it works",
+   "title": "Inside the model",
+   "body": "Dense decoder-only transformer (Qwen2 architecture): grouped-query attention (GQA), SwiGLU feed-forward layers, RoPE positional embeddings, and a large vocabulary (~150k) tokenizer that helps multilingual and code performance. The Instruct variant is chat-tuned with a ChatML-style template.",
+   "flow": {
+    "nodes": [
+     "Prompt",
+     "Attention",
+     "MLP",
+     "Next token"
+    ],
+    "accent": "Attention",
+    "caption": "Attention gathers context; the feed-forward layers transform it; the cycle repeats one token at a time.",
+    "steps": [
+     {
+      "label": "Prompt",
+      "text": "Your chat messages become token ids."
+     },
+     {
+      "label": "Attention",
+      "text": "Each token looks back at useful context."
+     },
+     {
+      "label": "MLP",
+      "text": "A dense feed-forward block transforms the state."
+     },
+     {
+      "label": "Next token",
+      "text": "Sample / argmax \u2192 stream the next piece of text."
+     }
+    ]
+   },
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "story",
+   "kicker": "Mental model",
+   "title": "One token through the stack",
+   "body": "Generation is a loop: build context, run the transformer block stack, sample the next token, append, repeat.",
+   "bullets": [
+    "Prefill reads the prompt once; decode emits one token at a time",
+    "KV cache remembers attention state so decode stays cheap",
+    "Temperature / top_p only change the final sampling step"
+   ],
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "walkthrough",
+   "kicker": "Code walkthrough",
+   "title": "Talk to the local server",
+   "body": "After Serve shows running, the notebook uses the same OpenAI-compatible API that Chat uses \u2014 no cloud round-trip.",
+   "code": "from openai import OpenAI\n\nclient = OpenAI(\n    base_url=\"http://127.0.0.1:8100/v1\",\n    api_key=\"local\",  # ignored by max serve\n)\nstream = client.chat.completions.create(\n    model=\"Qwen/Qwen2.5-0.5B-Instruct\",\n    messages=[{\"role\": \"user\", \"content\": \"Explain this model in one sentence.\"}],\n    stream=True,\n    max_tokens=64,\n)\nfor event in stream:\n    delta = event.choices[0].delta.content or \"\"\n    print(delta, end=\"\", flush=True)\n",
+   "code_lang": "python",
+   "steps": [
+    {
+     "label": "Point the client",
+     "text": "base_url is mxstudio's max serve port (8100)."
+    },
+    {
+     "label": "Send one chat turn",
+     "text": "Use the Hugging Face id as the model name."
+    },
+    {
+     "label": "Stream tokens",
+     "text": "Each event carries a tiny delta \u2014 that is generation you can feel."
+    }
+   ],
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "goals",
+   "kicker": "Learn",
+   "title": "Lab goals",
+   "body": "Finish the notebook when you can explain these in your own words.",
+   "bullets": [
+    "Explain what makes Qwen2.5 different from earlier small open models",
+    "Call a local OpenAI-compatible endpoint and stream tokens",
+    "Measure how temperature changes creativity vs. determinism"
+   ],
+   "fragments": true,
+   "animate": true
+  },
+  {
+   "kind": "sources",
+   "kicker": "Sources",
+   "title": "Cite & go deeper",
+   "body": "Hugging Face is the primary source; papers are secondary.",
+   "links": {
+    "Paper (Qwen2.5 Technical Report)": "https://arxiv.org/abs/2412.15115",
+    "GitHub": "https://github.com/QwenLM/Qwen2.5",
+    "Hugging Face": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct"
+   },
+   "animate": true
+  }
+ ]
+}

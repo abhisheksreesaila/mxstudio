@@ -1,0 +1,20 @@
+{
+  "model_id": "allenai/OLMoE-1B-7B-0125-Instruct",
+  "architecture": "OlmoeForCausalLM",
+  "package": "olmoe_1b_7b_0125_instruct",
+  "status": "runtime_verified",
+  "validation": {
+    "compile": "passed",
+    "strict_weight_load": "passed",
+    "chat_completion": "passed",
+    "numerical_parity": "pending",
+    "multi_gpu": "unsupported"
+  },
+  "docs": {
+    "custom_arch": "https://docs.modular.com/develop/serve-custom-model-architectures/",
+    "bring_up": "https://docs.modular.com/develop/model-bring-up/",
+    "handbook": "https://handbook.modular.com/",
+    "models": "https://docs.modular.com/max/models/"
+  },
+  "generated_by": "mxstudio.architectures"
+}
