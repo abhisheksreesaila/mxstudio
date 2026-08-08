@@ -8,6 +8,7 @@ backend, and its pid is persisted so the studio survives its own restarts.
 from __future__ import annotations
 
 import os
+import platform
 import signal
 import subprocess
 import time
@@ -62,7 +63,10 @@ class ServerManager:
             "--no-device-graph-capture",
         ]
         devices = [d.strip() for d in entry.cuda_devices.split(",") if d.strip()]
-        if len(devices) > 1:
+        is_macos = platform.system() == "Darwin"
+        if is_macos:
+            cmd += ["--devices", "cpu"]
+        elif len(devices) > 1:
             cmd += ["--devices", "gpu:" + ",".join(devices), "--ep-size", str(len(devices))]
         arch_path = custom_arch_path(entry)
         if arch_path:
@@ -78,7 +82,10 @@ class ServerManager:
         state.LOGS.mkdir(parents=True, exist_ok=True)
         log_file = open(log_path, "ab")
         env = os.environ.copy()
-        env["CUDA_VISIBLE_DEVICES"] = entry.cuda_devices
+        if is_macos:
+            env.pop("CUDA_VISIBLE_DEVICES", None)
+        else:
+            env["CUDA_VISIBLE_DEVICES"] = entry.cuda_devices
         # Ensure `max` from the pixi env is found when launched outside pixi run.
         pixi_bin = str(PROJECT_ROOT / ".pixi" / "envs" / "default" / "bin")
         env["PATH"] = pixi_bin + os.pathsep + env.get("PATH", "")

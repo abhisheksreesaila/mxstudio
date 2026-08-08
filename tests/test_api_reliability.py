@@ -66,6 +66,32 @@ class JobApiReliabilityTests(unittest.TestCase):
         self.assertIn("--custom-architectures", command)
         self.assertEqual(command[command.index("--max-batch-size") + 1], "1")
 
+    @patch("notebooks.mxstudio.servers.platform.system", return_value="Darwin")
+    @patch.object(ServerManager, "status", return_value={"state": "starting"})
+    @patch("notebooks.mxstudio.servers.state.update")
+    @patch("notebooks.mxstudio.servers.state.load", return_value={})
+    @patch("notebooks.mxstudio.servers.subprocess.Popen")
+    @patch("builtins.open", new_callable=MagicMock)
+    def test_macos_start_uses_cpu_without_cuda_environment(
+        self,
+        _open,
+        popen,
+        _state_load,
+        _state_update,
+        _status,
+        _platform_system,
+    ) -> None:
+        popen.return_value.pid = 1234
+        entry = get("Qwen/Qwen2.5-0.5B-Instruct")
+        self.assertIsNotNone(entry)
+
+        ServerManager().start(entry)
+
+        command = popen.call_args.args[0]
+        environment = popen.call_args.kwargs["env"]
+        self.assertEqual(command[command.index("--devices") + 1], "cpu")
+        self.assertNotIn("CUDA_VISIBLE_DEVICES", environment)
+
 
 class SetupApiTests(unittest.TestCase):
     @patch("notebooks.mxstudio.api.setup.acknowledge")

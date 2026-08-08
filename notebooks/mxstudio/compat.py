@@ -16,7 +16,7 @@ from huggingface_hub.constants import HF_HUB_CACHE
 from notebooks.mxstudio import setup
 from notebooks.mxstudio import hwinfo, settings as studio_settings
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ENVIRONMENT = PROJECT_ROOT / ".pixi" / "envs" / "default"
 
 # Architecture names seen in config.json that map to MAX pipelines.
@@ -211,8 +211,26 @@ def hardware_fit(approx_gb: float | None, *, cuda_devices: str | None = None) ->
     )
     # Weights + KV/activations headroom — rough rule of thumb for serve.
     need_gb = round(approx_gb * 1.25, 2) if approx_gb else None
+    available_ram_gb = mem.get("available_gb") or 0
 
-    if not gpus and detected_gpus and selected_ids is not None:
+    if not gpus and sys.platform == "darwin":
+        if need_gb is None:
+            level = "unknown"
+            message = "Model size unknown — Apple silicon CPU fit not estimated."
+        elif need_gb <= available_ram_gb:
+            level = "ok"
+            message = (
+                f"Fits in available unified memory: need ~{need_gb} GB, "
+                f"{available_ram_gb} GB available. MAX serving uses experimental CPU mode; "
+                "Apple GPU inference is not enabled."
+            )
+        else:
+            level = "insufficient"
+            message = (
+                f"Not recommended for CPU serving: need ~{need_gb} GB but only "
+                f"{available_ram_gb} GB unified memory is available."
+            )
+    elif not gpus and detected_gpus and selected_ids is not None:
         level = "unknown"
         message = (
             f"Configured CUDA device(s) {', '.join(sorted(selected_ids))} were not detected — "
@@ -236,7 +254,7 @@ def hardware_fit(approx_gb: float | None, *, cuda_devices: str | None = None) ->
             f"Tight fit: need ~{need_gb} GB but only {free_vram_gb} GB free "
             f"({total_vram_gb} GB total). Stop other GPU jobs first."
         )
-    elif need_gb <= (total_vram_gb + mem.get("available_gb", 0) * 0.5):
+    elif need_gb <= (total_vram_gb + available_ram_gb * 0.5):
         level = "slow"
         message = (
             f"Likely needs host offload / will be extremely slow: need ~{need_gb} GB, "
@@ -274,8 +292,13 @@ def bench_readiness(approx_gb: float | None = None) -> dict:
     warnings: list[str] = []
     ok = True
     if gpus == 0:
-        ok = False
-        warnings.append("No NVIDIA GPU detected — max benchmark needs a serving GPU.")
+        if sys.platform == "darwin":
+            warnings.append(
+                "Apple silicon uses experimental CPU serving; benchmark results do not measure Apple GPU inference."
+            )
+        else:
+            ok = False
+            warnings.append("No NVIDIA GPU detected — max benchmark needs a serving GPU.")
     if fit["free_vram_gb"] is not None and fit["free_vram_gb"] < 2:
         warnings.append("Less than 2 GB free VRAM — serve/benchmark may OOM.")
     if fit["ram_available_gb"] is not None and fit["ram_available_gb"] < 4:

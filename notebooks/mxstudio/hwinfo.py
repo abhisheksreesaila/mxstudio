@@ -137,10 +137,45 @@ def memory() -> dict:
             elif line.startswith("MemAvailable:"):
                 avail_kb = int(line.split()[1])
     except OSError:
-        pass
+        if platform.system() == "Darwin":
+            return _macos_memory()
     return {
         "total_gb": round(total_kb / 1024 / 1024, 1),
         "available_gb": round(avail_kb / 1024 / 1024, 1),
+    }
+
+
+def _macos_memory() -> dict:
+    try:
+        total_bytes = int(
+            subprocess.run(
+                ["sysctl", "-n", "hw.memsize"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=True,
+            ).stdout.strip()
+        )
+        vm_stat = subprocess.run(
+            ["vm_stat"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return {"total_gb": 0.0, "available_gb": 0.0}
+
+    page_size = 4096
+    available_pages = 0
+    for line in vm_stat.splitlines():
+        if "page size of" in line:
+            page_size = int(line.split("page size of", 1)[1].split()[0])
+        elif line.startswith(("Pages free:", "Pages inactive:", "Pages speculative:")):
+            available_pages += int(line.rsplit(maxsplit=1)[1].rstrip("."))
+    return {
+        "total_gb": round(total_bytes / 1024**3, 1),
+        "available_gb": round(available_pages * page_size / 1024**3, 1),
     }
 
 

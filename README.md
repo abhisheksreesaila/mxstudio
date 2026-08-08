@@ -6,7 +6,7 @@ mxstudio turns the path from a Hugging Face checkpoint to a running MAX endpoint
 
 The goal is not to hide MAX behind another abstraction. The goal is to make MAX easier to approach, observe, and learn from.
 
-> **Project status:** early and experimental. Curated dense models are the easiest place to start. Custom architecture support and the OLMoE port are systems-learning work, not production guarantees; OLMoE numerical parity validation is still pending.
+> **Project status:** early and experimental. Curated dense models are the easiest place to start. Architectures is a beta workflow: inspection and scaffolding are automated, while graph implementation and numerical validation remain engineering work. The OLMoE port is not a production guarantee; numerical parity validation is still pending.
 
 ## Why mxstudio exists
 
@@ -65,14 +65,17 @@ Treat it as a starter cartridge, not a permanent default. Once the workflow is c
 
 ## Requirements
 
-- Linux x86-64 or WSL2
-- A supported NVIDIA GPU and working driver (`nvidia-smi` should succeed)
+- Linux x86-64, WSL2, or Apple silicon macOS
+- For the primary serving path, a supported NVIDIA GPU and working driver (`nvidia-smi` should succeed)
+- On Apple silicon, enough unified memory for the model and experimental MAX CPU serving
 - [Pixi](https://pixi.sh/) for the isolated project environment
 - Git
 - Internet access for initial packages and model downloads
 - A Hugging Face token only for gated models such as Llama or Gemma
 
 MAX is installed into the repository-local Pixi environment. mxstudio does not modify the system Python environment.
+
+> **Apple silicon preview:** mxstudio installs natively on `osx-arm64` and starts MAX with `--devices cpu`. This is suitable for learning the workflow with a small model such as Qwen2.5 0.5B. It does not enable Apple GPU inference, and serving or benchmarking will be slower than the NVIDIA GPU path.
 
 ## Install
 
@@ -137,6 +140,20 @@ pixi run mxs stop
 
 Model names resolve by a unique substring, so `qwen2.5-0.5b`, `smollm`, and `olmoe` can be used instead of full Hugging Face IDs.
 
+### Automated first-run acceptance test
+
+The live harness follows the same path as a new user: it verifies the environment and Hugging Face metadata, downloads the public Qwen2.5 0.5B checkpoint, creates its notebook and presentation, starts MAX, streams one chat response, and stops the server it started.
+
+```bash
+pixi run python scripts/first_run_live.py
+```
+
+No Hugging Face token is required for this model. The harness refuses gated models, unsupported models, and replacement of an already-running server. Its first run downloads about 1 GB and may take several minutes to compile and serve. The hermetic regression test, which does not download weights or start MAX, is:
+
+```bash
+pixi run python -m unittest tests.test_first_run_acceptance
+```
+
 ## Hugging Face access
 
 Public models need no token. For gated or private models, create a read token in Hugging Face and save it from **Settings**. mxstudio stores it at `~/.mxstudio/secrets.json` with restrictive permissions. Never commit a token.
@@ -151,7 +168,7 @@ flowchart LR
     Studio --> HF[Hugging Face cache]
     Studio --> Jobs[(SQLite jobs)]
     Studio --> MAX[max serve :8100]
-    MAX --> GPU[NVIDIA GPU]
+    MAX --> Device[NVIDIA GPU or experimental Apple CPU]
     Studio --> Labs[Notebook + slide templates]
 ```
 

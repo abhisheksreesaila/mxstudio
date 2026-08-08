@@ -339,6 +339,15 @@ body::after {
   stroke-linecap: round; stroke-linejoin: round;
   flex-shrink: 0;
 }
+.nav-status {
+  margin-left: 4px;
+  padding: 1px 4px;
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, transparent);
+  border-radius: 3px;
+  color: var(--warn);
+  font-size: 8px;
+  letter-spacing: 0;
+}
 .nav-btn:hover { background: color-mix(in srgb, var(--panel-2) 80%, transparent); color: var(--text); }
 .nav-btn.active {
   background: transparent;

@@ -114,6 +114,17 @@ class HardwareFitTests(unittest.TestCase):
         self.assertEqual(fit["total_vram_gb"], 8.0)
         self.assertNotEqual(fit["level"], "ok")
 
+    @patch("notebooks.mxstudio.compat.sys.platform", "darwin")
+    @patch("notebooks.mxstudio.compat.hwinfo.memory", return_value={"available_gb": 12, "total_gb": 16})
+    @patch("notebooks.mxstudio.compat.hwinfo.gpus", return_value=[])
+    def test_apple_silicon_fit_uses_unified_memory(self, _gpus, _memory) -> None:
+        fit = compat.hardware_fit(1, cuda_devices="0")
+
+        self.assertEqual(fit["level"], "ok")
+        self.assertTrue(fit["recommend_download"])
+        self.assertIn("experimental CPU mode", fit["message"])
+        self.assertIn("Apple GPU inference is not enabled", fit["message"])
+
 
 if __name__ == "__main__":
     unittest.main()
