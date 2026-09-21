@@ -1,0 +1,25 @@
+[Unit]
+Description=MX Studio Nucleus Caddy ingress
+After=network-online.target mxstudio-nucleus.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@NUCLEUS_USER@
+Group=@NUCLEUS_GROUP@
+EnvironmentFile=/etc/mxstudio/nucleus.env
+WorkingDirectory=/var/lib/mxstudio-caddy
+Environment=XDG_DATA_HOME=/var/lib/mxstudio-caddy
+Environment=XDG_CONFIG_HOME=/var/cache/mxstudio-caddy
+UMask=0077
+ExecStart=/usr/bin/caddy run --config /etc/mxstudio/Caddyfile --adapter caddyfile
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+StateDirectory=mxstudio-caddy
+CacheDirectory=mxstudio-caddy
+
+[Install]
+WantedBy=multi-user.target

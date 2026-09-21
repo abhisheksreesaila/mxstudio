@@ -63,12 +63,12 @@
     {
      "tone": "good",
      "label": "Estimated VRAM fit",
-     "text": "Fits comfortably: need ~1.25 GB (weights+headroom), 23.09 GB VRAM free of 24.0 GB total."
+     "text": "Fits comfortably: need ~1.25 GB (weights+headroom), 23.93 GB VRAM free of 24.0 GB total."
     },
     {
-     "tone": "good",
-     "label": "Measured here",
-     "text": "87.4 tok/s \u00b7 0.064s TTFT via max benchmark."
+     "tone": "",
+     "label": "Next measurement",
+     "text": "Serve the model, then run Benchmark to replace estimates with local evidence."
     }
    ],
    "animate": true

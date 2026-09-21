@@ -1,0 +1,27 @@
+# Trust this local CA explicitly on every client; mDNS does not establish trust.
+{
+    admin off
+}
+{$NUCLEUS_HOSTNAME:api.mxstudio.local} {
+    tls internal
+    @models {
+        method GET
+        path /v1/models
+    }
+    @chat {
+        method POST
+        path /v1/chat/completions
+    }
+    handle @models {
+        reverse_proxy 127.0.0.1:8080
+    }
+    handle @chat {
+        reverse_proxy 127.0.0.1:8080 {
+            transport http {
+                dial_timeout 5s
+                response_header_timeout 330s
+            }
+        }
+    }
+    respond 404
+}

@@ -1,0 +1,31 @@
+# OPT-IN ONLY: selecting hybrid-local permits sending prompts to a paid cloud API.
+# Never installed automatically. Keep nucleus-local keys restricted to that alias.
+model_list:
+  - model_name: nucleus-local
+    litellm_params:
+      model: openai/nucleus-local
+      api_base: http://127.0.0.1:8080/v1
+      api_key: os.environ/MXSTUDIO_NUCLEUS_API_KEY
+  - model_name: hybrid-local
+    litellm_params:
+      model: openai/nucleus-local
+      api_base: http://127.0.0.1:8080/v1
+      api_key: os.environ/MXSTUDIO_NUCLEUS_API_KEY
+  - model_name: cloud-gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+router_settings:
+  num_retries: 0
+  fallbacks:
+    - hybrid-local: [cloud-gpt-4o]
+general_settings:
+  database_url: os.environ/DATABASE_URL
+  master_key: os.environ/LITELLM_MASTER_KEY
+  store_model_in_db: false
+  disable_spend_logs: true
+litellm_settings:
+  request_timeout: 330
+  stream_timeout: 300
+  turn_off_message_logging: true
+  set_verbose: false

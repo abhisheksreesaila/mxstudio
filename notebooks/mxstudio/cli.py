@@ -88,7 +88,11 @@ def serve(
     if not downloads.is_installed(entry.id):
         typer.echo(f"{entry.id} is not downloaded. Run: mxs download '{entry.id}'")
         raise typer.Exit(1)
-    SERVERS.start(entry)
+    try:
+        SERVERS.start(entry)
+    except RuntimeError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(1) from None
     typer.echo(f"Starting {entry.id} on http://localhost:{MODEL_PORT} ...")
     if not wait:
         return
@@ -108,7 +112,11 @@ def serve(
 @app.command()
 def stop() -> None:
     """Stop the running model server."""
-    SERVERS.stop()
+    try:
+        SERVERS.stop()
+    except RuntimeError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(1) from None
     typer.echo("Stopped.")
 
 
@@ -143,36 +151,44 @@ def chat(
     messages: list[dict] = []
 
     def turn(text: str) -> None:
-        messages.append({"role": "user", "content": text})
-        stream = client.chat.completions.create(
-            model=info["model_id"],
-            messages=messages,
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_tokens,
-            stream=True,
-        )
-        reply = ""
-        for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                piece = chunk.choices[0].delta.content
-                reply += piece
-                typer.echo(piece, nl=False)
-        typer.echo("")
-        messages.append({"role": "assistant", "content": reply})
-
-    if prompt:
-        turn(prompt)
-        return
-    typer.echo(f"Chatting with {info['model_id']} (Ctrl-C or 'exit' to quit)")
-    while True:
         try:
-            text = typer.prompt("you")
-        except typer.Abort:
+            with SERVERS.inference_reservation(info["model_id"]):
+                messages.append({"role": "user", "content": text})
+                with client.chat.completions.create(
+                    model=info["model_id"],
+                    messages=messages,
+                    temperature=temperature,
+                    top_p=top_p,
+                    max_tokens=max_tokens,
+                    stream=True,
+                ) as stream:
+                    reply = ""
+                    for chunk in stream:
+                        if chunk.choices and chunk.choices[0].delta.content:
+                            piece = chunk.choices[0].delta.content
+                            reply += piece
+                            typer.echo(piece, nl=False)
+                typer.echo("")
+                messages.append({"role": "assistant", "content": reply})
+        except RuntimeError as exc:
+            typer.echo(str(exc))
+            raise typer.Exit(1) from None
+
+    try:
+        if prompt:
+            turn(prompt)
             return
-        if text.strip().lower() in {"exit", "quit"}:
-            return
-        turn(text)
+        typer.echo(f"Chatting with {info['model_id']} (Ctrl-C or 'exit' to quit)")
+        while True:
+            try:
+                text = typer.prompt("you")
+            except typer.Abort:
+                return
+            if text.strip().lower() in {"exit", "quit"}:
+                return
+            turn(text)
+    finally:
+        client.close()
 
 
 @app.command()
@@ -254,6 +270,82 @@ def json_dumps(obj) -> str:
     import json
 
     return json.dumps(obj, indent=2)
+
+
+# Nucleus is an opt-in deployment profile; existing commands remain unchanged.
+nucleus_app = typer.Typer(help="Authenticated OpenAI-compatible Nucleus deployment profile.")
+app.add_typer(nucleus_app, name="nucleus")
+
+
+@nucleus_app.command("status")
+def nucleus_status() -> None:
+    """Show Nucleus readiness, transition and request lease state."""
+    from notebooks.mxstudio.nucleus import MANAGER
+    typer.echo(json_dumps(MANAGER.status()))
+
+
+@nucleus_app.command("prepare")
+@nucleus_app.command("start")
+def nucleus_start(model: str = typer.Option(None, help="Downloaded model id (defaults to NUCLEUS_MODEL_ID)."), timeout: float = typer.Option(600.0, min=0.1, max=600.0)) -> None:
+    """Prepare the configured model without installing services or changing host config."""
+    import asyncio
+    from notebooks.mxstudio import nucleus
+    try:
+        result = asyncio.run(nucleus.MANAGER.prepare(model, timeout=timeout))
+    except (ValueError, RuntimeError, TimeoutError) as exc:
+        typer.echo(f"Nucleus preparation failed: {exc}")
+        raise typer.Exit(1)
+    typer.echo(json_dumps(result))
+
+
+@nucleus_app.command("run")
+def nucleus_run(
+    host: str = typer.Option("127.0.0.1", help="Private loopback interface; expose only through Caddy."),
+    port: int = typer.Option(8080, min=1, max=65535),
+    workers: int = typer.Option(1, min=1, max=1),
+    prewarm: bool = typer.Option(True, help="Queue preparation of NUCLEUS_MODEL_ID on startup."),
+) -> None:
+    """Run the authenticated inference profile with private Studio administration."""
+    import os
+    import uvicorn
+
+    if host != "127.0.0.1":
+        raise typer.BadParameter("Nucleus must bind 127.0.0.1; use Caddy for LAN access")
+    if not os.environ.get("MXSTUDIO_NUCLEUS_API_KEY", "").strip():
+        raise typer.BadParameter("MXSTUDIO_NUCLEUS_API_KEY is required")
+    if not os.environ.get("NUCLEUS_MODEL_ID", "").strip():
+        raise typer.BadParameter("NUCLEUS_MODEL_ID must name a downloaded model")
+    os.environ["NUCLEUS_PREWARM"] = "1" if prewarm else "0"
+    uvicorn.run("mxstudio.api:app", host=host, port=port, workers=workers, log_level="info")
+
+
+@nucleus_app.command("lesson")
+def nucleus_lesson(output: str = typer.Option("nucleus-ttft.ipynb")) -> None:
+    """Generate an editable first-request versus warm-token timing notebook."""
+    from notebooks.mxstudio.nucleus_lesson import write_lesson
+    try:
+        destination = write_lesson(output)
+    except OSError as exc:
+        typer.echo(f"Cannot write lesson: {exc}")
+        raise typer.Exit(1) from None
+    typer.echo(str(destination))
+
+
+@nucleus_app.command("render-config")
+def nucleus_render_config(output: str = typer.Option(None, help="Write deployment config manifest to this path.")) -> None:
+    """Render safe deployment paths and required environment variables."""
+    from pathlib import Path
+    payload = {"profile": "nucleus", "model_env": "NUCLEUS_MODEL_ID", "api_key_env": "MXSTUDIO_NUCLEUS_API_KEY", "studio_bind": "127.0.0.1:8080", "max_bind": "127.0.0.1:8100", "public_ingress": "Caddy only; GET /v1/models and POST /v1/chat/completions"}
+    text = json_dumps(payload) + "\n"
+    if output:
+        try:
+            with Path(output).open("x", encoding="utf-8") as destination:
+                destination.write(text)
+        except OSError as exc:
+            typer.echo(f"Cannot write config: {exc}")
+            raise typer.Exit(1) from None
+    else:
+        typer.echo(text, nl=False)
 
 
 if __name__ == "__main__":

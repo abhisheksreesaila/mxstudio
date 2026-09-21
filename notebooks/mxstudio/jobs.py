@@ -344,7 +344,18 @@ def run_bench(
             raise RuntimeError(st.get("error") or "benchmark failed")
 
 
+def run_nucleus_prepare(model_id: str, timeout_s: float = 600.0, *, job_id: str, progress: Callable) -> dict:
+    import asyncio
+    from notebooks.mxstudio.nucleus import MANAGER
+
+    progress("Starting model; waiting for MAX readiness")
+    result = asyncio.run(MANAGER.prepare(model_id, timeout_s))
+    progress("Model ready", 100)
+    return result
+
+
 HANDLERS: dict[str, Callable[..., Any]] = {
+    "nucleus_prepare": run_nucleus_prepare,
     "hf_check": run_hf_check,
     "arch_analyze": run_arch_analyze,
     "arch_scaffold": run_arch_scaffold,
@@ -357,6 +368,7 @@ HANDLERS: dict[str, Callable[..., Any]] = {
 }
 
 _KIND_KEYS: dict[str, set[str]] = {
+    "nucleus_prepare": {"model_id", "timeout_s"},
     "hf_check": {"model_id"},
     "arch_analyze": {"model_id"},
     "arch_scaffold": {"model_id"},

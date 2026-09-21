@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import unittest
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,7 +14,16 @@ from notebooks.mxstudio.registry import get
 from notebooks.mxstudio.servers import ServerManager
 
 
-class JobApiReliabilityTests(unittest.TestCase):
+class IsolatedServerState(unittest.TestCase):
+    def setUp(self):
+        from notebooks.mxstudio import state
+        home = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        for name, value in (("HOME", home), ("LOGS", home / "logs"), ("STATE_FILE", home / "state.json")):
+            self.enterContext(patch.object(state, name, value))
+        self.enterContext(patch("notebooks.mxstudio.servers._process_identity", return_value="test"))
+
+
+class JobApiReliabilityTests(IsolatedServerState):
     def test_job_start_reads_json_body(self) -> None:
         response = TestClient(app).post(
             "/api/jobs/start",
@@ -62,6 +73,8 @@ class JobApiReliabilityTests(unittest.TestCase):
 
         command = popen.call_args.args[0]
         self.assertIn("--model", command)
+        self.assertNotIn("--host", command)
+        self.assertEqual(popen.call_args.kwargs["env"]["MAX_SERVE_HOST"], "127.0.0.1")
         self.assertNotIn("--model-path", command)
         self.assertIn("--custom-architectures", command)
         self.assertEqual(command[command.index("--max-batch-size") + 1], "1")
@@ -126,7 +139,7 @@ class SetupApiTests(unittest.TestCase):
         acknowledge.assert_not_called()
 
 
-class AgentApiTests(unittest.TestCase):
+class AgentApiTests(IsolatedServerState):
     @patch("notebooks.mxstudio.agents.dispatch_tool")
     @patch("notebooks.mxstudio.api.AsyncOpenAI")
     @patch("notebooks.mxstudio.api.SERVERS.status")
@@ -138,6 +151,7 @@ class AgentApiTests(unittest.TestCase):
     ) -> None:
         server_status.return_value = {"state": "running", "model_id": "acme/demo"}
         dispatch_tool.return_value = {"state": "running", "model_id": "acme/demo"}
+        openai_client.return_value.close = AsyncMock()
 
         tool_message = MagicMock()
         tool_message.content = None
@@ -201,6 +215,7 @@ class AgentApiTests(unittest.TestCase):
         _dispatch_tool,
     ) -> None:
         server_status.return_value = {"state": "running", "model_id": "acme/demo"}
+        openai_client.return_value.close = AsyncMock()
         tool_message = MagicMock()
         tool_message.content = None
         tool_message.tool_calls = [

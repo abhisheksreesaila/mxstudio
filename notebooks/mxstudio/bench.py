@@ -295,7 +295,16 @@ class BenchManager:
                 self.job["state"] = "error"
                 self.job["error"] = str(exc)[:500]
 
-        threading.Thread(target=_worker, daemon=True, name="bench").start()
+        def _reserved_worker() -> None:
+            from notebooks.mxstudio.servers import MANAGER as SERVERS
+            try:
+                with SERVERS.inference_reservation(model_id):
+                    _worker()
+            except Exception as exc:
+                self.job["state"] = "error"
+                self.job["error"] = str(exc)[:500]
+
+        threading.Thread(target=_reserved_worker, daemon=True, name="bench").start()
         return self.job
 
     def status(self) -> dict:

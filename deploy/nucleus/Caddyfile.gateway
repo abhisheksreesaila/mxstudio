@@ -1,0 +1,27 @@
+# Optional virtual keys; keep LiteLLM key generation and administration private.
+{
+    admin off
+}
+{$NUCLEUS_HOSTNAME:api.mxstudio.local} {
+    tls internal
+    @models {
+        method GET
+        path /v1/models
+    }
+    @chat {
+        method POST
+        path /v1/chat/completions
+    }
+    handle @models {
+        reverse_proxy 127.0.0.1:4000
+    }
+    handle @chat {
+        reverse_proxy 127.0.0.1:4000 {
+            transport http {
+                dial_timeout 5s
+                response_header_timeout 330s
+            }
+        }
+    }
+    respond 404
+}

@@ -181,6 +181,7 @@ class FirstRunAcceptanceTests(unittest.TestCase):
                     openai_client.return_value.chat.completions.create = AsyncMock(
                         return_value=_chat_stream()
                     )
+                    openai_client.return_value.close = AsyncMock()
                     chat_response = client.post(
                         "/api/chat",
                         json={
@@ -189,6 +190,7 @@ class FirstRunAcceptanceTests(unittest.TestCase):
                         },
                     )
                 self.assertEqual(chat_response.status_code, 200)
+                openai_client.return_value.close.assert_awaited_once()
                 self.assertIn("Hello from MAX", chat_response.text)
                 self.assertIn('"done": true', chat_response.text)
 

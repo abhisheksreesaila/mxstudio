@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import os
+
+import anyio
+import httpx
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from notebooks.mxstudio import agents, architectures, compat, downloads, fhsaas, hwinfo, jobs, modelinfo, notebooks, registry, settings as studio_settings
 from openai import AsyncOpenAI
@@ -18,10 +24,35 @@ from notebooks.mxstudio import (
 from notebooks.mxstudio.bench import MANAGER as BENCH
 from notebooks.mxstudio.downloads import MANAGER as DOWNLOADS
 from notebooks.mxstudio.servers import MANAGER as SERVERS, MODEL_PORT
+from notebooks.mxstudio import nucleus, discovery
 
 WEB_DIR = Path(__file__).parent / "web"
 
-app = FastAPI(title="mxstudio", version="0.1.1")
+@asynccontextmanager
+async def _lifespan(_app):
+    advertiser = None
+    host = os.environ.get("NUCLEUS_DISCOVERY_HOST", "").strip()
+    if host:
+        advertiser = discovery.NucleusDiscovery(
+            host, int(os.environ.get("NUCLEUS_DISCOVERY_PORT", "443")),
+            address=os.environ.get("NUCLEUS_DISCOVERY_ADDRESS") or None,
+        )
+        await asyncio.to_thread(advertiser.start)
+    try:
+        if os.environ.get("NUCLEUS_PREWARM") == "1":
+            model_id = nucleus.MANAGER.resolve()
+            job = await asyncio.to_thread(
+                jobs.enqueue_process, "nucleus_prepare", f"Prepare {model_id}",
+                {"model_id": model_id, "timeout_s": 600.0},
+            )
+            _app.state.nucleus_prewarm_job_id = job["job_id"]
+        yield
+    finally:
+        if advertiser:
+            await asyncio.to_thread(advertiser.stop)
+
+
+app = FastAPI(title="mxstudio", version="0.1.1", lifespan=_lifespan)
 
 # fh-saas base: logging config + the additive /api/jobs job-state bridge.
 fhsaas.setup()
@@ -387,6 +418,137 @@ class ServeRequest(BaseModel):
     model_id: str
 
 
+def _nucleus_auth(request: Request) -> None:
+    if not nucleus.authorized(request.headers.get("authorization"), request.headers.get("x-api-key")):
+        raise HTTPException(401, "invalid or missing Nucleus API key", headers={"WWW-Authenticate": "Bearer"})
+
+
+@app.get("/nucleus/status")
+def nucleus_status(request: Request) -> dict:
+    _nucleus_auth(request)
+    return nucleus.MANAGER.status()
+
+
+class NucleusPrepareRequest(BaseModel):
+    model: str | None = None
+    timeout_s: float = Field(600.0, ge=0.1, le=600.0)
+
+
+@app.post("/nucleus/prepare", status_code=202)
+def nucleus_prepare(request: Request, req: NucleusPrepareRequest) -> dict:
+    _nucleus_auth(request)
+    try:
+        entry = nucleus.MANAGER._entry(req.model)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(400, str(exc)) from None
+    return _queued(jobs.enqueue_process(
+        "nucleus_prepare", f"Prepare {entry.id}",
+        {"model_id": entry.id, "timeout_s": req.timeout_s},
+    ))
+
+
+@app.get("/nucleus/jobs/{job_id}")
+def nucleus_job(request: Request, job_id: str) -> dict:
+    _nucleus_auth(request)
+    job = jobs.get(job_id)
+    if not job or job.get("kind") != "nucleus_prepare":
+        raise HTTPException(404, "preparation job not found")
+    return job
+
+
+@app.get("/v1/models")
+def nucleus_models(request: Request) -> dict:
+    _nucleus_auth(request)
+    status = SERVERS.status()
+    model = nucleus.model_id() or status.get("model_id")
+    return {"object": "list", "data": [
+        {"id": model, "object": "model", "created": 0, "owned_by": "mxstudio"}
+    ] if model else []}
+
+
+@app.exception_handler(HTTPException)
+async def http_error(request: Request, exc: HTTPException) -> JSONResponse:
+    if request.url.path.startswith("/v1/"):
+        error_type = "invalid_request_error" if exc.status_code < 500 else "server_error"
+        content = {"error": {"message": str(exc.detail), "type": error_type, "param": None, "code": str(exc.status_code)}}
+    else:
+        content = {"detail": exc.detail}
+    return JSONResponse(content, status_code=exc.status_code, headers=exc.headers)
+
+
+class _LeasedStreamingResponse(StreamingResponse):
+    def __init__(self, content, cleanup, **kwargs):
+        super().__init__(content, **kwargs)
+        self._cleanup = cleanup
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            with anyio.CancelScope(shield=True):
+                await self._cleanup()
+
+
+@app.post("/v1/chat/completions")
+async def nucleus_chat(request: Request) -> Response:
+    _nucleus_auth(request)
+    try:
+        body = await request.json()
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(400, "invalid JSON body") from None
+    if not isinstance(body, dict) or not isinstance(body.get("messages"), list) or not body["messages"]:
+        raise HTTPException(400, "messages must be a nonempty list")
+    if not isinstance(body.get("model"), str) or not body["model"].strip():
+        raise HTTPException(400, "model must be a nonempty string")
+    if "stream" in body and not isinstance(body["stream"], bool):
+        raise HTTPException(400, "stream must be a boolean")
+    try:
+        lease = nucleus.MANAGER.lease(body["model"])
+        admitted = await lease.__aenter__()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+    except (TimeoutError, RuntimeError) as exc:
+        raise HTTPException(503, str(exc), headers={"Retry-After": "5"}) from None
+    body["model"] = admitted["model_id"]
+    try:
+        upstream = await nucleus.proxy_openai("/v1/chat/completions", body)
+    except BaseException as exc:
+        with anyio.CancelScope(shield=True):
+            await lease.__aexit__(None, None, None)
+        if isinstance(exc, httpx.TimeoutException):
+            raise HTTPException(504, "MAX request timed out") from None
+        if isinstance(exc, (httpx.HTTPError, RuntimeError)):
+            raise HTTPException(502, "MAX request failed; inspect local diagnostics") from None
+        raise
+    if isinstance(upstream, tuple):
+        upstream_response, upstream_client = upstream
+
+        async def release_stream():
+            async for chunk in upstream_response.aiter_bytes():
+                yield chunk
+
+        async def cleanup():
+            try:
+                await nucleus.close_upstream(upstream_response, upstream_client)
+            finally:
+                await lease.__aexit__(None, None, None)
+
+        return _LeasedStreamingResponse(
+            release_stream(), cleanup, media_type="text/event-stream",
+            status_code=upstream_response.status_code,
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+    try:
+        return Response(
+            content=upstream.content, status_code=upstream.status_code,
+            media_type=upstream.headers.get("content-type", "application/json").split(";")[0],
+            headers={key: upstream.headers[key] for key in ("retry-after", "x-request-id") if key in upstream.headers},
+        )
+    finally:
+        with anyio.CancelScope(shield=True):
+            await lease.__aexit__(None, None, None)
+
+
 @app.get("/api/server")
 def server_status() -> dict:
     return SERVERS.status()
@@ -417,12 +579,18 @@ def server_start(req: ServeRequest) -> dict:
             409,
             entry.serve_disabled_reason or "serving is disabled for this model",
         )
-    return SERVERS.start(entry)
+    try:
+        return SERVERS.start(entry)
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from None
 
 
 @app.post("/api/server/stop")
 def server_stop() -> dict:
-    SERVERS.stop()
+    try:
+        SERVERS.stop()
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from None
     return {"state": "stopped"}
 
 
@@ -438,6 +606,27 @@ class ChatRequest(BaseModel):
     max_tokens: int = Field(256, ge=1, le=4096)
 
 
+async def _studio_stream(model_id, content):
+    reservation = SERVERS.inference_reservation(model_id)
+    try:
+        reservation.__enter__()
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from None
+    try:
+        client = AsyncOpenAI(base_url=f"http://127.0.0.1:{MODEL_PORT}/v1", api_key="EMPTY")
+    except BaseException:
+        reservation.__exit__(None, None, None)
+        raise
+
+    async def cleanup():
+        try:
+            await client.close()
+        finally:
+            reservation.__exit__(None, None, None)
+
+    return _LeasedStreamingResponse(content(client), cleanup, media_type="text/event-stream")
+
+
 @app.post("/api/chat")
 async def chat(req: ChatRequest) -> StreamingResponse:
     status = SERVERS.status()
@@ -447,10 +636,7 @@ async def chat(req: ChatRequest) -> StreamingResponse:
         )
     model_id = status["model_id"]
 
-    async def generate():
-        client = AsyncOpenAI(
-            base_url=f"http://127.0.0.1:{MODEL_PORT}/v1", api_key="EMPTY"
-        )
+    async def generate(client):
         try:
             stream = await client.chat.completions.create(
                 model=model_id,
@@ -468,7 +654,7 @@ async def chat(req: ChatRequest) -> StreamingResponse:
             yield f"data: {json.dumps({'error': str(exc)[:300]})}\n\n"
         yield f"data: {json.dumps({'done': True})}\n\n"
 
-    return StreamingResponse(generate(), media_type="text/event-stream")
+    return await _studio_stream(model_id, generate)
 
 
 class AgentRequest(ChatRequest):
@@ -483,11 +669,9 @@ async def run_agent(req: AgentRequest) -> StreamingResponse:
             409, f"model server is not running (state: {status['state']})"
         )
     model_id = status["model_id"]
-    client = AsyncOpenAI(
-        base_url=f"http://127.0.0.1:{MODEL_PORT}/v1", api_key="EMPTY"
-    )
-    return StreamingResponse(
-        agents.agent_events(
+    return await _studio_stream(
+        model_id,
+        lambda client: agents.agent_events(
             client,
             model_id=model_id,
             messages=req.messages,
@@ -496,7 +680,6 @@ async def run_agent(req: AgentRequest) -> StreamingResponse:
             max_tokens=req.max_tokens,
             max_steps=req.max_steps,
         ),
-        media_type="text/event-stream",
     )
 
 

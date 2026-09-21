@@ -4,7 +4,7 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 const TAB_TITLES = {
-  models: "Models",
+  models: "Workspace",
   notebooks: "Notebooks",
   bench: "Benchmark",
   architectures: "Architectures",
@@ -29,6 +29,7 @@ let lastModelsRenderKey = "";
 let modelSearchQuery = "";
 let modelPage = 1;
 const MODEL_PAGE_SIZE = 10;
+let workspaceModelId = localStorage.getItem("mxstudio.workspace.modelId") || "";
 
 /* ---------- helpers ---------- */
 
@@ -396,16 +397,17 @@ function renderActivity(jobs) {
 
 /* ---------- tabs ---------- */
 
-$$(".nav-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    if (activeTab === "learn" && btn.dataset.tab !== "learn") {
+function activateTab(tab) {
+    if (activeTab === "learn" && tab !== "learn") {
       hideLearnPreview();
     }
-    activeTab = btn.dataset.tab;
-    $$(".nav-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    activeTab = tab;
+    $$(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.tab === activeTab));
     $$(".tab").forEach((t) => t.classList.toggle("active", t.id === "tab-" + activeTab));
     const title = $("#tab-title");
     if (title) title.textContent = TAB_TITLES[activeTab] || activeTab;
+    const back = $("#workspace-back");
+    if (back) back.hidden = activeTab === "models";
     if (activeTab === "bench") {
       loadHardware();
       wireBenchInfo();
@@ -420,8 +422,18 @@ loadBenchReadiness();
     if (activeTab === "architectures") initArchWizard();
     closeMobileSidebar();
     window.__mxDissolveNav?.();
+    scrollTo({ top: 0, behavior: "smooth" });
+}
+
+$$('.nav-btn').forEach((btn) => {
+  btn.addEventListener("click", () => {
+    activateTab(btn.dataset.tab);
   });
 });
+
+$("#workspace-back")?.addEventListener("click", () => activateTab("models"));
+$("#open-learn")?.addEventListener("click", () => activateTab("learn"));
+$("#open-settings")?.addEventListener("click", () => activateTab("settings"));
 
 (function setupDissolvingNav() {
   const shell = document.querySelector(".shell");
@@ -522,10 +534,7 @@ function closeMobileSidebar() {
   });
 })();
 
-/* ---------- server status + active model switcher ---------- */
-
-let modelSwitcherWired = false;
-let modelSwitchBusy = false;
+/* ---------- server status ---------- */
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -638,148 +647,185 @@ async function startServerWithProgress(modelId, { name } = {}) {
 function renderServerStatus() {
   const s = serverStatus || { state: "stopped" };
   const pill = $("#server-pill");
+  const statusLabel = $("#server-status-label");
+  const statusGroup = pill?.closest(".topbar-runtime");
   const state = s.state || "stopped";
-  if (pill) {
-    pill.className = "pill " + state;
-    const extra = state === "starting" && s.uptime_s != null ? ` (${s.uptime_s}s)` : "";
-    const stateLabels = {
-      running: "Serving",
-      starting: "Starting",
-      stopping: "Stopping",
-      crashed: "Crashed",
-      idle: "Stopped",
-      stopped: "Stopped",
-    };
-    const label = (stateLabels[state] || state) + extra;
-    const modelName =
-      (models || []).find((model) => model.id === s.model_id)?.name ||
-      s.model_id?.split("/").pop() ||
-      "";
-    pill.textContent = stateLabels[state] || state;
-    pill.title = modelName ? `${label}: ${modelName}` : `Server ${label.toLowerCase()}`;
-    pill.setAttribute("aria-label", pill.title);
-  }
-  renderModelSwitcher();
-}
-
-function renderModelSwitcher() {
-  const sel = $("#model-switcher");
-  if (!sel) return;
-  if (!modelSwitcherWired) {
-    modelSwitcherWired = true;
-    sel.addEventListener("change", onModelSwitcherChange);
-  }
-  if (modelSwitchBusy) return;
-
-  const installed = (models || []).filter((m) => m.installed);
-  const cur = serverStatus?.model_id || "";
-  const state = serverStatus?.state || "stopped";
-  const sig = installed.map((m) => m.id).join("|") + "::" + cur + "::" + state;
-  if (sel.dataset.sig === sig) {
-    sel.className = "model-switcher " + state + " select-ui-native";
-    return;
-  }
-  sel.dataset.sig = sig;
-  sel.innerHTML =
-    `<option value="">Stopped</option>` +
-    installed
-      .map((m) => {
-        const label = m.name || m.id;
-        const mark = m.id === cur && (state === "running" || state === "starting") ? " ●" : "";
-        return `<option value="${esc(m.id)}">${esc(label)}${mark}</option>`;
-      })
-      .join("");
-  if (cur && installed.some((m) => m.id === cur)) sel.value = cur;
-  else sel.value = "";
-  sel.className = "model-switcher " + state + " select-ui-native";
-}
-
-async function onModelSwitcherChange(ev) {
-  const sel = ev.target;
-  const id = sel.value;
-  const prev = serverStatus?.model_id || "";
-  const state = serverStatus?.state || "stopped";
-  const prevName =
-    (models || []).find((m) => m.id === prev)?.name || prev.split("/").pop() || prev;
-
-  const revert = () => {
-    sel.dataset.sig = "";
-    if (prev && (state === "running" || state === "starting")) sel.value = prev;
-    else sel.value = "";
-    renderModelSwitcher();
+  const extra = state === "starting" && s.uptime_s != null ? ` (${s.uptime_s}s)` : "";
+  const stateLabels = {
+    running: "Running",
+    starting: "Starting",
+    stopping: "Stopping",
+    crashed: "Crashed",
+    idle: "Stopped",
+    stopped: "Stopped",
   };
+  const modelName =
+    (models || []).find((model) => model.id === s.model_id)?.name ||
+    s.model_id?.split("/").pop() ||
+    "";
+  const stateLabel = stateLabels[state] || state;
+  const label = `${stateLabel}${extra}${modelName && state !== "stopped" && state !== "idle" ? ` · ${modelName}` : ""}`;
+  if (pill) pill.className = "pill " + state;
+  if (statusLabel) statusLabel.textContent = label;
+  if (statusGroup) statusGroup.title = modelName ? `${stateLabel}: ${modelName}` : `MAX server ${stateLabel.toLowerCase()}`;
+  renderWorkspaceStatus();
+  renderWorkspaceArtifact();
+}
 
-  // Stopped selected
-  if (!id) {
-    if (state === "stopped" || state === "idle") return;
-    const ok = confirm(
-      `Stop the active API?\n\n${prevName || "Current model"} is ${state} on :8100.\nChat and benchmarks will pause until you serve another model.`
-    );
-    if (!ok) {
-      revert();
-      return;
-    }
-    modelSwitchBusy = true;
-    sel.disabled = true;
-    try {
-      await stopServerGracefully({ label: prevName });
-      toast("Server stopped", prevName || "", "ok");
-      await pollModels();
-      pollActivity();
-    } catch (err) {
-      toast("Stop failed", err.message, "err", { persist: true });
-      setServeProgress({ hidden: true });
-    } finally {
-      modelSwitchBusy = false;
-      sel.disabled = false;
-      sel.dataset.sig = "";
-      renderModelSwitcher();
-    }
-    return;
+function renderWorkspaceStatus() {
+  const state = serverStatus?.state || "stopped";
+  const runtime = $("#workspace-runtime-status");
+  const count = $("#workspace-model-count");
+  const endpoint = $("#workspace-endpoint");
+  const stateLabels = {
+    running: "Serving",
+    starting: "Starting",
+    stopping: "Stopping",
+    crashed: "Crashed",
+    idle: "Stopped",
+    stopped: "Stopped",
+  };
+  if (runtime) runtime.textContent = stateLabels[state] || state;
+  if (count) {
+    const installed = (models || []).filter((model) => model.installed).length;
+    count.textContent = `${installed} ready`;
   }
-
-  if (id === prev && (state === "running" || state === "starting")) return;
-
-  const m = models.find((x) => x.id === id);
-  const nextName = m?.name || id.split("/").pop() || id;
-  const busy = state === "running" || state === "starting";
-  if (busy && prev && prev !== id) {
-    const ok = confirm(
-      `Switch active model?\n\nStop ${prevName} (${state}), then start ${nextName}.\nCompile can take a few minutes — wait for the progress bar.`
-    );
-    if (!ok) {
-      revert();
-      return;
-    }
-  } else if (m?.serve_enabled === false) {
-    toast("Serve unavailable", m.serve_disabled_reason || nextName, "warn", { persist: true });
-    revert();
-    return;
-  }
-
-  modelSwitchBusy = true;
-  sel.disabled = true;
-  try {
-    if (busy && prev && prev !== id) {
-      await stopServerGracefully({ label: prevName });
-    }
-    toast("Starting model", `${nextName} — wait for Running`, "warn");
-    await startServerWithProgress(id, { name: nextName });
-    toast("Model ready", `${nextName} is serving`, "ok");
-    await pollModels();
-    pollActivity();
-  } catch (err) {
-    toast("Switch failed", err.message, "err", { persist: true });
-    setServeProgress({ hidden: true });
-    await pollModels();
-  } finally {
-    modelSwitchBusy = false;
-    sel.disabled = false;
-    sel.dataset.sig = "";
-    renderModelSwitcher();
+  if (endpoint) {
+    endpoint.textContent = state === "running"
+      ? `http://127.0.0.1:${serverStatus.port || 8100}/v1`
+      : "Not serving";
   }
 }
 
+function selectWorkspaceModel(modelId) {
+  workspaceModelId = modelId || "";
+  if (workspaceModelId) localStorage.setItem("mxstudio.workspace.modelId", workspaceModelId);
+  else localStorage.removeItem("mxstudio.workspace.modelId");
+  renderWorkspaceArtifact();
+}
+
+function renderWorkspaceArtifact(local = null) {
+  const panel = $("#workspace-artifact");
+  if (!panel || !workspaceModelId) {
+    if (panel) panel.hidden = true;
+    return;
+  }
+  const model = (models || []).find((item) => item.id === workspaceModelId);
+  const localPath = local?.path || model?.local_path || "";
+  const installed = Boolean(local?.installed || model?.installed || localPath);
+  const state = model?.server_state ||
+    (serverStatus?.model_id === workspaceModelId ? serverStatus.state : "stopped");
+  const serving = state === "running" || state === "starting";
+  const reportApplies = lastHfReport?.model_id === workspaceModelId;
+  const needsPort = model?.serve_enabled === false || (reportApplies && !lastHfReport.modular_compatible);
+  const canServe = installed && !needsPort;
+  const origin = model?.custom_arch
+    ? "MX port"
+    : needsPort
+      ? "Port required"
+      : reportApplies && lastHfReport.modular_compatible
+        ? "Native MAX"
+        : "MAX status unknown";
+  const endpoint = `http://127.0.0.1:${serverStatus?.port || 8100}/v1`;
+  const actions = [];
+  if (!installed && model) {
+    actions.push('<button class="btn primary" type="button" data-workspace-act="download">Download</button>');
+  }
+  if (needsPort) {
+    actions.push('<button class="btn primary" type="button" data-workspace-act="port">Make it MAX</button>');
+  }
+  if (serving) {
+    actions.push('<button class="btn danger" type="button" data-workspace-act="stop">Stop</button>');
+    actions.push('<button class="btn" type="button" data-workspace-act="copy-endpoint">Copy endpoint</button>');
+  } else if (canServe) {
+    actions.push('<button class="btn primary" type="button" data-workspace-act="serve">Serve</button>');
+  }
+  if (installed) {
+    actions.push(`<button class="btn" type="button" data-workspace-act="verify" ${serving ? "" : 'title="Serve the model before verification"'}>Verify</button>`);
+    actions.push('<button class="btn" type="button" data-workspace-act="lab">Lab</button>');
+    actions.push('<button class="btn" type="button" data-workspace-act="open">Files</button>');
+  }
+  const status = serving ? (state === "running" ? "Serving" : "Starting") : installed ? "Ready locally" : "Checked";
+  renderWorkspacePipeline({ installed, serving, needsPort, canServe });
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="workspace-artifact-main">
+      <div>
+        <span class="workspace-status-label">Final model</span>
+        <strong>${esc(model?.name || workspaceModelId.split("/").pop() || workspaceModelId)}</strong>
+        <span class="workspace-artifact-id">${esc(workspaceModelId)} · ${esc(origin)}</span>
+      </div>
+      <span class="badge ${serving ? "running" : installed ? "installed" : "exp"}">${esc(status)}</span>
+    </div>
+    ${localPath ? `<button class="workspace-local-path" type="button" data-workspace-act="open" title="Open containing folder">${esc(localPath)}</button>` : ""}
+    ${serving ? `<div class="workspace-live-endpoint">${esc(endpoint)}</div>` : ""}
+    <div class="workspace-artifact-actions">${actions.join("")}</div>`;
+}
+
+function renderWorkspacePipeline({ installed, serving, needsPort, canServe }) {
+  const pipeline = $("#workspace-pipeline");
+  if (!pipeline) return;
+  pipeline.hidden = false;
+  const states = {
+    inspect: "done",
+    fetch: installed ? "done" : "active",
+    max: needsPort ? "blocked" : canServe ? "done" : "pending",
+    verify: installed ? "active" : "pending",
+    serve: serving ? "done" : "pending",
+  };
+  pipeline.querySelectorAll("[data-stage]").forEach((stage) => {
+    stage.className = states[stage.dataset.stage] || "pending";
+  });
+}
+
+$("#workspace-artifact")?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-workspace-act]");
+  if (!button || !workspaceModelId) return;
+  const action = button.dataset.workspaceAct;
+  const model = (models || []).find((item) => item.id === workspaceModelId);
+  if (action === "open") return openModelFolder(workspaceModelId);
+  if (action === "download" && model) return handleModelAction("download", model, button);
+  if (action === "port") {
+    activateTab("architectures");
+    setTimeout(() => {
+      const input = $("#arch-id");
+      if (input) input.value = workspaceModelId;
+      $("#arch-run-inspect")?.click();
+    }, 100);
+    return;
+  }
+  if (action === "verify") {
+    if (!servingModel(workspaceModelId)) {
+      toast("Serve first", "Verification runs against the live MAX endpoint.", "warn");
+      return;
+    }
+    activateTab("bench");
+    return;
+  }
+  if (action === "lab") {
+    activateTab("notebooks");
+    setTimeout(() => {
+      const select = $("#nb-model");
+      if (select && [...select.options].some((option) => option.value === workspaceModelId)) {
+        select.value = workspaceModelId;
+      }
+    }, 100);
+    return;
+  }
+  if (action === "copy-endpoint") {
+    const endpoint = `http://127.0.0.1:${serverStatus?.port || 8100}/v1`;
+    await navigator.clipboard.writeText(endpoint);
+    toast("Endpoint copied", endpoint, "ok");
+    return;
+  }
+  if (model && (action === "serve" || action === "stop")) {
+    handleModelAction(action, model, button);
+  }
+});
+
+function servingModel(modelId) {
+  return serverStatus?.state === "running" && serverStatus?.model_id === modelId;
+}
 
 /* ---------- models tab ---------- */
 
@@ -1123,50 +1169,43 @@ function renderModels() {
         primary = `<button class="btn danger" data-act="stop">Stop</button>`;
       }
 
+      const number = String(pageStart + pageModels.indexOf(m) + 1).padStart(2, "0");
       return `
-        <tr data-id="${esc(m.id)}" class="${open ? "is-open" : ""}">
-          <td class="col-name">
-            <div class="name-cell" title="${esc(m.id)}">
-              <span class="nm">${esc(m.name)}</span>
-            </div>
-          </td>
-          <td class="col-size col-num" title="${esc(m.params)} · estimated download: ~${m.approx_gb} GB">${esc(modelTableSize(m.params))}</td>
-          <td class="col-ctx col-num">${Number(m.context || 0).toLocaleString()}</td>
-          <td class="col-status">${modelTableStatusBadge(m)}</td>
-          <td class="col-actions">
+        <article data-id="${esc(m.id)}" class="model-strip ${open ? "is-open" : ""}">
+          <span class="model-strip-index">${number}</span>
+          <div class="model-strip-name" title="${esc(m.id)}">
+            <strong>${esc(m.name)}</strong>
+            <span>${esc(m.id)}</span>
+          </div>
+          <span class="model-strip-spec">${esc(modelTableSize(m.params))} · ${Number(m.context || 0).toLocaleString()} ctx</span>
+          <span class="model-strip-status">${modelTableStatusBadge(m)}</span>
+          <div class="model-strip-actions">
             ${primary}
-            <button class="btn" data-act="details">Details</button>
-          </td>
-        </tr>`;
+            <button class="btn" data-act="details">Inspect</button>
+          </div>
+        </article>`;
     })
     .join("");
 
-  list.innerHTML = `
-    <div class="models-table-wrap">
-      <table class="models-table">
-        <thead>
-          <tr>
-            <th>Model</th>
-            <th>Size</th>
-            <th>Context</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>${rows || `<tr><td colspan="5" class="models-empty">No matching models.</td></tr>`}</tbody>
-      </table>
-    </div>`;
+  list.innerHTML = `<div class="model-shelf">${rows || '<div class="models-empty">No matching models.</div>'}</div>`;
 
-  list.querySelector("tbody")?.addEventListener("click", (ev) => {
-    const tr = ev.target.closest("tr[data-id]");
-    if (!tr) return;
-    const id = tr.dataset.id;
+  list.querySelector(".model-shelf")?.addEventListener("click", (ev) => {
+    const row = ev.target.closest("[data-id]");
+    if (!row) return;
+    const id = row.dataset.id;
     const m = models.find((x) => x.id === id);
     if (!m) return;
     const act = ev.target.dataset && ev.target.dataset.act;
-    if (act === "details" || (!act && !ev.target.closest("button"))) {
+    if (act === "details") {
       if (drawerModelId === id) closeModelDrawer();
       else openModelDrawer(id);
+      return;
+    }
+    if (!act && !ev.target.closest("button")) {
+      selectWorkspaceModel(id);
+      const input = $("#hf-id");
+      if (input) input.value = id;
+      $("#workspace-artifact")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     if (act) handleModelAction(act, m, ev.target);
@@ -1259,17 +1298,12 @@ Wait for the progress bar before chatting.`
         }
       }
       btn.disabled = true;
-      modelSwitchBusy = true;
-      try {
-        if ((state === "running" || state === "starting") && cur && cur !== m.id) {
-          await stopServerGracefully({ label: cur });
-        }
-        toast("Starting model", `${m.name} — wait for Running`, "warn");
-        await startServerWithProgress(m.id, { name: m.name });
-        toast("Model ready", `${m.name} is serving`, "ok");
-      } finally {
-        modelSwitchBusy = false;
+      if ((state === "running" || state === "starting") && cur && cur !== m.id) {
+        await stopServerGracefully({ label: cur });
       }
+      toast("Starting model", `${m.name} — wait for Running`, "warn");
+      await startServerWithProgress(m.id, { name: m.name });
+      toast("Model ready", `${m.name} is serving`, "ok");
       pollModels();
       pollActivity();
     } else if (act === "stop") {
@@ -1280,13 +1314,8 @@ ${m.name} will go offline on :8100.`
       );
       if (!ok) return;
       btn.disabled = true;
-      modelSwitchBusy = true;
-      try {
-        await stopServerGracefully({ label: m.name });
-        toast("Server stopped", m.name, "ok");
-      } finally {
-        modelSwitchBusy = false;
-      }
+      await stopServerGracefully({ label: m.name });
+      toast("Server stopped", m.name, "ok");
       pollModels();
       pollActivity();
     } else if (act === "folder") {
@@ -1492,7 +1521,7 @@ $("#model-page-next")?.addEventListener("click", () => {
 });
 
 $("#hf-check")?.addEventListener("click", async () => {
-  const id = ($("#hf-id").value || "").trim();
+  const id = normalizeModelInput($("#hf-id").value || "");
   if (!id) {
     toast("Hugging Face id required", "Use org/name format", "warn");
     return;
@@ -1517,6 +1546,8 @@ $("#hf-check")?.addEventListener("click", async () => {
     }
     renderHfReport(report);
     if (report?.ok) {
+      selectWorkspaceModel(report.model_id);
+      await pollModels();
       toast(
         "Check complete",
         report.model_id,
@@ -1527,6 +1558,44 @@ $("#hf-check")?.addEventListener("click", async () => {
     toast("Check failed", err.message, "err");
   } finally {
     $("#hf-check").disabled = false;
+  }
+});
+
+function normalizeModelInput(value) {
+  const trimmed = String(value || "").trim();
+  const match = trimmed.match(/^https?:\/\/(?:www\.)?huggingface\.co\/([^/?#]+\/[^/?#]+)/i);
+  return match ? match[1] : trimmed;
+}
+
+async function runWorkspaceCommand(value) {
+  const command = String(value || "").trim().toLowerCase();
+  if (!command.startsWith("/")) {
+    $("#hf-check")?.click();
+    return;
+  }
+  if (command === "/learn") return activateTab("learn");
+  if (command === "/settings" || command === "/status") return activateTab("settings");
+  if (command === "/stop") return stopServerGracefully();
+  if (command === "/serve") {
+    const model = models.find((item) => item.id === workspaceModelId);
+    if (model?.installed) return handleModelAction("serve", model, $("#hf-check"));
+  }
+  toast("Unknown command", "Try /learn, /settings, /status, /serve, or /stop", "warn");
+}
+
+$("#hf-id")?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  runWorkspaceCommand(event.currentTarget.value);
+});
+
+addEventListener("keydown", (event) => {
+  const target = event.target;
+  const editing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
+  if ((event.key === "/" && !editing) || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k")) {
+    event.preventDefault();
+    activateTab("models");
+    $("#hf-id")?.focus();
   }
 });
 
@@ -1561,8 +1630,11 @@ $("#hf-download")?.addEventListener("click", async () => {
     toast("Download queued", jid || id, "warn");
     if (jid) {
       waitForJob(jid)
-        .then((job) => {
+        .then(async (job) => {
           const path = job.result?.local?.path || id;
+          selectWorkspaceModel(id);
+          await pollModels();
+          renderWorkspaceArtifact(job.result?.local);
           toast("Download done", path, "ok", {
             persist: true,
             actionLabel: "Open containing folder",
@@ -4529,7 +4601,6 @@ $("#arch-local-model")?.addEventListener("change", (event) => {
   }
 });
 
-enhanceSelect($("#model-switcher"));
 enhanceSelect($("#arch-local-model"));
 
 $("#arch-run-inspect")?.addEventListener("click", () => {
