@@ -31,6 +31,10 @@ class ModelEntry:
     # Explicitly hide Serve for parked entries with known-incomplete adapters.
     serve_enabled: bool = True
     serve_disabled_reason: str = ""
+    # Optional immutable local checkpoint identity; canonical `id` remains public.
+    load_path: str | None = None
+    revision: str | None = None
+    advertised_model_id: str | None = None
 
     def to_dict(self) -> dict:
         d = dataclasses.asdict(self)

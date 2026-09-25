@@ -8,11 +8,11 @@
 by MAX, with the complete setup history available for debugging.**
 
 The primary experience is a terminal command, not a studio dashboard or a model
-router. After any necessary first-time permissions and trust setup, the command
-should resolve the model, check the machine, download or adapt it, validate real
-inference, configure Caddy, and print the usable URL and connection instructions.
-"Fastest" describes the intended low-friction workflow, not a measured performance
-claim. Running the HTTP process alone is not success.
+router. The current CLI/API now connect model resolution, revision-pinned
+download, local generation proof, a setup handoff, and separate server/client
+HTTPS evidence. The command does **not** install services or change host
+configuration. "Fastest" describes the intended low-friction workflow, not a
+measured performance claim. A running HTTP process alone is not success.
 
 ## Three entry paths
 
@@ -37,23 +37,40 @@ or fits the machine. Existing hand-written ports must be preserved.
 
 ## What is actually implemented?
 
-Code-level check of the current working tree, 2026-09-20. No model download,
-GPU execution, service installation, or LAN/TLS acceptance was performed for this check.
+Code-level check of the current working tree, 2026-09-25. Hermetic tests exercise
+adapters and state handling; no live model download, MAX generation, service
+installation, distro acceptance, or second-client LAN/TLS verification was
+performed.
 
 | Capability | Finding | Source |
 | --- | --- | --- |
-| One command from model reference to verified HTTPS URL | **Missing.** Download, serve, preparation, API startup, and deployment remain separate operations. | [CLI](../notebooks/mxstudio/cli.py), [installer](../deploy/nucleus/install.sh) |
-| MAX support discovery and Hugging Face inspection | **Partial foundation.** Reads `max list --json` when available and inspects HF metadata; support/fallback heuristics are advisory, not inference proof. | [Compatibility](../notebooks/mxstudio/compat.py) |
-| General model resolution from the terminal | **Incomplete.** `download` and `serve` use curated registry IDs or unique substrings; arbitrary HF/model-catalog discovery is not integrated into those commands. | [CLI resolver](../notebooks/mxstudio/cli.py), [registry](../notebooks/mxstudio/registry.py) |
-| Managed MAX lifecycle and authenticated chat | **Implemented components.** One managed model, cross-process reservations, bounded preparation, OpenAI chat forwarding, and cancellation cleanup. Target-model success still requires real execution. | [Lifecycle](../notebooks/mxstudio/servers.py), [Nucleus](../notebooks/mxstudio/nucleus.py), [API](../notebooks/mxstudio/api.py) |
+| One command from model reference to verified HTTPS URL | **Orchestrated, not live-accepted.** `mxs up` creates a durable run and queues work; first-time publication pauses at `needs_setup`. Actual distro install and second-client proof remain explicit steps. | [CLI](../notebooks/mxstudio/cli.py), [runs](../notebooks/mxstudio/deployments.py), [installer](../deploy/nucleus/install.sh) |
+| MAX support discovery and Hugging Face inspection | **Advisory discovery plus evidence gates.** Catalog/compatibility metadata helps resolve candidates; local generation, HTTPS generation, and client proof are distinct evidence. | [Inventory](../notebooks/mxstudio/inventory.py), [compatibility](../notebooks/mxstudio/compat.py), [runs](../notebooks/mxstudio/deployments.py) |
+| General model resolution from the terminal | **Implemented for durable runs.** `catalog`, `pull`, and `up` accept supported catalog/model references and persist immutable revisions; legacy `download`/`serve` commands remain. | [CLI](../notebooks/mxstudio/cli.py), [inventory](../notebooks/mxstudio/inventory.py) |
+| Managed MAX lifecycle and authenticated chat | **Implemented components; target proof remains live.** One managed MAX process, revision/load-path identity, reservations, authenticated chat, and streaming generation evidence are recorded. | [Lifecycle](../notebooks/mxstudio/servers.py), [Nucleus](../notebooks/mxstudio/nucleus.py), [API](../notebooks/mxstudio/api.py) |
 | Skill-driven unsupported-model workflow | **Guided only.** Approval, donor/scaffold work, and skill stages exist through API/jobs. `inspect` runs a skill script; the stage called `implement` runs a gates/preflight command, not an autonomous coding agent. No complete repair/retry loop or architecture CLI exists. | [Architectures](../notebooks/mxstudio/architectures.py), [job dispatch](../notebooks/mxstudio/jobs.py) |
 | Evidence-gated promotion of a new port | **Not implemented as a trustworthy automated gate.** Gate records can be updated without validating the claimed execution artifacts; smoke checks do not establish serve readiness. No automatic validated promotion to HTTPS serving exists. | [Architecture gate records](../notebooks/mxstudio/architectures.py), [gate update API](../notebooks/mxstudio/api.py) |
-| Caddy HTTPS deployment | **Configuration and installer exist, not seamless onboarding.** Requires prepared service user/cache/secrets, hostname resolution, and certificate trust. The install probe checks API responsiveness and service activity, not inference through HTTPS from another device. | [Caddy](../deploy/nucleus/Caddyfile), [installer](../deploy/nucleus/install.sh), [preflight](../deploy/nucleus/preflight.py) |
-| Complete debug history for one deployment | **Partial.** MAX logs, SQLite jobs, worker logs, and bring-up artifacts exist. There is no single deployment run ID/history covering discovery through verified HTTPS; repeated skill stages overwrite their stage artifact. | [Server logs](../notebooks/mxstudio/servers.py), [worker](../notebooks/mxstudio/job_worker.py), [architecture artifacts](../notebooks/mxstudio/architectures.py) |
+| Caddy HTTPS deployment | **Explicit per-run setup handoff and verification stages.** `needs_setup` includes a unique protected EnvironmentFile destination and generated dry-run, guarded copy, and `--apply` commands; none execute automatically. Verification first checks the active systemd service's single protected environment and its user/group, state/cache paths, model/revision, and hostname against the run. DNS and CA trust remain operator actions. | [Caddy](../deploy/nucleus/Caddyfile), [installer](../deploy/nucleus/install.sh), [preflight](../deploy/nucleus/preflight.py) |
+| Complete debug history for one deployment | **Durable run timeline implemented.** A run ID connects model/revision, stages, jobs, endpoint evidence, and recovery; worker failure is surfaced for safe resume. | [Deployments](../notebooks/mxstudio/deployments.py), [jobs](../notebooks/mxstudio/jobs.py) |
+| Independent client completion proof | **Trusted-operator report, not remote attestation.** A streamed HTTPS probe records a distinct machine fingerprint and fresh timestamps; the operator imports the JSON proof to transition to `ready`. Evidence expires after 24 hours. | [CLI](../notebooks/mxstudio/cli.py), [API](../notebooks/mxstudio/api.py), [deployments](../notebooks/mxstudio/deployments.py) |
 
-**Conclusion: the core mission is not finished.** Prior implementation delivered
-useful components, not the integrated experience described above. Unit tests of
-those components do not establish completion of this product contract.
+**Conclusion: the terminal/API integration is implemented, but the appliance
+acceptance is not complete.** Hermetic tests do not establish successful MAX
+execution, distro installation, LAN reachability, TLS trust, or independent
+client generation on real hardware.
+
+The explicit catalog reference syntax is `catalog:<exact MAX architecture>`,
+for example `catalog:Qwen2`; matching is case-insensitive but exact. A unique HF
+example resolves to its real repository with `source="catalog"`. Zero examples
+is an actionable `missing` result; multiple examples return `ambiguous`
+candidates and require an exact HF ID, never auto-select; unavailable installed
+MAX catalog data is an actionable `blocked` result rather than a guessed fallback.
+Before `up` downloads, known HF dtype/quantization metadata is compared with
+normalized MAX encodings; unsupported/unknown architectures or clear encoding
+mismatches block serving before fetch. `pull` still permits unsupported
+architecture/encoding weights for later port work, retaining `supported=false`;
+missing safetensors artifacts alone block the pull. Compatibility checks are
+guidance, not runtime proof; pull errors and blockers are structured results.
 
 ## What “done” must mean to the user
 
@@ -62,8 +79,10 @@ those components do not establish completion of this product contract.
 - Reuse cached weights and a suitable running model instead of repeating work unnecessarily.
 - Require recorded model-load and real generation evidence; unsupported ports also need
   strict weight loading and reference-comparison evidence before promotion.
-- Receive an authenticated HTTPS base URL, model ID, and safe credential instructions.
-- Verify a real chat through that HTTPS URL, not only localhost health or model listing.
+- Receive an authenticated HTTPS base URL and model identity only after the
+  corresponding stages provide evidence.
+- Verify a real chat through HTTPS from both the server and an independent client;
+  server-side evidence alone must remain `awaiting_client_verification`.
 - Preserve a per-run timeline: resolved source/revision, compatibility decisions,
   commands, versions/hardware, durations, exit status, logs, and validation artifacts.
   Redact credentials; do not record user prompts by default.
@@ -88,7 +107,28 @@ universal client readiness before those checks succeed.
 - **Local persistence:** keep SQLite jobs and the existing FastAPI controller;
   changing the web framework or database is not the missing product feature.
 
-The next milestone is to connect the existing supported-model path to verified
-Caddy publication as one logged, terminal-first workflow. The unsupported-model
-adaptation loop is a separate substantial gap that must then join the same
-success/failure contract—not be represented as already solved by skill preflight.
+The next work is live A4/A5 acceptance: approved Linux installation, Caddy
+hostname/CA setup, and an independent client request. Unsupported-model
+adaptation (B) and LiteLLM endpoint routing (C) remain deferred; guided
+preflight/scaffolding and optional gateway files are not those milestones.
+
+## Shipped run states and evidence
+
+- `downloaded`: a revision-pinned checkpoint was downloaded/validated; it is not
+  proof that MAX can load or generate with it.
+- `local_ready`: the managed MAX process passed a local authenticated streamed
+  generation check for the pinned revision. No LAN claim follows.
+- `needs_setup`: service installation, hostname resolution, or CA setup needs an
+  operator. This is a handoff, not success; `mxs up` does not invoke sudo or apply
+  host changes.
+- `awaiting_client_verification`: server-side HTTPS authenticated generation and
+  private-route checks passed. Independent client trust/generation is still
+  missing, so this is not `ready`.
+- `ready`: server proof plus an imported, fresh independent-client probe report
+  were accepted. Provenance is `trusted_operator_report`, not cryptographic
+  remote attestation. Fingerprints must differ; server/client evidence is limited
+  to 24 hours, client time cannot precede server time and may be at most 300
+  seconds in the future, and the probe is bounded to 300 seconds.
+- `blocked`, `failed`, `interrupted`, and `stopped` retain their distinct
+  recovery/ownership meaning; resume does not claim a completed stage without
+  evidence.

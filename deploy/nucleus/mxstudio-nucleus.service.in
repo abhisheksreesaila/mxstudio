@@ -7,14 +7,10 @@ Type=simple
 User=@NUCLEUS_USER@
 Group=@NUCLEUS_GROUP@
 WorkingDirectory=@MXSTUDIO_ROOT@
-EnvironmentFile=/etc/mxstudio/nucleus.env
+EnvironmentFile=@NUCLEUS_ENV_FILE@
 Environment=PYTHONPATH=@MXSTUDIO_ROOT@/notebooks
 Environment=MAX_SERVE_HOST=127.0.0.1
-Environment=MXSTUDIO_HOME=/var/lib/mxstudio
-Environment=HF_HOME=/var/cache/mxstudio/huggingface
 ExecStart=@MXSTUDIO_ROOT@/.pixi/envs/default/bin/python -m mxstudio.cli nucleus run --host 127.0.0.1 --port 8080 --workers 1
-StateDirectory=mxstudio
-CacheDirectory=mxstudio
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

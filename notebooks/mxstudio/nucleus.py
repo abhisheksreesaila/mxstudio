@@ -57,6 +57,7 @@ class NucleusManager:
                 "profile": "nucleus",
                 "configured": configured(),
                 "desired_model": model_id() or None,
+                "desired_revision": os.environ.get("NUCLEUS_MODEL_REVISION") or None,
                 "server": server,
                 "readiness": dict(self._progress),
                 "active_leases": len(self._leases),
@@ -75,10 +76,20 @@ class NucleusManager:
             wanted = str(SERVERS.status().get("model_id") or "")
         if not wanted:
             raise ValueError("NUCLEUS_MODEL_ID is not configured")
+        if os.environ.get("NUCLEUS_MODEL_REVISION") and wanted != model_id():
+            raise ValueError("this deployment serves only its configured model revision")
         return wanted
 
     def _entry(self, requested: str | None = None):
         wanted = self.resolve(requested)
+        revision = os.environ.get("NUCLEUS_MODEL_REVISION", "").strip()
+        if revision:
+            from notebooks.mxstudio import inventory
+
+            record = inventory.get_model(wanted, revision=revision)
+            if record is None:
+                raise RuntimeError("pinned model is not installed in this service's inventory")
+            return inventory.entry_for(record)
         entry = registry.get(wanted)
         if entry is None:
             if not downloads.is_installed(wanted):
@@ -92,7 +103,9 @@ class NucleusManager:
 
     @staticmethod
     def _ready(status: dict, wanted: str) -> bool:
+        revision = os.environ.get("NUCLEUS_MODEL_REVISION", "").strip()
         return (status.get("state") == "running" and status.get("model_id") == wanted
+                and (not revision or status.get("revision") == revision)
                 and status.get("host") == MODEL_HOST and SERVERS.model_matches(wanted))
 
     def _prepare_sync(self, requested: str | None, timeout: float) -> dict:
@@ -214,6 +227,9 @@ async def proxy_openai(path: str, body: dict):
     )
     response = None
     try:
+        observed = await asyncio.to_thread(SERVERS.status)
+        if body.get("model") == observed.get("model_id") and observed.get("advertised_model_id"):
+            body = dict(body, model=observed["advertised_model_id"])
         request = client.build_request("POST", path, json=body)
         response = await client.send(request, stream=True)
         if body.get("stream") and response.is_success:

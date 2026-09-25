@@ -126,5 +126,79 @@ class HardwareFitTests(unittest.TestCase):
         self.assertIn("Apple GPU inference is not enabled", fit["message"])
 
 
+class MaxCatalogTests(unittest.TestCase):
+    @patch(
+        "notebooks.mxstudio.compat.max_architectures",
+        return_value={
+            "Qwen2": {
+                "description": "Qwen models",
+                "encodings": ["bf16"],
+                "examples": ["org/model", "Qwen", "not/a/valid/repo"],
+            }
+        },
+    )
+    def test_catalog_normalizes_installed_architectures(self, _architectures) -> None:
+        catalog = compat.max_catalog()
+
+        self.assertTrue(catalog["available"])
+        self.assertEqual(catalog["source"], "max list --json")
+        self.assertEqual(catalog["entries"][0]["architecture"], "Qwen2")
+        self.assertEqual(catalog["entries"][0]["encodings"], ["bf16"])
+        self.assertEqual(catalog["entries"][0]["examples"], ["org/model"])
+
+    @patch("notebooks.mxstudio.compat.max_architectures", return_value={})
+    def test_unavailable_catalog_is_explicit(self, _architectures) -> None:
+        catalog = compat.max_catalog()
+
+        self.assertFalse(catalog["available"])
+        self.assertEqual(catalog["entries"], [])
+        self.assertIn("unknown", catalog["advisory"])
+
+    @patch("notebooks.mxstudio.compat.subprocess.run")
+    @patch("notebooks.mxstudio.compat.shutil.which")
+    def test_max_list_architecture_array_is_normalized(self, which, run) -> None:
+        which.side_effect = lambda command: "/usr/bin/max" if command == "max" else None
+        run.return_value.returncode = 0
+        run.return_value.stdout = (
+            '{"architectures":[{"name":"Qwen2","encodings":["bf16"]}]}'
+        )
+        compat.max_architectures.cache_clear()
+        try:
+            architectures = compat.max_architectures()
+        finally:
+            compat.max_architectures.cache_clear()
+
+        self.assertIn("Qwen2", architectures)
+        self.assertEqual(architectures["Qwen2"]["encodings"], ["bf16"])
+
+    def test_catalog_family_aliases_respect_hf_architecture_version(self) -> None:
+        self.assertTrue(compat.architecture_listed("LlamaForCausalLM", {"Llama3": {}}))
+        self.assertTrue(compat.architecture_listed("Qwen2ForCausalLM", {"Qwen2": {}}))
+        self.assertFalse(compat.architecture_listed("Qwen2ForCausalLM", {"Qwen3": {}}))
+
+    def test_checkpoint_quantization_is_compared_to_max_encodings(self) -> None:
+        checkpoint = compat.checkpoint_encoding(
+            {"quantization_config": {"quant_method": "gptq", "bits": 4}}
+        )
+        result = compat.encoding_compatibility(
+            "Qwen2ForCausalLM",
+            checkpoint,
+            {"Qwen2": {"encodings": ["bf16", "fp16"]}},
+        )
+
+        self.assertEqual(checkpoint["encoding"], "int4")
+        self.assertEqual(result["status"], "unsupported")
+        self.assertIn("int4", result["advisory"])
+
+    def test_dtype_alias_matches_max_encoding_evidence(self) -> None:
+        checkpoint = compat.checkpoint_encoding({"torch_dtype": "bfloat16"})
+        result = compat.encoding_compatibility(
+            "Qwen2ForCausalLM", checkpoint, {"Qwen2": {"encodings": ["bf16"]}}
+        )
+
+        self.assertEqual(result["status"], "supported")
+        self.assertEqual(result["checkpoint_encoding"], "bf16")
+
+
 if __name__ == "__main__":
     unittest.main()

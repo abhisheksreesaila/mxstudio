@@ -350,12 +350,24 @@ class NucleusCLITests(IsolatedState, unittest.TestCase):
 
 
 class ProxyCleanupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_proxy_maps_canonical_identity_without_mutating_request(self):
+        client = MagicMock()
+        client.send = AsyncMock(return_value=httpx.Response(200, json={}))
+        client.aclose = AsyncMock()
+        body = {"model": "example/a", "stream": False}
+        with patch.object(nucleus.httpx, "AsyncClient", return_value=client), \
+             patch.object(nucleus.SERVERS, "status", return_value={"model_id": "example/a", "advertised_model_id": "/cache/snapshot"}):
+            await nucleus.proxy_openai("/v1/chat/completions", body)
+        self.assertEqual(client.build_request.call_args.kwargs["json"]["model"], "/cache/snapshot")
+        self.assertEqual(body["model"], "example/a")
+
     async def test_send_failures_and_cancellation_close_client(self):
         for failure in (httpx.ConnectError("test"), asyncio.CancelledError()):
             client = MagicMock()
             client.send = AsyncMock(side_effect=failure)
             client.aclose = AsyncMock()
-            with patch.object(nucleus.httpx, "AsyncClient", return_value=client):
+            with patch.object(nucleus.httpx, "AsyncClient", return_value=client), \
+                 patch.object(nucleus.SERVERS, "status", return_value={}):
                 with self.assertRaises(type(failure)):
                     await nucleus.proxy_openai("/v1/chat/completions", {"stream": True})
             client.aclose.assert_awaited_once()
@@ -414,6 +426,18 @@ class ServerLaunchTests(IsolatedState, unittest.TestCase):
 
 
 class ModelResolutionTests(unittest.TestCase):
+    def test_pinned_controller_rejects_other_models_and_revisions(self):
+        manager = nucleus.NucleusManager()
+        with patch.dict(os.environ, {"NUCLEUS_MODEL_ID": "example/a", "NUCLEUS_MODEL_REVISION": "a" * 40}), \
+             patch.object(nucleus.SERVERS, "model_matches", return_value=True):
+            self.assertEqual(manager.resolve("local"), "example/a")
+            with self.assertRaisesRegex(ValueError, "configured model revision"):
+                manager.resolve("example/b")
+            status = {"state": "running", "model_id": "example/a", "host": servers.MODEL_HOST, "revision": "b" * 40}
+            self.assertFalse(manager._ready(status, "example/a"))
+            status["revision"] = "a" * 40
+            self.assertTrue(manager._ready(status, "example/a"))
+
     def test_custom_model_keeps_architecture(self):
         with patch.object(nucleus.downloads, "is_installed", return_value=True), \
              patch.object(nucleus.registry, "get", return_value=None), \

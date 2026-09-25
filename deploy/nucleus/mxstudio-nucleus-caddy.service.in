@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 User=@NUCLEUS_USER@
 Group=@NUCLEUS_GROUP@
-EnvironmentFile=/etc/mxstudio/nucleus.env
+EnvironmentFile=@NUCLEUS_ENV_FILE@
 WorkingDirectory=/var/lib/mxstudio-caddy
 Environment=XDG_DATA_HOME=/var/lib/mxstudio-caddy
 Environment=XDG_CONFIG_HOME=/var/cache/mxstudio-caddy

@@ -6,13 +6,11 @@ Type=simple
 User=@NUCLEUS_USER@
 Group=@NUCLEUS_GROUP@
 WorkingDirectory=@MXSTUDIO_ROOT@
-EnvironmentFile=/etc/mxstudio/nucleus.env
-Environment=VIRTUAL_ENV=/var/lib/mxstudio/litellm-venv
-Environment=PATH=/var/lib/mxstudio/litellm-venv/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=@NUCLEUS_ENV_FILE@
+Environment=VIRTUAL_ENV=@MXSTUDIO_HOME@/.litellm-venv
+Environment=PATH=@MXSTUDIO_HOME@/.litellm-venv/bin:/usr/local/bin:/usr/bin:/bin
 UMask=0077
-ExecStart=/var/lib/mxstudio/litellm-venv/bin/litellm --config @MXSTUDIO_ROOT@/deploy/nucleus/litellm_config.yaml --host 127.0.0.1 --port 4000
-StateDirectory=mxstudio
-CacheDirectory=mxstudio
+ExecStart=@MXSTUDIO_HOME@/.litellm-venv/bin/litellm --config @MXSTUDIO_ROOT@/deploy/nucleus/litellm_config.yaml --host 127.0.0.1 --port 4000
 Restart=on-failure
 NoNewPrivileges=true
 [Install]

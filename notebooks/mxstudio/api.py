@@ -5,13 +5,15 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
+from typing import Literal
 
 import anyio
 import httpx
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from notebooks.mxstudio import agents, architectures, compat, downloads, fhsaas, hwinfo, jobs, modelinfo, notebooks, registry, settings as studio_settings
@@ -423,6 +425,205 @@ def _nucleus_auth(request: Request) -> None:
         raise HTTPException(401, "invalid or missing Nucleus API key", headers={"WWW-Authenticate": "Bearer"})
 
 
+class NucleusRunRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=256)
+    revision: str | None = Field(None, min_length=1, max_length=200)
+    mode: Literal["pull", "local", "lan"] = "lan"
+    hostname: str = Field("api.mxstudio.local", min_length=1, max_length=253)
+    ca_file: str | None = Field(None, min_length=1, max_length=4096)
+
+
+class NucleusEndpointVerifyRequest(BaseModel):
+    ca_file: str | None = Field(None, min_length=1, max_length=4096)
+
+
+def _deployment_id(value: str) -> str:
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", value):
+        raise HTTPException(400, "invalid deployment identifier")
+    return value
+
+
+def _validate_nucleus_run(req: NucleusRunRequest) -> None:
+    if not req.query.strip():
+        raise HTTPException(400, "query must not be blank")
+    if req.revision is not None and (
+        not re.fullmatch(r"[A-Za-z0-9._/-]{1,200}", req.revision)
+    ):
+        raise HTTPException(400, "invalid revision")
+    hostname_labels = req.hostname.split(".")
+    if not hostname_labels or not all(
+        re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label)
+        for label in hostname_labels
+    ):
+        raise HTTPException(400, "invalid hostname")
+    if req.ca_file is not None and ("\x00" in req.ca_file or not req.ca_file.strip()):
+        raise HTTPException(400, "invalid CA file path")
+
+
+def _validate_client_evidence(evidence: dict) -> None:
+    if (
+        evidence.get("vantage") != "client"
+        or not isinstance(evidence.get("machine_fingerprint"), str)
+        or not evidence["machine_fingerprint"].strip()
+        or not isinstance(evidence.get("base_url"), str)
+        or not evidence["base_url"].startswith("https://")
+        or not isinstance(evidence.get("model_id"), str)
+        or not evidence["model_id"].strip()
+        or not isinstance(evidence.get("content_bytes"), int)
+        or isinstance(evidence.get("content_bytes"), bool)
+        or evidence["content_bytes"] <= 0
+        or evidence.get("stream_complete") is not True
+        or evidence.get("authentication_verified") is not True
+        or evidence.get("tls_verified") is not True
+        or evidence.get("private_routes_verified") is not True
+    ):
+        raise HTTPException(400, "invalid client probe evidence")
+
+
+@app.post("/nucleus/runs", status_code=202)
+def nucleus_create_run(request: Request, req: NucleusRunRequest) -> dict:
+    _nucleus_auth(request)
+    _validate_nucleus_run(req)
+    from notebooks.mxstudio import deployments
+
+    try:
+        created = deployments.create_run(
+            req.query.strip(),
+            revision=req.revision,
+            mode=req.mode,
+            hostname=req.hostname.strip(),
+            ca_file=req.ca_file,
+        )
+        run_id = created["run_id"]
+        run = deployments.enqueue(run_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:300]) from None
+    except (KeyError, RuntimeError):
+        raise HTTPException(409, "deployment run could not be scheduled") from None
+    return {
+        "run_id": run_id,
+        "job_id": run.get("job_id") if isinstance(run, dict) else None,
+        "run": run if isinstance(run, dict) else created,
+    }
+
+
+@app.get("/nucleus/runs")
+def nucleus_list_runs(request: Request) -> list[dict]:
+    _nucleus_auth(request)
+    from notebooks.mxstudio import deployments
+
+    return deployments.list_runs()
+
+
+@app.get("/nucleus/runs/{run_id}")
+def nucleus_get_run(request: Request, run_id: str) -> dict:
+    _nucleus_auth(request)
+    run_id = _deployment_id(run_id)
+    from notebooks.mxstudio import deployments
+
+    run = deployments.get_run(run_id)
+    if run is None:
+        raise HTTPException(404, "deployment run not found")
+    return run
+
+
+@app.post("/nucleus/runs/{run_id}/resume", status_code=202)
+def nucleus_resume_run(request: Request, run_id: str) -> dict:
+    _nucleus_auth(request)
+    run_id = _deployment_id(run_id)
+    from notebooks.mxstudio import deployments
+
+    try:
+        run = deployments.resume(run_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:300]) from None
+    except RuntimeError:
+        raise HTTPException(409, "deployment run could not be resumed") from None
+    return {
+        "run_id": run.get("run_id", run_id),
+        "job_id": run.get("job_id"),
+        "run": run,
+    }
+
+
+@app.get("/nucleus/endpoints")
+def nucleus_list_endpoints(request: Request) -> list[dict]:
+    _nucleus_auth(request)
+    from notebooks.mxstudio import deployments
+
+    return deployments.list_endpoints()
+
+
+@app.post("/nucleus/endpoints/{run_id}/verify", status_code=202)
+def nucleus_verify_endpoint(
+    request: Request,
+    run_id: str,
+    req: NucleusEndpointVerifyRequest | None = None,
+) -> dict:
+    _nucleus_auth(request)
+    run_id = _deployment_id(run_id)
+    ca_file = req.ca_file if req else None
+    if ca_file is not None and ("\x00" in ca_file or not ca_file.strip()):
+        raise HTTPException(400, "invalid CA file path")
+    from notebooks.mxstudio import deployments
+
+    try:
+        run = deployments.get_run(run_id)
+        if run is None or not run.get("endpoint"):
+            raise HTTPException(404, "deployment has no endpoint")
+        job = jobs.enqueue_process(
+            "endpoint_verify",
+            f"Verify endpoint {run_id}",
+            {"run_id": run_id, "ca_file": ca_file},
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:300]) from None
+    except RuntimeError:
+        raise HTTPException(503, "endpoint verification could not be scheduled") from None
+    return {"run_id": run_id, "job_id": job["job_id"], "queued": True}
+
+
+@app.post("/nucleus/endpoints/{run_id}/stop", status_code=202)
+def nucleus_stop_endpoint(request: Request, run_id: str) -> dict:
+    _nucleus_auth(request)
+    run_id = _deployment_id(run_id)
+    from notebooks.mxstudio import deployments
+
+    try:
+        run = deployments.get_run(run_id)
+        if run is None or not run.get("endpoint"):
+            raise HTTPException(404, "deployment has no endpoint")
+        job = jobs.enqueue_process(
+            "endpoint_stop",
+            f"Stop endpoint {run_id}",
+            {"run_id": run_id},
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)[:300]) from None
+    except RuntimeError:
+        raise HTTPException(503, "endpoint stop could not be scheduled") from None
+    return {"run_id": run_id, "job_id": job["job_id"], "queued": True}
+
+
+@app.post("/nucleus/endpoints/{run_id}/client-evidence")
+def nucleus_accept_client_evidence(
+    request: Request,
+    run_id: str,
+    evidence: dict = Body(...),
+) -> dict:
+    _nucleus_auth(request)
+    run_id = _deployment_id(run_id)
+    _validate_client_evidence(evidence)
+    from notebooks.mxstudio import deployments
+
+    try:
+        return deployments.record_client_evidence(run_id, evidence)
+    except ValueError:
+        raise HTTPException(400, "invalid client evidence or deployment binding") from None
+    except RuntimeError:
+        raise HTTPException(409, "client evidence could not be accepted") from None
+
+
 @app.get("/nucleus/status")
 def nucleus_status(request: Request) -> dict:
     _nucleus_auth(request)
@@ -460,10 +661,17 @@ def nucleus_job(request: Request, job_id: str) -> dict:
 def nucleus_models(request: Request) -> dict:
     _nucleus_auth(request)
     status = SERVERS.status()
-    model = nucleus.model_id() or status.get("model_id")
+    canonical_model = nucleus.model_id() or status.get("model_id")
     return {"object": "list", "data": [
-        {"id": model, "object": "model", "created": 0, "owned_by": "mxstudio"}
-    ] if model else []}
+        {
+            "id": canonical_model,
+            "model_id": canonical_model,
+            "object": "model",
+            "created": 0,
+            "owned_by": "mxstudio",
+            "revision": status.get("revision"),
+        }
+    ] if canonical_model else []}
 
 
 @app.exception_handler(HTTPException)
@@ -502,14 +710,29 @@ async def nucleus_chat(request: Request) -> Response:
         raise HTTPException(400, "model must be a nonempty string")
     if "stream" in body and not isinstance(body["stream"], bool):
         raise HTTPException(400, "stream must be a boolean")
+    requested_model = body["model"]
     try:
+        initial_status = await asyncio.to_thread(SERVERS.status)
+        canonical_model = nucleus.model_id() or initial_status.get("model_id")
+        advertised_model = initial_status.get("advertised_model_id") or canonical_model
+        if (
+            canonical_model
+            and advertised_model
+            and requested_model == advertised_model
+        ):
+            body["model"] = canonical_model
         lease = nucleus.MANAGER.lease(body["model"])
         admitted = await lease.__aenter__()
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from None
     except (TimeoutError, RuntimeError) as exc:
         raise HTTPException(503, str(exc), headers={"Retry-After": "5"}) from None
-    body["model"] = admitted["model_id"]
+    server = admitted.get("server") or {}
+    body["model"] = (
+        server.get("advertised_model_id")
+        or server.get("model_id")
+        or admitted["model_id"]
+    )
     try:
         upstream = await nucleus.proxy_openai("/v1/chat/completions", body)
     except BaseException as exc:

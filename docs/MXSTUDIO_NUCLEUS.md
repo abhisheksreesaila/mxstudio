@@ -4,6 +4,13 @@ Nucleus extends the existing Studio controller; it does not introduce a second
 MAX process owner. The simplest profile is **Caddy → Nucleus → MAX**. LiteLLM and
 PostgreSQL are optional when satellite apps need separate virtual keys.
 
+**Implementation status (2026-09-25):** durable runs, CLI/API adapters, installer
+handoffs, and distinct server/client evidence states are implemented and have
+hermetic coverage. No live Hugging Face download, MAX inference, distro install,
+or LAN/client TLS acceptance was performed for this change. This is not a claim
+that all plan-A live acceptance is complete. Unsupported-model port automation
+(B) and gateway endpoint inventory/routing (C) are deferred.
+
 ## Recommended stack: FastAPI + SQLite, with MAX
 
 **Yes, SQLite is a good fit for the current single-machine controller, and it is
@@ -42,7 +49,165 @@ not been built. **Recommendation: use the core profile first; add the gateway on
 when those extra capabilities are needed.** No database or framework changes are
 required to try the current core.
 
-## Start locally, without the GUI
+## Durable deployment workflow
+
+The terminal path is the primary interface; the Studio GUI is not required.
+These commands create durable deployment runs and retain revision/stage evidence:
+
+```bash
+pixi run mxs catalog --json
+pixi run mxs pull org/model --revision COMMIT_SHA
+pixi run mxs runs list
+pixi run mxs runs inspect RUN_ID
+pixi run mxs up org/model --local-only
+```
+
+`pull` resolves and downloads a pinned checkpoint. `up` defaults to LAN mode and
+waits for the run; `--no-wait` returns after scheduling. `--revision` can pin an
+immutable revision, while `--hostname` and `--ca-file` configure HTTPS identity
+and trust. Existing `download`, `serve`, `nucleus prepare`, and `nucleus run`
+commands remain available as lower-level workflows.
+
+MAX architecture catalog lookup uses `catalog:<exact architecture>`, e.g.
+`catalog:Qwen2` (case-insensitive, exact match). If that architecture has one HF
+example, the resolver uses its actual repository ID and sets `source="catalog"`.
+No example produces an actionable `missing` state; multiple examples produce an
+`ambiguous` response with candidates and require an exact HF `org/name`—the
+resolver never auto-selects. Unavailable `max list --json` data produces an
+actionable `blocked` result rather than a guessed fallback.
+Before `up` downloads, known HF dtype/quantization metadata is checked against
+normalized MAX encodings; unsupported/unknown architectures or clear encoding
+mismatches block serving before fetch. `pull` permits unsupported
+architecture/encoding weights for later port work while retaining
+`supported=false`; missing safetensors artifacts block the pull. These checks
+are guidance, not proof of runtime support, and direct pulls return structured
+blocked/error records.
+
+Run states describe evidence, not optimistic milestones:
+
+| State | Meaning |
+| --- | --- |
+| `downloaded` | The selected snapshot/revision was downloaded and validated; no MAX load or generation claim. |
+| `local_ready` | Pinned MAX load and authenticated local generated-content probe passed. No LAN claim. |
+| `needs_setup` | First-time service installation or hostname/CA setup needs an operator. It is a handoff, **not success**. `mxs up` never invokes sudo or applies host changes. |
+| `awaiting_client_verification` | Authenticated HTTPS generation and route-isolation checks passed from the server, but an independent client proof is still required. Not `ready`. |
+| `ready` | Server evidence and a fresh independent-client report were accepted for the endpoint's model/revision. |
+| `blocked`, `failed`, `interrupted`, `stopped` | An explicit blocker, operation failure, lost worker, or owned-resource stop; inspect recovery/run history before acting. |
+
+The CLI prints the run ID before waiting. `mxs runs inspect RUN_ID` and
+`mxs runs resume RUN_ID` inspect or resume it; resume reuses the recorded model
+and options rather than silently selecting a new revision.
+
+### First-time setup is an explicit operator decision
+
+For a LAN run, `needs_setup` contains a private per-run environment file under
+`$MXSTUDIO_HOME/deployments/<RUN_ID>/nucleus.env` and recovery instructions. The
+key is never printed. Review the file locally; do not copy or share its contents.
+The setup handoff supplies three exact commands:
+
+1. `dry_run_command` runs the installer with `--dry-run`, the unique destination
+   `/etc/mxstudio/deployments/<RUN_ID>/nucleus.env`, `--service-user-current`,
+   and the selected private service group. Run it first; it is read-only and
+   does not require sudo.
+2. After reviewing the plan, `environment_install_command` uses a
+   `sudo test ! -e ...` guard and `sudo install -D` to copy the per-run file to
+   its unique destination, owned by `root:<service-group>` with mode `0640`.
+   If the destination exists, stop and compare it privately; never overwrite it.
+3. Only after explicit operator approval, run the supplied `install_command`,
+   which uses `sudo bash ... --apply` and the same `--env-file`,
+   `--service-user-current`, and `--service-group` options. It is not emitted
+   with `--install` or a named `--service-user`.
+
+Use the exact values and commands shown in that run record rather than replacing
+the unique path with `/etc/mxstudio/nucleus.env`. The selected current account is
+the service user; the service group must be private to that account. The installer
+supports Debian/Ubuntu and Arch/Omarchy x86_64. `up` does not invoke any of these
+commands. Resolve the advertised hostname and configure Caddy CA trust separately;
+neither DNS/mDNS nor trust is changed automatically.
+
+After an approved installation and restart, inspect the same run with
+`mxs runs resume RUN_ID` or `mxs endpoint verify RUN_ID --ca-file CA_PATH`.
+Before HTTPS probing, verification checks that the installed Nucleus systemd
+service has exactly one protected environment file and that its loaded service
+user/group, active state, `MXSTUDIO_HOME`, `HF_HOME`, model, revision, and hostname
+match this run. A missing or mismatched identity returns the run to `needs_setup`.
+Only after those checks pass does verification check TLS and perform a real
+streamed response from the server, leaving the run in
+`awaiting_client_verification`. The CLI command performs the check directly; the
+authenticated API counterpart queues it and returns a job ID.
+
+### Independent-client proof
+
+The controller key is loaded from `MXSTUDIO_NUCLEUS_API_KEY`, or created at
+`$MXSTUDIO_HOME/endpoint.key` (normally `~/.mxstudio/endpoint.key`) with owner-only
+permissions. Keep it in a secret manager or protected environment; never put it
+in a command argument, proof file, or shared logs.
+
+On a second client, set the key in that machine's environment without echoing it.
+Use the public canonical `id` and pinned `revision` from authenticated
+`GET /v1/models`. MAX's backend-advertised model ID is an internal routing detail
+and is not exposed as the public model ID.
+
+```bash
+pixi run mxs endpoint probe \
+  --url https://api.mxstudio.local/v1 \
+  --model CANONICAL_MODEL_ID \
+  --ca-file /path/to/trusted-caddy-ca.crt > client-proof.json
+```
+
+The probe requires HTTPS, validates the CA, checks authentication and route
+isolation, and verifies nonempty streamed generation. It prints machine-readable
+proof without a key. Transfer that JSON proof to the appliance through a trusted
+operator channel, then import it there while the authenticated loopback Nucleus
+API is available:
+
+```bash
+pixi run mxs endpoint accept-client RUN_ID --evidence client-proof.json
+```
+
+The file is limited to 64 KiB. At acceptance, the controller validates
+endpoint/model/revision binding, a different machine fingerprint,
+server-before-client timestamps, evidence freshness (24 hours), clock skew (at
+most 300 seconds into the future), and a 300-second probe time budget. `ready`
+records that accepted evidence; it is not a continuous health monitor. Accepted provenance is
+`trusted_operator_report`: this is an operator-imported probe record, **not
+cryptographic remote attestation**. Protect the proof file and remove it when no
+longer needed.
+
+### CLI and private management API
+
+Additional commands:
+
+```text
+mxs runs list [--json]
+mxs runs inspect RUN_ID [--json]
+mxs runs resume RUN_ID [--no-wait] [--json]
+mxs endpoint list [--json]
+mxs endpoint verify RUN_ID [--ca-file CA_PATH] [--json]
+mxs endpoint stop RUN_ID [--json]
+mxs endpoint probe --url HTTPS_BASE_URL --model ID [--ca-file PATH]
+mxs endpoint accept-client RUN_ID --evidence JSON_PATH
+```
+
+All `/nucleus/*` management routes require the controller key and are private;
+Caddy exposes only `GET /v1/models` and `POST /v1/chat/completions`, never run,
+verify, stop, or client-evidence management:
+
+| Route | Result |
+| --- | --- |
+| `POST /nucleus/runs` | Creates/enqueues a run; HTTP 202 with `run_id` and `job_id`. Body: `query`, optional `revision`, `mode` (`pull`, `local`, `lan`), `hostname`, and `ca_file`. |
+| `GET /nucleus/runs`, `GET /nucleus/runs/{id}` | List or inspect durable run records and stage evidence. |
+| `POST /nucleus/runs/{id}/resume` | Re-enqueues a validated existing run; HTTP 202 with IDs. |
+| `GET /nucleus/endpoints` | Lists recorded endpoints and their distinct evidence. |
+| `POST /nucleus/endpoints/{id}/verify`, `/stop` | Queue endpoint verification/owned-resource stop; HTTP 202 with `run_id` and `job_id`. Poll the run record for its resulting state. |
+| `POST /nucleus/endpoints/{id}/client-evidence` | Authenticated local import of the probe JSON; validates the proof before recording it. Never route through Caddy. |
+
+`GET /v1/models` keeps the canonical HF identity as its public `id` and
+`model_id` metadata, and includes the pinned `revision`. Chat accepts the
+canonical ID and maps it to MAX's learned backend-advertised ID internally; the
+backend load-path-derived ID is not a client-facing identifier.
+
+## Manual local Nucleus profile
 
 Run these Bash commands from the checkout. They download a starter model into
 this user's Hugging Face cache and start real MAX; packages/weights require
@@ -131,12 +296,14 @@ is the server root, such as `http://127.0.0.1:8080`, **without** `/v1`.
 All Nucleus routes require `Authorization: Bearer <key>` or `X-API-Key`.
 Only these inference routes are exposed by either Caddy profile:
 
-- `GET /v1/models`: configured/current model metadata, with no preparation side effects.
+- `GET /v1/models`: canonical public model `id`, canonical `model_id` metadata,
+  and immutable `revision`, with no preparation side effects.
 - `POST /v1/chat/completions`: streaming or non-streaming OpenAI-compatible chat.
 
-Requests may select a downloaded registry/custom model by canonical ID;
-`nucleus-local` and `local` resolve to `NUCLEUS_MODEL_ID`. MAX compatibility is
-still required; a downloaded checkpoint or scaffold is not proof of support.
+Chat accepts the canonical public ID, leases the pinned managed model, and maps
+to the backend-advertised ID only on the private MAX hop. `nucleus-local` and
+`local` resolve to `NUCLEUS_MODEL_ID`. MAX compatibility is still required; a
+downloaded checkpoint or scaffold is not proof of support.
 
 Private loopback management routes, **never routed through Caddy**:
 
@@ -144,6 +311,9 @@ Private loopback management routes, **never routed through Caddy**:
 - `POST /nucleus/prepare`, body `{"model":"...","timeout_s":600}`: returns
   HTTP 202 and `job_id` using the existing detached job worker.
 - `GET /nucleus/jobs/{job_id}`: durable preparation progress/result.
+- Deployment run, endpoint, verify/stop, and client-evidence routes described
+  above. They require the same controller authentication and are not reachable
+  through either Caddy profile. Poll run records after queued verify/stop jobs.
 
 Shared filesystem reservations protect Nucleus requests, Studio chat/agents,
 CLI chat, and managed benchmarks for their entire execution. Preparation and
@@ -173,6 +343,9 @@ Legacy state without `process_identity` is deliberately refused: inspect and
 stop the old MAX instance explicitly before migrating. Do not delete state to
 bypass an active/unverified process. CLI-launched MAX may outlive the API;
 `mxs stop` deliberately stops it once reservations are released.
+When switching models for a non-service endpoint, MX Studio stops only its
+tracked controller under the lifecycle reservation before changing the managed
+MAX model. Existing systemd service configuration is never silently rewritten.
 
 ## Optional systemd installation
 
@@ -182,20 +355,25 @@ The installer is **read-only by default**:
 ./deploy/nucleus/install.sh --dry-run --with-caddy
 ```
 
-Installation supports Ubuntu/Debian **x86_64**. It is not an Arch/Omarchy package
-installer and the lockfile does not support Apple Silicon Linux. Use the local
-CLI workflow on other supported environments; do not infer GPU/hardware support
+Installation supports Debian/Ubuntu and Arch/Omarchy **x86_64**. The Linux
+installer does not support Apple Silicon Linux; do not infer GPU/hardware support
 from the presence of deployment files.
+
+The commands below describe a standalone/manual installation. A deployment run's
+`needs_setup` handoff instead uses a unique protected environment path under
+`/etc/mxstudio/deployments/<RUN_ID>/nucleus.env`; follow its generated commands
+and do not substitute the shared manual-install path.
 
 Before explicit installation:
 
 1. Provide a dedicated checkout readable/traversable by the non-root `mxstudio`
    user. Its `.pixi` environment must be writable by that user. Install Pixi at
    a shared executable path visible to `sudo` and the service user.
-2. Populate `/etc/mxstudio/nucleus.env` from
-   [the example](../deploy/nucleus/nucleus.env.example), owned `root:mxstudio`
-   with mode 0640. Create the group first if necessary. The installer creates
-   the system user/group if absent but never generates or overwrites secrets.
+2. Populate the selected absolute `--env-file` path (default
+   `/etc/mxstudio/nucleus.env`) from [the example](../deploy/nucleus/nucleus.env.example)
+   or the per-run protected setup handoff. It must be owned `root:GROUP` with
+   mode 0640. The installer creates the system user/group if absent but never
+   generates or overwrites secrets.
    Use one literal assignment per line, optionally quoted; no multiline values,
    escapes, or shell expansion. URL-encode PostgreSQL passwords.
 3. Download the selected model as the service user with
@@ -206,12 +384,19 @@ Before explicit installation:
    ensure 80/443 are available. Existing active/enabled host Caddy causes a clear
    refusal: deliberately integrate the template yourself or disable it first.
 
-After completing those prerequisites, explicitly install the core HTTPS profile:
+After completing those prerequisites and reviewing the dry-run plan, explicitly
+apply the core HTTPS profile:
 
 ```bash
-sudo ./deploy/nucleus/install.sh --install --with-caddy
+sudo ./deploy/nucleus/install.sh --apply --with-caddy \
+  --service-user mxstudio --service-group mxstudio \
+  --env-file /etc/mxstudio/nucleus.env
 # Add --with-gateway only after provisioning PostgreSQL and gateway credentials.
 ```
+
+The dry-run needs no sudo. The installer's legacy `--install` alias remains
+available for manual use; deployment-run handoffs emit `--apply`. Review the
+plan and environment file before either explicit apply form.
 
 The units use `/var/lib/mxstudio` for state and `/var/cache/mxstudio` for cache.
 Existing units, Caddyfiles, and environment files are preserved; profile upgrades
@@ -301,11 +486,13 @@ the API process's counters. Do not infer that zero CLI leases means no API clien
 | Notebook already exists | Keep hand edits; generate with a new `--output` filename. |
 | Phone cannot connect or reports a TLS error | Use the appliance hostname, not phone localhost; verify LAN DNS, CA trust, firewall, and Caddy. mDNS alone does not establish trust. |
 
-For another downloaded, compatible model, use `nucleus prepare --model` with its
-canonical Hugging Face ID, then send that **same ID** in chat requests. Preparing a
-different model does not change `NUCLEUS_MODEL_ID` in the running controller:
-`nucleus-local` continues to mean the configured default and may request a swap
-back. To change that default, restart the controller with the new environment value.
+The `/v1/models` response uses the canonical HF ID as public `id`, with the
+immutable `revision`; `model_id` is also included as canonical metadata. Use that
+public ID for direct OpenAI chat requests. The backend-advertised MAX ID is
+resolved privately and is not exposed to clients. `nucleus-local` and `local`
+remain aliases for configured `NUCLEUS_MODEL_ID`; changing a pinned run's
+revision requires a new deployment run rather than relabeling the existing
+endpoint.
 
 ### Stop and inspect installed services
 
@@ -320,6 +507,10 @@ sudo systemctl status mxstudio-nucleus.service
 sudo journalctl -u mxstudio-nucleus.service -n 80 --no-pager
 sudo systemctl stop mxstudio-nucleus.service
 ```
+
+`mxs endpoint stop RUN_ID` refuses to stop MAX while the managed Nucleus service
+is still answering. Explicitly stop the systemd service first, then run the
+endpoint stop command; it stops only the MAX process owned by that run.
 
 Caddy's unit is `mxstudio-nucleus-caddy.service`; the optional gateway's unit is
 `litellm-nucleus.service`. They can be inspected/stopped separately. Commands and
@@ -338,11 +529,11 @@ product experiences still need evidence or additional work.
 | Intercept OpenAI chat requests | Authenticated FastAPI streaming/non-streaming chat proxy | Complete a real request from the intended satellite app. |
 | Swap models without breaking active inference | Shared request reservations and exclusive lifecycle changes; busy conflicts are rejected, not silently killed | Exercise two compatible models and overlapping clients; inspect GPU memory release. |
 | Hide compilation with progress SSE | Bounded waiting and separate status/preparation jobs; **no fake compilation-stage events in the OpenAI token stream** | Decide whether an app needs a separate progress UI; integrate private management deliberately rather than exposing Studio administration. |
-| HTTPS via Caddy | Core/gateway templates using a persistent local CA | Install Caddy, configure resolution, trust its CA on another device, and test HTTPS streaming/cancellation. |
+| HTTPS via Caddy | Run-specific server HTTPS proof plus distinct independent-client report; accepted provenance is a trusted-operator report, not remote attestation. | Install Caddy, configure resolution, trust its CA on another device, and perform live HTTPS streaming/cancellation acceptance. |
 | Virtual keys | Optional LiteLLM/PostgreSQL profile; core has one shared key | Provision the database and test generation, use, and revocation of app keys. Native SQLite app-key management is not implemented. |
 | Hybrid local/cloud routing | Separate opt-in cloud example; local defaults do not send prompts to cloud | Configure provider credentials and explicitly approve/test a paid cloud fallback. No automatic GPU-capacity routing is implemented. |
 | Zero-config discovery | Optional mDNS service advertisement | Test discovery in the real LAN and receiving app. TLS trust, firewall rules, and app discovery support are not automatic. |
-| One-click boot deployment | Guarded, default-dry-run installer and non-root systemd templates for Debian/Ubuntu x86_64 | Complete user/cache/secret prerequisites, install explicitly, reboot, and test inference. Not a zero-prerequisite appliance image. |
+| One-click boot deployment | Guarded, default-dry-run installer and non-root systemd templates for Debian/Ubuntu and Arch/Omarchy x86_64 | Complete user/cache/secret prerequisites, install explicitly, reboot, and test inference. Not a zero-prerequisite appliance image. |
 | Omarchy/Linux on Apple Silicon; large Apple GPU target | **Not supported by the supplied Linux platform lock/installer**; macOS preview is a different CPU path | Establish OS/MAX/driver support before claiming this target works. No Apple GPU-on-Linux proof exists here. |
 | Touch/voice apps and professional deployment | An inference endpoint, not finished satellite apps or a validated professional product | Build app integration, speech components, domain evaluation, and privacy/oversight controls separately. |
 
@@ -352,7 +543,7 @@ product experiences still need evidence or additional work.
 - [ ] An authenticated chat request produces real text; a request without a key returns 401.
 - [ ] A second warm request succeeds; the notebook records actual timing and hardware context.
 - [ ] A model switch during an active managed request is refused rather than interrupting it.
-- [ ] After requests finish, another downloaded compatible model can be prepared and queried by its canonical ID.
+- [ ] After requests finish, another downloaded compatible model can be prepared and queried by its canonical public `/v1/models` ID and pinned revision.
 - [ ] The controller and MAX stop/restart as intended without deleting state.
 - [ ] If LAN access is needed: a second device resolves the hostname, trusts TLS, and receives tokens.
 - [ ] If virtual keys are needed: a restricted app key works and stops working after revocation.
@@ -365,12 +556,16 @@ parity are also not completed by the Nucleus layer.
 
 ## Verification and limitations
 
-Hermetic tests cover model identity, process ownership, reservations across
-processes, busy responses, cancellation, OpenAI forwarding, CLI startup, detached
-job wiring, discovery cleanup, safe config validation, and notebook measurements.
-They mock MAX/model/network operations. Deployment dry-runs do not install services.
+Hermetic tests cover model identity/revisions, deployment-run stages, probe evidence
+validation, process ownership, reservations across processes, busy responses,
+cancellation, OpenAI forwarding, CLI/API adapters, detached job wiring, discovery
+cleanup, safe config validation, and notebook measurements. They mock MAX/model/
+network operations. Deployment dry-runs do not install services.
 
-Actual MAX compilation/generation, GPU memory release, LAN multicast, Caddy
-certificate trust on another device, PostgreSQL-backed LiteLLM keys, and cloud
-fallback still require live acceptance on the deployment target. No Apple GPU on
-Linux, M5 appliance, numerical-parity, or regulated-workflow readiness is claimed.
+Actual Hugging Face downloads, MAX compilation/generation, GPU memory release,
+distro installation, LAN multicast, Caddy certificate trust and independent-client
+generation, PostgreSQL-backed LiteLLM keys, and cloud fallback still require live
+acceptance on the deployment target. Plan A live acceptance is not complete.
+Milestone B (unsupported-model port automation/promotion) and C (gateway endpoint
+inventory/routing) are deferred. No Apple GPU on Linux, M5 appliance,
+numerical-parity, or regulated-workflow readiness is claimed.

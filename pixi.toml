@@ -7,6 +7,8 @@ version = "0.1.1"
 
 [tasks]
 studio = "PYTHONPATH=notebooks python -m mxstudio.cli ui"
+mxstudio = "PYTHONPATH=notebooks python -m mxstudio.cli"
+# Backward-compatible short alias.
 mxs = "PYTHONPATH=notebooks python -m mxstudio.cli"
 
 [dependencies]

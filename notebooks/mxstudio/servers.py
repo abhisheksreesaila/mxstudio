@@ -129,10 +129,23 @@ class ServerManager:
 
     def _start_unlocked(self, entry: ModelEntry) -> dict:
         current = state.load().get("server")
+        advertised_id = entry.advertised_model_id or entry.id
+        if entry.load_path and not Path(entry.load_path).is_dir():
+            raise RuntimeError(f"pinned model snapshot is unavailable: {entry.load_path}")
         if current and _alive(current.get("pid")):
             if not _owned(current):
                 raise RuntimeError("cannot verify existing MAX process ownership; inspect it before retrying")
-            if current.get("model_id") == entry.id and current.get("host") == MODEL_HOST:
+            if (
+                current.get("model_id") == entry.id
+                and current.get("host") == MODEL_HOST
+                and current.get("revision") == entry.revision
+                and current.get("load_path") == entry.load_path
+                and (
+                    entry.advertised_model_id is None
+                    or (current.get("advertised_model_id") or current.get("model_id"))
+                    == advertised_id
+                )
+            ):
                 return self.status()
             self._stop_unlocked()
 
@@ -141,7 +154,7 @@ class ServerManager:
             "max",
             "serve",
             "--model",
-            entry.id,
+            entry.load_path or entry.id,
             "--port",
             str(MODEL_PORT),
             # CUDA graph capture fails on WSL (CUDA_ERROR_INVALID_DEVICE).
@@ -193,6 +206,10 @@ class ServerManager:
                 "port": MODEL_PORT,
                 "host": MODEL_HOST,
                 "model_id": entry.id,
+                "revision": entry.revision,
+                "load_path": entry.load_path,
+                "advertised_model_id": advertised_id,
+                "advertised_model_id_verified": False,
                 "log": str(log_path),
                 "started_at": time.time(),
             }
@@ -252,6 +269,9 @@ class ServerManager:
             return {"state": "stopped"}
         base = {
             "model_id": server.get("model_id"),
+            "revision": server.get("revision"),
+            "load_path": server.get("load_path"),
+            "advertised_model_id": server.get("advertised_model_id") or server.get("model_id"),
             "port": server.get("port"),
             "host": server.get("host"),
             "log": server.get("log"),
@@ -275,19 +295,62 @@ class ServerManager:
             }
         if not _owned(server):
             return {"state": "unmanaged", **base}
+        base.update(pid=server["pid"], process_identity=server["process_identity"])
         if self._healthy(server["port"]):
+            if server.get("load_path") and not server.get("advertised_model_id_verified"):
+                self.model_matches(server.get("model_id"))
+                current = state.load().get("server") or server
+                base["advertised_model_id"] = (
+                    current.get("advertised_model_id") or current.get("model_id")
+                )
             return {"state": "running", **base}
         return {"state": "starting", **base}
 
-    def model_matches(self, model_id: str) -> bool:
+    def model_matches(self, model_id: str | None = None) -> bool:
+        server = state.load().get("server") or {}
+        canonical_id = server.get("model_id")
+        checking_canonical = model_id is None or model_id == canonical_id
+        expected_id = (
+            (server.get("advertised_model_id") or canonical_id)
+            if checking_canonical
+            else model_id
+        )
+        if not expected_id:
+            return False
         try:
             response = httpx.get(
                 f"http://{MODEL_HOST}:{MODEL_PORT}/v1/models", timeout=2.0, trust_env=False,
             )
             response.raise_for_status()
-            return any(item.get("id") == model_id for item in response.json().get("data", []))
+            advertised_ids = [
+                item.get("id")
+                for item in response.json().get("data", [])
+                if isinstance(item, dict) and isinstance(item.get("id"), str)
+            ]
+            if expected_id in advertised_ids:
+                self._persist_advertised_identity(server, expected_id)
+                return True
+            if checking_canonical and canonical_id and len(advertised_ids) == 1:
+                self._persist_advertised_identity(server, advertised_ids[0])
+                return True
+            return False
         except (httpx.HTTPError, ValueError, TypeError, AttributeError):
             return False
+
+    @staticmethod
+    def _persist_advertised_identity(server: dict, advertised_id: str) -> None:
+        if not server.get("model_id"):
+            return
+        current = state.load().get("server") or {}
+        if (
+            current.get("pid") != server.get("pid")
+            or current.get("model_id") != server.get("model_id")
+            or current.get("revision") != server.get("revision")
+        ):
+            return
+        current["advertised_model_id"] = advertised_id
+        current["advertised_model_id_verified"] = True
+        state.update(server=current)
 
     def logs(self, lines: int = 100) -> str:
         server = state.load().get("server")

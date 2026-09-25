@@ -354,7 +354,30 @@ def run_nucleus_prepare(model_id: str, timeout_s: float = 600.0, *, job_id: str,
     return result
 
 
+def run_deployment(run_id: str, *, job_id: str, progress: Callable) -> dict:
+    from notebooks.mxstudio import deployments
+
+    return deployments.execute(run_id, job_id=job_id, progress=progress)
+
+
+def run_endpoint_verify(run_id: str, ca_file: str | None = None, *, job_id: str, progress: Callable) -> dict:
+    from notebooks.mxstudio import deployments
+
+    progress("Verifying authenticated endpoint generation", 5)
+    return deployments.verify_endpoint(run_id, ca_file=ca_file)
+
+
+def run_endpoint_stop(run_id: str, *, job_id: str, progress: Callable) -> dict:
+    from notebooks.mxstudio import deployments
+
+    progress("Stopping owned endpoint resources", 5)
+    return deployments.stop_endpoint(run_id)
+
+
 HANDLERS: dict[str, Callable[..., Any]] = {
+    "deployment": run_deployment,
+    "endpoint_verify": run_endpoint_verify,
+    "endpoint_stop": run_endpoint_stop,
     "nucleus_prepare": run_nucleus_prepare,
     "hf_check": run_hf_check,
     "arch_analyze": run_arch_analyze,
@@ -368,6 +391,9 @@ HANDLERS: dict[str, Callable[..., Any]] = {
 }
 
 _KIND_KEYS: dict[str, set[str]] = {
+    "deployment": {"run_id"},
+    "endpoint_verify": {"run_id", "ca_file"},
+    "endpoint_stop": {"run_id"},
     "nucleus_prepare": {"model_id", "timeout_s"},
     "hf_check": {"model_id"},
     "arch_analyze": {"model_id"},
@@ -390,7 +416,7 @@ _KIND_KEYS: dict[str, set[str]] = {
 
 def start_kind(kind: str, *, label: str | None = None, **payload: Any) -> dict:
     """Dispatch a known kind from /api/jobs/start."""
-    if kind not in HANDLERS:
+    if kind not in HANDLERS or kind in {"deployment", "endpoint_verify", "endpoint_stop"}:
         raise ValueError(f"unknown job kind: {kind}")
     handler = HANDLERS[kind]
     allowed = _KIND_KEYS.get(kind, set(payload))

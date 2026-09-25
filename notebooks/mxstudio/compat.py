@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -167,12 +168,83 @@ def max_architectures() -> dict:
             if proc.returncode != 0 or not proc.stdout.strip():
                 continue
             data = json.loads(proc.stdout)
-            arches = data.get("architectures") or data
+            arches = data.get("architectures") or data.get("models") or data
             if isinstance(arches, dict):
                 return arches
+            if isinstance(arches, list):
+                normalized = {}
+                for entry in arches:
+                    if isinstance(entry, str):
+                        normalized[entry] = {}
+                    elif isinstance(entry, dict):
+                        name = (
+                            entry.get("architecture")
+                            or entry.get("name")
+                            or entry.get("id")
+                            or entry.get("key")
+                        )
+                        if name:
+                            normalized[str(name)] = entry
+                if normalized:
+                    return normalized
         except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
             continue
     return {}
+
+
+def max_catalog() -> dict:
+    """Normalize the installed `max list --json` schema without inventing HF IDs."""
+    architectures = max_architectures()
+    if not architectures:
+        return {
+            "available": False,
+            "source": "unavailable",
+            "entries": [],
+            "runtime": _max_cli_status(),
+            "advisory": "MAX architecture catalog unavailable; support is unknown.",
+        }
+    entries = []
+    for name, metadata in architectures.items():
+        details = metadata if isinstance(metadata, dict) else {}
+        raw_examples = (
+            details.get("examples")
+            or details.get("model_ids")
+            or details.get("models")
+            or []
+        )
+        if isinstance(raw_examples, str):
+            raw_examples = [raw_examples]
+        examples = []
+        for example in raw_examples:
+            if isinstance(example, dict):
+                example = (
+                    example.get("model_id")
+                    or example.get("repo_id")
+                    or example.get("id")
+                )
+            if isinstance(example, str) and example.count("/") == 1:
+                examples.append(example)
+        entries.append(
+            {
+                "architecture": str(name),
+                "description": details.get("description") or details.get("family"),
+                "encodings": (
+                    details.get("encodings")
+                    or details.get("supported_encodings")
+                    or details.get("weight_encodings")
+                    or details.get("supported_formats")
+                    or []
+                ),
+                "examples": sorted(set(examples), key=str.casefold),
+                "provenance": "max list --json",
+            }
+        )
+    return {
+        "available": True,
+        "source": "max list --json",
+        "runtime": _max_cli_status(),
+        "entries": sorted(entries, key=lambda item: item["architecture"].casefold()),
+    }
 
 
 def _arch_supported(arch: str, max_arches: dict) -> bool:
@@ -187,6 +259,177 @@ def _arch_supported(arch: str, max_arches: dict) -> bool:
         if k in lower or lower.startswith(k) or arch.endswith(key):
             return True
     return False
+
+
+def architecture_listed(arch: str, max_arches: dict) -> bool:
+    """Match a config architecture to a MAX catalog key, including family aliases."""
+    if not arch:
+        return False
+    lower = arch.casefold()
+    for key in max_arches:
+        normalized = str(key).casefold()
+        if normalized in lower or lower.startswith(normalized) or arch.endswith(str(key)):
+            return True
+        key_stub = normalized.split("for", 1)[0]
+        arch_stub = lower.split("for", 1)[0]
+        key_family = "".join(char for char in key_stub if char.isalpha())
+        arch_family = "".join(char for char in arch_stub if char.isalpha())
+        key_version = "".join(char for char in key_stub if char.isdigit())
+        arch_version = "".join(char for char in arch_stub if char.isdigit())
+        # MAX commonly names a family (e.g. Llama3) while HF config uses the
+        # generic class (LlamaForCausalLM). Versioned HF classes must not match
+        # a different versioned MAX family (e.g. Qwen2 vs Qwen3).
+        if (
+            key_family
+            and key_family == arch_family
+            and (not key_version or not arch_version or key_version == arch_version)
+        ):
+            return True
+    return False
+
+
+def _normalize_encoding(value) -> str | None:
+    if isinstance(value, dict):
+        for key in ("encoding", "dtype", "format", "name", "precision"):
+            normalized = _normalize_encoding(value.get(key))
+            if normalized:
+                return normalized
+        for key in value:
+            normalized = _normalize_encoding(key)
+            if normalized:
+                return normalized
+        return None
+    if not isinstance(value, str):
+        return None
+    text = value.casefold().replace("_", "").replace("-", "").replace(" ", "")
+    text = text.removeprefix("torch.")
+    aliases = {
+        "bfloat16": "bf16",
+        "bf16": "bf16",
+        "float16": "fp16",
+        "half": "fp16",
+        "fp16": "fp16",
+        "float32": "fp32",
+        "fp32": "fp32",
+        "float8": "fp8",
+        "fp8": "fp8",
+        "int8": "int8",
+        "8bit": "int8",
+        "int4": "int4",
+        "4bit": "int4",
+        "nf4": "nf4",
+        "fp4": "fp4",
+    }
+    if text in aliases:
+        return aliases[text]
+    if text.startswith("fp8") or text.startswith("float8"):
+        return "fp8"
+    if text.startswith("bfloat16"):
+        return "bf16"
+    bits = re.search(r"(?:int|bit)([0-9]+)", text)
+    if bits:
+        return f"int{bits.group(1)}"
+    return None
+
+
+def checkpoint_encoding(config: dict) -> dict:
+    """Extract only unambiguous dtype/quantization evidence from HF config.json."""
+    quantization = config.get("quantization_config") or config.get("compression_config")
+    if isinstance(quantization, dict):
+        method = str(quantization.get("quant_method") or "").casefold()
+        quant_type = str(quantization.get("bnb_4bit_quant_type") or "").casefold()
+        bits = next(
+            (
+                quantization[key]
+                for key in ("bits", "weight_bits", "num_bits", "w_bit")
+                if quantization.get(key) is not None
+            ),
+            None,
+        )
+        if quantization.get("load_in_4bit"):
+            encoding = _normalize_encoding(quant_type) or "int4"
+        elif quantization.get("load_in_8bit"):
+            encoding = "int8"
+        elif "fp8" in method:
+            encoding = "fp8"
+        elif bits is not None:
+            try:
+                encoding = f"int{int(bits)}"
+            except (TypeError, ValueError):
+                encoding = None
+        else:
+            encoding = next(
+                (
+                    normalized
+                    for key in ("weight_dtype", "dtype", "format", "quant_type")
+                    if (normalized := _normalize_encoding(quantization.get(key)))
+                ),
+                None,
+            )
+        if encoding:
+            return {"encoding": encoding, "source": "quantization_config"}
+        return {"encoding": None, "source": "quantization_config"}
+    encoding = _normalize_encoding(config.get("torch_dtype") or config.get("dtype"))
+    return {
+        "encoding": encoding,
+        "source": "torch_dtype" if encoding else "unknown",
+    }
+
+
+def encoding_compatibility(architecture: str | None, checkpoint: dict, max_arches: dict) -> dict:
+    """Compare clear HF precision evidence with MAX's advertised encodings."""
+    encoding = checkpoint.get("encoding")
+    if not encoding:
+        return {
+            "status": "unknown",
+            "checkpoint_encoding": None,
+            "max_encodings": [],
+            "advisory": "Checkpoint encoding could not be determined from config.json.",
+        }
+    encodings: set[str] = set()
+    if architecture:
+        for name, metadata in max_arches.items():
+            if not architecture_listed(architecture, {name: metadata}):
+                continue
+            details = metadata if isinstance(metadata, dict) else {}
+            raw = (
+                details.get("encodings")
+                or details.get("supported_encodings")
+                or details.get("weight_encodings")
+                or details.get("supported_formats")
+                or []
+            )
+            if isinstance(raw, str):
+                raw = re.split(r"[,|;]", raw)
+            elif isinstance(raw, dict):
+                raw = [raw]
+            for value in raw:
+                normalized = _normalize_encoding(value)
+                if normalized:
+                    encodings.add(normalized)
+    if not encodings:
+        return {
+            "status": "unknown",
+            "checkpoint_encoding": encoding,
+            "max_encodings": [],
+            "advisory": "MAX did not publish encoding evidence for this architecture.",
+        }
+    if encoding in encodings:
+        return {
+            "status": "supported",
+            "checkpoint_encoding": encoding,
+            "max_encodings": sorted(encodings),
+            "advisory": None,
+        }
+    return {
+        "status": "unsupported",
+        "checkpoint_encoding": encoding,
+        "max_encodings": sorted(encodings),
+        "advisory": (
+            f"Checkpoint encoding {encoding} is not listed for MAX architecture "
+            f"{architecture}; listed encodings: {', '.join(sorted(encodings))}."
+        ),
+    }
 
 
 def hardware_fit(approx_gb: float | None, *, cuda_devices: str | None = None) -> dict:
@@ -319,7 +562,7 @@ def bench_readiness(approx_gb: float | None = None) -> dict:
     }
 
 
-def check_hf_model(model_id: str) -> dict:
+def check_hf_model(model_id: str, revision: str | None = None) -> dict:
     """Ask HF for metadata + config, then score Modular MAX compatibility."""
     model_id = model_id.strip().strip("/")
     if not model_id or "/" not in model_id:
@@ -333,7 +576,7 @@ def check_hf_model(model_id: str) -> dict:
     token = studio_settings.get_hf_token() or None
     api = HfApi(token=token)
     try:
-        info = api.model_info(model_id, files_metadata=True)
+        info = api.model_info(model_id, revision=revision, files_metadata=True)
     except Exception as exc:
         return {
             "ok": False,
@@ -347,6 +590,8 @@ def check_hf_model(model_id: str) -> dict:
         }
 
     gated = bool(getattr(info, "gated", False))
+    card_data = getattr(info, "card_data", None)
+    license_value = getattr(card_data, "license", None) if card_data else None
     siblings = info.siblings or []
     has_st = any(
         (s.rfilename or "").endswith(".safetensors") for s in siblings
@@ -354,13 +599,17 @@ def check_hf_model(model_id: str) -> dict:
     size_bytes = sum(s.size or 0 for s in siblings if s.size)
 
     architecture = None
+    config_data: dict = {}
     config_ok = False
     try:
-        cfg_path = hf_hub_download(model_id, "config.json", token=token)
+        resolved_revision = getattr(info, "sha", None) or revision
+        cfg_path = hf_hub_download(
+            model_id, "config.json", token=token, revision=resolved_revision
+        )
         with open(cfg_path, encoding="utf-8") as f:
-            cfg = json.load(f)
-        archs = cfg.get("architectures") or []
-        architecture = archs[0] if archs else cfg.get("model_type")
+            config_data = json.load(f)
+        archs = config_data.get("architectures") or []
+        architecture = archs[0] if archs else config_data.get("model_type")
         config_ok = True
     except Exception as exc:
         cfg_error = str(exc)[:240]
@@ -370,6 +619,10 @@ def check_hf_model(model_id: str) -> dict:
     max_arches = max_architectures()
     modular_compatible = bool(
         architecture and _arch_supported(str(architecture), max_arches)
+    )
+    checkpoint = checkpoint_encoding(config_data)
+    encoding_check = encoding_compatibility(
+        str(architecture) if architecture else None, checkpoint, max_arches
     )
 
     approx_gb = round(size_bytes / 1e9, 2) if size_bytes else None
@@ -385,13 +638,18 @@ def check_hf_model(model_id: str) -> dict:
     if gated and not env["hf_token_set"]:
         warnings.append("Model is gated and HF token is not set — open Settings to save one.")
     if not has_st:
-        warnings.append("No .safetensors weights found — MAX prefers safetensors.")
+        warnings.append(
+            "Unsupported checkpoint format: no safetensors weights found; "
+            "this MX Studio load path currently supports safetensors only."
+        )
     if not modular_compatible:
         warnings.append(
             f"Architecture '{architecture}' is not in the known MAX list — "
             "serve may fail. Use Learn → Custom architectures to scaffold a port, "
             "or see https://docs.modular.com/max/models/"
         )
+    if encoding_check["status"] == "unsupported":
+        warnings.append(encoding_check["advisory"])
     if env["disk_free_gb"] is not None and size_bytes and env["disk_free_gb"] < size_bytes / 1e9 * 1.2:
         warnings.append(
             f"Disk may be tight: model ~{size_bytes / 1e9:.1f} GB, free {env['disk_free_gb']} GB."
@@ -403,25 +661,54 @@ def check_hf_model(model_id: str) -> dict:
     recommend_download = bool(
         can_download
         and modular_compatible
+        and encoding_check["status"] != "unsupported"
         and hardware.get("recommend_download", True)
     )
     risk = "ok"
-    if not modular_compatible:
+    if not has_st:
+        risk = "unsupported_format"
+    elif encoding_check["status"] == "unsupported":
+        risk = "unsupported_encoding"
+    elif not modular_compatible:
         risk = "unsupported_arch"
     elif hardware["level"] in ("slow", "insufficient"):
         risk = "hardware_risk"
     elif hardware["level"] == "tight":
         risk = "tight_vram"
 
+    if risk == "ok":
+        risk_message = "Compatible and hardware looks OK."
+    elif risk == "unsupported_format":
+        risk_message = "This checkpoint format is unsupported; this load path currently requires safetensors."
+    elif risk == "unsupported_encoding":
+        risk_message = encoding_check["advisory"]
+    elif risk == "unsupported_arch":
+        risk_message = "Architecture may not run on MAX — use the guided Custom architectures workflow."
+    else:
+        risk_message = hardware["message"]
+
     return {
         "ok": True,
         "model_id": model_id,
+        "revision": getattr(info, "sha", None) or revision,
         "name": model_id.split("/")[-1],
         "architecture": architecture,
         "config_ok": config_ok,
         "config_error": cfg_error,
         "gated": gated,
+        "license": license_value,
         "has_safetensors": has_st,
+        "format_status": "supported" if has_st else "unsupported",
+        "checkpoint_encoding": checkpoint,
+        "encoding_compatibility": encoding_check,
+        "files": [
+            {
+                "name": getattr(sibling, "rfilename", ""),
+                "size": getattr(sibling, "size", None),
+            }
+            for sibling in siblings
+            if getattr(sibling, "rfilename", "")
+        ],
         "approx_gb": approx_gb,
         "modular_compatible": modular_compatible,
         "max_list_available": bool(max_arches),
@@ -432,15 +719,7 @@ def check_hf_model(model_id: str) -> dict:
         "can_download": can_download,
         "recommend_download": recommend_download,
         "risk": risk,
-        "risk_message": (
-            "Compatible and hardware looks OK."
-            if risk == "ok"
-            else (
-                "Architecture may not run on MAX — use at your own risk, or scaffold a custom arch."
-                if risk == "unsupported_arch"
-                else hardware["message"]
-            )
-        ),
+        "risk_message": risk_message,
         "handbook": "https://handbook.modular.com/",
         "models_docs": "https://docs.modular.com/max/models/",
         "hf_url": f"https://huggingface.co/{model_id}",
