@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS models (
     pinned INTEGER NOT NULL DEFAULT 0,
     keep_alive INTEGER NOT NULL DEFAULT 300,
     weights_path TEXT,
+    custom_arch_path TEXT,
     created_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS keys (
@@ -49,6 +50,7 @@ class Model:
     pinned: bool
     keep_alive: int
     weights_path: str | None
+    custom_arch_path: str | None = None
 
 
 class Store:
@@ -60,20 +62,29 @@ class Store:
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        cols = {r["name"] for r in self.db.execute("PRAGMA table_info(models)")}
+        if "custom_arch_path" not in cols:
+            self.db.execute("ALTER TABLE models ADD COLUMN custom_arch_path TEXT")
 
     @classmethod
     def open(cls) -> "Store":
         return cls(mst_home() / "mst.db")
 
     def add_model(self, *, name: str, repo_id: str, revision: str, source: str,
-                  architecture: str, weights_path: str | None = None) -> Model:
+                  architecture: str, weights_path: str | None = None,
+                  custom_arch_path: str | None = None) -> Model:
         self.db.execute(
-            """INSERT INTO models (name, repo_id, revision, source, architecture, weights_path, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)
+            """INSERT INTO models (name, repo_id, revision, source, architecture, weights_path,
+                                   custom_arch_path, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(name) DO UPDATE SET repo_id=excluded.repo_id, revision=excluded.revision,
                  source=excluded.source, architecture=excluded.architecture,
-                 weights_path=excluded.weights_path""",
-            (name, repo_id, revision, source, architecture, weights_path, time.time()),
+                 weights_path=excluded.weights_path,
+                 custom_arch_path=excluded.custom_arch_path""",
+            (name, repo_id, revision, source, architecture, weights_path, custom_arch_path, time.time()),
         )
         return self.get_model(name)
 
@@ -98,7 +109,7 @@ def _model(row: sqlite3.Row) -> Model:
     return Model(
         name=row["name"], repo_id=row["repo_id"], revision=row["revision"], source=row["source"],
         architecture=row["architecture"], pinned=bool(row["pinned"]), keep_alive=row["keep_alive"],
-        weights_path=row["weights_path"],
+        weights_path=row["weights_path"], custom_arch_path=row["custom_arch_path"],
     )
 
 
