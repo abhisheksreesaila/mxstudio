@@ -111,3 +111,10 @@ Brief: docs/brief.md · Design: canvas row 2 (D1–D4) · Needs: F-013, the pers
 - [ ] Overview: summary tiles with sparklines, throughput chart, models card, CLI card
 - [ ] Metrics page: time range, per-model series, decode/TTFT/requests/GPU memory charts
 - [ ] API reference page in the console skin replaces /docs (Scalar), with examples using real model names and a Try it box
+
+## F-017 Rename to Hotfire [doing]
+Brief: docs/brief.md · ADR: docs/adr/0002-name-hotfire.md · Needs: none
+- [ ] Python package `mst/` becomes `hotfire/`; PyPI/project name `hotfire`; commands `hotfire` and `mst` (alias, one release)
+- [ ] state folder `~/.hotfire` (an existing `~/.mst` is moved on first run); `HOTFIRE_HOME`, `HOTFIRE_PORT`, … with `MST_*` read as a fallback
+- [ ] every user-facing string says Hotfire / `hotfire …` (CLI output, console title, notebooks, docs, README); console title "Hotfire Mission Control"
+- [ ] full test suite passes; `hotfire --help` and `mst --help` both work
