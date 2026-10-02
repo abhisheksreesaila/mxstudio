@@ -19,6 +19,10 @@ if os.environ.get("FAKE_MAX_FAIL"):
     sys.exit(1)
 if os.environ.get("FAKE_MAX_PID_FILE"):
     open(os.environ["FAKE_MAX_PID_FILE"], "w").write(str(os.getpid()))
+if os.environ.get("FAKE_MAX_SPAWN_CHILD"):  # a grandchild in the same process group, like a worker
+    import subprocess
+    gc = subprocess.Popen(["sleep", "60"])
+    open(os.environ["FAKE_MAX_SPAWN_CHILD"], "w").write(str(gc.pid))
 port = int(args[args.index("--port") + 1])
 served = args[args.index("--served-model-name") + 1] if "--served-model-name" in args else "unnamed"
 time.sleep(float(os.environ.get("FAKE_MAX_DELAY", "0")))

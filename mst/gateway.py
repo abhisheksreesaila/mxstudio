@@ -112,6 +112,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                 except Exception:  # a failed sweep must not end the loop
                     log.exception("idle sweep failed")
 
+        supervisor.acquire_lock()  # a second daemon must exit before touching the first's children
         supervisor.sweep_orphans()  # max children left behind by a daemon that died
         task = asyncio.create_task(reaper())
         try:
