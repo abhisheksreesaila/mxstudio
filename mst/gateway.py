@@ -6,21 +6,27 @@ import contextlib
 import json
 import os
 import signal
+import socket
+from pathlib import Path
 
 import httpx
 import logging
 from fasthtml.common import FastHTML
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from mst import keys
-from mst.store import Store
+from mst.store import Store, mst_home
 from mst.supervisor import StartFailed, Supervisor, UnknownModel
 
 log = logging.getLogger("mst.gateway")
 PROXIED = ("/v1/chat/completions", "/v1/completions", "/v1/embeddings")
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 ADMIN_HEADER = "x-mst-admin"
+CONSOLE_DIR = Path(__file__).parent / "console"
+CONSOLE_ASSETS = {"console.css", "console.js"}
+LOG_TAIL_BYTES = 8000
+NO_CACHE = {"Cache-Control": "no-cache"}  # an upgraded mst never shows a stale console
 HOP_BY_HOP = {"content-length", "transfer-encoding", "connection", "content-encoding"}
 
 SCALAR_PAGE = """<!doctype html>
@@ -228,6 +234,80 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             return unauthorized()
         return openai_error(404, f"mst does not serve /v1/{path}. Supported: /v1/models, "
                                  + ", ".join(PROXIED) + ".", "unknown_route")
+
+    def admin_refused() -> Response:
+        return Response("admin is only served to this machine", status_code=403)
+
+    def model_row(model, live: dict) -> dict:
+        return {"name": model.name, "repo_id": model.repo_id, "revision": model.revision,
+                "source": model.source, "architecture": model.architecture, "pinned": model.pinned,
+                "keep_alive": model.keep_alive, "state": live.get("state", "cold"),
+                "port": live.get("port"), "idle_seconds": live.get("idle_seconds"),
+                "in_flight": live.get("in_flight", 0)}
+
+    @app.get("/admin/models")
+    def admin_models(request: Request):
+        if not admin_only(request):
+            return admin_refused()
+        live = {row["name"]: row for row in supervisor.status()}
+        return JSONResponse([model_row(m, live.get(m.name, {})) for m in store.models()])
+
+    @app.patch("/admin/models/{name}")
+    async def admin_patch(request: Request, name: str):
+        if not admin_only(request):
+            return admin_refused()
+        if store.get_model(name) is None:
+            return openai_error(404, f"The model `{name}` is not registered.", "model_not_found")
+        try:
+            body = json.loads(await request.body())
+        except ValueError:
+            body = None
+        allowed = {"pinned": bool, "keep_alive": int}
+        if (not isinstance(body, dict) or not body or set(body) - set(allowed)
+                or any(type(v) is not allowed[k] for k, v in body.items())
+                or body.get("keep_alive", 0) < 0):
+            return openai_error(400, "Send JSON with `pinned` (true/false) and/or `keep_alive` "
+                                     "(seconds, 0 or more).", "invalid_request_body")
+        store.set_lifecycle(name, pinned=body.get("pinned"), keep_alive=body.get("keep_alive"))
+        live = {row["name"]: row for row in supervisor.status()}
+        return JSONResponse(model_row(store.get_model(name), live.get(name, {})))
+
+    @app.get("/admin/models/{name}/log")
+    def admin_log(request: Request, name: str):
+        if not admin_only(request):
+            return admin_refused()
+        if store.get_model(name) is None:
+            return openai_error(404, f"The model `{name}` is not registered.", "model_not_found")
+        path = mst_home() / "logs" / f"{name}.log"
+        try:
+            with open(path, "rb") as f:
+                f.seek(0, os.SEEK_END)
+                f.seek(max(0, f.tell() - LOG_TAIL_BYTES))
+                tail = f.read().decode(errors="replace")
+        except FileNotFoundError:
+            tail = ""
+        return Response(tail, media_type="text/plain; charset=utf-8")
+
+    @app.get("/admin/info")
+    def admin_info(request: Request):
+        if not admin_only(request):
+            return admin_refused()
+        base = f"http://{request.headers.get('host', '127.0.0.1')}"
+        return JSONResponse({"host": socket.gethostname(), "endpoint": f"{base}/v1", "docs": f"{base}/docs"})
+
+    @app.get("/console")
+    def console_page(request: Request):
+        if not loopback_only(request):
+            return Response("the console is only served to this machine", status_code=403)
+        return FileResponse(CONSOLE_DIR / "index.html", headers=NO_CACHE)
+
+    @app.get("/console/{asset}")
+    def console_asset(request: Request, asset: str):
+        if not loopback_only(request):
+            return Response("the console is only served to this machine", status_code=403)
+        if asset not in CONSOLE_ASSETS:  # a fixed list: no path ever reaches the filesystem
+            return Response("not found", status_code=404)
+        return FileResponse(CONSOLE_DIR / asset, headers=NO_CACHE)
 
     @app.get("/admin/status")
     def admin_status(request: Request):

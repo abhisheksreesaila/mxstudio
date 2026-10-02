@@ -107,7 +107,8 @@ def first_key(store: Store) -> str | None:
 def usage(name: str, key: str | None) -> str:
     base = f"{daemon_url()}/v1"
     shown = key or "$MST_API_KEY"
-    lines = [f"endpoint  {base}   (API reference: {daemon_url()}/docs)"]
+    lines = [f"endpoint  {base}   (API reference: {daemon_url()}/docs)",
+             f"console   {daemon_url()}/console"]
     if key:
         lines.append(f"key       {key}   (app '{DEFAULT_APP}'; shown once, keep it)")
     else:

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MX Studio console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&amp;family=Source+Code+Pro:wght@400;500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/console/console.css">
+</head>
+<body>
+<header class="topbar">
+  <button class="menu-toggle" type="button" aria-label="Show menu" aria-expanded="false" data-action="toggle-menu">
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5"/></svg>
+  </button>
+  <span class="product">MX Studio</span>
+  <span class="host" id="host">mst</span>
+  <label class="search">
+    <span class="sr-only">Search models</span>
+    <input type="search" id="search" placeholder="Search models (/)" autocomplete="off">
+  </label>
+  <a class="topbar-link" id="docs-link" href="/docs" target="_blank" rel="noopener">API reference</a>
+</header>
+
+<div class="layout">
+  <nav class="resource-menu" id="menu" aria-label="Console"></nav>
+
+  <main class="page" id="page">
+    <div class="banner" id="banner" hidden></div>
+    <div class="crumbs"><a href="#overview">Home</a> &gt; <span id="crumb-host">mst</span></div>
+    <h1 id="title">Models</h1>
+    <div class="subtitle">Local inference host</div>
+    <div id="view"></div>
+  </main>
+
+  <aside class="blade" id="blade" aria-label="Model details" hidden></aside>
+</div>
+
+<script src="/console/console.js"></script>
+</body>
+</html>

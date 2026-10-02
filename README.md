@@ -34,6 +34,7 @@ Architecture decision: [docs/adr/0001](docs/adr/0001-mst-core-architecture.md)
 | **Keys** | `mst-…` keys, one per app, stored only as SHA-256 hashes. Shown once. | `mst/keys.py` |
 | **Expose** | Writes and runs Caddy (`tls internal`, forward_auth) and LiteLLM (its own pixi env, master key, no Postgres) as your user. | `mst/expose.py` |
 | **Learn** | A Jupyter notebook built only from the Hugging Face API: model card, config table, parameter breakdown, sample code, and a pointer to MAX's source. | `mst/learn.py` |
+| **Console** | `http://127.0.0.1:11435/console`: Azure-style operations console (resource menu, models grid, settings blade). This machine only. | `mst/console/` |
 | **Port** | For unsupported architectures: clones `modular/skills`, picks a donor architecture, and writes `PORT.md` plus the `claude '/import-model …'` command. | `mst/port.py` |
 
 State lives in `~/.mst/` (override with `MST_HOME`): `mst.db` (models, key hashes), `logs/`,
@@ -100,6 +101,8 @@ pixi run mst serve qwen2.5-0.5b
 endpoint `http://127.0.0.1:11435/v1`, a key `mst-…` (**save it**: `export MST_API_KEY=mst-…`), and
 a curl and a Python snippet. Paste the curl and expect a JSON reply.
 ✅ Open http://127.0.0.1:11435/docs and you should see the API reference.
+✅ Open http://127.0.0.1:11435/console: the operations console lists your models. Click one to open its
+blade: Overview, Settings (pin, unload after idle; Apply saves) and Logs.
 ❌ If loading fails: the error includes the tail of `~/.mst/logs/qwen2.5-0.5b.log`.
 
 ### 4. Several models, on demand
