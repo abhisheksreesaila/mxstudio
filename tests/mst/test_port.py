@@ -262,3 +262,18 @@ def test_mst_max_version_from_conda_meta(tmp_path, monkeypatch):
     assert port.mst_max_version() == "1.2.3"
     monkeypatch.setattr("sys.prefix", str(tmp_path / "nowhere"))
     assert port.mst_max_version() is None
+
+
+def test_full_copy_step_lists_the_donors_real_subfolders(tmp_path):
+    archs = tmp_path / "a"
+    v3 = archs / "llama3_modulev3"
+    for sub in ("layers", "recipes", "__pycache__"):
+        (v3 / sub).mkdir(parents=True)
+    (archs / "llama3").mkdir()
+    (v3 / "llama3.py").write_text("")
+    res = port.prepare("acme/weird", catalog=CAT, hf=make_hf(), runner=Runner(),
+                       fetch_config=fake_fetch, arch_dir=archs)
+    md = (res.workspace / "PORT.md").read_text()
+    assert f"cp -r {v3}/layers <output_dir>/<slug>/" in md
+    assert f"cp -r {v3}/recipes <output_dir>/<slug>/" in md
+    assert "__pycache__" not in md
