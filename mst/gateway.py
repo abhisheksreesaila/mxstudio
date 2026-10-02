@@ -24,9 +24,16 @@ PROXIED = ("/v1/chat/completions", "/v1/completions", "/v1/embeddings")
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 ADMIN_HEADER = "x-mst-admin"
 CONSOLE_DIR = Path(__file__).parent / "console"
-CONSOLE_ASSETS = {"console.css", "console.js"}
+CONSOLE_FONTS = {"source-sans-3-400.woff2", "source-sans-3-600.woff2",
+                 "source-code-pro-400.woff2", "source-code-pro-500.woff2"}
+CONSOLE_ASSETS = {"console.css", "console.js"} | CONSOLE_FONTS
 LOG_TAIL_BYTES = 8000
-NO_CACHE = {"Cache-Control": "no-cache"}  # an upgraded mst never shows a stale console
+# no-cache: an upgraded mst never shows a stale console. The rest: no other site can frame the
+# console (clickjacking Load/Stop) and the page loads nothing from anywhere but the daemon.
+CONSOLE_HEADERS = {"Cache-Control": "no-cache", "X-Frame-Options": "DENY",
+                   "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; "
+                                              "form-action 'none'; object-src 'none'",
+                   "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"}
 HOP_BY_HOP = {"content-length", "transfer-encoding", "connection", "content-encoding"}
 
 SCALAR_PAGE = """<!doctype html>
@@ -243,6 +250,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                 "source": model.source, "architecture": model.architecture, "pinned": model.pinned,
                 "keep_alive": model.keep_alive, "state": live.get("state", "cold"),
                 "port": live.get("port"), "idle_seconds": live.get("idle_seconds"),
+                "starting_seconds": live.get("starting_seconds"),
                 "in_flight": live.get("in_flight", 0)}
 
     @app.get("/admin/models")
@@ -299,7 +307,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
     def console_page(request: Request):
         if not loopback_only(request):
             return Response("the console is only served to this machine", status_code=403)
-        return FileResponse(CONSOLE_DIR / "index.html", headers=NO_CACHE)
+        return FileResponse(CONSOLE_DIR / "index.html", headers=CONSOLE_HEADERS)
 
     @app.get("/console/{asset}")
     def console_asset(request: Request, asset: str):
@@ -307,7 +315,8 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             return Response("the console is only served to this machine", status_code=403)
         if asset not in CONSOLE_ASSETS:  # a fixed list: no path ever reaches the filesystem
             return Response("not found", status_code=404)
-        return FileResponse(CONSOLE_DIR / asset, headers=NO_CACHE)
+        media = "font/woff2" if asset in CONSOLE_FONTS else None
+        return FileResponse(CONSOLE_DIR / asset, headers=CONSOLE_HEADERS, media_type=media)
 
     @app.get("/admin/status")
     def admin_status(request: Request):

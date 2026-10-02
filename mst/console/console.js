@@ -32,6 +32,7 @@
     models: null, // null = still loading
     error: null,
     filter: "",
+    menuFilter: "",
     stateFilter: "all",
     selected: null,
     tab: "overview",
@@ -48,6 +49,7 @@
       if (v === false || v === null || v === undefined) continue;
       if (k.startsWith("on")) el.addEventListener(k.slice(2).toLowerCase(), v);
       else if (k === "class") el.className = v;
+      else if (k === "style") el.style.cssText = v; // CSSOM, which the console's CSP allows (style="" attributes it blocks)
       else el.setAttribute(k, v === true ? "" : String(v));
     }
     for (const c of children.flat()) {
@@ -88,6 +90,7 @@
       const info = await api("GET", "/admin/info");
       $("host").textContent = `mst@${info.host}`;
       $("crumb-host").textContent = `mst@${info.host}`;
+      $("title-host").textContent = `mst@${info.host}`;
     } catch (_) { /* the banner covers a dead daemon */ }
   }
 
@@ -132,6 +135,7 @@
   const effective = (m) => ({ pinned: m.pinned, keep_alive: m.keep_alive, ...(state.draft || {}) });
 
   function lifecycle(m) {
+    if (m.state === "starting" && m.starting_seconds !== null) return `Starting for ${duration(Math.round(m.starting_seconds))}`;
     if (m.pinned) return "Pinned";
     const ka = duration(m.keep_alive);
     if (m.state === "ready" && m.idle_seconds !== null) return `Idle ${duration(Math.round(m.idle_seconds))} of ${ka}`;
@@ -155,9 +159,11 @@
 
   function select(name) {
     if (state.selected !== name) { state.draft = null; state.note = ""; state.log = ""; }
+    const changed = state.selected !== name;
     state.selected = name;
     const m = selectedModel();
-    state.tab = m && m.state === "crashed" ? "logs" : (state.tab || "overview");
+    if (m && m.state === "crashed") state.tab = "logs";
+    else if (changed) state.tab = "overview";
     if (state.tab === "logs") loadLog(name);
     render();
   }
@@ -166,12 +172,25 @@
   // -- render ---------------------------------------------------------------------------------
   function renderMenu() {
     const menu = $("menu");
-    menu.replaceChildren(...MENU.map((g) => h("div", { class: "menu-group" },
-      g.label ? h("div", { class: "menu-label" }, g.label) : null,
-      g.items.map(([id, label]) => h("button", {
-        class: "menu-item", type: "button", "aria-current": state.page === id ? "page" : false,
-        onClick: () => { location.hash = id; menu.classList.remove("open"); },
-      }, label)))));
+    const focused = document.activeElement && document.activeElement.id === "menu-filter";
+    const q = state.menuFilter.toLowerCase();
+    const groups = MENU.map((g) => ({ ...g, items: g.items.filter(([, label]) => !q || label.toLowerCase().includes(q)) }))
+      .filter((g) => g.items.length);
+    menu.replaceChildren(
+      h("label", { class: "menu-filter" }, h("span", { class: "sr-only" }, "Filter menu"),
+        h("input", { id: "menu-filter", type: "search", placeholder: "Search (Ctrl+/)", value: state.menuFilter,
+          onInput: (e) => { state.menuFilter = e.target.value; renderMenu(); } })),
+      ...groups.map((g) => h("div", { class: "menu-group" },
+        g.label ? h("div", { class: "menu-label" }, g.label) : null,
+        g.items.map(([id, label]) => h("button", {
+          class: "menu-item", type: "button", "aria-current": state.page === id ? "page" : false,
+          onClick: () => { location.hash = id; closeMenu(); },
+        }, label)))));
+    if (focused) { const input = $("menu-filter"); input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  }
+  function closeMenu() {
+    $("menu").classList.remove("open");
+    document.querySelector("[data-action=toggle-menu]").setAttribute("aria-expanded", "false");
   }
 
   function renderModels() {
@@ -245,6 +264,7 @@
     const blade = $("blade");
     const m = state.page === "models" ? selectedModel() : null;
     blade.hidden = !m;
+    document.querySelector(".layout").classList.toggle("blade-open", !!m);
     if (!m) { blade.replaceChildren(); return; }
     const e = effective(m);
     const tabs = [["overview", "Overview"], ["settings", "Settings"], ["logs", "Logs"]];
@@ -329,11 +349,12 @@
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && state.selected) closeBlade();
+    if (e.key === "/" && e.ctrlKey) { e.preventDefault(); $("menu-filter").focus(); return; }
     if (e.key === "/" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); $("search").focus(); }
   });
 
   render();
   loadInfo();
   refresh();
-  setInterval(() => { if (!state.busy) refresh(true); }, POLL_MS);
+  setInterval(() => refresh(true), POLL_MS); // keeps polling during a Load: busy only disables buttons
 })();

@@ -54,6 +54,7 @@ class _Child:
     ready: bool = False
     crashed: bool = False
     in_flight: int = 0
+    started_at: float = 0.0
 
 
 class Supervisor:
@@ -177,7 +178,8 @@ class Supervisor:
             model = self.store.get_model(name)
             child = self._children.get(name)
             row = {"name": name, "state": "cold", "port": None, "pid": None,
-                   "idle_seconds": None, "pinned": bool(model and model.pinned), "in_flight": 0}
+                   "idle_seconds": None, "starting_seconds": None,
+                   "pinned": bool(model and model.pinned), "in_flight": 0}
             if child is not None:
                 if _dead(child):
                     child.crashed = True
@@ -185,6 +187,8 @@ class Supervisor:
                 row["port"], row["pid"], row["in_flight"] = child.port, child.proc.pid, child.in_flight
                 if child.ready and not child.crashed:
                     row["idle_seconds"] = now - child.last_used
+                elif row["state"] == "starting":
+                    row["starting_seconds"] = now - child.started_at
             rows.append(row)
         return rows
 
@@ -295,7 +299,7 @@ class Supervisor:
         finally:
             log.close()
         self._pidfile(model.name, proc.pid).write_text(f"{proc.pid} {proc.pid}")
-        return _Child(proc=proc, port=port, last_used=self.clock())
+        return _Child(proc=proc, port=port, last_used=self.clock(), started_at=self.clock())
 
     def _log_tail(self, name: str, offset: int = 0) -> str:
         with open(self._log_path(name), "rb") as f:

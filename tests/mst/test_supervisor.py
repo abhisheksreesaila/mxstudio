@@ -187,3 +187,16 @@ async def test_stop_all(sup):
     await sup.ensure_running("other")
     await sup.stop_all()
     assert {s["state"] for s in sup.status()} == {"cold"}
+
+
+async def test_a_starting_model_reports_how_long_it_has_been_starting(sup, monkeypatch):
+    monkeypatch.setenv("FAKE_MAX_DELAY", "1.5")
+    task = asyncio.create_task(sup.ensure_running("tiny"))
+    for _ in range(50):
+        if st(sup, "tiny")["state"] == "starting":
+            break
+        await asyncio.sleep(0.02)
+    row = st(sup, "tiny")
+    assert row["state"] == "starting" and row["starting_seconds"] is not None and row["starting_seconds"] >= 0
+    await task
+    assert st(sup, "tiny")["starting_seconds"] is None

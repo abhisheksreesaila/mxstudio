@@ -62,3 +62,21 @@ async def test_model_log_tail(http, store, monkeypatch, tmp_path):
 async def test_admin_info_for_the_top_bar(http):
     info = (await http.get("/admin/info", headers=ADMIN)).json()
     assert {"host", "endpoint", "docs"} <= set(info)
+
+
+async def test_console_cannot_be_framed_and_loads_nothing_from_elsewhere(http):
+    for path in ("/console", "/console/console.js", "/console/console.css"):
+        r = await http.get(path)
+        assert r.headers["x-frame-options"] == "DENY"
+        csp = r.headers["content-security-policy"]
+        assert "frame-ancestors 'none'" in csp and "default-src 'self'" in csp
+    page = (await http.get("/console")).text
+    assert "fonts.googleapis.com" not in page  # fonts ship with mst; no outside calls
+
+
+async def test_console_fonts_are_served_locally(http):
+    css = (await http.get("/console/console.css")).text
+    for font in ("source-sans-3-400.woff2", "source-sans-3-600.woff2", "source-code-pro-400.woff2", "source-code-pro-500.woff2"):
+        assert f"/console/{font}" in css
+        r = await http.get(f"/console/{font}")
+        assert r.status_code == 200 and r.headers["content-type"] == "font/woff2" and r.content[:4] == b"wOF2"

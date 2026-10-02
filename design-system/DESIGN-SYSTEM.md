@@ -22,8 +22,14 @@ https://claude.ai/artifact/21NSyXKpzcrqanmqr8bEe5 (option C).
 | `--idle` | `#8a8886` | state Cold |
 | `--bad` | `#c50f1f` | state Crashed, destructive actions (`#a4262c` for text) |
 | `--input-border` | `#8a8886` | inputs and selects |
+| `--hover` | `#f5f5f5` | row and button hover |
+| `--disabled` / `--disabled-fill` | `#a19f9d` / `#c8c6c4` | disabled text / disabled primary button, blade edge |
+| `--switch-off` | `#616161` | switch track and knob when off |
+| `--log-bg` | `#1b1a19` (text `--line`) | log viewer |
+| `--bad-border` / `--bad-soft` | `#f1bbbc` / `#fdf3f4` | error banner |
 
 Type: **Source Sans 3** (400/600) for UI, **Source Code Pro** (400/500) for ids, paths, numbers.
+Both ship as woff2 files with mst (`mst/console/`, SIL OFL): the console makes no outside requests.
 Sizes: 22 page title, 20 blade title, 14 body/table, 13 secondary, 12.5 mono.
 Radius: 0 everywhere except inputs/buttons (2px) and filter chips (12px). No shadows except the
 blade's left edge (`-6px 0 16px rgba(0,0,0,.06)`).
