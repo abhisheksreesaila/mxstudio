@@ -41,11 +41,11 @@ Brief: docs/brief.md · Needs: F-001
 - [x] `mst keys new <app>` prints a key once; only its hash is stored
 - [x] `mst keys ls` shows app, prefix, created, last used; `mst keys revoke <app>` disables it
 
-## F-006 `mst serve <model>`: one command to a working endpoint [review]
+## F-006 `mst serve <model>`: one command to a working endpoint [done]
 Brief: docs/brief.md · Needs: F-002, F-004, F-005
-- [ ] pulls if needed, registers, starts the daemon (in the background) if not running, warms the model
-- [ ] prints the base URL, a key (made on first use) and a ready-to-paste curl and Python snippet
-- [ ] `--pin` keeps it loaded; `--keep-alive 10m` sets the idle timeout; `mst stop <model>` unloads it
+- [x] pulls if needed, registers, starts the daemon (in the background) if not running, warms the model
+- [x] prints the base URL, a key (made on first use) and a ready-to-paste curl and Python snippet
+- [x] `--pin` keeps it loaded; `--keep-alive 10m` sets the idle timeout; `mst stop <model>` unloads it
 
 ## F-007 Secure LAN endpoint: Caddy + LiteLLM [done]
 Brief: docs/brief.md · Needs: F-004
@@ -60,12 +60,12 @@ Brief: docs/brief.md · Needs: F-002
 - [x] includes a layer/parameter table from config.json and sample code (OpenAI client, streaming, raw HTTP) wired to the local endpoint and a key from the environment
 - [x] opens it in Jupyter Lab (`--no-open` just writes it)
 
-## F-009 Unsupported architectures: `mst port <ref>` [review]
+## F-009 Unsupported architectures: `mst port <ref>` [done]
 Brief: docs/brief.md · Needs: F-002
-- [ ] installs/updates Modular's skills (github.com/modular/skills) into `~/.mst/skills`
-- [ ] creates a port workspace with the HF config and a `PORT.md` naming the architecture and the closest supported donor
-- [ ] prints the command to run the import-model skill with Claude Code in that workspace
-- [ ] a finished port can be registered with `mst pull <ref> --port <dir>`
+- [x] installs/updates Modular's skills (github.com/modular/skills) into `~/.mst/skills`
+- [x] creates a port workspace with the HF config and a `PORT.md` naming the architecture and the closest supported donor
+- [x] prints the command to run the import-model skill with Claude Code in that workspace
+- [x] a finished port can be registered with `mst pull <ref> --port <dir>`
 
 ## F-010 Endpoints page design [blocked]
 Blocked: pick a visual direction with the designer skill (brief says explore, not Terminal Ledger). Say "design the endpoints page" when you're up.
