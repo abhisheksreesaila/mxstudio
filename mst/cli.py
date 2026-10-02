@@ -13,7 +13,8 @@ from mst import report, resolve
 from mst.store import Store, format_duration, parse_duration
 
 app = typer.Typer(help="MX Studio: local models on Modular MAX you can see into and reshape.",
-                  no_args_is_help=True, add_completion=False)
+                  no_args_is_help=True, add_completion=False,
+                  epilog="Exit codes: 0 ok, 1 refused (one `error:` line on stderr), 2 bad usage.")
 
 
 keys_app = typer.Typer(help="Per-app API keys.", no_args_is_help=True)
@@ -24,7 +25,7 @@ JSON = typer.Option(False, "--json", help="Print JSON only, for scripts and agen
 
 
 def _fail(message: str) -> NoReturn:
-    typer.echo(f"error: {message}")
+    typer.echo(f"error: {message}", err=True)
     raise typer.Exit(1)
 
 
@@ -143,11 +144,9 @@ def keys_new(app_name: str = typer.Argument(..., metavar="APP"),
     try:
         key = keys.create_key(Store.open(), app_name, rotate=rotate)
     except ValueError as e:
-        typer.echo(f"error: {e}")
-        raise typer.Exit(1)
+        _fail(str(e))
     except keys.KeyExists as e:
-        typer.echo(str(e))
-        raise typer.Exit(1)
+        _fail(str(e))
     typer.echo(key)
     typer.echo("This key will not be shown again. Copy it now.")
 
@@ -174,11 +173,9 @@ def keys_ls(as_json: bool = JSON) -> None:
 def keys_revoke(app_name: str = typer.Argument(..., metavar="APP")) -> None:
     """Disable an app's key."""
     if app_name.startswith("_"):
-        typer.echo(f"{app_name} is managed by mst (mst expose --stop revokes it)")
-        raise typer.Exit(1)
+        _fail(f"{app_name} is managed by mst (mst expose --stop revokes it)")
     if not keys.revoke_key(Store.open(), app_name):
-        typer.echo(f"no active key for {app_name}")
-        raise typer.Exit(1)
+        _fail(f"no active key for {app_name}")
     typer.echo(f"revoked the key for {app_name}")
 
 
@@ -193,25 +190,23 @@ def pull(ref: str = typer.Argument(..., help="Short name (qwen2.5-0.5b) or Huggi
         try:
             model = port.register(ref, port_dir, name=name)
         except resolve.PullError as e:
-            typer.echo(e.resolution.message)
-            raise typer.Exit(1)
+            _fail(e.resolution.message)
         except (port.PortError, resolve.ResolveError) as e:
-            typer.echo(f"error: {e}")
-            raise typer.Exit(1)
+            _fail(str(e))
         typer.echo(f"registered port {model.name} ({model.repo_id}@{model.revision[:8]}, custom architecture {model.custom_arch_path})")
         return
     try:
         if dry_run:
             res = resolve.resolve(ref, catalog=resolve.load_catalog(), hf=resolve.HubClient())
+            if not res.supported:
+                _fail(f"{res.kind}: {res.message}")
             typer.echo(f"{res.kind}: {res.message}")
-            raise typer.Exit(0 if res.supported else 1)
+            return
         model = resolve.pull(ref, name=name)
     except resolve.PullError as e:
-        typer.echo(e.resolution.message)
-        raise typer.Exit(1)
+        _fail(e.resolution.message)
     except resolve.ResolveError as e:
-        typer.echo(f"error: {e}")
-        raise typer.Exit(1)
+        _fail(str(e))
     typer.echo(f"pulled {model.name} ({model.repo_id}@{model.revision[:8]}, {model.source})")
 
 
@@ -222,8 +217,7 @@ def port_model(ref: str = typer.Argument(..., help="Short name or Hugging Face r
     try:
         result = port.prepare(ref)
     except (port.PortError, resolve.ResolveError) as e:
-        typer.echo(f"error: {e}")
-        raise typer.Exit(1)
+        _fail(str(e))
     if result.workspace is None:
         typer.echo(result.message)
         return
@@ -245,8 +239,7 @@ def learn_model(
     try:
         path = learn.write_notebook(model)
     except Exception as exc:
-        typer.echo(f"could not build a notebook for {model}: {exc}", err=True)
-        raise typer.Exit(1)
+        _fail(f"could not build a notebook for {model}: {exc}")
     typer.echo(f"wrote {path}")
     if not no_open:
         try:
@@ -268,19 +261,16 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
     try:  # before any download: a typo shouldn't cost gigabytes first
         seconds = parse_duration(keep_alive) if keep_alive else None
     except ValueError:
-        typer.echo(f"error: --keep-alive {keep_alive!r} is not a duration (try 90s, 10m or 1h)")
-        raise typer.Exit(1)
+        _fail(f"--keep-alive {keep_alive!r} is not a duration (try 90s, 10m or 1h)")
     store = Store.open()
     found = store.get_model(model) or next((m for m in store.models() if m.repo_id == model), None)
     if found is None:
         try:
             found = resolve.pull(model)
         except resolve.PullError as e:
-            typer.echo(e.resolution.message)
-            raise typer.Exit(1)
+            _fail(e.resolution.message)
         except resolve.ResolveError as e:
-            typer.echo(f"error: {e}")
-            raise typer.Exit(1)
+            _fail(str(e))
         typer.echo(f"pulled {found.name} ({found.repo_id}@{found.revision[:8]})")
         try:
             if expose.refresh_if_running(store):
@@ -299,8 +289,7 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
             serve.load(name)
             typer.echo(f"{name} is ready ({time.monotonic() - started:.1f}s)")
     except serve.DaemonError as e:
-        typer.echo(f"error: {e}")
-        raise typer.Exit(1)
+        _fail(str(e))
     typer.echo("")
     typer.echo(serve.usage(name, serve.first_key(store)))
     typer.echo(f"\nmanage it in the console: {report.console_link('models')}   (or: mst status, mst set {name} --pin)")
@@ -315,21 +304,18 @@ def stop_model(model: str = typer.Argument(None, help="Model to unload"),
         try:
             stopped = serve.shutdown()
         except serve.DaemonError as e:
-            typer.echo(f"error: {e}")
-            raise typer.Exit(1)
+            _fail(str(e))
         typer.echo("stopped the daemon and every model" if stopped else "the daemon isn't running")
         return
     if not model:
-        typer.echo("name a model, or use --all")
-        raise typer.Exit(1)
+        _fail("name a model, or use --all")
     if not serve.daemon_running():
         typer.echo("the daemon isn't running; nothing is loaded")
         return
     try:
         serve.stop(model)
     except serve.DaemonError as e:
-        typer.echo(f"error: {e}")
-        raise typer.Exit(1)
+        _fail(str(e))
     typer.echo(f"unloaded {model}")
 
 
@@ -350,8 +336,7 @@ def expose_cmd(host: str = typer.Option(None, help="Hostname clients use. Defaul
         else:
             configs = expose.start(host=host, litellm=litellm)
     except (expose.ExposeError, ValueError) as e:
-        typer.echo(f"error: {e}")
-        raise typer.Exit(1)
+        _fail(str(e))
     typer.echo(f"endpoint   https://{host}:{expose.EXPOSE_PORT}/v1")
     typer.echo(f"configs    {configs['caddyfile']}  {configs['litellm']}")
     if litellm:
