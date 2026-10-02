@@ -23,6 +23,9 @@ class FakeHF:
         arch, files = self.repos[repo_id]
         return r.RepoInfo(sha="abc123", architecture=arch, files=files)
 
+    def read_json(self, repo_id, revision, filename):
+        return {"weight_map": {"a": "model-00001.safetensors", "b": "model-00002.safetensors"}}
+
     def download(self, repo_id, revision, patterns):
         self.downloads.append((repo_id, revision, patterns))
         return "/cache/snap"
@@ -31,4 +34,10 @@ class FakeHF:
 def make_hf(**kw):
     return FakeHF({"Qwen/Qwen2.5-0.5B-Instruct": ("Qwen2ForCausalLM", FILES),
                    "someone/qwen-finetune": ("Qwen2ForCausalLM", FILES),
+                   "acme/pickle": ("Qwen2ForCausalLM", ["config.json", "pytorch_model.bin", "tokenizer.json"]),
+                   "acme/sharded": ("Qwen2ForCausalLM", [
+                       "config.json", "tokenizer.json", "model.safetensors.index.json",
+                       "model-00001.safetensors", "model-00002.safetensors", "consolidated.safetensors"]),
+                   "bob/foo": ("Qwen2ForCausalLM", FILES),
+                   "alice/foo": ("Qwen2ForCausalLM", FILES),
                    "acme/weird": ("WeirdForCausalLM", FILES)}, **kw)
