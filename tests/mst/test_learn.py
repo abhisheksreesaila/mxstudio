@@ -125,7 +125,7 @@ def test_cli_accepts_raw_repo_id(mst_home, monkeypatch):
     monkeypatch.setattr(learn, "default_source", lambda: FakeHF())
     result = runner.invoke(app, ["learn", "Qwen/Qwen2.5-0.5B-Instruct", "--no-open"])
     assert result.exit_code == 0, result.output
-    assert (mst_home / "notebooks" / "Qwen2.5-0.5B-Instruct.ipynb").exists()
+    assert (mst_home / "notebooks" / "qwen2.5-0.5b-instruct.ipynb").exists()
 
 
 def test_cli_reports_hf_failure(monkeypatch):
@@ -136,3 +136,67 @@ def test_cli_reports_hf_failure(monkeypatch):
     result = runner.invoke(app, ["learn", "no/such-model", "--no-open"])
     assert result.exit_code == 1
     assert "no/such-model" in result.output
+
+
+def test_hubsource_card_text_downloads_readme(tmp_path, monkeypatch):
+    import huggingface_hub
+    readme = tmp_path / "README.md"
+    readme.write_text("---\nlicense: mit\n---\n# Hello card\n")
+    seen = {}
+
+    def fake_download(repo_id, filename, **kw):
+        seen.update(repo_id=repo_id, filename=filename, **kw)
+        return str(readme)
+
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", fake_download)
+    text = learn.HubSource().card_text("a/b", "rev9")
+    assert "Hello card" in text and "license" not in text
+    assert seen["filename"] == "README.md" and seen["revision"] == "rev9"
+
+
+def test_model_name_for_pulled_and_unpulled_models(monkeypatch):
+    monkeypatch.setattr(learn, "default_source", lambda: FakeHF())
+    # curated alias, not pulled yet
+    nb = learn.build_notebook(model_id="qwen2.5-0.5b", repo_id="Qwen/Qwen2.5-0.5B-Instruct",
+                              source=FakeHF(), registered=False, max_finder=lambda a: [])
+    assert "mst pull qwen2.5-0.5b" in text_of(nb)
+    assert learn.resolve("qwen2.5-0.5b") == ("qwen2.5-0.5b", "Qwen/Qwen2.5-0.5B-Instruct", None, False)
+    assert learn.resolve("Qwen/Qwen2.5-0.5B-Instruct")[0] == "qwen2.5-0.5b-instruct"
+    assert learn.resolve("Foo/Bar-7B")[0] == "bar-7b"
+    # pulled: looked up by repo id returns the registered name
+    Store.open().add_model(name="qwen2.5-0.5b", repo_id="Qwen/Qwen2.5-0.5B-Instruct", revision="r",
+                           source="max-catalog", architecture="Qwen2ForCausalLM")
+    assert learn.resolve("Qwen/Qwen2.5-0.5B-Instruct") == ("qwen2.5-0.5b", "Qwen/Qwen2.5-0.5B-Instruct", "r", True)
+    nb = learn.build_notebook(model_id="qwen2.5-0.5b", repo_id="x/y", source=FakeHF(),
+                              max_finder=lambda a: [])
+    assert "mst pull" not in text_of(nb)
+
+
+def test_base_url_default_comes_from_settings(monkeypatch):
+    monkeypatch.setattr(learn, "daemon_url", lambda: "http://127.0.0.1:9999")
+    code = "\n".join(c.source for c in build().cells if c.cell_type == "code")
+    assert '"http://127.0.0.1:9999/v1"' in code
+
+
+def test_cli_launches_jupyter_detached(monkeypatch):
+    import subprocess
+    monkeypatch.setattr(learn, "default_source", lambda: FakeHF())
+    calls = []
+    monkeypatch.setattr(subprocess, "Popen", lambda cmd, **kw: calls.append((cmd, kw)))
+    result = runner.invoke(app, ["learn", "Qwen/Qwen2.5-0.5B-Instruct"])
+    assert result.exit_code == 0, result.output
+    cmd, kw = calls[0]
+    assert cmd[:3] == ["jupyter", "lab", cmd[2]] and cmd[2].endswith(".ipynb")
+    assert kw["start_new_session"] is True
+
+
+def test_cli_without_jupyter_prints_fallback(monkeypatch):
+    import subprocess
+    monkeypatch.setattr(learn, "default_source", lambda: FakeHF())
+
+    def missing(*a, **k):
+        raise FileNotFoundError("jupyter")
+    monkeypatch.setattr(subprocess, "Popen", missing)
+    result = runner.invoke(app, ["learn", "Qwen/Qwen2.5-0.5B-Instruct"])
+    assert result.exit_code == 0
+    assert "pixi run jupyter lab" in result.output and ".ipynb" in result.output

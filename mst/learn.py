@@ -13,6 +13,8 @@ from typing import Any, Callable, Protocol
 import nbformat
 from nbformat.v4 import new_code_cell, new_markdown_cell, new_notebook
 
+from mst.resolve import CURATED, model_name
+from mst.settings import daemon_url
 from mst.store import Store, mst_home
 
 CARD_LIMIT = 6000
@@ -37,11 +39,21 @@ class HFSource(Protocol):
 
 
 class HubSource:
-    """The real thing: huggingface_hub API calls only."""
+    """The real thing: huggingface_hub API calls only, with HF_TOKEN handled by resolve.HubClient."""
+
+    def __init__(self):
+        from mst.resolve import HubClient
+        self.client = HubClient()
 
     def info(self, repo_id, revision):
-        from huggingface_hub import model_info
-        mi = model_info(repo_id, revision=revision)
+        from huggingface_hub.errors import GatedRepoError, RepositoryNotFoundError
+        try:
+            mi = self.client.api.model_info(repo_id, revision=revision)
+        except GatedRepoError as e:
+            raise RuntimeError(f"{repo_id} is gated: accept its license on huggingface.co, "
+                               "then set HF_TOKEN and retry.") from e
+        except RepositoryNotFoundError as e:
+            raise RuntimeError(f"no such model on Hugging Face: {repo_id} (use owner/repo)") from e
         card = mi.card_data.to_dict() if getattr(mi, "card_data", None) else {}
         st = getattr(mi, "safetensors", None)
         total = getattr(st, "total", None) if st else None
@@ -53,18 +65,22 @@ class HubSource:
                       tags=list(mi.tags or []))
 
     def card_text(self, repo_id, revision):
-        from huggingface_hub import ModelCard
+        from huggingface_hub import ModelCard, hf_hub_download
+        from huggingface_hub.errors import EntryNotFoundError
         try:
-            return ModelCard.load(repo_id, revision=revision).text or ""
-        except Exception:
+            path = hf_hub_download(repo_id, "README.md", revision=revision, token=self.client.token)
+        except EntryNotFoundError:
             return ""
+        return ModelCard(Path(path).read_text(encoding="utf-8")).text or ""
 
     def config(self, repo_id, revision):
         from huggingface_hub import hf_hub_download
+        from huggingface_hub.errors import EntryNotFoundError
         try:
-            return json.loads(Path(hf_hub_download(repo_id, "config.json", revision=revision)).read_text())
-        except Exception:
+            path = hf_hub_download(repo_id, "config.json", revision=revision, token=self.client.token)
+        except EntryNotFoundError:
             return {}
+        return json.loads(Path(path).read_text())
 
 
 def default_source() -> HFSource:
@@ -233,7 +249,7 @@ def _trim(text: str, limit: int = CARD_LIMIT) -> str:
 def _setup_code(model_id: str) -> str:
     return (
         "import os\n"
-        'BASE_URL = os.environ.get("MST_BASE_URL", "http://127.0.0.1:11435/v1")\n'
+        f'BASE_URL = os.environ.get("MST_BASE_URL", "{daemon_url()}/v1")\n'
         'API_KEY = os.environ["MST_API_KEY"]  # create one with: mst keys new <app>\n'
         f'MODEL = "{model_id}"\n'
         "print(BASE_URL, MODEL)"
@@ -270,7 +286,7 @@ r.raise_for_status()
 print(r.json()["choices"][0]["message"]["content"])'''
 
 
-def build_notebook(*, model_id: str, repo_id: str, source: HFSource, revision: str | None = None,
+def build_notebook(*, model_id: str, repo_id: str, source: HFSource, revision: str | None = None, registered: bool = True,
                    max_finder: Callable[[str | None], list[Path]] = find_max_implementation):
     info = source.info(repo_id, revision)
     card = source.card_text(repo_id, revision)
@@ -309,7 +325,9 @@ def build_notebook(*, model_id: str, repo_id: str, source: HFSource, revision: s
     cells.append(new_markdown_cell(_max_cell(arch, max_finder)))
     cells += [
         new_markdown_cell("## Try it\n\nThese cells talk to your local `mst` endpoint. Set `MST_API_KEY` "
-                          "(and optionally `MST_BASE_URL`) in the environment before starting Jupyter."),
+                          "(and optionally `MST_BASE_URL`) in the environment before starting Jupyter."
+                          + ("" if registered else f"\n\n**This model is not pulled yet:** run `mst pull {model_id}` "
+                             "first, or the endpoint will not know the name below.")),
         new_code_cell(_setup_code(model_id)),
         new_markdown_cell("### OpenAI client"),
         new_code_cell(OPENAI_CODE),
@@ -325,19 +343,24 @@ def build_notebook(*, model_id: str, repo_id: str, source: HFSource, revision: s
     return nb
 
 
-def resolve(ref: str) -> tuple[str, str, str | None]:
-    """(notebook name, repo id, revision) for a registered model name or a raw repo id."""
-    m = Store.open().get_model(ref)
+def resolve(ref: str) -> tuple[str, str, str | None, bool]:
+    """(name the gateway serves, repo id, revision, registered) for a model name, repo id or curated alias."""
+    store = Store.open()
+    m = store.get_model(ref) or next((x for x in store.models() if x.repo_id == ref), None)
     if m:
-        return m.name, m.repo_id, m.revision
-    return ref.split("/")[-1], ref, None
+        return m.name, m.repo_id, m.revision, True
+    repo_id = CURATED.get(ref.lower(), ref)
+    m = next((x for x in store.models() if x.repo_id == repo_id), None)
+    if m:
+        return m.name, m.repo_id, m.revision, True
+    return model_name(ref, repo_id), repo_id, None, False
 
 
 def write_notebook(ref: str, source: HFSource | None = None,
                    max_finder: Callable[[str | None], list[Path]] = find_max_implementation) -> Path:
-    name, repo_id, revision = resolve(ref)
+    name, repo_id, revision, registered = resolve(ref)
     nb = build_notebook(model_id=name, repo_id=repo_id, source=source or default_source(),
-                        revision=revision, max_finder=max_finder)
+                        revision=revision, registered=registered, max_finder=max_finder)
     out = mst_home() / "notebooks" / f"{name}.ipynb"
     out.parent.mkdir(parents=True, exist_ok=True)
     nbformat.write(nb, out)

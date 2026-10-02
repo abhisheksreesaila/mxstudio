@@ -101,8 +101,12 @@ def learn_model(
         raise typer.Exit(1)
     typer.echo(f"wrote {path}")
     if not no_open:
-        subprocess.Popen(["jupyter", "lab", str(path)], start_new_session=True,
-                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            subprocess.Popen(["jupyter", "lab", str(path)], start_new_session=True,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except FileNotFoundError:
+            typer.echo(f"jupyter not found. Open it yourself: pixi run jupyter lab {path}")
+            return
         typer.echo("opening in Jupyter Lab")
 
 
