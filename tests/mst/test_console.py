@@ -113,3 +113,22 @@ async def test_ttft_and_decode_speed_come_only_from_streamed_replies(http, key):
     await http.post("/v1/chat/completions", json=CHAT, headers=auth(key))
     plain = (await http.get("/admin/requests", headers=ADMIN)).json()[0]
     assert plain["ttft_ms"] is None and plain["completion_tokens"] == 12
+
+
+async def test_a_malformed_upstream_chunk_still_reaches_the_client(http, key, monkeypatch):
+    from test_gateway import CHAT, auth
+    from mst import metrics
+
+    def boom(self, data):
+        raise RuntimeError("meter bug")
+    monkeypatch.setattr(metrics.StreamMeter, "feed", boom)
+    r = await http.post("/v1/chat/completions", json={**CHAT, "stream": True}, headers=auth(key))
+    assert r.status_code == 200 and "[DONE]" in r.text
+
+
+async def test_ttft_does_not_include_the_cold_start(http, key, monkeypatch):
+    from test_gateway import CHAT, auth
+    monkeypatch.setenv("FAKE_MAX_DELAY", "1.0")  # the model takes a second to load
+    await http.post("/v1/chat/completions", json={**CHAT, "stream": True}, headers=auth(key))
+    row = (await http.get("/admin/requests", headers=ADMIN)).json()[0]
+    assert row["ttft_ms"] < 900

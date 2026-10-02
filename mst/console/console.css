@@ -88,12 +88,12 @@ h1 { margin: 4px 0 2px; font-size: 22px; font-weight: 600; }
 .essentials .section-title { margin-top: 12px; }
 .essentials-grid { display: grid; grid-template-columns: 140px minmax(0, 1fr) 140px minmax(0, 1fr); row-gap: 8px; column-gap: 12px; margin: 0; }
 .essentials-grid dt { color: var(--muted); }
-.essentials-grid dd { margin: 0; word-break: break-all; }
+.essentials-grid dd { margin: 0; overflow-wrap: anywhere; }
 .gauges { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--surface); border: 1px solid var(--line); }
 .gauge { padding: 12px 14px 10px; border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; }
 .gauge:last-child { border-right: 0; }
 .gauge-head, .gauge-foot { align-self: stretch; display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
-.gauge-foot { font-size: 11.5px; }
+.gauge-foot { font-size: 11.5px; flex-wrap: wrap; }
 .gauge-svg { width: 100%; max-width: 200px; height: auto; margin: 4px 0; }
 .gauge-track { stroke: var(--line-soft); }
 .gauge-fill { stroke: var(--accent); }

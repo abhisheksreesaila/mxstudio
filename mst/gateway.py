@@ -125,6 +125,9 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                 await asyncio.sleep(reap_interval)
                 try:
                     metrics.prune(store)
+                except Exception:  # a locked database must not stop idle unloading
+                    log.exception("pruning request metrics failed")
+                try:
                     await supervisor.reap_idle()
                 except Exception:  # a failed sweep must not end the loop
                     log.exception("idle sweep failed")
@@ -222,6 +225,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             note(app_name, name, route, 503, started)
             return openai_error(503, f"Model `{name}` failed to start: {e}", "model_unavailable",
                                 "server_error")
+        started = time.monotonic()  # model latency from here: a cold start isn't counted as TTFT
         in_flight = contextlib.AsyncExitStack()
         await in_flight.enter_async_context(supervisor.request(name))  # never reaped mid-request
         target = base + request.url.path.removeprefix("/v1")
@@ -247,13 +251,19 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                 async for chunk in upstream.aiter_raw():
                     if first is None:
                         first = time.monotonic()
-                    meter.feed(chunk)
+                    try:
+                        meter.feed(chunk)
+                    except Exception:  # metrics never break a reply
+                        log.exception("metrics meter failed")
                     yield chunk
             finally:
                 await upstream.aclose()
                 await in_flight.aclose()
                 if not streamed:
-                    meter.finish()
+                    try:
+                        meter.finish()
+                    except Exception:
+                        log.exception("metrics meter failed")
                 # TTFT (and so decode speed) only means something when tokens arrive one by one
                 note(app_name, name, route, upstream.status_code, started, meter=meter,
                      ttft_ms=(first - started) * 1000 if streamed and first is not None else None)

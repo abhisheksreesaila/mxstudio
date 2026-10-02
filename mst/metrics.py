@@ -9,6 +9,7 @@ from mst.store import Store
 
 RETENTION_SECONDS = 7 * 24 * 3600
 MAX_JSON_BYTES = 1_000_000  # a non-streamed reply larger than this isn't parsed for usage
+MAX_EVENT_BYTES = 256_000  # one SSE event larger than this is dropped, not buffered
 
 
 def record(store: Store, *, app: str | None, model: str | None, route: str, status: int,
@@ -41,10 +42,10 @@ def _percentile(values: list[float], p: float) -> float | None:
 
 def _decode_tps(r) -> float | None:
     """Completion tokens per second after the first token: the steady-state decode speed."""
-    if not r["completion_tokens"] or r["ttft_ms"] is None:
+    if not r["completion_tokens"] or r["completion_tokens"] < 2 or r["ttft_ms"] is None:
         return None
     seconds = (r["duration_ms"] - r["ttft_ms"]) / 1000
-    return r["completion_tokens"] / seconds if seconds > 0 else None
+    return (r["completion_tokens"] - 1) / seconds if seconds > 0 else None  # the first token is in the TTFT
 
 
 def _stats(rows) -> dict:
@@ -69,7 +70,8 @@ def summary(store: Store, window: float = 300, now: float | None = None) -> dict
 
 
 class StreamMeter:
-    """Reads an SSE stream as it passes through: content chunks (≈ tokens) and any usage block."""
+    """Reads an SSE stream as it passes through: generated chunks (≈ tokens) and any usage block.
+    It never raises: a metrics problem must not break the reply it is watching."""
 
     def __init__(self):
         self.buffer = b""
@@ -78,54 +80,77 @@ class StreamMeter:
         self.usage_completion: int | None = None
 
     def feed(self, data: bytes) -> None:
-        self.buffer += data
-        *events, self.buffer = self.buffer.split(b"\n\n")
-        for event in events:
-            for line in event.split(b"\n"):
-                if not line.startswith(b"data:") or line[5:].strip() == b"[DONE]":
-                    continue
-                try:
-                    chunk = json.loads(line[5:])
-                except ValueError:
-                    continue
-                usage = chunk.get("usage") if isinstance(chunk, dict) else None
-                if isinstance(usage, dict):
-                    self.prompt_tokens = usage.get("prompt_tokens")
-                    self.usage_completion = usage.get("completion_tokens")
-                for choice in (chunk.get("choices") or []) if isinstance(chunk, dict) else []:
-                    text = (choice.get("delta") or {}).get("content") or choice.get("text")
-                    if text:
-                        self.chunks += 1
+        try:
+            self.buffer += data
+            *events, self.buffer = self.buffer.split(b"\n\n")
+            if len(self.buffer) > MAX_EVENT_BYTES:  # no separator in sight: stop holding it
+                self.buffer = b""
+            for event in events:
+                for line in event.split(b"\n"):
+                    if line.startswith(b"data:") and line[5:].strip() != b"[DONE]":
+                        self._event(line[5:])
+        except Exception:
+            self.buffer = b""
+
+    def _event(self, payload: bytes) -> None:
+        try:
+            chunk = json.loads(payload)
+        except ValueError:
+            return
+        if not isinstance(chunk, dict):
+            return
+        usage = chunk.get("usage")
+        if isinstance(usage, dict):
+            self.prompt_tokens = usage.get("prompt_tokens")
+            self.usage_completion = usage.get("completion_tokens")
+        generated = False
+        for choice in chunk.get("choices") or []:
+            if not isinstance(choice, dict):
+                continue
+            delta = choice.get("delta")
+            parts = [choice.get("text")]
+            if isinstance(delta, dict):  # content, reasoning (MAX: reasoning_content / reasoning), tool calls
+                parts += [delta.get(k) for k in ("content", "reasoning_content", "reasoning", "tool_calls")]
+            generated = generated or any(parts)
+        if generated:
+            count = chunk.get("token_count")  # MAX can put several tokens in one chunk
+            self.chunks += count if isinstance(count, int) and count > 0 else 1
 
     @property
     def completion_tokens(self) -> int:
         return self.usage_completion if self.usage_completion is not None else self.chunks
 
     @property
-    def estimated(self) -> bool:  # without a usage block, one content chunk counts as one token
+    def estimated(self) -> bool:  # without a usage block, chunks are counted as tokens
         return self.usage_completion is None
 
 
 class JsonMeter:
-    """Reads `usage` from a non-streamed JSON reply."""
+    """Reads `usage` from a non-streamed JSON reply. Never raises; skips replies over the cap."""
 
     def __init__(self):
         self.body = b""
+        self.too_big = False
         self.prompt_tokens: int | None = None
         self.completion_tokens: int | None = None
         self.estimated = False
 
     def feed(self, data: bytes) -> None:
-        if len(self.body) < MAX_JSON_BYTES:
+        if len(self.body) + len(data) > MAX_JSON_BYTES:
+            self.too_big, self.body = True, b""
+        elif not self.too_big:
             self.body += data
 
     def finish(self) -> None:
+        if self.too_big:
+            return
         try:
-            usage = json.loads(self.body).get("usage") or {}
+            usage = json.loads(self.body).get("usage")
         except (ValueError, AttributeError):
             return
-        self.prompt_tokens = usage.get("prompt_tokens")
-        self.completion_tokens = usage.get("completion_tokens")
+        if isinstance(usage, dict):
+            self.prompt_tokens = usage.get("prompt_tokens")
+            self.completion_tokens = usage.get("completion_tokens")
 
 
 def _nvidia_smi() -> str:

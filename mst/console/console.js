@@ -40,7 +40,9 @@
     log: "",
     info: null,
     metrics: null,
-    requests: null,
+    requests: null,      // Overview's last 10
+    activity: null,      // Activity log's last 200
+    infoAt: 0,           // when info was fetched, so uptime keeps counting between fetches
   };
 
   // -- tiny DOM helper ------------------------------------------------------------------------
@@ -83,7 +85,7 @@
         [state.metrics, state.requests] = await Promise.all([api("GET", "/admin/metrics"), api("GET", "/admin/requests?limit=10")]);
         if (!state.info || !fromPoll) await loadInfo();
       } else if (state.page === "activity") {
-        state.requests = await api("GET", "/admin/requests?limit=200");
+        state.activity = await api("GET", "/admin/requests?limit=200");
       }
       state.error = null;
     } catch (e) {
@@ -96,6 +98,7 @@
     try {
       const info = await api("GET", "/admin/info");
       state.info = info;
+      state.infoAt = Date.now();
       $("host").textContent = `mst@${info.host}`;
       $("crumb-host").textContent = `mst@${info.host}`;
       $("title-host").textContent = `mst@${info.host}`;
@@ -294,7 +297,7 @@
     if (!rows || rows.length === 0) {
       return h("div", { class: "empty" }, h("h2", {}, "No requests yet"),
         h("p", {}, "Requests to /v1 show up here: which app, which model, tokens and latency."),
-        h("div", { class: "code" }, "curl http://127.0.0.1:11435/v1/models -H 'Authorization: Bearer $MST_API_KEY'"));
+        h("div", { class: "code" }, `curl ${(state.info && state.info.endpoint) || location.origin + "/v1"}/models -H "Authorization: Bearer $MST_API_KEY"`));
     }
     const time = (ts) => new Date(ts * 1000).toLocaleTimeString([], { hour12: false });
     const tokens = (r) => r.completion_tokens === null ? "—" : `${fmt(r.prompt_tokens)} → ${r.estimated ? "~" : ""}${fmt(r.completion_tokens)}`;
@@ -311,8 +314,11 @@
         compact ? null : h("td", { class: "mono" }, `${fmt(r.duration_ms)} ms`)))));
   }
   function renderOverview() {
-    const m = state.metrics, info = state.info || {};
+    const info = state.info || {};
+    // While the daemon is down the last numbers would be stale: show dashes, not old values.
+    const m = state.error ? { requests: null, per_minute: null, error_rate: 0, ttft_p50_ms: null, ttft_p95_ms: null, decode_tps_p50: null, by_model: {}, gpus: [] } : state.metrics;
     if (!m) return [h("div", { class: "soon" }, h("p", {}, "Loading…"))];
+    const uptime = info.uptime_seconds === undefined || state.error ? null : info.uptime_seconds + (Date.now() - state.infoAt) / 1000;
     const models = state.models || [];
     const loaded = models.filter((x) => x.state === "ready").length;
     const gpus = m.gpus || [];
@@ -322,7 +328,7 @@
       ["LAN endpoint", info.lan_endpoint || "not exposed (mst expose)"],
       ["MAX", info.max_version || "unknown"],
       ["Hardware", gpus.length ? `${gpus.length} × ${gpus[0].name.replace("NVIDIA GeForce ", "")}` : "no NVIDIA GPU found"],
-      ["Daemon", `up ${duration2(info.uptime_seconds)}`],
+      ["Daemon", state.error ? "not answering" : `up ${duration2(uptime)}`],
       ["Models", `${loaded} loaded of ${models.length}`],
       ["API keys", `${fmt(info.active_keys)} active`],
       ["API reference", info.docs || "/docs"],
@@ -337,10 +343,10 @@
         h("dl", { class: "essentials-grid" }, essentials.map(([k, v]) => [h("dt", {}, k), h("dd", { class: "mono" }, v)]))),
       h("section", { "aria-label": "Live gauges" }, h("h2", { class: "section-title" }, "Last 5 minutes"),
         h("div", { class: "gauges" },
-          gauge("Decode throughput", "p50, all models", m.decode_tps_p50, "tok/s", niceMax(m.decode_tps_p50 || 0, 100), `${fmt(m.requests)} requests`),
+          gauge("Decode throughput", "p50, all models", m.decode_tps_p50, "tok/s", niceMax(m.decode_tps_p50 || 0, 100), m.requests === null ? "—" : `${fmt(m.requests)} requests`),
           gauge("Time to first token", "p50", m.ttft_p50_ms, "ms", niceMax(m.ttft_p50_ms || 0, 200), m.ttft_p95_ms === null ? "p95 —" : `p95 ${fmt(m.ttft_p95_ms)} ms`),
           gauge("GPU memory", gpus.length ? `${gpus.length} GPU${gpus.length > 1 ? "s" : ""}` : "none", gpus.length ? usedGb : null, "GB", Math.max(1, Math.round(totalGb)), gpus.map((g) => `GPU ${g.index} ${g.util}%`).join(" · ") || "—"),
-          gauge("Requests", "per minute", m.per_minute, "req/min", niceMax(m.per_minute || 0, 10), `${(m.error_rate * 100).toFixed(1)}% errors`))),
+          gauge("Requests", "per minute", m.per_minute, "req/min", niceMax(m.per_minute || 0, 10), m.per_minute === null ? "—" : `${(m.error_rate * 100).toFixed(1)}% errors`))),
       byModel.length ? h("section", { "aria-label": "By model" }, h("h2", { class: "section-title" }, "By model"),
         h("table", { class: "grid static" },
           h("thead", {}, h("tr", {}, ["Model", "Requests", "Errors", "TTFT p50", "TTFT p95", "Decode p50"].map((t) => h("th", {}, t)))),
@@ -355,12 +361,12 @@
     ].filter(Boolean);
   }
   function renderActivity() {
-    if (state.requests === null) return [h("div", { class: "soon" }, h("p", {}, "Loading…"))];
+    if (state.activity === null) return [h("div", { class: "soon" }, h("p", {}, "Loading…"))];
     return [
       h("div", { class: "commands", role: "toolbar", "aria-label": "Activity commands" },
         h("button", { class: "cmd", type: "button", onClick: () => refresh() }, "Refresh")),
       h("p", { class: "subtitle" }, "The last 200 requests to /v1. Kept for 7 days. ~ means tokens were counted from streamed chunks."),
-      requestsTable(state.requests, false),
+      requestsTable(state.activity, false),
     ];
   }
 

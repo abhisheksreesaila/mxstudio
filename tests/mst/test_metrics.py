@@ -25,7 +25,7 @@ def test_summary_over_a_window(tmp_path):
     now = 10_000.0
     # 4 ok requests: TTFT 40/50/60/200 ms; decode = 100 tokens over (duration - ttft) seconds
     for ttft in (40, 50, 60, 200):
-        rec(store, ts=now - 30, ttft_ms=ttft, duration_ms=ttft + 500)  # 100 tok / 0.5 s = 200 tok/s
+        rec(store, ts=now - 30, ttft_ms=ttft, duration_ms=ttft + 500)  # 99 tok after the first / 0.5 s = 198 tok/s
     rec(store, ts=now - 20, status=401, app=None, model=None, prompt_tokens=None, completion_tokens=None,
         ttft_ms=None, duration_ms=1.0)
     rec(store, ts=now - 4000, ttft_ms=9999)  # outside the window
@@ -34,7 +34,7 @@ def test_summary_over_a_window(tmp_path):
     assert s["per_minute"] == 1.0
     assert s["errors"] == 1 and s["error_rate"] == 0.2
     assert s["ttft_p50_ms"] == 55.0 and s["ttft_p95_ms"] == 179.0  # linear: 60 + (200 - 60) * 0.85
-    assert s["decode_tps_p50"] == 200.0
+    assert s["decode_tps_p50"] == 198.0
     assert s["by_model"]["m"]["requests"] == 4
 
 
@@ -78,3 +78,40 @@ def test_gpus_from_nvidia_smi_and_none_without_it():
     def missing():
         raise FileNotFoundError("nvidia-smi")
     assert metrics.gpus(runner=missing) == []
+
+
+def test_meters_never_raise_on_odd_upstream_data():
+    m = metrics.StreamMeter()
+    m.feed(b'data: {"choices":[{"delta":"x"}]}\n\ndata: [1,2]\n\ndata: {"usage": 5}\n\n')
+    j = metrics.JsonMeter()
+    j.feed(b'{"usage": 5}')
+    j.finish()
+    assert j.completion_tokens is None
+
+
+def test_stream_meter_counts_reasoning_and_tool_call_deltas_and_token_counts():
+    m = metrics.StreamMeter()
+    events = [{"choices": [{"delta": {"reasoning_content": "think"}}]},
+              {"choices": [{"delta": {"reasoning": "more"}}]},
+              {"choices": [{"delta": {"tool_calls": [{"function": {"arguments": "{"}}]}}]},
+              {"choices": [{"delta": {"content": "ok"}}], "token_count": 3}]
+    m.feed(b"".join(f"data: {json.dumps(e)}\n\n".encode() for e in events))
+    assert m.completion_tokens == 6  # 1 + 1 + 1 + 3 (MAX's per-chunk token_count wins when present)
+
+
+def test_stream_meter_buffer_is_capped():
+    m = metrics.StreamMeter()
+    m.feed(b"x" * (metrics.MAX_EVENT_BYTES * 3))  # a stream that never separates events
+    assert len(m.buffer) <= metrics.MAX_EVENT_BYTES
+
+
+def test_json_meter_ignores_replies_over_the_cap():
+    j = metrics.JsonMeter()
+    j.feed(b'{"usage": {"completion_tokens": 3}, "pad": "' + b"x" * metrics.MAX_JSON_BYTES + b'"}')
+    j.finish()
+    assert len(j.body) <= metrics.MAX_JSON_BYTES and j.completion_tokens is None
+
+
+def test_decode_speed_excludes_the_first_token():
+    row = {"completion_tokens": 11, "ttft_ms": 100.0, "duration_ms": 1100.0}
+    assert metrics._decode_tps(row) == 10.0  # (11 - 1) tokens in 1.0 s after the first

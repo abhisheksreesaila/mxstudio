@@ -90,7 +90,7 @@ Brief: docs/brief.md · Design: docs/design/console.md · Needs: F-006
 Brief: docs/brief.md · Design: docs/design/console.md (gauges from option B) · Needs: F-012
 - [ ] the daemon records per-request metrics (model, app, status, prompt/completion tokens, TTFT, duration) in SQLite
 - [ ] Overview shows essentials (endpoints, MAX version, GPUs, daemon uptime, active keys) and gauges for decode tok/s, TTFT p50, GPU memory, requests/min
-- [ ] Recent requests list (last 50) on Overview and Activity log
+- [ ] Recent requests: the last 10 on Overview, the last 200 on Activity log
 
 ## F-014 API keys and Network pages [todo]
 Brief: docs/brief.md · Design: docs/design/console.md · Needs: F-012
