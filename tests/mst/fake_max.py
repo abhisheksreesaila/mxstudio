@@ -14,7 +14,10 @@ if os.environ.get("FAKE_MAX_STARTS_FILE"):
 if os.environ.get("FAKE_MAX_FAIL"):
     print("boom: cannot load model", file=sys.stderr, flush=True)
     sys.exit(1)
+if os.environ.get("FAKE_MAX_PID_FILE"):
+    open(os.environ["FAKE_MAX_PID_FILE"], "w").write(str(os.getpid()))
 port = int(args[args.index("--port") + 1])
+served = args[args.index("--served-model-name") + 1] if "--served-model-name" in args else "unnamed"
 time.sleep(float(os.environ.get("FAKE_MAX_DELAY", "0")))
 
 
@@ -23,7 +26,7 @@ class H(BaseHTTPRequestHandler):
         ok = self.path in ("/health", "/v1/models")
         self.send_response(200 if ok else 404)
         self.end_headers()
-        self.wfile.write(b'{"data": []}' if ok else b"")
+        self.wfile.write(json.dumps({"data": [{"id": served}]}).encode() if ok else b"")
 
     def log_message(self, *a):
         pass
