@@ -88,7 +88,7 @@ def test_prepare_creates_workspace(tmp_path):
     md = (ws / "PORT.md").read_text()
     for needle in ("WeirdForCausalLM", "acme/weird", "abc123", "hidden_size", "LlamaForCausalLM",
                    str(archs / "llama3"), "compare", "llama3_modulev3", "Choose the lane",
-                   "scripts/scaffold.py acme/weird --start-from llama3_modulev3 --output-dir",
+                   "scripts/scaffold.py acme/weird --start-from llama3_modulev3 --output-dir <output_dir> --full-copy",
                    "<output_dir>/<slug>", "pixi run max serve", "skill root", "MAX versions"):
         assert needle in md
     link = ws / ".claude" / "skills" / "import-model"
@@ -228,3 +228,37 @@ def test_cli_port_hf_error_is_not_a_traceback(monkeypatch):
     _patch(monkeypatch, _boom_hf(), Runner())
     out = runner.invoke(cli.app, ["port", "acme/weird"])
     assert out.exit_code == 1 and "could not reach" in out.output and isinstance(out.exception, SystemExit)
+
+
+def test_scaffold_flags_match_what_scaffold_py_can_introspect(tmp_path):
+    archs = tmp_path / "a"
+    for d in ("llama3", "llama3_modulev3", "olmo3"):
+        (archs / d).mkdir(parents=True)
+    (archs / "llama3" / "llama3.py").write_text("")
+    (archs / "llama3_modulev3" / "llama3.py").write_text("")  # as in the real MAX package
+    (archs / "olmo3" / "olmo3.py").write_text("")
+    v3 = port.Donor("LlamaForCausalLM", archs / "llama3", "r", archs / "llama3_modulev3")
+    assert port.scaffold_args(v3) == ("llama3_modulev3", " --full-copy", "ModuleV3")
+    v2 = port.Donor("LlamaForCausalLM", archs / "llama3", "r")
+    assert port.scaffold_args(v2) == ("llama3", "", "V2")
+    native = port.Donor("Olmo3ForCausalLM", archs / "olmo3", "r", archs / "olmo3")
+    assert port.scaffold_args(native) == ("olmo3", "", "ModuleV3")
+
+
+def test_port_md_without_v3_twin_says_v2_lane(tmp_path):
+    archs = tmp_path / "a"
+    (archs / "llama3").mkdir(parents=True)
+    res = port.prepare("acme/weird", catalog=CAT, hf=make_hf(), runner=Runner(),
+                       fetch_config=fake_fetch, arch_dir=archs)
+    assert "V2 lane" in (res.workspace / "PORT.md").read_text()
+
+
+def test_mst_max_version_from_conda_meta(tmp_path, monkeypatch):
+    meta = tmp_path / "conda-meta"
+    meta.mkdir()
+    (meta / "max-core-9.9-x.json").write_text(json.dumps({"name": "max-core", "version": "9.9"}))
+    (meta / "max-1.2.3-py.json").write_text(json.dumps({"name": "max", "version": "1.2.3"}))
+    monkeypatch.setattr("sys.prefix", str(tmp_path))
+    assert port.mst_max_version() == "1.2.3"
+    monkeypatch.setattr("sys.prefix", str(tmp_path / "nowhere"))
+    assert port.mst_max_version() is None
