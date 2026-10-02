@@ -93,6 +93,16 @@ def live_states() -> dict[str, str]:
         return {}
 
 
+def daemon_info() -> dict | None:
+    """The daemon's /admin/info (uptime, endpoints, MAX version), or None when it isn't running."""
+    try:
+        r = httpx.get(f"{daemon_url()}/admin/info", headers=ADMIN, timeout=1.0)
+        body = r.json()
+        return body if r.status_code == 200 and isinstance(body, dict) else None
+    except (httpx.HTTPError, ValueError):
+        return None
+
+
 def first_key(store: Store) -> str | None:
     """Make a key for the 'default' app on first use; None when the user already has one."""
     active = [k for k in keys.list_keys(store) if k.revoked_at is None and not k.app.startswith("_")]

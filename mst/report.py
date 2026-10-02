@@ -26,6 +26,52 @@ def when(t: float | None) -> str:
     return "never" if t is None else time.strftime("%Y-%m-%d %H:%M", time.localtime(t))
 
 
+def lan_endpoint() -> str | None:
+    """https endpoint on the LAN when `mst expose` is running, else None."""
+    from mst import expose
+    if not expose.status()["caddy"]:
+        return None
+    try:
+        return f"https://{(expose.expose_dir() / 'host').read_text().strip()}:{expose.EXPOSE_PORT}/v1"
+    except OSError:
+        return None
+
+
+def format_uptime(seconds: int) -> str:
+    h, rem = divmod(int(seconds), 3600)
+    m, s = divmod(rem, 60)
+    return f"{h}h {m}m" if h else f"{m}m {s}s" if m else f"{s}s"
+
+
+def status_data(store, info: dict | None, states: dict[str, str]) -> dict:
+    """Everything `mst status` shows. Models are 'cold' when the daemon isn't running."""
+    from mst import expose, keys
+    from mst.port import mst_max_version
+    models = store.models()
+    counts: dict[str, int] = {}
+    for m in models:
+        state = states.get(m.name, "cold") if info else "cold"
+        counts[state] = counts.get(state, 0) + 1
+    active = sum(1 for k in keys.list_keys(store) if k.revoked_at is None and not k.app.startswith("_"))
+    lan = lan_endpoint()
+    return {"daemon": {"running": info is not None, "uptime_seconds": info["uptime_seconds"] if info else None},
+            "endpoint": f"{daemon_url()}/v1", "console": console_link(),
+            "lan": {"exposed": lan is not None, "endpoint": lan, "processes": expose.status()},
+            "models": {"total": len(models), "by_state": counts},
+            "active_keys": active, "max_version": mst_max_version()}
+
+
+def status_text(d: dict) -> str:
+    daemon = d["daemon"]
+    up = (f"running, up {format_uptime(daemon['uptime_seconds'])}" if daemon["running"]
+          else "not running (mst serve <model> starts it)")
+    lan = d["lan"]["endpoint"] or "not exposed (mst expose)"
+    by = ", ".join(f"{n} {s}" for s, n in sorted(d["models"]["by_state"].items())) or "none"
+    return "\n".join([f"{'daemon':<10}{up}", f"{'endpoint':<10}{d['endpoint']}", f"{'console':<10}{d['console']}",
+                      f"{'lan':<10}{lan}", f"{'models':<10}{d['models']['total']} ({by})",
+                      f"{'keys':<10}{d['active_keys']} active", f"{'max':<10}{d['max_version'] or 'not installed'}"])
+
+
 def models_data(models: list[Model], states: dict[str, str]) -> list[dict]:
     """Registered models; `state` is the daemon live state, or null when the daemon is not running."""
     return [{"name": m.name, "repo_id": m.repo_id, "revision": m.revision, "source": m.source,

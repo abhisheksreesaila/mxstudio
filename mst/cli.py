@@ -108,6 +108,34 @@ def requests_cmd(limit: int = typer.Option(20, "--limit", min=1, help="How many 
     typer.echo(f"\nconsole  {report.console_link('activity')}")
 
 
+@app.command("status")
+def status_cmd(as_json: bool = JSON) -> None:
+    """One screen: daemon, endpoints, models, keys, MAX version. Works without the daemon."""
+    from mst import serve
+    info = serve.daemon_info()
+    data = report.status_data(Store.open(), info, serve.live_states() if info else {})
+    typer.echo(report.dump(data) if as_json else report.status_text(data))
+
+
+@app.command("console")
+def console_cmd(page: str = typer.Argument("overview", help="One of: " + ", ".join(report.PAGES)),
+                no_open: bool = typer.Option(False, "--no-open", help="Only print the link.")) -> None:
+    """Print the console link for a page and open it in the browser. Starts the daemon if needed."""
+    import webbrowser
+
+    from mst import serve
+    if page not in report.PAGES:
+        _fail(f"no console page {page!r}. Pages: {', '.join(report.PAGES)}")
+    try:
+        serve.ensure_daemon()
+    except serve.DaemonError as e:
+        _fail(str(e))
+    url = report.console_link(page)
+    typer.echo(url)
+    if not no_open:
+        webbrowser.open(url)
+
+
 @keys_app.command("new")
 def keys_new(app_name: str = typer.Argument(..., metavar="APP"),
              rotate: bool = typer.Option(False, "--rotate", help="Revoke the app's current key and issue a new one.")) -> None:
@@ -275,6 +303,7 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
         raise typer.Exit(1)
     typer.echo("")
     typer.echo(serve.usage(name, serve.first_key(store)))
+    typer.echo(f"\nmanage it in the console: {report.console_link('models')}   (or: mst status, mst set {name} --pin)")
 
 
 @app.command("stop")
