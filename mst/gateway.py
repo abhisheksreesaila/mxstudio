@@ -20,6 +20,7 @@ from mst.supervisor import StartFailed, Supervisor, UnknownModel
 log = logging.getLogger("mst.gateway")
 PROXIED = ("/v1/chat/completions", "/v1/completions", "/v1/embeddings")
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+ADMIN_HEADER = "x-mst-admin"
 HOP_BY_HOP = {"content-length", "transfer-encoding", "connection", "content-encoding"}
 
 SCALAR_PAGE = """<!doctype html>
@@ -139,11 +140,21 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
     def loopback_only(request: Request) -> bool:
         # A proxy (Caddy) connects from loopback but sets X-Forwarded-For for a LAN client.
         proxied = "x-forwarded-for" in request.headers or "forwarded" in request.headers
-        return bool(request.client) and request.client.host in LOOPBACK and not proxied
+        # Host guards against DNS rebinding: a web page that rebinds its own name to 127.0.0.1.
+        host = request.headers.get("host", "").rsplit(":", 1)[0].strip("[]")
+        return (bool(request.client) and request.client.host in LOOPBACK and not proxied
+                and host in LOOPBACK)
+
+    def admin_only(request: Request) -> bool:
+        """Admin calls come from the mst CLI. The custom header can't be sent cross-site without a
+        CORS preflight (which the gateway never grants), so browser pages can't reach these routes."""
+        origin = request.headers.get("origin")
+        origin_ok = origin is None or origin.split("://", 1)[-1].rsplit(":", 1)[0].strip("[]") in LOOPBACK
+        return loopback_only(request) and request.headers.get(ADMIN_HEADER) == "1" and origin_ok
 
     @app.get("/health")
     def health():
-        return JSONResponse({"status": "ok"})
+        return JSONResponse({"status": "ok", "service": "mst"})
 
     @app.get("/auth/check")
     def auth_check(request: Request):
@@ -220,13 +231,13 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
 
     @app.get("/admin/status")
     def admin_status(request: Request):
-        if not loopback_only(request):
+        if not admin_only(request):
             return Response("admin is only served to this machine", status_code=403)
         return JSONResponse(supervisor.status())
 
     @app.post("/admin/models/{name}/load")
     async def admin_load(request: Request, name: str):
-        if not loopback_only(request):
+        if not admin_only(request):
             return Response("admin is only served to this machine", status_code=403)
         try:
             base = await supervisor.ensure_running(name)
@@ -239,14 +250,14 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
 
     @app.post("/admin/models/{name}/stop")
     async def admin_stop(request: Request, name: str):
-        if not loopback_only(request):
+        if not admin_only(request):
             return Response("admin is only served to this machine", status_code=403)
         await supervisor.stop(name)
         return JSONResponse({"name": name, "state": "cold"})
 
     @app.post("/admin/shutdown")
     async def admin_shutdown(request: Request):
-        if not loopback_only(request):
+        if not admin_only(request):
             return Response("admin is only served to this machine", status_code=403)
         await supervisor.stop_all()
         asyncio.get_running_loop().call_later(0.2, lambda: os.kill(os.getpid(), signal.SIGTERM))

@@ -13,6 +13,7 @@ from mst.settings import daemon_url
 from mst.store import Store, mst_home
 
 DEFAULT_APP = "default"
+ADMIN = {"X-Mst-Admin": "1"}
 
 
 class DaemonError(Exception):
@@ -21,8 +22,9 @@ class DaemonError(Exception):
 
 def daemon_running() -> bool:
     try:
-        return httpx.get(f"{daemon_url()}/health", timeout=1.0).status_code == 200
-    except httpx.HTTPError:
+        r = httpx.get(f"{daemon_url()}/health", timeout=1.0)
+        return r.status_code == 200 and r.json().get("service") == "mst"
+    except (httpx.HTTPError, ValueError):
         return False
 
 
@@ -46,21 +48,33 @@ def ensure_daemon(timeout: float = 30.0) -> bool:
     raise DaemonError(f"the mst daemon did not start. Last log lines ({logs / 'daemon.log'}):\n{tail}")
 
 
-def load(name: str) -> None:
-    r = httpx.post(f"{daemon_url()}/admin/models/{name}/load", timeout=None)
+def _admin(path: str, timeout: float | None) -> httpx.Response:
+    try:
+        r = httpx.post(f"{daemon_url()}/admin/{path}", headers=ADMIN, timeout=timeout)
+    except httpx.HTTPError as e:
+        raise DaemonError(f"could not reach the mst daemon at {daemon_url()}: {e}")
     if r.status_code != 200:
-        raise DaemonError(r.json().get("error", {}).get("message", r.text))
+        try:
+            message = r.json()["error"]["message"]
+        except (ValueError, KeyError, TypeError):
+            message = r.text or f"HTTP {r.status_code}"
+        raise DaemonError(message)
+    return r
+
+
+def load(name: str) -> None:
+    _admin(f"models/{name}/load", timeout=None)
 
 
 def stop(name: str) -> None:
-    httpx.post(f"{daemon_url()}/admin/models/{name}/stop", timeout=60.0).raise_for_status()
+    _admin(f"models/{name}/stop", timeout=None)
 
 
-def shutdown(timeout: float = 30.0) -> bool:
+def shutdown(timeout: float = 120.0) -> bool:
     """Stop every model and the daemon. False if it wasn't running."""
     if not daemon_running():
         return False
-    httpx.post(f"{daemon_url()}/admin/shutdown", timeout=timeout)
+    _admin("shutdown", timeout=None)  # stop_all can take ~10s per model
     deadline = time.monotonic() + timeout
     while daemon_running() and time.monotonic() < deadline:
         time.sleep(0.1)
@@ -70,8 +84,9 @@ def shutdown(timeout: float = 30.0) -> bool:
 def live_states() -> dict[str, str]:
     """name → state from the running daemon, or {} when it isn't running."""
     try:
-        return {m["name"]: m["state"] for m in httpx.get(f"{daemon_url()}/admin/status", timeout=1.0).json()}
-    except (httpx.HTTPError, ValueError):
+        r = httpx.get(f"{daemon_url()}/admin/status", headers=ADMIN, timeout=1.0)
+        return {m["name"]: m["state"] for m in r.json()}
+    except (httpx.HTTPError, ValueError, TypeError, KeyError):
         return {}
 
 
@@ -80,7 +95,10 @@ def first_key(store: Store) -> str | None:
     active = [k for k in keys.list_keys(store) if k.revoked_at is None and not k.app.startswith("_")]
     if active:
         return None
-    return keys.create_key(store, DEFAULT_APP)
+    try:
+        return keys.create_key(store, DEFAULT_APP)
+    except keys.KeyExists:  # another `mst serve` made it a moment ago and printed it
+        return None
 
 
 def usage(name: str, key: str | None) -> str:

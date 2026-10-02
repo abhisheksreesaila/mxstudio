@@ -36,7 +36,7 @@ async def sup(store):
 
 def client(app, host="127.0.0.1", **kw):
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app, client=(host, 5000)),
-                             base_url="http://mst", **kw)
+                             base_url="http://127.0.0.1:11435", **kw)  # the Host a local client sends
 
 
 @pytest.fixture

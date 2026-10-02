@@ -78,3 +78,27 @@ def test_store_files_are_private_to_the_owner(mst_home):
     Store.open()
     assert (mst_home.stat().st_mode & 0o777) == 0o700
     assert ((mst_home / "mst.db").stat().st_mode & 0o777) == 0o600
+
+
+def test_concurrent_first_keys_never_hand_out_a_dead_key(tmp_path):
+    """Two processes racing to create the same app's key: exactly one wins; the other gets KeyExists."""
+    import threading
+    import pytest
+    from mst.keys import KeyExists, create_key, verify_key
+    from mst.store import Store
+    results, barrier = [], threading.Barrier(8)
+
+    def worker():
+        store = Store.open()  # its own connection, like a separate `mst serve`
+        barrier.wait()
+        try:
+            results.append(create_key(store, "default"))
+        except KeyExists:
+            results.append(None)
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    issued = [k for k in results if k]
+    assert len(issued) == 1
+    assert verify_key(Store.open(), issued[0]) == "default"

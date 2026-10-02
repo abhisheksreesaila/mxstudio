@@ -179,10 +179,13 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
         typer.echo(f"pulled {found.name} ({found.repo_id}@{found.revision[:8]})")
         expose.refresh_if_running(store)
     name = found.name
-    if pin:
-        store.set_lifecycle(name, pinned=True)
-    elif keep_alive:
-        store.set_lifecycle(name, pinned=False, keep_alive=parse_duration(keep_alive))
+    try:
+        seconds = parse_duration(keep_alive) if keep_alive else None
+    except ValueError:
+        typer.echo(f"error: --keep-alive {keep_alive!r} is not a duration (try 90s, 10m or 1h)")
+        raise typer.Exit(1)
+    if pin or seconds is not None:
+        store.set_lifecycle(name, pinned=pin, keep_alive=seconds)
     try:
         if serve.ensure_daemon():
             typer.echo("started the mst daemon")
@@ -204,7 +207,12 @@ def stop_model(model: str = typer.Argument(None, help="Model to unload"),
     """Unload a model now, or stop everything with --all."""
     from mst import serve
     if all_:
-        typer.echo("stopped the daemon and every model" if serve.shutdown() else "the daemon isn't running")
+        try:
+            stopped = serve.shutdown()
+        except serve.DaemonError as e:
+            typer.echo(f"error: {e}")
+            raise typer.Exit(1)
+        typer.echo("stopped the daemon and every model" if stopped else "the daemon isn't running")
         return
     if not model:
         typer.echo("name a model, or use --all")
@@ -212,7 +220,11 @@ def stop_model(model: str = typer.Argument(None, help="Model to unload"),
     if not serve.daemon_running():
         typer.echo("the daemon isn't running; nothing is loaded")
         return
-    serve.stop(model)
+    try:
+        serve.stop(model)
+    except serve.DaemonError as e:
+        typer.echo(f"error: {e}")
+        raise typer.Exit(1)
     typer.echo(f"unloaded {model}")
 
 

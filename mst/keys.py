@@ -39,16 +39,24 @@ def create_key(store: Store, app: str, *, rotate: bool = False, internal: bool =
         raise ValueError(f"app name {app!r} must be letters, digits, '.', '_' or '-'")
     if app.startswith("_") and not internal:
         raise ValueError(f"app names starting with '_' are reserved for mst")
-    row = store.db.execute("SELECT revoked_at FROM keys WHERE app = ?", (app,)).fetchone()
-    if row and row["revoked_at"] is None and not rotate:
-        raise KeyExists(f"{app} already has a key. Use --rotate to replace it (the old key stops working).")
     plaintext = "mst-" + secrets.token_urlsafe(32)
-    store.db.execute(
-        """INSERT INTO keys (app, prefix, key_hash, created_at) VALUES (?, ?, ?, ?)
-           ON CONFLICT(app) DO UPDATE SET prefix=excluded.prefix, key_hash=excluded.key_hash,
-             created_at=excluded.created_at, last_used_at=NULL, revoked_at=NULL""",
-        (app, plaintext[:PREFIX_LEN], _hash(plaintext), time.time()),
-    )
+    # Check and write in one write transaction, so two racing `mst serve` runs can't both
+    # "create" a key and leave the first one printed but already overwritten.
+    store.db.execute("BEGIN IMMEDIATE")
+    try:
+        row = store.db.execute("SELECT revoked_at FROM keys WHERE app = ?", (app,)).fetchone()
+        if row and row["revoked_at"] is None and not rotate:
+            raise KeyExists(f"{app} already has a key. Use --rotate to replace it (the old key stops working).")
+        store.db.execute(
+            """INSERT INTO keys (app, prefix, key_hash, created_at) VALUES (?, ?, ?, ?)
+               ON CONFLICT(app) DO UPDATE SET prefix=excluded.prefix, key_hash=excluded.key_hash,
+                 created_at=excluded.created_at, last_used_at=NULL, revoked_at=NULL""",
+            (app, plaintext[:PREFIX_LEN], _hash(plaintext), time.time()),
+        )
+    except BaseException:
+        store.db.execute("ROLLBACK")
+        raise
+    store.db.execute("COMMIT")
     return plaintext
 
 
