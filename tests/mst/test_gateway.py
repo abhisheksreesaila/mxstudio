@@ -160,6 +160,12 @@ async def test_docs_only_for_loopback(store, sup):
         assert (await c.get("/health")).status_code == 200
 
 
+async def test_docs_refuse_requests_that_came_through_a_proxy(http):
+    # Caddy connects from loopback but adds X-Forwarded-For: the client is on the LAN.
+    r = await http.get("/docs", headers={"X-Forwarded-For": "192.168.1.20"})
+    assert r.status_code == 403
+
+
 async def test_reaper_runs_and_stop_all_on_shutdown(store, sup, key):
     app = create_app(store, sup, reap_interval=0.05)
     async with app.router.lifespan_context(app):

@@ -2,11 +2,14 @@
 
 Request path: client → Caddy (tls internal, forward_auth → daemon /auth/check)
 → LiteLLM (routing, master key) → daemon → max serve. With --no-litellm, Caddy
-proxies straight to the daemon, which checks the app key again.
+proxies straight to the daemon, which checks the app key again. Caddy forwards only
+the OpenAI routes, so an app key never reaches LiteLLM's admin API or the daemon's
+loopback-only pages.
 """
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import shlex
 import signal
@@ -22,7 +25,15 @@ from mst.settings import DAEMON_HOST, DAEMON_PORT, EXPOSE_PORT, LITELLM_PORT, da
 from mst.store import Model, Store, mst_home
 
 PROCESSES = ("caddy", "litellm")
-UPSTREAM_APP = "litellm"  # the key LiteLLM uses to call the daemon
+UPSTREAM_APP = "_litellm"  # the reserved key LiteLLM uses to call the daemon
+API_PATHS = ("/v1/models", "/v1/chat/completions", "/v1/completions", "/v1/embeddings")
+HOSTNAME = re.compile(r"[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?|\[[0-9A-Fa-f:]+\]")
+SETTLE_SECONDS = float(os.environ.get("MST_EXPOSE_SETTLE", "1.0"))
+_upstream_key_for_tests: str | None = None
+
+
+class ExposeError(Exception):
+    pass
 
 
 def default_host() -> str:
@@ -35,13 +46,16 @@ def ca_root_path() -> Path:
 
 
 def render_caddyfile(*, hosts: list[str], port: int = EXPOSE_PORT, litellm: bool = True) -> str:
+    for h in hosts:
+        if not HOSTNAME.fullmatch(h):
+            raise ValueError(f"{h!r} is not a hostname or IP address")
     sites = ", ".join(f"https://{h}:{port}" for h in hosts)
     if litellm:
-        upstream = f"""	reverse_proxy 127.0.0.1:{LITELLM_PORT} {{
-		header_up Authorization "Bearer {{env.LITELLM_MASTER_KEY}}"
-	}}"""
+        upstream = f"""		reverse_proxy 127.0.0.1:{LITELLM_PORT} {{
+			header_up Authorization "Bearer {{env.LITELLM_MASTER_KEY}}"
+		}}"""
     else:
-        upstream = f"	reverse_proxy {DAEMON_HOST}:{DAEMON_PORT}"
+        upstream = f"		reverse_proxy {DAEMON_HOST}:{DAEMON_PORT}"
     return f"""{{
 	admin 127.0.0.1:2099
 	skip_install_trust
@@ -50,11 +64,17 @@ def render_caddyfile(*, hosts: list[str], port: int = EXPOSE_PORT, litellm: bool
 
 {sites} {{
 	tls internal
-	forward_auth {DAEMON_HOST}:{DAEMON_PORT} {{
-		uri /auth/check
-		copy_headers X-Mst-App
-	}}
+	@api path {" ".join(API_PATHS)}
+	handle @api {{
+		forward_auth {DAEMON_HOST}:{DAEMON_PORT} {{
+			uri /auth/check
+			copy_headers X-Mst-App
+		}}
 {upstream}
+	}}
+	handle {{
+		respond 404
+	}}
 }}
 """
 
@@ -99,10 +119,21 @@ def write_configs(*, host: str, litellm: bool, store: Store | None = None) -> di
 
 def _master_key() -> str:
     path = expose_dir() / "litellm_master_key"
-    if not path.exists():
-        path.touch(mode=0o600)
-        path.write_text("sk-" + secrets.token_urlsafe(32))
-    return path.read_text().strip()
+    try:
+        key = path.read_text().strip()
+    except FileNotFoundError:
+        key = ""
+    if len(key) >= 32:
+        return key
+    # Never fall back to an empty key: LiteLLM would run without auth.
+    key = "sk-" + secrets.token_urlsafe(32)
+    tmp = path.with_suffix(".tmp")
+    tmp.unlink(missing_ok=True)
+    fd = os.open(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(key)
+    os.replace(tmp, path)
+    return key
 
 
 def _command(name: str, configs: dict[str, Path]) -> list[str]:
@@ -120,20 +151,22 @@ def _pid_file(name: str) -> Path:
     return expose_dir() / f"{name}.pid"
 
 
-def _alive(pid: int) -> bool:
+def _start_time(pid: int) -> str | None:
+    """Kernel start time of a live (non-zombie) process; tells our process from a reused pid."""
     try:
-        state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+        fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
     except (FileNotFoundError, IndexError):
-        return False
-    return state != "Z"
+        return None
+    return None if fields[0] == "Z" else fields[19]
 
 
 def _running_pid(name: str) -> int | None:
     try:
-        pid = int(_pid_file(name).read_text())
+        pid_text, started = _pid_file(name).read_text().split()
+        pid = int(pid_text)
     except (FileNotFoundError, ValueError):
         return None
-    return pid if _alive(pid) else None
+    return pid if _start_time(pid) == started else None
 
 
 def status() -> dict[str, bool]:
@@ -142,25 +175,41 @@ def status() -> dict[str, bool]:
 
 def start(*, host: str, litellm: bool = True, store: Store | None = None) -> dict[str, Path]:
     """Write configs and (re)start Caddy and, unless disabled, LiteLLM as user processes."""
+    global _upstream_key_for_tests
     store = store or Store.open()
-    stop()
+    stop(store=store)
     configs = write_configs(host=host, litellm=litellm, store=store)
     (expose_dir() / "host").write_text(host)
     env = {**os.environ, "LITELLM_MASTER_KEY": _master_key()}
     if litellm:
-        env["MST_UPSTREAM_KEY"] = keys.create_key(store, UPSTREAM_APP, rotate=True)
+        env["MST_UPSTREAM_KEY"] = keys.create_key(store, UPSTREAM_APP, rotate=True, internal=True)
+        _upstream_key_for_tests = env["MST_UPSTREAM_KEY"]
+    started = []
     for name in PROCESSES:
         if name == "litellm" and not litellm:
             continue
-        log = open(expose_dir() / f"{name}.log", "ab")
-        proc = subprocess.Popen(_command(name, configs), env=env, stdout=log, stderr=subprocess.STDOUT,
-                                stdin=subprocess.DEVNULL, start_new_session=True)
-        log.close()
-        _pid_file(name).write_text(str(proc.pid))
+        log_path = expose_dir() / f"{name}.log"
+        with open(log_path, "ab") as log:
+            try:
+                proc = subprocess.Popen(_command(name, configs), env=env, stdout=log, stderr=subprocess.STDOUT,
+                                        stdin=subprocess.DEVNULL, start_new_session=True)
+            except FileNotFoundError as e:
+                stop(store=store)
+                raise ExposeError(f"{name} not found ({e.filename}). Install it, then run mst expose again.")
+        _pid_file(name).write_text(f"{proc.pid} {_start_time(proc.pid)}")
+        started.append((name, proc, log_path))
+    deadline = time.monotonic() + SETTLE_SECONDS
+    while time.monotonic() < deadline:
+        for name, proc, log_path in started:
+            if proc.poll() is not None:
+                stop(store=store)
+                tail = log_path.read_text(errors="replace")[-600:].strip()
+                raise ExposeError(f"{name} exited with code {proc.returncode}. Last log lines ({log_path}):\n{tail}")
+        time.sleep(0.05)
     return configs
 
 
-def stop(timeout: float = 10.0) -> None:
+def stop(timeout: float = 10.0, store: Store | None = None) -> None:
     for name in PROCESSES:
         pid = _running_pid(name)
         _pid_file(name).unlink(missing_ok=True)
@@ -168,15 +217,16 @@ def stop(timeout: float = 10.0) -> None:
             continue
         try:
             os.killpg(pid, signal.SIGTERM)
-        except ProcessLookupError:
+        except (ProcessLookupError, PermissionError):
             continue
         deadline = time.monotonic() + timeout
-        while _alive(pid) and time.monotonic() < deadline:
+        while _start_time(pid) is not None and time.monotonic() < deadline:
             _reap(pid)
             time.sleep(0.05)
-        if _alive(pid):
+        if _start_time(pid) is not None:
             os.killpg(pid, signal.SIGKILL)
         _reap(pid)
+    keys.revoke_key(store or Store.open(), UPSTREAM_APP)
 
 
 def _reap(pid: int) -> None:

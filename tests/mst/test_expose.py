@@ -94,3 +94,83 @@ def test_refresh_restarts_litellm_with_new_models_only_when_exposed(mst_home, mo
     assert [m["model_name"] for m in config["model_list"]] == ["smollm2-1.7b"]
     assert "https://box.local:8443" in (mst_home / "expose" / "Caddyfile").read_text()
     runner.invoke(app, ["expose", "--stop"])
+
+
+def test_caddy_only_forwards_the_openai_routes_so_keys_never_reach_litellm_admin():
+    for litellm in (True, False):
+        text = expose.render_caddyfile(hosts=["box.local"], port=8443, litellm=litellm)
+        assert "@api path /v1/models /v1/chat/completions /v1/completions /v1/embeddings" in text
+        assert "handle @api" in text
+        assert "respond 404" in text
+
+
+@pytest.mark.skipif(not shutil.which("caddy"), reason="caddy not installed")
+def test_caddy_answers_404_for_litellm_admin_paths(tmp_path):
+    path = tmp_path / "Caddyfile"
+    path.write_text(expose.render_caddyfile(hosts=["box.local"], port=8443, litellm=True))
+    adapted = subprocess.run(["caddy", "adapt", "--config", str(path), "--adapter", "caddyfile"],
+                             capture_output=True, text=True, env={"LITELLM_MASTER_KEY": "x", "PATH": "/usr/bin"})
+    assert adapted.returncode == 0, adapted.stderr
+    assert '"/v1/models"' in adapted.stdout and '"/model/info"' not in adapted.stdout
+
+
+def test_bad_hostnames_are_refused():
+    for bad in ["box local", "box{.local", "", "a;b"]:
+        with pytest.raises(ValueError):
+            expose.render_caddyfile(hosts=[bad], port=8443, litellm=True)
+
+
+def test_master_key_is_private_never_empty_and_never_printed(mst_home, monkeypatch):
+    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("MST_LITELLM_CMD", "sleep 60")
+    d = mst_home / "expose"
+    d.mkdir(parents=True)
+    (d / "litellm_master_key").write_text("")  # left behind by a crash
+    result = runner.invoke(app, ["expose", "--host", "box.local"])
+    key = (d / "litellm_master_key").read_text().strip()
+    assert len(key) >= 32
+    assert ((d / "litellm_master_key").stat().st_mode & 0o777) == 0o600
+    assert key not in result.output
+    runner.invoke(app, ["expose", "--stop"])
+
+
+def test_upstream_key_is_reserved_rotated_and_revoked_on_stop(mst_home, monkeypatch):
+    from mst import keys
+    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("MST_LITELLM_CMD", "sleep 60")
+    with pytest.raises(ValueError):
+        keys.create_key(Store.open(), expose.UPSTREAM_APP)  # users can't take the reserved name
+    runner.invoke(app, ["expose", "--host", "box.local"])
+    first = expose._upstream_key_for_tests
+    runner.invoke(app, ["expose", "--host", "box.local"])
+    second = expose._upstream_key_for_tests
+    store = Store.open()
+    assert keys.verify_key(store, first) is None
+    assert keys.verify_key(store, second) == expose.UPSTREAM_APP
+    runner.invoke(app, ["expose", "--stop"])
+    assert keys.verify_key(store, second) is None
+
+
+def test_a_reused_pid_is_not_mistaken_for_our_process(mst_home):
+    import os
+    d = mst_home / "expose"
+    d.mkdir(parents=True)
+    (d / "caddy.pid").write_text(f"{os.getpid()} 1")  # some other live process, wrong start time
+    assert expose.status()["caddy"] is False
+    expose.stop()  # must not signal it
+    assert os.getpid()  # still alive
+
+
+def test_a_process_that_dies_at_once_is_reported_with_its_log(mst_home, monkeypatch):
+    monkeypatch.setenv("MST_CADDY_CMD", "sh -c 'echo address already in use; exit 1'")
+    result = runner.invoke(app, ["expose", "--no-litellm", "--host", "box.local"])
+    assert result.exit_code == 1
+    assert "caddy exited" in result.output
+    assert "address already in use" in result.output
+
+
+def test_a_missing_binary_is_a_one_line_error(mst_home, monkeypatch):
+    monkeypatch.setenv("MST_CADDY_CMD", "/nonexistent/caddy")
+    result = runner.invoke(app, ["expose", "--no-litellm", "--host", "box.local"])
+    assert result.exit_code == 1
+    assert "not found" in result.output

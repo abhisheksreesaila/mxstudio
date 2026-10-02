@@ -160,17 +160,21 @@ def expose_cmd(host: str = typer.Option(None, help="Hostname clients use. Defaul
         typer.echo("stopped Caddy and LiteLLM")
         return
     host = host or expose.default_host()
-    if dry_run:
-        configs = expose.write_configs(host=host, litellm=litellm)
-    else:
-        configs = expose.start(host=host, litellm=litellm)
+    try:
+        if dry_run:
+            configs = expose.write_configs(host=host, litellm=litellm)
+        else:
+            configs = expose.start(host=host, litellm=litellm)
+    except (expose.ExposeError, ValueError) as e:
+        typer.echo(f"error: {e}")
+        raise typer.Exit(1)
     typer.echo(f"endpoint   https://{host}:{expose.EXPOSE_PORT}/v1")
     typer.echo(f"configs    {configs['caddyfile']}  {configs['litellm']}")
     if litellm:
         typer.echo(f"litellm    http://127.0.0.1:{expose.LITELLM_PORT}/ui (this machine only)")
     typer.echo("keys       mst keys new <app>   (send it as: Authorization: Bearer <key>)")
-    typer.echo(f"trust      copy {expose.ca_root_path()} to each client device and trust it once")
-    typer.echo("           (Linux: sudo trust anchor root.crt · macOS: open it in Keychain Access, set Always Trust)")
+    typer.echo(f"trust      copy {expose.ca_root_path()} to each client (this machine too) and trust it once")
+    typer.echo("           Linux: sudo trust anchor root.crt · or pass it as the CA bundle (curl --cacert root.crt)")
 
 
 @app.command("daemon")

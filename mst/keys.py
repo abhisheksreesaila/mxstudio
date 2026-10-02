@@ -33,9 +33,12 @@ def _hash(plaintext: str) -> str:
     return hashlib.sha256(plaintext.encode()).hexdigest()
 
 
-def create_key(store: Store, app: str, *, rotate: bool = False) -> str:
+def create_key(store: Store, app: str, *, rotate: bool = False, internal: bool = False) -> str:
+    """`internal` keys (names starting with '_') belong to mst itself, e.g. LiteLLM's upstream key."""
     if not APP_NAME.fullmatch(app):
         raise ValueError(f"app name {app!r} must be letters, digits, '.', '_' or '-'")
+    if app.startswith("_") and not internal:
+        raise ValueError(f"app names starting with '_' are reserved for mst")
     row = store.db.execute("SELECT revoked_at FROM keys WHERE app = ?", (app,)).fetchone()
     if row and row["revoked_at"] is None and not rotate:
         raise KeyExists(f"{app} already has a key. Use --rotate to replace it (the old key stops working).")

@@ -130,7 +130,9 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                             "invalid_api_key", "authentication_error")
 
     def loopback_only(request: Request) -> bool:
-        return bool(request.client) and request.client.host in LOOPBACK
+        # A proxy (Caddy) connects from loopback but sets X-Forwarded-For for a LAN client.
+        proxied = "x-forwarded-for" in request.headers or "forwarded" in request.headers
+        return bool(request.client) and request.client.host in LOOPBACK and not proxied
 
     @app.get("/health")
     def health():
