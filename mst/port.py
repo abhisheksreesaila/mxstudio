@@ -13,6 +13,7 @@ import os
 import re
 import shlex
 import shutil
+import sys
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -185,11 +186,15 @@ def _link_skills(workspace: Path, skills_root: Path, names: list[str]) -> None:
 
 
 def mst_max_version() -> str | None:
-    try:
-        from importlib.metadata import version
-        return version("max")
-    except Exception:
-        return None
+    """The MAX that mst serves with, read from conda-meta (importlib.metadata can't see it here)."""
+    for f in sorted(Path(sys.prefix, "conda-meta").glob("max-[0-9]*.json")):
+        try:
+            meta = json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        if meta.get("name") == "max" and meta.get("version"):
+            return meta["version"]
+    return None
 
 
 def skill_max_range(skills_root: Path) -> str | None:
@@ -200,6 +205,19 @@ def skill_max_range(skills_root: Path) -> str | None:
     return m.group(1) if m else None
 
 
+def scaffold_args(donor: Donor) -> tuple[str, str, str]:
+    """(start-from slug, extra flags, lane) that scaffold.py accepts for this donor.
+
+    scaffold.py introspects `<donor_dir>/<slug>.py`; a `_modulev3` dir holds `<family>.py`
+    instead, so those need --full-copy.
+    """
+    d, lane = (donor.v3_dir, "ModuleV3") if donor.v3_dir else (donor.source_dir, "V2")
+    if d is None:
+        return "<slug>", "", lane
+    flags = "" if (d / f"{d.name}.py").is_file() else " --full-copy"
+    return d.name, flags, lane
+
+
 def _port_md(res: resolve.Resolution, config: dict, donor: Donor, *, skills_root: Path,
              workspace: Path) -> str:
     fields = "\n".join(f"- `{k}`: `{json.dumps(config[k])}`" for k in KEY_FIELDS if k in config)
@@ -207,7 +225,10 @@ def _port_md(res: resolve.Resolution, config: dict, donor: Donor, *, skills_root
     v2 = f"`{donor.slug}` at `{donor.source_dir}`" if donor.source_dir else "none found"
     v3 = (f"`{donor.v3_slug}` at `{donor.v3_dir}`" if donor.v3_dir else
           "no `_modulev3` twin; check whether a natively-V3 architecture fits (the skill names `olmo3`)")
-    start = donor.v3_slug or donor.slug or "<slug>"
+    start, flags, lane = scaffold_args(donor)
+    lane_note = ("" if donor.v3_dir else
+                 "\nNo ModuleV3 donor was found, so this scaffold line is on the **V2 lane**. "
+                 "Switch to a natively-V3 donor (for example `olmo3`) if you want ModuleV3.\n")
     ours, theirs = mst_max_version() or "unknown", skill_max_range(skills_root) or "unknown"
     return f"""# Port {res.repo_id} to MAX
 
@@ -234,9 +255,9 @@ From the skill root (`pixi install` there once):
 
 ```
 cd {shlex.quote(str(skill))}
-pixi run python scripts/scaffold.py {res.repo_id} --start-from {start} --output-dir <output_dir>
+pixi run python scripts/scaffold.py {res.repo_id} --start-from {start} --output-dir <output_dir>{flags}
 ```
-
+{lane_note}
 The port dir is `<output_dir>/<slug>` (the slug folder holding `arch.py` and an `__init__.py`
 that exposes `ARCHITECTURES`). That folder is what `--custom-architectures` takes and what
 `mst pull --port` registers.
