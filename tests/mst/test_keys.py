@@ -62,3 +62,19 @@ def test_new_key_after_revoke_allowed(store):
     keys.revoke_key(store, "notes")
     new = keys.create_key(store, "notes")
     assert keys.verify_key(store, new) == "notes"
+
+
+def test_app_names_are_simple_identifiers():
+    import pytest
+    from mst.keys import create_key
+    from mst.store import Store
+    for bad in ["", "  ", "my app", "a/b"]:
+        with pytest.raises(ValueError):
+            create_key(Store.open(), bad)
+
+
+def test_store_files_are_private_to_the_owner(mst_home):
+    from mst.store import Store
+    Store.open()
+    assert (mst_home.stat().st_mode & 0o777) == 0o700
+    assert ((mst_home / "mst.db").stat().st_mode & 0o777) == 0o600

@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS keys (
 def mst_home() -> Path:
     home = Path(os.environ.get("MST_HOME", Path.home() / ".mst")).expanduser()
     home.mkdir(parents=True, exist_ok=True)
+    home.chmod(0o700)
     return home
 
 
@@ -53,6 +54,8 @@ class Model:
 class Store:
     def __init__(self, path: Path):
         self.path = path
+        path.touch(mode=0o600, exist_ok=True)
+        path.chmod(0o600)
         self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA journal_mode=WAL")

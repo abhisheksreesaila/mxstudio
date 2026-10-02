@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import secrets
 import time
 from dataclasses import dataclass
@@ -25,11 +26,16 @@ class KeyInfo:
     revoked_at: float | None
 
 
+APP_NAME = re.compile(r"[A-Za-z0-9._-]{1,64}")
+
+
 def _hash(plaintext: str) -> str:
     return hashlib.sha256(plaintext.encode()).hexdigest()
 
 
 def create_key(store: Store, app: str, *, rotate: bool = False) -> str:
+    if not APP_NAME.fullmatch(app):
+        raise ValueError(f"app name {app!r} must be letters, digits, '.', '_' or '-'")
     row = store.db.execute("SELECT revoked_at FROM keys WHERE app = ?", (app,)).fetchone()
     if row and row["revoked_at"] is None and not rotate:
         raise KeyExists(f"{app} already has a key. Use --rotate to replace it (the old key stops working).")
