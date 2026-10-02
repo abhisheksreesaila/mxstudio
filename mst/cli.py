@@ -4,11 +4,12 @@ from __future__ import annotations
 import time
 import subprocess
 from pathlib import Path
+from typing import NoReturn
 
 import typer
 
 from mst import expose, keys
-from mst import resolve
+from mst import report, resolve
 from mst.store import Store, format_duration, parse_duration
 
 app = typer.Typer(help="MX Studio: local models on Modular MAX you can see into and reshape.",
@@ -19,25 +20,120 @@ keys_app = typer.Typer(help="Per-app API keys.", no_args_is_help=True)
 app.add_typer(keys_app, name="keys")
 
 
+JSON = typer.Option(False, "--json", help="Print JSON only, for scripts and agents.")
+
+
+def _fail(message: str) -> NoReturn:
+    typer.echo(f"error: {message}")
+    raise typer.Exit(1)
+
+
 @app.callback()
 def _root() -> None:
     """Keeps `mst` a command group even while it has one command."""
 
 
 @app.command("ls")
-def list_models() -> None:
+def list_models(as_json: bool = JSON) -> None:
     """List registered models."""
+    from mst import serve
     models = Store.open().models()
+    states = serve.live_states()
+    if as_json:
+        typer.echo(report.dump(report.models_data(models, states)))
+        return
     if not models:
         typer.echo("no models yet. Try: mst serve qwen2.5-0.5b")
         return
-    from mst import serve
-    states = serve.live_states()
     typer.echo(f"{'NAME':<24} {'STATE':<9} {'SOURCE':<13} {'PINNED':<7} {'KEEP-ALIVE':<10} REPO")
     for m in models:
         keep = "-" if m.pinned else format_duration(m.keep_alive)
         state = states.get(m.name, "-")
         typer.echo(f"{m.name:<24} {state:<9} {m.source:<13} {'yes' if m.pinned else 'no':<7} {keep:<10} {m.repo_id}")
+    typer.echo(f"\nconsole  {report.console_link('models')}")
+
+
+@app.command("set")
+def set_model(model: str = typer.Argument(..., help="A registered model name"),
+              pin: bool = typer.Option(False, "--pin", help="Keep it loaded; never unload when idle."),
+              unpin: bool = typer.Option(False, "--unpin", help="Let it unload when idle again."),
+              keep_alive: str = typer.Option(None, "--keep-alive", help="Unload after this idle time: 90s, 10m, 1h.")) -> None:
+    """Change a model's pin and keep-alive (what the console's Models page edits)."""
+    if pin and unpin:
+        _fail("--pin and --unpin together make no sense")
+    if not (pin or unpin or keep_alive):
+        _fail("nothing to change. Use --pin, --unpin or --keep-alive 10m")
+    try:
+        seconds = parse_duration(keep_alive) if keep_alive else None
+    except ValueError:
+        _fail(f"--keep-alive {keep_alive!r} is not a duration (try 90s, 10m or 1h)")
+    store = Store.open()
+    if store.get_model(model) is None:
+        _fail(f"no model named {model}. See: mst ls")
+    store.set_lifecycle(model, pinned=True if pin else False if unpin else None, keep_alive=seconds)
+    m = store.get_model(model)
+    typer.echo(f"{m.name}: {report.lifecycle(m)}")
+    typer.echo(f"console  {report.console_link('models')}")
+
+
+@app.command("metrics")
+def metrics_cmd(range_: str = typer.Option("5m", "--range", help="Window: " + ", ".join(report.RANGES) + "."),
+                as_json: bool = JSON) -> None:
+    """The console's numbers: requests, errors, latency, per model, and GPUs. Works without the daemon."""
+    from mst import metrics
+    if range_ not in report.RANGES:
+        _fail(f"--range {range_!r} is not one of {', '.join(report.RANGES)}")
+    data = metrics.summary(Store.open(), window=report.RANGES[range_])
+    gpus = metrics.gpus()
+    if as_json:
+        typer.echo(report.dump({"range": range_, **data, "gpus": gpus}))
+        return
+    typer.echo(report.metrics_text(data, range_, gpus))
+    typer.echo(f"\nconsole  {report.console_link('metrics')}")
+
+
+@app.command("requests")
+def requests_cmd(limit: int = typer.Option(20, "--limit", min=1, help="How many recent requests."),
+                 as_json: bool = JSON) -> None:
+    """The activity log, newest first. Works without the daemon."""
+    from mst import metrics
+    rows = metrics.recent(Store.open(), limit)
+    if as_json:
+        typer.echo(report.dump(rows))
+        return
+    if not rows:
+        typer.echo("no requests yet")
+    else:
+        typer.echo(report.requests_text(rows))
+    typer.echo(f"\nconsole  {report.console_link('activity')}")
+
+
+@app.command("status")
+def status_cmd(as_json: bool = JSON) -> None:
+    """One screen: daemon, endpoints, models, keys, MAX version. Works without the daemon."""
+    from mst import serve
+    info = serve.daemon_info()
+    data = report.status_data(Store.open(), info, serve.live_states() if info else {})
+    typer.echo(report.dump(data) if as_json else report.status_text(data))
+
+
+@app.command("console")
+def console_cmd(page: str = typer.Argument("overview", help="One of: " + ", ".join(report.PAGES)),
+                no_open: bool = typer.Option(False, "--no-open", help="Only print the link.")) -> None:
+    """Print the console link for a page and open it in the browser. Starts the daemon if needed."""
+    import webbrowser
+
+    from mst import serve
+    if page not in report.PAGES:
+        _fail(f"no console page {page!r}. Pages: {', '.join(report.PAGES)}")
+    try:
+        serve.ensure_daemon()
+    except serve.DaemonError as e:
+        _fail(str(e))
+    url = report.console_link(page)
+    typer.echo(url)
+    if not no_open:
+        webbrowser.open(url)
 
 
 @keys_app.command("new")
@@ -57,16 +153,17 @@ def keys_new(app_name: str = typer.Argument(..., metavar="APP"),
 
 
 @keys_app.command("ls")
-def keys_ls() -> None:
+def keys_ls(as_json: bool = JSON) -> None:
     """List keys (never the secret)."""
     rows = [k for k in keys.list_keys(Store.open()) if not k.app.startswith("_")]  # hide mst's own keys
+    if as_json:
+        typer.echo(report.dump(report.keys_data(rows)))
+        return
     if not rows:
         typer.echo("no keys yet. Try: mst keys new <app>")
         return
 
-    def when(t: float | None) -> str:
-        return "never" if t is None else time.strftime("%Y-%m-%d %H:%M", time.localtime(t))
-
+    when = report.when
     typer.echo(f"{'APP':<20} {'PREFIX':<13} {'CREATED':<17} {'LAST USED':<17} STATUS")
     for k in rows:
         status = "active" if k.revoked_at is None else "revoked"
@@ -206,6 +303,7 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
         raise typer.Exit(1)
     typer.echo("")
     typer.echo(serve.usage(name, serve.first_key(store)))
+    typer.echo(f"\nmanage it in the console: {report.console_link('models')}   (or: mst status, mst set {name} --pin)")
 
 
 @app.command("stop")
