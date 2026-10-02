@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import ctypes
+import fcntl
 import os
 import signal
 import socket
@@ -37,6 +38,10 @@ class StartFailed(SupervisorError):
     pass
 
 
+class DaemonAlreadyRunning(SupervisorError):
+    pass
+
+
 class _PortClash(Exception):
     pass
 
@@ -60,6 +65,7 @@ class Supervisor:
         self.clock = clock
         self._children: dict[str, _Child] = {}
         self._starts: dict[str, asyncio.Task] = {}
+        self._lock_file = None
 
     # -- public API -------------------------------------------------------------------------
 
@@ -68,7 +74,7 @@ class Supervisor:
         if model is None:
             raise UnknownModel(name)
         child = self._children.get(name)
-        if child is not None and child.ready and child.proc.poll() is None:
+        if child is not None and child.ready and not _dead(child):
             child.last_used = self.clock()
             return self._url(child)
         task = self._starts.get(name)
@@ -110,7 +116,7 @@ class Supervisor:
         stopped = []
         for name, child in list(self._children.items()):
             model = self.store.get_model(name)
-            if model is None or not child.ready or child.proc.poll() is not None or child.in_flight:
+            if model is None or not child.ready or _dead(child) or child.in_flight:
                 continue
             if not model.pinned and now - child.last_used > model.keep_alive:
                 await self.stop(name)
@@ -129,6 +135,20 @@ class Supervisor:
     async def stop_all(self) -> None:
         for name in set(self._children) | set(self._starts):
             await self.stop(name)
+
+    def acquire_lock(self) -> None:
+        """Take MST_HOME/run/daemon.lock for the life of this process, or raise DaemonAlreadyRunning.
+
+        Call before sweep_orphans: only the daemon holding the lock may kill leftover children."""
+        if self._lock_file is not None:
+            return
+        f = open(self._run_dir() / "daemon.lock", "a+")
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            f.close()
+            raise DaemonAlreadyRunning("another mst daemon is already running for this MST_HOME") from None
+        self._lock_file = f
 
     def sweep_orphans(self) -> list[int]:
         """Kill children recorded in MST_HOME/run that a dead daemon left behind. Call at startup."""
@@ -159,7 +179,7 @@ class Supervisor:
             row = {"name": name, "state": "cold", "port": None, "pid": None,
                    "idle_seconds": None, "pinned": bool(model and model.pinned), "in_flight": 0}
             if child is not None:
-                if child.proc.poll() is not None:
+                if _dead(child):
                     child.crashed = True
                 row["state"] = "crashed" if child.crashed else ("ready" if child.ready else "starting")
                 row["port"], row["pid"], row["in_flight"] = child.port, child.proc.pid, child.in_flight
@@ -213,16 +233,16 @@ class Supervisor:
                         ids = [m.get("id") for m in (await http.get(base + "/v1/models")).json()["data"]]
                     except (httpx.TransportError, ValueError, KeyError, TypeError):
                         ids = []
-                    if name in ids and child.proc.poll() is None:
+                    if name in ids and not _dead(child):
                         return
                     if name not in ids:
                         raise _PortClash(f"something else answered on port {child.port}")
-                if child.proc.poll() is not None:
+                if _dead(child):
                     tail = self._log_tail(name, offset)
                     if "in use" in tail.lower():
                         raise _PortClash(tail)
                     raise StartFailed(
-                        f"max serve for {name!r} exited with code {child.proc.returncode}:\n{tail}")
+                        f"max serve for {name!r} exited with code {_exit_code(child.proc.pid)}:\n{tail}")
                 if time.monotonic() > deadline:
                     raise StartFailed(
                         f"max serve for {name!r} was not healthy after {self.health_timeout:g}s:\n"
@@ -244,6 +264,9 @@ class Supervisor:
         run = mst_home() / "run"
         run.mkdir(parents=True, exist_ok=True)
         return run
+
+    def _pidfile(self, name: str, pid: int) -> Path:
+        return self._run_dir() / f"{name}.{pid}.pid"
 
     def _command(self, model, port: int) -> list[str]:
         # A pulled model loads from its pinned local snapshot, so serving needs no network.
@@ -271,7 +294,7 @@ class Supervisor:
             raise StartFailed(f"could not run {' '.join(self.max_command)}: {e}") from e
         finally:
             log.close()
-        (self._run_dir() / f"{model.name}.pid").write_text(f"{proc.pid} {proc.pid}")
+        self._pidfile(model.name, proc.pid).write_text(f"{proc.pid} {proc.pid}")
         return _Child(proc=proc, port=port, last_used=self.clock())
 
     def _log_tail(self, name: str, offset: int = 0) -> str:
@@ -281,27 +304,33 @@ class Supervisor:
             return f.read().decode(errors="replace").strip()
 
     def _terminate(self, name: str, child: _Child, grace: float = 10.0) -> None:
-        """SIGTERM the group, wait for the leader (without reaping it), SIGKILL stragglers, reap."""
+        """SIGTERM the group, wait for the leader (without reaping it), SIGKILL the whole group, reap."""
         proc = child.proc
-        if proc.poll() is None:
+        if _exit_code(proc.pid) is None:
             with contextlib.suppress(ProcessLookupError, PermissionError):
                 os.killpg(proc.pid, signal.SIGTERM)
             deadline = time.monotonic() + grace
-            while time.monotonic() < deadline and not _exited(proc.pid):
+            while time.monotonic() < deadline and _exit_code(proc.pid) is None:
                 time.sleep(0.05)
-            # The pgid is still held by the unreaped leader, so this cannot hit a reused pid.
-            with contextlib.suppress(ProcessLookupError, PermissionError):
-                os.killpg(proc.pid, signal.SIGKILL)
+        # The pgid is still held by the unreaped leader, so this cannot hit a reused pid. It also
+        # catches grandchildren, including those of a leader that crashed.
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(proc.pid, signal.SIGKILL)
         proc.wait()
-        (self._run_dir() / f"{name}.pid").unlink(missing_ok=True)
+        self._pidfile(name, proc.pid).unlink(missing_ok=True)
 
 
-def _exited(pid: int) -> bool:
-    """True once the process has exited, leaving it unreaped (zombie) so its pgid stays reserved."""
+def _dead(child: _Child) -> bool:
+    return _exit_code(child.proc.pid) is not None
+
+
+def _exit_code(pid: int) -> int | None:
+    """Exit status once the process has exited, leaving it unreaped so its pgid stays reserved."""
     try:
-        return os.waitid(os.P_PID, pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is not None
+        info = os.waitid(os.P_PID, pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
     except ChildProcessError:
-        return True
+        return -1  # already reaped
+    return None if info is None else info.si_status
 
 
 def _die_with_parent() -> None:  # runs in the child between fork and exec
