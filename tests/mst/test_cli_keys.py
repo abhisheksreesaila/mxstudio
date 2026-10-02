@@ -33,3 +33,11 @@ def test_keys_revoke():
 
 def test_keys_ls_empty():
     assert "no keys" in runner.invoke(app, ["keys", "ls"]).output
+
+
+def test_internal_keys_are_hidden_and_managed_by_mst():
+    from mst.store import Store
+    from mst import keys
+    keys.create_key(Store.open(), "_litellm", internal=True)
+    assert "_litellm" not in runner.invoke(app, ["keys", "ls"]).output
+    assert runner.invoke(app, ["keys", "revoke", "_litellm"]).exit_code == 1

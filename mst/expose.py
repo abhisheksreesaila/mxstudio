@@ -28,6 +28,7 @@ PROCESSES = ("caddy", "litellm")
 UPSTREAM_APP = "_litellm"  # the reserved key LiteLLM uses to call the daemon
 API_PATHS = ("/v1/models", "/v1/chat/completions", "/v1/completions", "/v1/embeddings")
 HOSTNAME = re.compile(r"[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?|\[[0-9A-Fa-f:]+\]")
+UNCLEAN = " || ".join(f'{{http.request.orig_uri.path}}.contains("{s}")' for s in ("/.", "//", "%", "\\\\"))
 SETTLE_SECONDS = float(os.environ.get("MST_EXPOSE_SETTLE", "1.0"))
 _upstream_key_for_tests: str | None = None
 
@@ -64,6 +65,12 @@ def render_caddyfile(*, hosts: list[str], port: int = EXPOSE_PORT, litellm: bool
 
 {sites} {{
 	tls internal
+	# reverse_proxy forwards the raw path while `path` matches the cleaned one, so refuse any
+	# path that cleaning would change: /anthropic/../v1/models must not reach LiteLLM.
+	@unclean expression `{UNCLEAN}`
+	handle @unclean {{
+		respond 400
+	}}
 	@api path {" ".join(API_PATHS)}
 	handle @api {{
 		forward_auth {DAEMON_HOST}:{DAEMON_PORT} {{
@@ -124,6 +131,7 @@ def _master_key() -> str:
     except FileNotFoundError:
         key = ""
     if len(key) >= 32:
+        path.chmod(0o600)
         return key
     # Never fall back to an empty key: LiteLLM would run without auth.
     key = "sk-" + secrets.token_urlsafe(32)
@@ -180,7 +188,11 @@ def start(*, host: str, litellm: bool = True, store: Store | None = None) -> dic
     stop(store=store)
     configs = write_configs(host=host, litellm=litellm, store=store)
     (expose_dir() / "host").write_text(host)
-    env = {**os.environ, "LITELLM_MASTER_KEY": _master_key()}
+    # Only what the children need: a provider key in the shell (OPENAI_API_KEY…) must never
+    # become spendable through LiteLLM by any app key.
+    env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "TMPDIR")
+           if k in os.environ}
+    env["LITELLM_MASTER_KEY"] = _master_key()
     if litellm:
         env["MST_UPSTREAM_KEY"] = keys.create_key(store, UPSTREAM_APP, rotate=True, internal=True)
         _upstream_key_for_tests = env["MST_UPSTREAM_KEY"]
@@ -206,7 +218,27 @@ def start(*, host: str, litellm: bool = True, store: Store | None = None) -> dic
                 tail = log_path.read_text(errors="replace")[-600:].strip()
                 raise ExposeError(f"{name} exited with code {proc.returncode}. Last log lines ({log_path}):\n{tail}")
         time.sleep(0.05)
+    if litellm:
+        _wait_for_port(LITELLM_PORT, next(p for n, p, _ in started if n == "litellm"),
+                       expose_dir() / "litellm.log", store)
     return configs
+
+
+def _wait_for_port(port: int, proc: subprocess.Popen, log_path: Path, store: Store) -> None:
+    """LiteLLM takes seconds to import; report a later failure (e.g. port taken) instead of claiming success."""
+    deadline = time.monotonic() + float(os.environ.get("MST_LITELLM_BOOT_SECONDS", "60"))
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            stop(store=store)
+            tail = log_path.read_text(errors="replace")[-600:].strip()
+            raise ExposeError(f"litellm exited with code {proc.returncode}. Last log lines ({log_path}):\n{tail}")
+        with socket.socket() as s:
+            s.settimeout(0.2)
+            if s.connect_ex(("127.0.0.1", port)) == 0:
+                return
+        time.sleep(0.2)
+    stop(store=store)
+    raise ExposeError(f"litellm did not open port {port}. See {log_path}")
 
 
 def stop(timeout: float = 10.0, store: Store | None = None) -> None:

@@ -1,4 +1,5 @@
 import shutil
+import sys
 import subprocess
 
 import pytest
@@ -10,6 +11,9 @@ from mst.cli import app
 from mst.store import Store
 
 runner = CliRunner()
+# A stand-in LiteLLM: records its environment and opens the LiteLLM port like the real one.
+FAKE_LITELLM = (f"sh -c 'env > \"$MST_HOME/litellm.env\"; exec {sys.executable} -m http.server "
+                f"{expose.LITELLM_PORT} --bind 127.0.0.1'")
 
 
 def test_caddyfile_checks_app_keys_then_swaps_in_the_litellm_master_key():
@@ -62,7 +66,7 @@ def test_expose_dry_run_writes_configs_and_prints_the_url(mst_home):
 
 def test_expose_starts_and_stops_both_processes(mst_home, monkeypatch):
     monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", "sleep 60")
+    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM)
     result = runner.invoke(app, ["expose", "--host", "box.local"])
     assert result.exit_code == 0, result.output
     running = expose.status()
@@ -75,7 +79,7 @@ def test_expose_starts_and_stops_both_processes(mst_home, monkeypatch):
 
 def test_expose_no_litellm_starts_only_caddy(mst_home, monkeypatch):
     monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", "sleep 60")
+    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM)
     result = runner.invoke(app, ["expose", "--no-litellm", "--host", "box.local"])
     assert result.exit_code == 0, result.output
     assert expose.status() == {"caddy": True, "litellm": False}
@@ -84,7 +88,7 @@ def test_expose_no_litellm_starts_only_caddy(mst_home, monkeypatch):
 
 def test_refresh_restarts_litellm_with_new_models_only_when_exposed(mst_home, monkeypatch):
     monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", "sleep 60")
+    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM)
     assert expose.refresh_if_running() is False
     runner.invoke(app, ["expose", "--host", "box.local"])
     Store.open().add_model(name="smollm2-1.7b", repo_id="HuggingFaceTB/SmolLM2-1.7B-Instruct", revision="r",
@@ -122,7 +126,7 @@ def test_bad_hostnames_are_refused():
 
 def test_master_key_is_private_never_empty_and_never_printed(mst_home, monkeypatch):
     monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", "sleep 60")
+    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM)
     d = mst_home / "expose"
     d.mkdir(parents=True)
     (d / "litellm_master_key").write_text("")  # left behind by a crash
@@ -137,7 +141,7 @@ def test_master_key_is_private_never_empty_and_never_printed(mst_home, monkeypat
 def test_upstream_key_is_reserved_rotated_and_revoked_on_stop(mst_home, monkeypatch):
     from mst import keys
     monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", "sleep 60")
+    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM)
     with pytest.raises(ValueError):
         keys.create_key(Store.open(), expose.UPSTREAM_APP)  # users can't take the reserved name
     runner.invoke(app, ["expose", "--host", "box.local"])
@@ -174,3 +178,60 @@ def test_a_missing_binary_is_a_one_line_error(mst_home, monkeypatch):
     result = runner.invoke(app, ["expose", "--no-litellm", "--host", "box.local"])
     assert result.exit_code == 1
     assert "not found" in result.output
+
+
+def test_litellm_gets_only_the_env_it_needs(mst_home, monkeypatch):
+    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM.replace('"$MST_HOME', f'"{mst_home}'))
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-should-not-leak")
+    result = runner.invoke(app, ["expose", "--host", "box.local"])
+    assert result.exit_code == 0, result.output
+    env = (mst_home / "litellm.env").read_text()
+    assert "LITELLM_MASTER_KEY=" in env and "MST_UPSTREAM_KEY=" in env
+    assert "sk-should-not-leak" not in env
+    runner.invoke(app, ["expose", "--stop"])
+
+
+def test_litellm_that_never_opens_its_port_is_an_error(mst_home, monkeypatch):
+    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("MST_LITELLM_CMD", "sleep 60")
+    monkeypatch.setenv("MST_LITELLM_BOOT_SECONDS", "1")
+    result = runner.invoke(app, ["expose", "--host", "box.local"])
+    assert result.exit_code == 1
+    assert "did not open port" in result.output
+    assert expose.status() == {"caddy": False, "litellm": False}
+
+
+@pytest.mark.skipif(not shutil.which("caddy"), reason="caddy not installed")
+def test_live_caddy_refuses_dot_segment_paths(tmp_path):
+    import socket
+    import time
+    import urllib.request
+    import http.client
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    text = expose.render_caddyfile(hosts=["127.0.0.1"], port=port, litellm=True)
+    text = text.replace(f"https://127.0.0.1:{port}", f"http://127.0.0.1:{port}").replace("tls internal", "")
+    text = text.replace("admin 127.0.0.1:2099", "admin off")
+    path = tmp_path / "Caddyfile"
+    path.write_text(text)
+    proc = subprocess.Popen(["caddy", "run", "--adapter", "caddyfile", "--config", str(path)],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env={"PATH": "/usr/bin", "HOME": str(tmp_path)})
+    try:
+        for _ in range(50):
+            try:
+                socket.create_connection(("127.0.0.1", port), timeout=0.1).close()
+                break
+            except OSError:
+                time.sleep(0.1)
+        for bad in ["/anthropic/../v1/models", "/v1/./models", "//v1/models", "/x/%2e%2e/v1/models"]:
+            c = http.client.HTTPConnection("127.0.0.1", port)
+            c.request("GET", bad)
+            assert c.getresponse().status == 400, bad
+        c = http.client.HTTPConnection("127.0.0.1", port)
+        c.request("GET", "/model/info")
+        assert c.getresponse().status == 404
+    finally:
+        proc.terminate()
+        proc.wait()

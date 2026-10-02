@@ -56,7 +56,7 @@ def keys_new(app_name: str = typer.Argument(..., metavar="APP"),
 @keys_app.command("ls")
 def keys_ls() -> None:
     """List keys (never the secret)."""
-    rows = keys.list_keys(Store.open())
+    rows = [k for k in keys.list_keys(Store.open()) if not k.app.startswith("_")]  # hide mst's own keys
     if not rows:
         typer.echo("no keys yet. Try: mst keys new <app>")
         return
@@ -73,6 +73,9 @@ def keys_ls() -> None:
 @keys_app.command("revoke")
 def keys_revoke(app_name: str = typer.Argument(..., metavar="APP")) -> None:
     """Disable an app's key."""
+    if app_name.startswith("_"):
+        typer.echo(f"{app_name} is managed by mst (mst expose --stop revokes it)")
+        raise typer.Exit(1)
     if not keys.revoke_key(Store.open(), app_name):
         typer.echo(f"no active key for {app_name}")
         raise typer.Exit(1)
