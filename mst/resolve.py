@@ -213,6 +213,24 @@ def model_name(ref: str, repo_id: str) -> str:
     return repo_id.split("/")[-1].lower()
 
 
+def check_name_free(store: Store, name: str, ref: str, res: Resolution) -> None:
+    """Refuse to replace a model registered under the same name for a different repo."""
+    existing = store.get_model(name)
+    if existing and existing.repo_id.lower() != res.repo_id.lower():
+        raise PullError(Resolution("name-taken", res.repo_id, res.revision, res.architecture, message=(
+            f"name '{name}' is already registered for {existing.repo_id}; "
+            f"pick another with: mst pull {ref} --name <name>")))
+
+
+def download_snapshot(res: Resolution, hf) -> str:
+    """Download the pinned safetensors snapshot (only the shards the index names)."""
+    shards = None
+    index = next((f for f in res.files if f.endswith(".safetensors.index.json")), None)
+    if index:
+        shards = set(hf.read_json(res.repo_id, res.revision, index)["weight_map"].values())
+    return hf.download(res.repo_id, res.revision, snapshot_patterns(res.files, shards))
+
+
 def pull(ref: str, *, store: Store | None = None, catalog: dict | None = None, hf=None,
          name: str | None = None) -> Model:
     hf = hf or HubClient()
@@ -221,15 +239,7 @@ def pull(ref: str, *, store: Store | None = None, catalog: dict | None = None, h
         raise PullError(res)
     store = store or Store.open()
     name = name or model_name(ref, res.repo_id)
-    existing = store.get_model(name)
-    if existing and existing.repo_id.lower() != res.repo_id.lower():
-        raise PullError(Resolution("name-taken", res.repo_id, res.revision, res.architecture, message=(
-            f"name '{name}' is already registered for {existing.repo_id}; "
-            f"pick another with: mst pull {ref} --name <name>")))
-    shards = None
-    index = next((f for f in res.files if f.endswith(".safetensors.index.json")), None)
-    if index:
-        shards = set(hf.read_json(res.repo_id, res.revision, index)["weight_map"].values())
-    path = hf.download(res.repo_id, res.revision, snapshot_patterns(res.files, shards))
+    check_name_free(store, name, ref, res)
+    path = download_snapshot(res, hf)
     return store.add_model(name=name, repo_id=res.repo_id, revision=res.revision, source=res.kind,
                            architecture=res.architecture, weights_path=str(path))
