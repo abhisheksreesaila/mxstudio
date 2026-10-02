@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
+import httpx
+
 from mst.store import Model, Store, mst_home
 
 # Short names -> HF repo ids. Each architecture here is in MAX's catalog.
@@ -34,6 +36,10 @@ TOKENIZER_FILES = {
 }
 
 
+class ResolveError(Exception):
+    """A failure outside the model itself (no `max`, network down); the message is one line."""
+
+
 class RepoNotFound(Exception):
     pass
 
@@ -51,7 +57,7 @@ class RepoInfo:
 
 @dataclass(frozen=True)
 class Resolution:
-    kind: str  # 'max-catalog' | 'hf-supported' | 'unsupported' | 'not-found' | 'gated'
+    kind: str  # 'max-catalog' | 'hf-supported' | 'unsupported' | 'not-found' | 'gated' | 'no-safetensors' | 'name-taken'
     repo_id: str
     revision: str | None = None
     architecture: str | None = None
@@ -75,9 +81,15 @@ class PullError(Exception):
 # ---- MAX catalog ---------------------------------------------------------
 
 def _run_max_list() -> str:
-    proc = subprocess.run(["max", "list", "--json"], capture_output=True, text=True, timeout=120)
+    try:
+        proc = subprocess.run(["max", "list", "--json"], capture_output=True, text=True, timeout=120)
+    except FileNotFoundError:
+        raise ResolveError("`max` not found: run mst inside the pixi env (pixi run mst ...)") from None
+    except subprocess.TimeoutExpired:
+        raise ResolveError("`max list --json` timed out; try again") from None
     if proc.returncode != 0:
-        raise RuntimeError(f"`max list --json` failed: {proc.stderr.strip()[:200]}")
+        lines = proc.stderr.strip().splitlines()
+        raise ResolveError(f"`max list --json` failed: {lines[-1][:200] if lines else proc.returncode}")
     return proc.stdout
 
 
@@ -86,7 +98,12 @@ def load_catalog(*, runner: Callable[[], str] = _run_max_list, refresh: bool = F
     cache = mst_home() / "max_catalog.json"
     if not refresh and cache.exists() and time.time() - cache.stat().st_mtime < CATALOG_TTL:
         return json.loads(cache.read_text())
-    arches = json.loads(runner()).get("architectures", {})
+    try:
+        arches = json.loads(runner()).get("architectures")
+    except (json.JSONDecodeError, AttributeError):
+        arches = None
+    if not isinstance(arches, dict) or not arches:
+        raise ResolveError("`max list --json` returned no architectures; not caching it")
     cache.write_text(json.dumps(arches))
     return arches
 
@@ -120,11 +137,24 @@ class HubClient:
         except HfHubHTTPError as e:
             if getattr(e.response, "status_code", None) in (401, 403):
                 raise RepoGated(repo_id) from e
-            raise
+            raise ResolveError(f"Hugging Face returned an error for {repo_id}: {str(e)[:120]}") from e
+        except (httpx.HTTPError, OSError) as e:
+            raise ResolveError(f"could not reach Hugging Face ({type(e).__name__}); check your network") from e
+
+    def read_json(self, repo_id: str, revision: str, filename: str) -> dict:
+        from huggingface_hub import hf_hub_download
+        try:
+            path = hf_hub_download(repo_id, filename, revision=revision, token=self.token)
+        except (httpx.HTTPError, OSError) as e:
+            raise ResolveError(f"could not read {filename} from {repo_id}: {type(e).__name__}") from e
+        return json.loads(Path(path).read_text())
 
     def download(self, repo_id: str, revision: str, patterns: list[str]) -> str:
         from huggingface_hub import snapshot_download
-        return snapshot_download(repo_id, revision=revision, allow_patterns=patterns, token=self.token)
+        try:
+            return snapshot_download(repo_id, revision=revision, allow_patterns=patterns, token=self.token)
+        except (httpx.HTTPError, OSError) as e:
+            raise ResolveError(f"download of {repo_id} failed ({type(e).__name__}); retry to resume") from e
 
 
 # ---- resolve -------------------------------------------------------------
@@ -148,6 +178,10 @@ def resolve(ref: str, *, catalog: dict | None = None, hf=None) -> Resolution:
         return Resolution("unsupported", repo_id, info.sha, arch, files=info.files, message=(
             f"{repo_id} uses {arch or 'an unknown architecture'}, which MAX does not support yet. "
             f"Next step: mst port {ref}"))
+    if not any(f.endswith(".safetensors") for f in info.files):
+        return Resolution("no-safetensors", repo_id, info.sha, arch, files=info.files, message=(
+            f"{repo_id} has no .safetensors weights (MAX needs safetensors); "
+            "look for a safetensors variant of this model."))
     kind = "max-catalog" if repo_id in entry.get("example_repo_ids", []) else "hf-supported"
     encodings = list(entry.get("supported_encodings", []))
     return Resolution(kind, repo_id, info.sha, arch, encodings, files=info.files,
@@ -156,27 +190,46 @@ def resolve(ref: str, *, catalog: dict | None = None, hf=None) -> Resolution:
 
 # ---- pull ----------------------------------------------------------------
 
-def snapshot_patterns(files: list[str]) -> list[str]:
-    """Safetensors weights (plus shard index) and config/tokenizer files; nothing else."""
+def snapshot_patterns(files: list[str], shards: set[str] | None = None) -> list[str]:
+    """Safetensors weights (plus shard index) and config/tokenizer files; nothing else.
+
+    With `shards` (the files a sharded index references), other .safetensors are skipped.
+    """
     keep = [f for f in files
-            if f == "config.json" or f.endswith(".safetensors") or f.endswith(".safetensors.index.json")
-            or Path(f).name in TOKENIZER_FILES]
+            if f == "config.json" or f.endswith(".safetensors.index.json")
+            or Path(f).name in TOKENIZER_FILES
+            or (f.endswith(".safetensors") and (shards is None or f in shards))]
     if not any(f.endswith(".safetensors") for f in keep):
         raise ValueError("no safetensors weights in this repo")
     return sorted(keep)
 
 
 def model_name(ref: str, repo_id: str) -> str:
-    return ref.lower() if ref.lower() in CURATED else repo_id.split("/")[-1].lower()
+    if ref.lower() in CURATED:
+        return ref.lower()
+    for alias, repo in CURATED.items():
+        if repo.lower() == repo_id.lower():
+            return alias
+    return repo_id.split("/")[-1].lower()
 
 
-def pull(ref: str, *, store: Store | None = None, catalog: dict | None = None, hf=None) -> Model:
+def pull(ref: str, *, store: Store | None = None, catalog: dict | None = None, hf=None,
+         name: str | None = None) -> Model:
     hf = hf or HubClient()
     res = resolve(ref, catalog=catalog, hf=hf)
     if not res.supported:
         raise PullError(res)
-    path = hf.download(res.repo_id, res.revision, snapshot_patterns(res.files))
     store = store or Store.open()
-    return store.add_model(name=model_name(ref, res.repo_id), repo_id=res.repo_id,
-                           revision=res.revision, source=res.kind,
+    name = name or model_name(ref, res.repo_id)
+    existing = store.get_model(name)
+    if existing and existing.repo_id.lower() != res.repo_id.lower():
+        raise PullError(Resolution("name-taken", res.repo_id, res.revision, res.architecture, message=(
+            f"name '{name}' is already registered for {existing.repo_id}; "
+            f"pick another with: mst pull {ref} --name <name>")))
+    shards = None
+    index = next((f for f in res.files if f.endswith(".safetensors.index.json")), None)
+    if index:
+        shards = set(hf.read_json(res.repo_id, res.revision, index)["weight_map"].values())
+    path = hf.download(res.repo_id, res.revision, snapshot_patterns(res.files, shards))
+    return store.add_model(name=name, repo_id=res.repo_id, revision=res.revision, source=res.kind,
                            architecture=res.architecture, weights_path=str(path))

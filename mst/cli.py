@@ -75,16 +75,20 @@ def keys_revoke(app_name: str = typer.Argument(..., metavar="APP")) -> None:
     typer.echo(f"revoked the key for {app_name}")
 @app.command("pull")
 def pull(ref: str = typer.Argument(..., help="Short name (qwen2.5-0.5b) or Hugging Face repo id"),
-         dry_run: bool = typer.Option(False, "--dry-run", help="Only resolve; download nothing")) -> None:
+         dry_run: bool = typer.Option(False, "--dry-run", help="Only resolve; download nothing"),
+         name: str = typer.Option(None, "--name", help="Register under this name")) -> None:
     """Resolve a model, download it at a pinned revision and register it."""
-    if dry_run:
-        res = resolve.resolve(ref, catalog=resolve.load_catalog(), hf=resolve.HubClient())
-        typer.echo(f"{res.kind}: {res.message}")
-        raise typer.Exit(0 if res.supported else 1)
     try:
-        model = resolve.pull(ref)
+        if dry_run:
+            res = resolve.resolve(ref, catalog=resolve.load_catalog(), hf=resolve.HubClient())
+            typer.echo(f"{res.kind}: {res.message}")
+            raise typer.Exit(0 if res.supported else 1)
+        model = resolve.pull(ref, name=name)
     except resolve.PullError as e:
         typer.echo(e.resolution.message)
+        raise typer.Exit(1)
+    except resolve.ResolveError as e:
+        typer.echo(f"error: {e}")
         raise typer.Exit(1)
     typer.echo(f"pulled {model.name} ({model.repo_id}@{model.revision[:8]}, {model.source})")
 @app.command("learn")
