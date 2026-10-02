@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 import subprocess
+from pathlib import Path
 
 import typer
 
@@ -73,11 +74,23 @@ def keys_revoke(app_name: str = typer.Argument(..., metavar="APP")) -> None:
         typer.echo(f"no active key for {app_name}")
         raise typer.Exit(1)
     typer.echo(f"revoked the key for {app_name}")
+
+
 @app.command("pull")
 def pull(ref: str = typer.Argument(..., help="Short name (qwen2.5-0.5b) or Hugging Face repo id"),
          dry_run: bool = typer.Option(False, "--dry-run", help="Only resolve; download nothing"),
-         name: str = typer.Option(None, "--name", help="Register under this name")) -> None:
+         name: str = typer.Option(None, "--name", help="Register under this name"),
+         port_dir: Path = typer.Option(None, "--port", help="Register a finished port (from `mst port`) instead")) -> None:
     """Resolve a model, download it at a pinned revision and register it."""
+    if port_dir is not None:
+        from mst import port
+        try:
+            model = port.register(ref, port_dir)
+        except (port.PortError, resolve.PullError) as e:
+            typer.echo(str(e))
+            raise typer.Exit(1)
+        typer.echo(f"registered port {model.name} ({model.repo_id}@{model.revision[:8]}, custom architecture {model.custom_arch_path})")
+        return
     try:
         if dry_run:
             res = resolve.resolve(ref, catalog=resolve.load_catalog(), hf=resolve.HubClient())
@@ -91,6 +104,28 @@ def pull(ref: str = typer.Argument(..., help="Short name (qwen2.5-0.5b) or Huggi
         typer.echo(f"error: {e}")
         raise typer.Exit(1)
     typer.echo(f"pulled {model.name} ({model.repo_id}@{model.revision[:8]}, {model.source})")
+
+
+@app.command("port")
+def port_model(ref: str = typer.Argument(..., help="Short name or Hugging Face repo id MAX does not support yet")) -> None:
+    """Set up a workspace to port an unsupported architecture to MAX with Claude Code."""
+    from mst import port
+    try:
+        result = port.prepare(ref)
+    except port.PortError as e:
+        typer.echo(str(e))
+        raise typer.Exit(1)
+    if result.workspace is None:
+        typer.echo(result.message)
+        return
+    typer.echo(f"Modular skills: {', '.join(result.skills)}")
+    typer.echo(f"Closest supported donor: {result.donor.architecture}")
+    typer.echo(f"Workspace: {result.workspace} (config.json, PORT.md, .claude/skills)")
+    typer.echo("Start the port with:")
+    typer.echo(f"  {result.command}")
+    typer.echo(f"When it works: mst pull {ref} --port <port dir>")
+
+
 @app.command("learn")
 def learn_model(
     model: str = typer.Argument(..., help="A registered model name or a Hugging Face repo id."),

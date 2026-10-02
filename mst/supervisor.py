@@ -248,6 +248,8 @@ class Supervisor:
     def _command(self, model, port: int) -> list[str]:
         # A pulled model loads from its pinned local snapshot, so serving needs no network.
         cmd = [*self.max_command, "serve", "--port", str(port), "--served-model-name", model.name]
+        if model.custom_arch_path:  # a ported architecture MAX doesn't ship
+            cmd += ["--custom-architectures", model.custom_arch_path]
         if model.weights_path and Path(model.weights_path).is_dir():
             return cmd + ["--model-path", model.weights_path]
         cmd += ["--model-path", model.repo_id]
