@@ -41,7 +41,7 @@ def list_models(as_json: bool = JSON) -> None:
     models = Store.open().models()
     states = serve.live_states()
     if as_json:
-        typer.echo(report.dump(report.models_data(models, states)))
+        typer.echo(report.dump(report.models_data(models, states, serve.daemon_running())))
         return
     if not models:
         typer.echo("no models yet. Try: mst serve qwen2.5-0.5b")
@@ -58,7 +58,8 @@ def list_models(as_json: bool = JSON) -> None:
 def set_model(model: str = typer.Argument(..., help="A registered model name"),
               pin: bool = typer.Option(False, "--pin", help="Keep it loaded; never unload when idle."),
               unpin: bool = typer.Option(False, "--unpin", help="Let it unload when idle again."),
-              keep_alive: str = typer.Option(None, "--keep-alive", help="Unload after this idle time: 90s, 10m, 1h.")) -> None:
+              keep_alive: str = typer.Option(None, "--keep-alive", help="Unload after this idle time: 90s, 10m, 1h."),
+              as_json: bool = JSON) -> None:
     """Change a model's pin and keep-alive (what the console's Models page edits)."""
     if pin and unpin:
         _fail("--pin and --unpin together make no sense")
@@ -73,8 +74,39 @@ def set_model(model: str = typer.Argument(..., help="A registered model name"),
         _fail(f"no model named {model}. See: mst ls")
     store.set_lifecycle(model, pinned=True if pin else False if unpin else None, keep_alive=seconds)
     m = store.get_model(model)
+    if as_json:
+        from mst import serve
+        running = serve.daemon_running()
+        typer.echo(report.dump(report.model_row(m, serve.live_states() if running else {}, running)))
+        return
     typer.echo(f"{m.name}: {report.lifecycle(m)}")
     typer.echo(f"console  {report.console_link('models')}")
+
+
+@app.command("logs")
+def logs_cmd(model: str = typer.Argument(..., help="A registered model name"),
+             lines: int = typer.Option(50, "--lines", "-n", min=1, help="How many trailing lines."),
+             follow: bool = typer.Option(False, "--follow", "-f", help="Keep printing new lines until Ctrl-C.")) -> None:
+    """Tail a model's server log (MX Studio's own log file; works without the daemon)."""
+    from mst.store import mst_home
+    if Store.open().get_model(model) is None:
+        _fail(f"no model named {model}. See: mst ls")
+    path = mst_home() / "logs" / f"{model}.log"
+    try:
+        with open(path, "rb") as f:
+            tail = f.read().decode(errors="replace").splitlines()[-lines:]
+            for line in tail:
+                typer.echo(line)
+            while follow:
+                chunk = f.readline()
+                if chunk:
+                    typer.echo(chunk.decode(errors="replace").rstrip("\n"))
+                else:
+                    time.sleep(0.5)
+    except FileNotFoundError:
+        _fail(f"no log yet for {model}. Start it with: mst serve {model}")
+    except KeyboardInterrupt:
+        pass
 
 
 @app.command("metrics")

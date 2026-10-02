@@ -72,11 +72,15 @@ def status_text(d: dict) -> str:
                       f"{'keys':<10}{d['active_keys']} active", f"{'max':<10}{d['max_version'] or 'not installed'}"])
 
 
-def models_data(models: list[Model], states: dict[str, str]) -> list[dict]:
-    """Registered models; `state` is the daemon live state, or null when the daemon is not running."""
-    return [{"name": m.name, "repo_id": m.repo_id, "revision": m.revision, "source": m.source,
-             "architecture": m.architecture, "pinned": m.pinned, "keep_alive": m.keep_alive,
-             "state": states.get(m.name) if states else None} for m in models]
+def model_row(m: Model, states: dict[str, str], daemon_running: bool) -> dict:
+    """One model as `ls --json` and `set --json` print it. `state` is 'cold' unless the daemon says otherwise."""
+    return {"name": m.name, "repo_id": m.repo_id, "revision": m.revision, "source": m.source,
+            "architecture": m.architecture, "pinned": m.pinned, "keep_alive": m.keep_alive,
+            "state": states.get(m.name, "cold") if daemon_running else "cold", "daemon_running": daemon_running}
+
+
+def models_data(models: list[Model], states: dict[str, str], daemon_running: bool = False) -> list[dict]:
+    return [model_row(m, states, daemon_running) for m in models]
 
 
 def keys_data(rows) -> list[dict]:

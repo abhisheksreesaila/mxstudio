@@ -18,7 +18,7 @@ def test_ls_json_is_only_json_with_lifecycle_and_null_state_without_daemon(monke
     assert json.loads(runner.invoke(app, ["ls", "--json"]).output) == []
     add()
     row = json.loads(runner.invoke(app, ["ls", "--json"]).output)[0]
-    assert row["name"] == "tiny" and row["pinned"] is False and row["keep_alive"] == 300 and row["state"] is None
+    assert row["name"] == "tiny" and row["pinned"] is False and row["keep_alive"] == 300 and row["state"] == "cold" and row["daemon_running"] is False
     assert row["repo_id"] == "org/tiny"
 
 
@@ -36,3 +36,14 @@ def test_keys_ls_json_never_has_the_secret():
     assert key not in out and "key_hash" not in out
     runner.invoke(app, ["keys", "revoke", "notes"])
     assert json.loads(runner.invoke(app, ["keys", "ls", "--json"]).output)[0]["status"] == "revoked"
+
+
+def test_ls_json_reports_live_state_and_daemon_running(monkeypatch):
+    from mst import serve
+    add()
+    add("other")
+    monkeypatch.setattr(serve, "live_states", lambda: {"tiny": "ready"})
+    monkeypatch.setattr(serve, "daemon_running", lambda: True)
+    rows = {r["name"]: r for r in json.loads(runner.invoke(app, ["ls", "--json"]).output)}
+    assert rows["tiny"]["state"] == "ready" and rows["other"]["state"] == "cold"
+    assert all(r["daemon_running"] is True for r in rows.values())
