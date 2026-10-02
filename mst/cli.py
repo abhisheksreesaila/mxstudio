@@ -6,7 +6,7 @@ import subprocess
 
 import typer
 
-from mst import keys
+from mst import expose, keys
 from mst import resolve
 from mst.store import Store, format_duration
 
@@ -104,6 +104,30 @@ def learn_model(
         subprocess.Popen(["jupyter", "lab", str(path)], start_new_session=True,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         typer.echo("opening in Jupyter Lab")
+
+
+@app.command("expose")
+def expose_cmd(host: str = typer.Option(None, help="Hostname clients use. Default: <this machine>.local"),
+               litellm: bool = typer.Option(True, "--litellm/--no-litellm", help="Route through LiteLLM."),
+               dry_run: bool = typer.Option(False, "--dry-run", help="Write the configs; start nothing."),
+               stop: bool = typer.Option(False, "--stop", help="Stop Caddy and LiteLLM.")) -> None:
+    """Serve your models on the LAN over HTTPS, with per-app keys."""
+    if stop:
+        expose.stop()
+        typer.echo("stopped Caddy and LiteLLM")
+        return
+    host = host or expose.default_host()
+    if dry_run:
+        configs = expose.write_configs(host=host, litellm=litellm)
+    else:
+        configs = expose.start(host=host, litellm=litellm)
+    typer.echo(f"endpoint   https://{host}:{expose.EXPOSE_PORT}/v1")
+    typer.echo(f"configs    {configs['caddyfile']}  {configs['litellm']}")
+    if litellm:
+        typer.echo(f"litellm    http://127.0.0.1:{expose.LITELLM_PORT}/ui (this machine only)")
+    typer.echo("keys       mst keys new <app>   (send it as: Authorization: Bearer <key>)")
+    typer.echo(f"trust      copy {expose.ca_root_path()} to each client device and trust it once")
+    typer.echo("           (Linux: sudo trust anchor root.crt · macOS: open it in Keychain Access, set Always Trust)")
 
 
 def main() -> None:
