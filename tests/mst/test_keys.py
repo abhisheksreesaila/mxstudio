@@ -87,16 +87,18 @@ def test_concurrent_first_keys_never_hand_out_a_dead_key(tmp_path):
     from mst.keys import KeyExists, create_key, verify_key
     from mst.store import Store
     results, barrier = [], threading.Barrier(8)
+    # One connection each, like separate `mst serve` processes. Opened up front: a thread that
+    # failed before the barrier would leave the others waiting forever (this test once hung).
+    stores = [Store.open() for _ in range(8)]
 
-    def worker():
-        store = Store.open()  # its own connection, like a separate `mst serve`
-        barrier.wait()
+    def worker(store):
+        barrier.wait(timeout=30)
         try:
             results.append(create_key(store, "default"))
         except KeyExists:
             results.append(None)
 
-    threads = [threading.Thread(target=worker) for _ in range(8)]
+    threads = [threading.Thread(target=worker, args=(s,)) for s in stores]
     [t.start() for t in threads]
     [t.join() for t in threads]
     issued = [k for k in results if k]

@@ -16,3 +16,4 @@ packages = ["mst"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+faulthandler_timeout = 120  # a stuck test prints every thread's stack instead of hanging silently
