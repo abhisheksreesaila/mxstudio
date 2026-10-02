@@ -218,6 +218,18 @@ def scaffold_args(donor: Donor) -> tuple[str, str, str]:
     return d.name, flags, lane
 
 
+def copy_subfolders_step(donor: Donor) -> str:
+    """--full-copy skips subfolders, but the donor's modules import `.layers.*` etc.: copy them by hand."""
+    d = donor.v3_dir or donor.source_dir
+    subs = sorted(s.name for s in d.iterdir() if s.is_dir() and s.name != "__pycache__") if d else []
+    if not subs:
+        return ""
+    cmds = "\n".join(f"cp -r {shlex.quote(str(d / s))} <output_dir>/<slug>/" for s in subs)
+    return (f"\n`--full-copy` copies only the donor's files, not its subfolders, yet the donor's code "
+            f"imports from them. Copy them into the port dir (`<slug>` is the folder scaffold prints):\n\n"
+            f"```\n{cmds}\n```\n")
+
+
 def _port_md(res: resolve.Resolution, config: dict, donor: Donor, *, skills_root: Path,
              workspace: Path) -> str:
     fields = "\n".join(f"- `{k}`: `{json.dumps(config[k])}`" for k in KEY_FIELDS if k in config)
@@ -229,6 +241,8 @@ def _port_md(res: resolve.Resolution, config: dict, donor: Donor, *, skills_root
     lane_note = ("" if donor.v3_dir else
                  "\nNo ModuleV3 donor was found, so this scaffold line is on the **V2 lane**. "
                  "Switch to a natively-V3 donor (for example `olmo3`) if you want ModuleV3.\n")
+    if flags:
+        lane_note += copy_subfolders_step(donor)
     ours, theirs = mst_max_version() or "unknown", skill_max_range(skills_root) or "unknown"
     return f"""# Port {res.repo_id} to MAX
 
