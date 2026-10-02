@@ -8,6 +8,7 @@ import os
 import signal
 
 import httpx
+import logging
 from fasthtml.common import FastHTML
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
@@ -16,6 +17,7 @@ from mst import keys
 from mst.store import Store
 from mst.supervisor import StartFailed, Supervisor, UnknownModel
 
+log = logging.getLogger("mst.gateway")
 PROXIED = ("/v1/chat/completions", "/v1/completions", "/v1/embeddings")
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 HOP_BY_HOP = {"content-length", "transfer-encoding", "connection", "content-encoding"}
@@ -108,7 +110,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                 try:
                     await supervisor.reap_idle()
                 except Exception:  # a failed sweep must not end the loop
-                    pass
+                    log.exception("idle sweep failed")
 
         supervisor.sweep_orphans()  # max children left behind by a daemon that died
         task = asyncio.create_task(reaper())
@@ -119,6 +121,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             with contextlib.suppress(asyncio.CancelledError):
                 await task
             await supervisor.stop_all()
+            await proxy.aclose()
 
     # a literal secret_key stops FastHTML writing a .sesskey file; the gateway uses no sessions
     app = FastHTML(lifespan=lifespan, secret_key="mst-gateway-unused", default_hdrs=False)
@@ -182,7 +185,9 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         in_flight = contextlib.AsyncExitStack()
         await in_flight.enter_async_context(supervisor.request(name))  # never reaped mid-request
         target = base + request.url.path.removeprefix("/v1")
-        headers = {"content-type": request.headers.get("content-type", "application/json")}
+        # identity: the body is passed through raw, so it must never arrive compressed
+        headers = {"content-type": request.headers.get("content-type", "application/json"),
+                   "accept-encoding": "identity"}
         try:
             upstream = await proxy.send(
                 proxy.build_request("POST", target, content=raw, headers=headers), stream=True)
@@ -204,6 +209,13 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
 
     for path in PROXIED:
         app.route(path, methods=["POST"])(proxy_route)
+
+    @app.route("/v1/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+    def unknown_v1(request: Request, path: str):
+        if authenticate(request) is None:
+            return unauthorized()
+        return openai_error(404, f"mst does not serve /v1/{path}. Supported: /v1/models, "
+                                 + ", ".join(PROXIED) + ".", "unknown_route")
 
     @app.get("/admin/status")
     def admin_status(request: Request):

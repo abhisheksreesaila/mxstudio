@@ -210,3 +210,17 @@ def test_daemon_command_exists():
     from mst.cli import app
     r = CliRunner().invoke(app, ["daemon", "--help"])
     assert r.exit_code == 0 and "foreground" in r.output.lower()
+
+
+async def test_replies_reach_the_client_uncompressed(http, key, monkeypatch):
+    monkeypatch.setenv("FAKE_MAX_GZIP", "1")
+    r = await http.post("/v1/chat/completions", json=CHAT, headers=auth(key))
+    assert r.status_code == 200
+    assert r.json()["choices"][0]["message"]["content"] == "hello from tiny"
+
+
+async def test_unknown_v1_routes_need_a_key_and_answer_like_openai(http, key):
+    assert (await http.get("/v1/foo")).status_code == 401
+    r = await http.post("/v1/responses", json=CHAT, headers=auth(key))
+    assert r.status_code == 404
+    assert r.json()["error"]["code"] == "unknown_route"

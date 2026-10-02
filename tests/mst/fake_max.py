@@ -1,7 +1,8 @@
 """Stand-in for `max serve`. Env: FAKE_MAX_DELAY (s before healthy), FAKE_MAX_FAIL (exit 1),
 FAKE_MAX_ARGS_FILE (write argv there), FAKE_MAX_STARTS_FILE (append a line per start).
 It also answers POST /v1/{chat/completions,completions,embeddings}, echoing the requested model:
-stream=true gives SSE chunks then `data: [DONE]`. FAKE_MAX_CHUNK_DELAY (s between chunks)."""
+stream=true gives SSE chunks then `data: [DONE]`. FAKE_MAX_CHUNK_DELAY (s between chunks).
+FAKE_MAX_GZIP gzips JSON replies when the caller accepts gzip."""
 import json
 import os
 import sys
@@ -65,6 +66,10 @@ class H(BaseHTTPRequestHandler):
         data = json.dumps(obj).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
+        if os.environ.get("FAKE_MAX_GZIP") and "gzip" in self.headers.get("Accept-Encoding", ""):
+            import gzip
+            data = gzip.compress(data)
+            self.send_header("Content-Encoding", "gzip")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
