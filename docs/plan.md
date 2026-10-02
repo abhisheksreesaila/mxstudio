@@ -67,12 +67,32 @@ Brief: docs/brief.md · Needs: F-002
 - [x] prints the command to run the import-model skill with Claude Code in that workspace
 - [x] a finished port can be registered with `mst pull <ref> --port <dir>`
 
-## F-010 Endpoints page design [blocked]
-Blocked: pick a visual direction with the designer skill (brief says explore, not Terminal Ledger). Say "design the endpoints page" when you're up.
-- [ ] design for the loopback admin page: models, state, memory, keys, base URL, copy snippets
+## F-010 Console design [done]
+Brief: docs/brief.md · Design: docs/design/console.md
+- [x] visual direction chosen: Azure Blade (option C), tokens in design-system/DESIGN-SYSTEM.md
 
 ## F-011 Live acceptance on this machine [blocked]
 Blocked: stop the other agents to free RAM, then run `pixi run python scripts/mst_acceptance.py` (downloads ~6 GB the first time). For the second-device check, copy ~/.local/share/caddy/pki/authorities/local/root.crt to that device and run the curl line the script prints.
 - [ ] 3 small models (qwen2.5-0.5b, smollm2-1.7b, qwen2.5-1.5b) answer through one keyed HTTPS endpoint
 - [ ] an idle model unloads and comes back on the next request
 - [ ] the same call works from a second device on the LAN
+
+## F-012 Console shell and Models blade [todo]
+Brief: docs/brief.md · Design: docs/design/console.md · Needs: F-006
+- [ ] `http://127.0.0.1:11435/console` serves the console (loopback-only, refused through a proxy or a foreign Host)
+- [ ] top bar, resource menu (all groups; unbuilt pages say "coming soon"), breadcrumb, command bar
+- [ ] Models grid from `/admin/status` + the store: name, state badge, source, lifecycle, refreshed every 3 s
+- [ ] clicking a model opens the blade: Overview (repo, revision, architecture, state) and Settings (pin, unload after idle) with Apply/Discard, saved through a new `PATCH /admin/models/{name}`
+- [ ] Load and Stop in the command bar and the blade work; a crashed model opens on Logs with its log tail
+- [ ] empty, loading, daemon-down and narrow-screen states as in the handoff
+
+## F-013 Overview page with gauges [todo]
+Brief: docs/brief.md · Design: docs/design/console.md (gauges from option B) · Needs: F-012
+- [ ] the daemon records per-request metrics (model, app, status, prompt/completion tokens, TTFT, duration) in SQLite
+- [ ] Overview shows essentials (endpoints, MAX version, GPUs, daemon uptime, active keys) and gauges for decode tok/s, TTFT p50, GPU memory, requests/min
+- [ ] Recent requests list (last 50) on Overview and Activity log
+
+## F-014 API keys and Network pages [todo]
+Brief: docs/brief.md · Design: docs/design/console.md · Needs: F-012
+- [ ] API keys grid (app, prefix, created, last used, status); New key shows the key once in the blade; Revoke with confirmation
+- [ ] Network page shows expose status, LAN URL, the CA path, and Expose/Stop buttons
