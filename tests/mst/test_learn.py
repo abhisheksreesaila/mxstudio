@@ -125,7 +125,7 @@ def test_cli_accepts_raw_repo_id(mst_home, monkeypatch):
     monkeypatch.setattr(learn, "default_source", lambda: FakeHF())
     result = runner.invoke(app, ["learn", "Qwen/Qwen2.5-0.5B-Instruct", "--no-open"])
     assert result.exit_code == 0, result.output
-    assert (mst_home / "notebooks" / "qwen2.5-0.5b-instruct.ipynb").exists()
+    assert (mst_home / "notebooks" / "qwen2.5-0.5b.ipynb").exists()
 
 
 def test_cli_reports_hf_failure(monkeypatch):
@@ -161,7 +161,7 @@ def test_model_name_for_pulled_and_unpulled_models(monkeypatch):
                               source=FakeHF(), registered=False, max_finder=lambda a: [])
     assert "mst pull qwen2.5-0.5b" in text_of(nb)
     assert learn.resolve("qwen2.5-0.5b") == ("qwen2.5-0.5b", "Qwen/Qwen2.5-0.5B-Instruct", None, False)
-    assert learn.resolve("Qwen/Qwen2.5-0.5B-Instruct")[0] == "qwen2.5-0.5b-instruct"
+    assert learn.resolve("Qwen/Qwen2.5-0.5B-Instruct")[0] == "qwen2.5-0.5b"  # curated alias, as mst pull registers it
     assert learn.resolve("Foo/Bar-7B")[0] == "bar-7b"
     # pulled: looked up by repo id returns the registered name
     Store.open().add_model(name="qwen2.5-0.5b", repo_id="Qwen/Qwen2.5-0.5B-Instruct", revision="r",
