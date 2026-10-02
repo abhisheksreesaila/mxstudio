@@ -239,15 +239,15 @@ def test_live_caddy_refuses_dot_segment_paths(tmp_path):
             except OSError:
                 time.sleep(0.1)
         for bad in ["/anthropic/../v1/models", "/v1/./models", "//v1/models", "/x/%2e%2e/v1/models"]:
-            c = http.client.HTTPConnection("127.0.0.1", port)
+            c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
             c.request("GET", bad)
             assert c.getresponse().status == 400, bad
-        c = http.client.HTTPConnection("127.0.0.1", port)
+        c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
         c.request("GET", "/model/info")
         assert c.getresponse().status == 404
     finally:
         proc.terminate()
-        proc.wait()
+        proc.wait(timeout=10)
 
 
 def test_a_busy_litellm_port_is_refused_before_anything_starts(mst_home, monkeypatch, litellm_port):

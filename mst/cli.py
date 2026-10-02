@@ -308,7 +308,7 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
             if expose.refresh_if_running(store):
                 typer.echo("restarted LiteLLM so the LAN endpoint lists it")
         except expose.ExposeError as e:
-            typer.echo(f"warning: could not refresh the LAN endpoint ({e}). Run: mst expose")
+            typer.echo(f"warning: could not refresh the LAN endpoint ({e}). Run: mst expose", err=True)
     name = found.name
     if pin or seconds is not None:
         store.set_lifecycle(name, pinned=pin, keep_alive=seconds)

@@ -100,7 +100,7 @@ def test_concurrent_first_keys_never_hand_out_a_dead_key(tmp_path):
 
     threads = [threading.Thread(target=worker, args=(s,)) for s in stores]
     [t.start() for t in threads]
-    [t.join() for t in threads]
+    [t.join(timeout=30) for t in threads]
     issued = [k for k in results if k]
     assert len(issued) == 1
     assert verify_key(Store.open(), issued[0]) == "default"
