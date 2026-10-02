@@ -46,6 +46,9 @@ def keys_new(app_name: str = typer.Argument(..., metavar="APP"),
     """Create a key for an app. It is printed once."""
     try:
         key = keys.create_key(Store.open(), app_name, rotate=rotate)
+    except ValueError as e:
+        typer.echo(f"error: {e}")
+        raise typer.Exit(1)
     except keys.KeyExists as e:
         typer.echo(str(e))
         raise typer.Exit(1)

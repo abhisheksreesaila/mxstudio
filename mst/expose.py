@@ -28,7 +28,9 @@ PROCESSES = ("caddy", "litellm")
 UPSTREAM_APP = "_litellm"  # the reserved key LiteLLM uses to call the daemon
 API_PATHS = ("/v1/models", "/v1/chat/completions", "/v1/completions", "/v1/embeddings")
 HOSTNAME = re.compile(r"[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?|\[[0-9A-Fa-f:]+\]")
-UNCLEAN = " || ".join(f'{{http.request.orig_uri.path}}.contains("{s}")' for s in ("/.", "//", "%", "\\\\"))
+# orig_uri.path is decoded, so '%' is checked on the raw request URI instead.
+UNCLEAN = " || ".join([*(f'{{http.request.orig_uri.path}}.contains("{s}")' for s in ("/.", "//", "\\\\")),
+                       '{http.request.orig_uri}.contains("%")'])
 SETTLE_SECONDS = float(os.environ.get("MST_EXPOSE_SETTLE", "1.0"))
 _upstream_key_for_tests: str | None = None
 
@@ -119,7 +121,7 @@ def write_configs(*, host: str, litellm: bool, store: Store | None = None) -> di
     store = store or Store.open()
     d = expose_dir()
     caddyfile, litellm_yaml = d / "Caddyfile", d / "litellm.yaml"
-    caddyfile.write_text(render_caddyfile(hosts=[host, "localhost"], litellm=litellm))
+    caddyfile.write_text(render_caddyfile(hosts=list(dict.fromkeys([host, "localhost"])), litellm=litellm))
     litellm_yaml.write_text(render_litellm_config(store.models()))
     return {"caddyfile": caddyfile, "litellm": litellm_yaml}
 
@@ -193,9 +195,13 @@ def start(*, host: str, litellm: bool = True, store: Store | None = None) -> dic
     env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "TMPDIR")
            if k in os.environ}
     env["LITELLM_MASTER_KEY"] = _master_key()
+    litellm_env = dict(env)
     if litellm:
-        env["MST_UPSTREAM_KEY"] = keys.create_key(store, UPSTREAM_APP, rotate=True, internal=True)
-        _upstream_key_for_tests = env["MST_UPSTREAM_KEY"]
+        if not _port_free(LITELLM_PORT):
+            raise ExposeError(f"port {LITELLM_PORT} is already in use, so LiteLLM can't start there "
+                              "(set MST_LITELLM_PORT to another port)")
+        litellm_env["MST_UPSTREAM_KEY"] = keys.create_key(store, UPSTREAM_APP, rotate=True, internal=True)
+        _upstream_key_for_tests = litellm_env["MST_UPSTREAM_KEY"]
     started = []
     for name in PROCESSES:
         if name == "litellm" and not litellm:
@@ -203,7 +209,7 @@ def start(*, host: str, litellm: bool = True, store: Store | None = None) -> dic
         log_path = expose_dir() / f"{name}.log"
         with open(log_path, "ab") as log:
             try:
-                proc = subprocess.Popen(_command(name, configs), env=env, stdout=log, stderr=subprocess.STDOUT,
+                proc = subprocess.Popen(_command(name, configs), env=litellm_env if name == "litellm" else env, stdout=log, stderr=subprocess.STDOUT,
                                         stdin=subprocess.DEVNULL, start_new_session=True)
             except FileNotFoundError as e:
                 stop(store=store)
@@ -222,6 +228,15 @@ def start(*, host: str, litellm: bool = True, store: Store | None = None) -> dic
         _wait_for_port(LITELLM_PORT, next(p for n, p, _ in started if n == "litellm"),
                        expose_dir() / "litellm.log", store)
     return configs
+
+
+def _port_free(port: int) -> bool:
+    with socket.socket() as s:
+        try:
+            s.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
 
 
 def _wait_for_port(port: int, proc: subprocess.Popen, log_path: Path, store: Store) -> None:

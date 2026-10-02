@@ -12,8 +12,21 @@ from mst.store import Store
 
 runner = CliRunner()
 # A stand-in LiteLLM: records its environment and opens the LiteLLM port like the real one.
-FAKE_LITELLM = (f"sh -c 'env > \"$MST_HOME/litellm.env\"; exec {sys.executable} -m http.server "
-                f"{expose.LITELLM_PORT} --bind 127.0.0.1'")
+FAKE_LITELLM_TEMPLATE = FAKE_LITELLM = (f"sh -c 'env > \"$MST_HOME/litellm.env\"; exec {sys.executable} -m http.server "
+                f"$MST_LITELLM_PORT --bind 127.0.0.1'")
+
+
+@pytest.fixture(autouse=True)
+def litellm_port(monkeypatch):
+    """Each test gets a free LiteLLM port, so tests never collide with a real LiteLLM on 4000."""
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    monkeypatch.setattr(expose, "LITELLM_PORT", port)
+    # LiteLLM gets a minimal env, so the fake can't read its port from it: bake it in per test.
+    monkeypatch.setattr(sys.modules[__name__], "FAKE_LITELLM", FAKE_LITELLM_TEMPLATE.replace("$MST_LITELLM_PORT", str(port)))
+    return port
 
 
 def test_caddyfile_checks_app_keys_then_swaps_in_the_litellm_master_key():
@@ -22,7 +35,7 @@ def test_caddyfile_checks_app_keys_then_swaps_in_the_litellm_master_key():
     assert "tls internal" in text
     assert "forward_auth 127.0.0.1:11435" in text
     assert "uri /auth/check" in text
-    assert "reverse_proxy 127.0.0.1:4000" in text
+    assert f"reverse_proxy 127.0.0.1:{expose.LITELLM_PORT}" in text
     assert 'header_up Authorization "Bearer {env.LITELLM_MASTER_KEY}"' in text
 
 
@@ -235,3 +248,32 @@ def test_live_caddy_refuses_dot_segment_paths(tmp_path):
     finally:
         proc.terminate()
         proc.wait()
+
+
+def test_a_busy_litellm_port_is_refused_before_anything_starts(mst_home, monkeypatch, litellm_port):
+    import socket
+    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM)
+    with socket.socket() as squatter:
+        squatter.bind(("127.0.0.1", litellm_port))
+        squatter.listen()
+        result = runner.invoke(app, ["expose", "--host", "box.local"])
+    assert result.exit_code == 1
+    assert f"port {litellm_port} is already in use" in result.output
+    assert expose.status() == {"caddy": False, "litellm": False}
+
+
+def test_percent_encoded_paths_are_refused():
+    text = expose.render_caddyfile(hosts=["box.local"], port=8443)
+    assert '{http.request.orig_uri}.contains("%")' in text
+
+
+def test_hosts_are_deduplicated(mst_home):
+    expose.write_configs(host="localhost", litellm=True)
+    assert "https://localhost:8443, https://localhost:8443" not in (mst_home / "expose" / "Caddyfile").read_text()
+
+
+def test_reserved_key_names_are_a_one_line_error():
+    result = runner.invoke(app, ["keys", "new", "_litellm"])
+    assert result.exit_code == 1
+    assert "reserved" in result.output
