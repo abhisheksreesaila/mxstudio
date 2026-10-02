@@ -10,4 +10,4 @@ EXPOSE_PORT = int(os.environ.get("MST_EXPOSE_PORT", "8443"))
 
 
 def daemon_url() -> str:
-    return f"http://{DAEMON_HOST}:{DAEMON_PORT}"
+    return f"http://{DAEMON_HOST}:{int(os.environ.get('MST_PORT', DAEMON_PORT))}"

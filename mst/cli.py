@@ -9,7 +9,7 @@ import typer
 
 from mst import expose, keys
 from mst import resolve
-from mst.store import Store, format_duration
+from mst.store import Store, format_duration, parse_duration
 
 app = typer.Typer(help="MX Studio: local models on Modular MAX you can see into and reshape.",
                   no_args_is_help=True, add_completion=False)
@@ -31,10 +31,13 @@ def list_models() -> None:
     if not models:
         typer.echo("no models yet. Try: mst serve qwen2.5-0.5b")
         return
-    typer.echo(f"{'NAME':<24} {'SOURCE':<13} {'PINNED':<7} {'KEEP-ALIVE':<10} REPO")
+    from mst import serve
+    states = serve.live_states()
+    typer.echo(f"{'NAME':<24} {'STATE':<9} {'SOURCE':<13} {'PINNED':<7} {'KEEP-ALIVE':<10} REPO")
     for m in models:
         keep = "-" if m.pinned else format_duration(m.keep_alive)
-        typer.echo(f"{m.name:<24} {m.source:<13} {'yes' if m.pinned else 'no':<7} {keep:<10} {m.repo_id}")
+        state = states.get(m.name, "-")
+        typer.echo(f"{m.name:<24} {state:<9} {m.source:<13} {'yes' if m.pinned else 'no':<7} {keep:<10} {m.repo_id}")
 
 
 @keys_app.command("new")
@@ -149,6 +152,64 @@ def learn_model(
         typer.echo("opening in Jupyter Lab")
 
 
+@app.command("serve")
+def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b) or Hugging Face repo id"),
+                pin: bool = typer.Option(False, "--pin", help="Keep it loaded; never unload when idle."),
+                keep_alive: str = typer.Option(None, "--keep-alive", help="Unload after this idle time: 90s, 10m, 1h."),
+                no_wait: bool = typer.Option(False, "--no-wait", help="Register and start the daemon; load on first request.")) -> None:
+    """Pull if needed, start the daemon, load the model and print how to call it."""
+    from mst import expose, serve
+    store = Store.open()
+    found = store.get_model(model) or next((m for m in store.models() if m.repo_id == model), None)
+    if found is None:
+        try:
+            found = resolve.pull(model)
+        except resolve.PullError as e:
+            typer.echo(e.resolution.message)
+            raise typer.Exit(1)
+        except resolve.ResolveError as e:
+            typer.echo(f"error: {e}")
+            raise typer.Exit(1)
+        typer.echo(f"pulled {found.name} ({found.repo_id}@{found.revision[:8]})")
+        expose.refresh_if_running(store)
+    name = found.name
+    if pin:
+        store.set_lifecycle(name, pinned=True)
+    elif keep_alive:
+        store.set_lifecycle(name, pinned=False, keep_alive=parse_duration(keep_alive))
+    try:
+        if serve.ensure_daemon():
+            typer.echo("started the mst daemon")
+        if not no_wait:
+            typer.echo(f"loading {name} (the first load compiles the model and can take a minute)…")
+            started = time.monotonic()
+            serve.load(name)
+            typer.echo(f"{name} is ready ({time.monotonic() - started:.1f}s)")
+    except serve.DaemonError as e:
+        typer.echo(f"error: {e}")
+        raise typer.Exit(1)
+    typer.echo("")
+    typer.echo(serve.usage(name, serve.first_key(store)))
+
+
+@app.command("stop")
+def stop_model(model: str = typer.Argument(None, help="Model to unload"),
+               all_: bool = typer.Option(False, "--all", help="Unload every model and stop the daemon.")) -> None:
+    """Unload a model now, or stop everything with --all."""
+    from mst import serve
+    if all_:
+        typer.echo("stopped the daemon and every model" if serve.shutdown() else "the daemon isn't running")
+        return
+    if not model:
+        typer.echo("name a model, or use --all")
+        raise typer.Exit(1)
+    if not serve.daemon_running():
+        typer.echo("the daemon isn't running; nothing is loaded")
+        return
+    serve.stop(model)
+    typer.echo(f"unloaded {model}")
+
+
 @app.command("expose")
 def expose_cmd(host: str = typer.Option(None, help="Hostname clients use. Default: <this machine>.local"),
                litellm: bool = typer.Option(True, "--litellm/--no-litellm", help="Route through LiteLLM."),
@@ -186,8 +247,13 @@ def daemon() -> None:
     from mst.settings import DAEMON_HOST, DAEMON_PORT
     from mst.supervisor import Supervisor
 
+    import os
+    import shlex
+
     store = Store.open()
-    uvicorn.run(create_app(store, Supervisor(store)), host=DAEMON_HOST, port=DAEMON_PORT,
+    max_command = tuple(shlex.split(os.environ.get("MST_MAX_CMD", "max")))
+    port = int(os.environ.get("MST_PORT", DAEMON_PORT))
+    uvicorn.run(create_app(store, Supervisor(store, max_command=max_command)), host=DAEMON_HOST, port=port,
                 log_level="info")
 
 

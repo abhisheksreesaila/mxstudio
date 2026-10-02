@@ -4,6 +4,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import os
+import signal
 
 import httpx
 from fasthtml.common import FastHTML
@@ -108,6 +110,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                 except Exception:  # a failed sweep must not end the loop
                     pass
 
+        supervisor.sweep_orphans()  # max children left behind by a daemon that died
         task = asyncio.create_task(reaper())
         try:
             yield
@@ -176,13 +179,15 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         except StartFailed as e:
             return openai_error(503, f"Model `{name}` failed to start: {e}", "model_unavailable",
                                 "server_error")
-        supervisor.touch(name)
+        in_flight = contextlib.AsyncExitStack()
+        await in_flight.enter_async_context(supervisor.request(name))  # never reaped mid-request
         target = base + request.url.path.removeprefix("/v1")
         headers = {"content-type": request.headers.get("content-type", "application/json")}
         try:
             upstream = await proxy.send(
                 proxy.build_request("POST", target, content=raw, headers=headers), stream=True)
         except httpx.TransportError as e:
+            await in_flight.aclose()
             return openai_error(502, f"Model `{name}` is not answering: {e}", "bad_gateway", "server_error")
 
         passthrough = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP_BY_HOP}
@@ -193,12 +198,46 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                     yield chunk
             finally:
                 await upstream.aclose()
-                supervisor.touch(name)
+                await in_flight.aclose()
 
         return StreamingResponse(body_iter(), status_code=upstream.status_code, headers=passthrough)
 
     for path in PROXIED:
         app.route(path, methods=["POST"])(proxy_route)
+
+    @app.get("/admin/status")
+    def admin_status(request: Request):
+        if not loopback_only(request):
+            return Response("admin is only served to this machine", status_code=403)
+        return JSONResponse(supervisor.status())
+
+    @app.post("/admin/models/{name}/load")
+    async def admin_load(request: Request, name: str):
+        if not loopback_only(request):
+            return Response("admin is only served to this machine", status_code=403)
+        try:
+            base = await supervisor.ensure_running(name)
+        except UnknownModel:
+            return openai_error(404, f"The model `{name}` is not registered. Run `mst pull {name}`.",
+                                "model_not_found")
+        except StartFailed as e:
+            return openai_error(503, f"Model `{name}` failed to start: {e}", "model_unavailable", "server_error")
+        return JSONResponse({"name": name, "upstream": base})
+
+    @app.post("/admin/models/{name}/stop")
+    async def admin_stop(request: Request, name: str):
+        if not loopback_only(request):
+            return Response("admin is only served to this machine", status_code=403)
+        await supervisor.stop(name)
+        return JSONResponse({"name": name, "state": "cold"})
+
+    @app.post("/admin/shutdown")
+    async def admin_shutdown(request: Request):
+        if not loopback_only(request):
+            return Response("admin is only served to this machine", status_code=403)
+        await supervisor.stop_all()
+        asyncio.get_running_loop().call_later(0.2, lambda: os.kill(os.getpid(), signal.SIGTERM))
+        return JSONResponse({"stopping": True})
 
     @app.get("/openapi.json")
     def openapi(request: Request):
