@@ -323,7 +323,7 @@
     const s = document.createElementNS(ns, "svg");
     s.setAttribute("viewBox", "0 0 16 16"); s.setAttribute("width", "14"); s.setAttribute("height", "14"); s.setAttribute("aria-hidden", "true");
     const p = document.createElementNS(ns, "path");
-    p.setAttribute("d", d); p.setAttribute("stroke", "#424242"); p.setAttribute("stroke-width", "1.5");
+    p.setAttribute("d", d); p.setAttribute("stroke", "currentColor"); p.setAttribute("stroke-width", "1.5");
     s.append(p);
     return s;
   }

@@ -303,6 +303,10 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         base = f"http://{request.headers.get('host', '127.0.0.1')}"
         return JSONResponse({"host": socket.gethostname(), "endpoint": f"{base}/v1", "docs": f"{base}/docs"})
 
+    @app.get("/favicon.ico")
+    def favicon():
+        return Response(status_code=204)  # browsers ask for it; an empty answer keeps their console clean
+
     @app.get("/console")
     def console_page(request: Request):
         if not loopback_only(request):

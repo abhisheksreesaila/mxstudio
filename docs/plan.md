@@ -77,14 +77,14 @@ Blocked: stop the other agents to free RAM, then run `pixi run python scripts/ms
 - [ ] an idle model unloads and comes back on the next request
 - [ ] the same call works from a second device on the LAN
 
-## F-012 Console shell and Models blade [todo]
+## F-012 Console shell and Models blade [done]
 Brief: docs/brief.md · Design: docs/design/console.md · Needs: F-006
-- [ ] `http://127.0.0.1:11435/console` serves the console (loopback-only, refused through a proxy or a foreign Host)
-- [ ] top bar, resource menu (all groups; unbuilt pages say "coming soon"), breadcrumb, command bar
-- [ ] Models grid from `/admin/status` + the store: name, state badge, source, lifecycle, refreshed every 3 s
-- [ ] clicking a model opens the blade: Overview (repo, revision, architecture, state) and Settings (pin, unload after idle) with Apply/Discard, saved through a new `PATCH /admin/models/{name}`
-- [ ] Load and Stop in the command bar and the blade work; a crashed model opens on Logs with its log tail
-- [ ] empty, loading, daemon-down and narrow-screen states as in the handoff
+- [x] `http://127.0.0.1:11435/console` serves the console (loopback-only, refused through a proxy or a foreign Host)
+- [x] top bar, resource menu (all groups; unbuilt pages say "coming soon"), breadcrumb, command bar
+- [x] Models grid from `/admin/status` + the store: name, state badge, source, lifecycle, refreshed every 3 s
+- [x] clicking a model opens the blade: Overview (repo, revision, architecture, state) and Settings (pin, unload after idle) with Apply/Discard, saved through a new `PATCH /admin/models/{name}`
+- [x] Load and Stop in the command bar and the blade work; a crashed model opens on Logs with its log tail
+- [x] empty, loading, daemon-down and narrow-screen states as in the handoff
 
 ## F-013 Overview page with gauges [todo]
 Brief: docs/brief.md · Design: docs/design/console.md (gauges from option B) · Needs: F-012
