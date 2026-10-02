@@ -79,11 +79,12 @@
   }
 
   async function refresh(fromPoll) {
+    const wasDown = !!state.error;
     try {
       state.models = await api("GET", "/admin/models");
       if (state.page === "overview") {
         [state.metrics, state.requests] = await Promise.all([api("GET", "/admin/metrics"), api("GET", "/admin/requests?limit=10")]);
-        if (!state.info || !fromPoll) await loadInfo();
+        if (!state.info || !fromPoll || wasDown) await loadInfo(); // after a restart, uptime starts over
       } else if (state.page === "activity") {
         state.activity = await api("GET", "/admin/requests?limit=200");
       }
@@ -327,7 +328,7 @@
       ["Local endpoint", info.endpoint || "—"],
       ["LAN endpoint", info.lan_endpoint || "not exposed (mst expose)"],
       ["MAX", info.max_version || "unknown"],
-      ["Hardware", gpus.length ? `${gpus.length} × ${gpus[0].name.replace("NVIDIA GeForce ", "")}` : "no NVIDIA GPU found"],
+      ["Hardware", state.error ? "unknown while the daemon is down" : gpus.length ? `${gpus.length} × ${gpus[0].name.replace("NVIDIA GeForce ", "")}` : "no NVIDIA GPU found"],
       ["Daemon", state.error ? "not answering" : `up ${duration2(uptime)}`],
       ["Models", `${loaded} loaded of ${models.length}`],
       ["API keys", `${fmt(info.active_keys)} active`],

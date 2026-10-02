@@ -86,11 +86,11 @@ Brief: docs/brief.md · Design: docs/design/console.md · Needs: F-006
 - [x] Load and Stop in the command bar and the blade work; a crashed model opens on Logs with its log tail
 - [x] empty, loading, daemon-down and narrow-screen states as in the handoff
 
-## F-013 Overview page with gauges [review]
+## F-013 Overview page with gauges [done]
 Brief: docs/brief.md · Design: docs/design/console.md (gauges from option B) · Needs: F-012
-- [ ] the daemon records per-request metrics (model, app, status, prompt/completion tokens, TTFT, duration) in SQLite
-- [ ] Overview shows essentials (endpoints, MAX version, GPUs, daemon uptime, active keys) and gauges for decode tok/s, TTFT p50, GPU memory, requests/min
-- [ ] Recent requests: the last 10 on Overview, the last 200 on Activity log
+- [x] the daemon records per-request metrics (model, app, status, prompt/completion tokens, TTFT, duration) in SQLite
+- [x] Overview shows essentials (endpoints, MAX version, GPUs, daemon uptime, active keys) and gauges for decode tok/s, TTFT p50, GPU memory, requests/min
+- [x] Recent requests: the last 10 on Overview, the last 200 on Activity log
 
 ## F-014 API keys and Network pages [todo]
 Brief: docs/brief.md · Design: docs/design/console.md · Needs: F-012
