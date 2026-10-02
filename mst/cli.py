@@ -138,5 +138,19 @@ def expose_cmd(host: str = typer.Option(None, help="Hostname clients use. Defaul
     typer.echo("           (Linux: sudo trust anchor root.crt · macOS: open it in Keychain Access, set Always Trust)")
 
 
+@app.command("daemon")
+def daemon() -> None:
+    """Run the gateway in the foreground (logs to stdout). Ctrl-C stops it and unloads every model."""
+    import uvicorn
+
+    from mst.gateway import create_app
+    from mst.settings import DAEMON_HOST, DAEMON_PORT
+    from mst.supervisor import Supervisor
+
+    store = Store.open()
+    uvicorn.run(create_app(store, Supervisor(store)), host=DAEMON_HOST, port=DAEMON_PORT,
+                log_level="info")
+
+
 def main() -> None:
     app()
