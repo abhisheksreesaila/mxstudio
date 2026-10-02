@@ -23,7 +23,7 @@ pytest-timeout = ">=2.4.0,<3"
 
 [pypi-dependencies]
 fh-saas = ">=0.9.14, <0.10"
-mxstudio = { path = ".", editable = true }
+hotfire = { path = ".", editable = true }
 
 [feature.gateway.dependencies]
 python = "3.12.*"

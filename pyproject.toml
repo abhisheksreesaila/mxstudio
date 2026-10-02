@@ -1,18 +1,19 @@
 [project]
-name = "mxstudio"
+name = "hotfire"
 version = "0.2.0"
-description = "MX Studio: local models on Modular MAX you can see into and reshape."
+description = "Hotfire: local models on Modular MAX you can see into and reshape."
 requires-python = ">=3.12"
 
 [project.scripts]
-mst = "mst.cli:main"
+hotfire = "hotfire.cli:main"
+mst = "hotfire.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["mst"]
+packages = ["hotfire"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

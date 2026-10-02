@@ -11189,7 +11189,7 @@ packages:
   size: 61218791
   timestamp: 1786082434277
 - pypi: ./
-  name: mxstudio
+  name: hotfire
   requires_python: '>=3.12'
 - pypi: https://files.pythonhosted.org/packages/00/e1/3047b4e244cc78bb598b0d5fcab6632b8bf8a4d526f2e840c4f4de02c989/stripe-15.4.0-py3-none-any.whl
   name: stripe
