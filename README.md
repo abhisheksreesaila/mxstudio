@@ -1,152 +1,158 @@
-# MX Studio
+# MX Studio (`mst`)
 
-Local models on Modular MAX that you can see into and reshape. `mst` serves small
-models behind one secure, OpenAI-compatible endpoint, loads them on demand, unloads
-them when idle, and writes a notebook that teaches you each one.
+Local models on **Modular MAX** that you can see into and reshape.
 
-## Quickstart (`mst`)
+`mst` serves small models behind **one secure, OpenAI-compatible endpoint**. It loads each
+model on its first request, unloads it when idle, and writes a notebook that explains the
+model. If a model's architecture isn't supported yet, it sets up a workspace to port it with
+Modular's own skills.
 
-```bash
-pixi run mst serve qwen2.5-0.5b          # pull, start the daemon, load, print URL + key + snippets
-pixi run mst serve smollm2-1.7b --pin    # stays loaded; others unload after 5 idle minutes
-pixi run mst ls                          # models and live state
-pixi run mst learn qwen2.5-0.5b          # notebook: model card, architecture, parameter breakdown, sample code
-pixi run mst expose                      # https://<host>.local:8443/v1 via Caddy (TLS + key check) and LiteLLM
-pixi run mst keys new my-app             # one key per app; mst keys ls / revoke
-pixi run mst port <hf-repo>              # unsupported architecture: workspace + Modular's import-model skill
-pixi run mst stop --all                  # unload everything and stop the daemon
-```
+- **As easy as Ollama:** `mst serve qwen2.5-0.5b` gives you a working endpoint.
+- **Safe on your network:** HTTPS through Caddy, one revocable key per app, LiteLLM for routing.
+- **Not a black box:** `mst learn` shows the architecture, a parameter breakdown, and where
+  MAX's Python implementation of the model lives so you can read and change it.
 
-The endpoint is `http://127.0.0.1:11435/v1` locally (API reference at `/docs`), and any
-OpenAI client works with it. Architecture: [ADR 0001](docs/adr/0001-mst-core-architecture.md).
-Brief: [docs/brief.md](docs/brief.md). Tickets: [docs/plan.md](docs/plan.md).
+Brief: [docs/brief.md](docs/brief.md) · Tickets: [docs/plan.md](docs/plan.md) ·
+Architecture decision: [docs/adr/0001](docs/adr/0001-mst-core-architecture.md)
 
 ---
 
-## Legacy core (`mxs`, being replaced by `mst`)
+## How it works
 
-
-> ## 🎯 Mission
-> **Make local AI simple:** take a supported Hugging Face or MAX model from
-> discovery to a reproducible, authenticated endpoint—without hiding the MAX,
-> hardware, evidence, or operator decisions underneath.
-
-**One model, one command, a secure endpoint.** MX Studio is a terminal-first
-local AI studio powered by Modular MAX and published through Caddy. It records
-what ran, which immutable model revision was used, and what has actually been
-verified.
-
-## ✅ Current status
-
-**Experimental, with a real local acceptance run completed.** MX Studio has
-resolved and downloaded `Qwen/Qwen2.5-0.5B-Instruct` at immutable revision
-`7ae557604adf67be50417f59c2c2f167def9a775`, generated content through MAX on
-NVIDIA hardware, and installed active Nucleus and Caddy systemd services on
-Arch/Omarchy. The Caddy HTTPS ingress has also answered an authenticated,
-CA-verified request on the LAN address.
-
-🔒 `up` never invokes `sudo` or changes the host. Service installation remains
-an explicit human-approved step. 🌐 The final independent second-device DNS,
-CA-trust, and HTTPS proof is still required before calling a LAN run `ready`.
-Unsupported-model adaptation remains guided, not autonomous.
-
-## Three ways in, one endpoint out
-
-| Starting point | Intended workflow | Available today |
-| --- | --- | --- |
-| ✅ MAX-supported model | Resolve its checkpoint → download → validate → serve → HTTPS URL | `catalog`, `pull`, and `up` use durable run history. Real local MAX generation and server-side Caddy HTTPS proof have completed; second-device acceptance remains. |
-| ✅ Hugging Face model supported by MAX | Inspect compatibility → use the supported MAX architecture → serve → HTTPS URL | General model references and immutable revisions are resolved by the run workflow; support checks become evidence only after actual generation. |
-| 🧭 Hugging Face model not supported by MAX | Skill-driven inspect → implement/adapt → load → compile → generate → compare → fix/retry → serve only after validation | Guided architecture tools exist; autonomous implementation, repair, and evidence-enforced promotion do not. |
-
-Already-supported checkpoints do not need an invented conversion step. Unsupported
-architectures require a real MAX implementation, not just renamed weights or a scaffold.
-
-## Try the current supported-model path
-
-Install [Pixi](https://pixi.sh/), clone this repository, and run from its root.
-`pixi run mxstudio` is the primary CLI; `pixi run mxs` remains a compatible alias.
-
-```bash
-pixi install
-pixi run mxstudio download Qwen/Qwen2.5-0.5B-Instruct
-pixi run mxstudio serve Qwen/Qwen2.5-0.5B-Instruct
-pixi run mxstudio chat "Say hello in one sentence."
-pixi run mxstudio logs --lines 80
-pixi run mxstudio stop
+```
+ your apps ──HTTPS──▶ Caddy :8443 ──▶ LiteLLM :4000 ──▶ mst daemon :11435 ──▶ max serve (one per model)
+ (LAN or local)        │  TLS (own CA)     routing by        on-demand start,     loopback ports,
+                       │  key check ───────▶ /auth/check      idle unload, pin     served by mst name
+                       └ only /v1/models, /v1/chat/completions, /v1/completions, /v1/embeddings
 ```
 
-This legacy path downloads weights and launches real MAX on suitable hardware.
-It is a **localhost smoke test**, not the endpoint workflow.
+| Piece | What it does | Code |
+|---|---|---|
+| **Resolver** | `qwen2.5-0.5b` → HF repo → architecture → is it in MAX's catalog (`max list --json`)? Downloads safetensors at a pinned commit. | `mst/resolve.py` |
+| **Supervisor** (the "hypervisor") | One `max serve` child per model on a free loopback port. Starts it on demand (concurrent callers share one start), stops it after `keep_alive` idle (default 5m) unless pinned, never mid-request. Cleans up orphans after a crash. | `mst/supervisor.py` |
+| **Gateway** (`mst daemon`) | OpenAI-compatible `/v1/*` on `127.0.0.1:11435`. Checks the Bearer key, routes by `model`, streams through, and serves the API reference at `/docs` (Scalar). Admin routes are for the CLI only. | `mst/gateway.py` |
+| **Keys** | `mst-…` keys, one per app, stored only as SHA-256 hashes. Shown once. | `mst/keys.py` |
+| **Expose** | Writes and runs Caddy (`tls internal`, forward_auth) and LiteLLM (its own pixi env, master key, no Postgres) as your user. | `mst/expose.py` |
+| **Learn** | A Jupyter notebook built only from the Hugging Face API: model card, config table, parameter breakdown, sample code, and a pointer to MAX's source. | `mst/learn.py` |
+| **Port** | For unsupported architectures: clones `modular/skills`, picks a donor architecture, and writes `PORT.md` plus the `claude '/import-model …'` command. | `mst/port.py` |
 
-## Durable model-to-endpoint commands
+State lives in `~/.mst/` (override with `MST_HOME`): `mst.db` (models, key hashes), `logs/`,
+`run/`, `notebooks/`, `ports/` and `expose/`. Weights stay in the Hugging Face cache.
+
+---
+
+## Commands
 
 ```bash
-pixi run mxstudio catalog --json
-pixi run mxstudio pull Qwen/Qwen2.5-0.5B-Instruct --no-wait
-pixi run mxstudio runs list
-pixi run mxstudio runs inspect RUN_ID
-pixi run mxstudio up Qwen/Qwen2.5-0.5B-Instruct --local-only
+pixi run mst serve qwen2.5-0.5b              # pull if needed → start daemon → load → print URL, key, curl, Python
+pixi run mst serve smollm2-1.7b --pin        # never unloads
+pixi run mst serve qwen2.5-1.5b --keep-alive 10m
+pixi run mst ls                              # registered models + live state (cold/starting/ready/crashed)
+pixi run mst stop qwen2.5-0.5b               # unload one now
+pixi run mst stop --all                      # unload everything, stop the daemon
+
+pixi run mst pull <name-or-hf-repo> [--dry-run] [--name N]   # resolve + download only
+pixi run mst keys new my-app | ls | revoke my-app            # one key per app (printed once)
+pixi run mst learn qwen2.5-0.5b [--no-open]                  # notebook → Jupyter Lab
+pixi run mst expose [--host box.local] [--no-litellm] | --stop
+pixi run mst port <hf-repo>                                  # workspace for an unsupported architecture
+pixi run mst daemon                                          # the gateway in the foreground (mst serve starts it for you)
 ```
 
-`up` defaults to LAN mode and waits for the run; `--no-wait` only schedules it.
-`--revision`, `--hostname`, and `--ca-file` pin or configure the request.
-`local_ready` proves local generated content only. LAN runs can stop at
-`needs_setup` for a first-time, explicit installer/DNS/CA handoff, then
-`awaiting_client_verification` after server-side HTTPS proof. Neither is `ready`.
-`up` never invokes sudo or applies system changes. See the
-[endpoint guide](docs/MXSTUDIO_NUCLEUS.md) for approval and independent-client
-verification.
+Short names: `qwen2.5-0.5b`, `qwen2.5-1.5b`, `qwen2.5-3b`, `smollm2-1.7b`, `all-minilm-l6`,
+and `llama3.2-1b` (gated: accept the license on HF and set `HF_TOKEN`). Any HF repo id
+works too.
 
-### 🧪 Acceptance evidence so far
+---
 
-| Check | Result |
-| --- | --- |
-| 📦 Immutable model pull | Qwen2.5 0.5B Instruct, revision `7ae557604adf67be50417f59c2c2f167def9a775` |
-| ⚡ MAX inference | Completed locally with authenticated streamed content on NVIDIA hardware |
-| 🛡️ System services | `mxstudio-nucleus.service` and `mxstudio-nucleus-caddy.service` are active |
-| 🔐 HTTPS ingress | Caddy internal-CA TLS served authenticated `/v1/models` on `192.168.50.226:443` |
-| ⏳ LAN completion | Pending a separate LAN device's hostname mapping, CA trust, probe, and imported evidence |
+## Morning checklist: verify it for real
 
-The setup handoff uses a unique protected environment file per run and supplies
-separate read-only dry-run, guarded environment-copy, and explicitly approved
-installer commands. HTTPS verification checks the installed systemd service
-identity/configuration against the run before probing the endpoint.
+Everything below has been built and reviewed, and 175 tests pass against a **fake** `max`. Steps 3 to 6
+are the first runs on real MAX and real hardware. Tick them off in order; each says what you
+should see.
 
-MAX catalog architectures can be queried as `catalog:<exact architecture>`,
-for example `catalog:Qwen2` (case-insensitive exact architecture match). A sole
-HF example resolves to its real repository ID with `source="catalog"`; no
-example is reported as missing, multiple examples return ambiguous candidates
-and require an exact `org/name` (never auto-select), and an unavailable installed
-MAX catalog is reported as blocked.
-Before `up` downloads, known HF dtype/quantization metadata is checked against
-MAX encodings; unsupported/unknown architectures or clear encoding mismatches
-block serving. `pull` can still fetch unsupported architecture/encoding weights
-for later port work while retaining `supported=false`; missing safetensors blocks
-the pull. Compatibility guidance is not runtime proof, and pull failures are
-returned as structured results.
+### 0. Free memory
+Stop the other agents. Three small models need about 8 GB of GPU memory in total (you have
+2× RTX 3090), plus some system RAM while they load.
 
-## 🌐 Finish LAN acceptance
+### 1. Retire the old Nucleus services (needs your password)
+The legacy `mxs` stack still runs as two systemd services on ports 443 and 8080:
 
-The installed endpoint is `https://api.mxstudio.local/v1`. Keep TLS verification
-enabled. On this server and on one **different** LAN device, make the name resolve
-to `192.168.50.226` using your LAN DNS or a deliberate hosts-file entry. On the
-client, trust the Caddy local CA at
-`/var/lib/mxstudio-caddy/caddy/pki/authorities/local/root.crt`, then run the
-endpoint probe and import the resulting client evidence. The deployment record,
-not a local curl alone, is the source of truth for `ready`.
+```bash
+sudo systemctl disable --now mxstudio-nucleus-caddy.service mxstudio-nucleus.service
+sudo rm /etc/systemd/system/mxstudio-nucleus.service /etc/systemd/system/mxstudio-nucleus-caddy.service
+sudo systemctl daemon-reload
+sudo rm -r /etc/mxstudio        # old deployment env files, Caddyfile, install manifests
+```
+✅ `systemctl status mxstudio-nucleus` says *could not be found*, and `ss -ltn | grep ':443 '` is empty.
 
-## Keep the core small
+### 2. Tests (no GPU)
+```bash
+pixi run pytest tests/mst -q
+```
+✅ `175 passed`.
 
-- **Core:** terminal-first, one managed MAX model, FastAPI, SQLite jobs, Caddy for HTTPS.
-- **Optional:** browser Studio, notebooks, benchmarks, and advanced LiteLLM routing.
-- LiteLLM is not needed to serve one model. It does not make this controller run multiple models concurrently.
-- Linux deployment installer: Debian/Ubuntu and Arch/Omarchy x86_64. Apple-Silicon Linux/GPU support is not established.
+### 3. One model, local endpoint
+```bash
+pixi run mst serve qwen2.5-0.5b
+```
+✅ You see `pulled …`, `started the mst daemon`, `loading …`, `qwen2.5-0.5b is ready (Ns)`, then the
+endpoint `http://127.0.0.1:11435/v1`, a key `mst-…` (**save it**: `export MST_API_KEY=mst-…`), and
+a curl and a Python snippet. Paste the curl and expect a JSON reply.
+✅ Open http://127.0.0.1:11435/docs and you should see the API reference.
+❌ If loading fails: the error includes the tail of `~/.mst/logs/qwen2.5-0.5b.log`.
 
-## Documentation
+### 4. Several models, on demand
+```bash
+pixi run mst serve smollm2-1.7b --pin
+pixi run mst serve qwen2.5-1.5b --keep-alive 2m
+pixi run mst ls
+```
+✅ `ls` shows all three as `ready`. Wait 2–3 minutes, run `mst ls` again, and `qwen2.5-1.5b`
+is `cold`, the others aren't. Call it again (curl with `"model": "qwen2.5-1.5b"`) and it comes
+back after a cold start.
 
-- [Mission, current gaps, and completion criteria](docs/ENDPOINT_FIRST.md)
-- [Installation, CLI, apps, and optional Studio experiences](docs/USER_GUIDE.md)
-- [Authenticated endpoint, Caddy, operations, and troubleshooting](docs/MXSTUDIO_NUCLEUS.md)
-- [Architecture and module ownership](docs/MXSTUDIO_ARCHITECTURE.md)
+### 5. Secure LAN endpoint
+```bash
+pixi run mst expose
+```
+✅ It prints `https://<your-host>.local:8443/v1` and the path to Caddy's `root.crt`. Then:
+```bash
+curl --cacert ~/.local/share/caddy/pki/authorities/local/root.crt \
+  https://$(hostname).local:8443/v1/models -H "Authorization: Bearer $MST_API_KEY"
+```
+✅ This lists your models. With a wrong key you get `401`, and
+`https://…:8443/model/info` gives `404`, because LiteLLM's admin API is never exposed.
+✅ LiteLLM's own UI is at http://127.0.0.1:4000/ui (this machine only).
 
-Project licensing has not yet been declared. Model weights retain their publishers' licenses.
+### 6. The whole acceptance run in one script
+```bash
+pixi run python scripts/mst_acceptance.py
+```
+✅ It ends with `N/N checks passed`. That covers chat and streaming on all three models over HTTPS, all three at
+once, a bad key refused, idle unload and reload, and a pinned model staying up. It prints a curl line for
+a **second device**: copy `root.crt` there, run the line, and you get a reply. That proves the LAN path.
+
+### 7. Learn and port
+```bash
+pixi run mst learn qwen2.5-0.5b          # opens Jupyter Lab; run the "Try it" cells with MST_API_KEY set
+pixi run mst port allenai/OLMoE-1B-7B-0125-Instruct   # prints the donor, workspace and Claude command
+```
+✅ The notebook shows the model card, a config table, a parameter breakdown (estimate ≈ actual)
+and MAX's source folder for the architecture. `port` prints a workspace with `PORT.md`.
+
+### When you're done
+```bash
+pixi run mst expose --stop && pixi run mst stop --all
+```
+
+---
+
+## Development
+
+- New code is in `mst/`; tests are in `tests/mst/` and use a fake `max` (`tests/mst/fake_max.py`), so they
+  need no GPU. Run them with `pixi run pytest tests/mst -q`.
+- LiteLLM lives in its own pixi environment: `pixi install -e gateway`.
+- The legacy core (`notebooks/mxstudio`, `mxs` command, old docs) is still in the repo until
+  `mst` has passed the live checks above. It will be removed after that, with your OK.
+- Ports: daemon `MST_PORT` (11435), LiteLLM `MST_LITELLM_PORT` (4000), HTTPS `MST_EXPOSE_PORT` (8443).
