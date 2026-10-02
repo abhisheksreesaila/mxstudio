@@ -29,12 +29,7 @@ def when(t: float | None) -> str:
 def lan_endpoint() -> str | None:
     """https endpoint on the LAN when `mst expose` is running, else None."""
     from mst import expose
-    if not expose.status()["caddy"]:
-        return None
-    try:
-        return f"https://{(expose.expose_dir() / 'host').read_text().strip()}:{expose.EXPOSE_PORT}/v1"
-    except OSError:
-        return None
+    return expose.lan_endpoint()
 
 
 def format_uptime(seconds: int) -> str:

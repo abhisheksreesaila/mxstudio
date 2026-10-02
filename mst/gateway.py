@@ -370,14 +370,9 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         base = f"http://{request.headers.get('host', '127.0.0.1')}"
         from mst import expose
         from mst.port import mst_max_version
-        exposed = expose.status()["caddy"]
-        try:
-            lan_host = (expose.expose_dir() / "host").read_text().strip() if exposed else None
-        except OSError:
-            lan_host = None
         active = sum(1 for k in keys.list_keys(store) if k.revoked_at is None and not k.app.startswith("_"))
         return JSONResponse({"host": socket.gethostname(), "endpoint": f"{base}/v1", "docs": f"{base}/docs",
-                             "lan_endpoint": f"https://{lan_host}:{expose.EXPOSE_PORT}/v1" if lan_host else None,
+                             "lan_endpoint": expose.lan_endpoint(),
                              "max_version": mst_max_version(), "uptime_seconds": round(time.monotonic() - boot),
                              "active_keys": active})
 

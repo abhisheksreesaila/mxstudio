@@ -39,6 +39,16 @@ class ExposeError(Exception):
     pass
 
 
+def lan_endpoint() -> str | None:
+    """https endpoint on the LAN when `mst expose` is running, else None."""
+    if not status()["caddy"]:
+        return None
+    try:
+        return f"https://{(expose_dir() / 'host').read_text().strip()}:{EXPOSE_PORT}/v1"
+    except OSError:
+        return None
+
+
 def default_host() -> str:
     return f"{socket.gethostname()}.local"
 

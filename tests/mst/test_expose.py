@@ -292,3 +292,13 @@ def test_a_port_with_only_time_wait_sockets_counts_as_free(litellm_port):
     client.close()
     server.close()
     assert expose._port_free(litellm_port)
+
+
+def test_lan_endpoint_is_none_until_caddy_runs_then_uses_the_saved_host(monkeypatch):
+    monkeypatch.setattr(expose, "status", lambda: {"caddy": False})
+    assert expose.lan_endpoint() is None
+    monkeypatch.setattr(expose, "status", lambda: {"caddy": True})
+    assert expose.lan_endpoint() is None  # no host file yet
+    expose.expose_dir().mkdir(parents=True, exist_ok=True)
+    (expose.expose_dir() / "host").write_text("box.local\n")
+    assert expose.lan_endpoint() == f"https://box.local:{expose.EXPOSE_PORT}/v1"
