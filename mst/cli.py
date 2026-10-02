@@ -20,6 +20,9 @@ keys_app = typer.Typer(help="Per-app API keys.", no_args_is_help=True)
 app.add_typer(keys_app, name="keys")
 
 
+JSON = typer.Option(False, "--json", help="Print JSON only, for scripts and agents.")
+
+
 def _fail(message: str) -> NoReturn:
     typer.echo(f"error: {message}")
     raise typer.Exit(1)
@@ -31,19 +34,23 @@ def _root() -> None:
 
 
 @app.command("ls")
-def list_models() -> None:
+def list_models(as_json: bool = JSON) -> None:
     """List registered models."""
+    from mst import serve
     models = Store.open().models()
+    states = serve.live_states()
+    if as_json:
+        typer.echo(report.dump(report.models_data(models, states)))
+        return
     if not models:
         typer.echo("no models yet. Try: mst serve qwen2.5-0.5b")
         return
-    from mst import serve
-    states = serve.live_states()
     typer.echo(f"{'NAME':<24} {'STATE':<9} {'SOURCE':<13} {'PINNED':<7} {'KEEP-ALIVE':<10} REPO")
     for m in models:
         keep = "-" if m.pinned else format_duration(m.keep_alive)
         state = states.get(m.name, "-")
         typer.echo(f"{m.name:<24} {state:<9} {m.source:<13} {'yes' if m.pinned else 'no':<7} {keep:<10} {m.repo_id}")
+    typer.echo(f"\nconsole  {report.console_link('models')}")
 
 
 @app.command("set")
@@ -86,16 +93,17 @@ def keys_new(app_name: str = typer.Argument(..., metavar="APP"),
 
 
 @keys_app.command("ls")
-def keys_ls() -> None:
+def keys_ls(as_json: bool = JSON) -> None:
     """List keys (never the secret)."""
     rows = [k for k in keys.list_keys(Store.open()) if not k.app.startswith("_")]  # hide mst's own keys
+    if as_json:
+        typer.echo(report.dump(report.keys_data(rows)))
+        return
     if not rows:
         typer.echo("no keys yet. Try: mst keys new <app>")
         return
 
-    def when(t: float | None) -> str:
-        return "never" if t is None else time.strftime("%Y-%m-%d %H:%M", time.localtime(t))
-
+    when = report.when
     typer.echo(f"{'APP':<20} {'PREFIX':<13} {'CREATED':<17} {'LAST USED':<17} STATUS")
     for k in rows:
         status = "active" if k.revoked_at is None else "revoked"
