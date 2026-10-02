@@ -1,5 +1,31 @@
 # MX Studio
 
+Local models on Modular MAX that you can see into and reshape. `mst` serves small
+models behind one secure, OpenAI-compatible endpoint, loads them on demand, unloads
+them when idle, and writes a notebook that teaches you each one.
+
+## Quickstart (`mst`)
+
+```bash
+pixi run mst serve qwen2.5-0.5b          # pull, start the daemon, load, print URL + key + snippets
+pixi run mst serve smollm2-1.7b --pin    # stays loaded; others unload after 5 idle minutes
+pixi run mst ls                          # models and live state
+pixi run mst learn qwen2.5-0.5b          # notebook: model card, architecture, parameter breakdown, sample code
+pixi run mst expose                      # https://<host>.local:8443/v1 via Caddy (TLS + key check) and LiteLLM
+pixi run mst keys new my-app             # one key per app; mst keys ls / revoke
+pixi run mst port <hf-repo>              # unsupported architecture: workspace + Modular's import-model skill
+pixi run mst stop --all                  # unload everything and stop the daemon
+```
+
+The endpoint is `http://127.0.0.1:11435/v1` locally (API reference at `/docs`), and any
+OpenAI client works with it. Architecture: [ADR 0001](docs/adr/0001-mst-core-architecture.md).
+Brief: [docs/brief.md](docs/brief.md). Tickets: [docs/plan.md](docs/plan.md).
+
+---
+
+## Legacy core (`mxs`, being replaced by `mst`)
+
+
 > ## 🎯 Mission
 > **Make local AI simple:** take a supported Hugging Face or MAX model from
 > discovery to a reproducible, authenticated endpoint—without hiding the MAX,
