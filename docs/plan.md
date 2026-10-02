@@ -92,7 +92,7 @@ Brief: docs/brief.md · Design: docs/design/console.md (gauges from option B) ·
 - [x] Overview shows essentials (endpoints, MAX version, GPUs, daemon uptime, active keys) and gauges for decode tok/s, TTFT p50, GPU memory, requests/min
 - [x] Recent requests: the last 10 on Overview, the last 200 on Activity log
 
-## F-014 API keys and Network pages [todo]
+## F-014 API keys and Network pages [todo] (folded into F-016)
 Brief: docs/brief.md · Design: docs/design/console.md · Needs: F-012
 - [ ] API keys grid (app, prefix, created, last used, status); New key shows the key once in the blade; Revoke with confirmation
 - [ ] Network page shows expose status, LAN URL, the CA path, and Expose/Stop buttons
@@ -105,13 +105,17 @@ Brief: docs/brief.md · Needs: F-013
 - [x] `mst console [page]` opens the console; `mst serve`, `mst ls` and `mst status` print the matching console link
 - [x] `mst status`: daemon, endpoints, models, keys, expose, in one screen
 
-## F-016 Console redesign: icons, colour, Metrics and API pages [todo]
-Brief: docs/brief.md · Design: canvas row 2 (D1–D4) · Needs: F-013, the person's OK on the canvas
-- [ ] Selawik bundled (Segoe UI first in the stack), Fluent UI icons on menu, commands and tiles, coloured service chips
-- [ ] Overview: summary tiles with sparklines, throughput chart, models card, CLI card
-- [ ] Metrics page: time range, per-model series, decode/TTFT/requests/GPU memory charts
-- [ ] API reference page in the console skin replaces /docs (Scalar), with examples using real model names and a Try it box
-
+## F-016 Hotfire Mission Control in Graphite [todo]
+Brief: docs/brief.md · Design: design-system/DESIGN-SYSTEM.md (Graphite) + canvas pages "Graphite · base" and "Graphite · personality" · Needs: F-017
+- [ ] shell: top bar, coloured menu (section hues), status bar, ⌘K palette whose rows run the same actions as the CLI and show the command; themes contrast (default) / light / dark, remembered per browser
+- [ ] Geist + Geist Mono and Lucide icons ship with Hotfire (no CDN); CSP stays `default-src 'self'`
+- [ ] Overview: live strip (a trace per running model), number strip, live tiles (models cycling, activity ticker, network packets, fastest model, gateway, pulling)
+- [ ] Models: table with mini traces + side sheet (trace, keep-loaded, idle timeout, logs, CLI twin); replaces the F-012 grid and blade
+- [ ] Metrics: number blocks, "what you should care about" (rules over the request metrics, no model needed), charts per model
+- [ ] API reference page in the console skin replaces /docs (Scalar)
+- [ ] API keys and Network pages: keys table with new/revoke; the patch-bay diagram from real expose and port data
+- [ ] motion per the design system, all off under prefers-reduced-motion; page transitions between menu pages
+- [ ] later tickets, not this one: Pull page (needs pull progress from the daemon), Benchmarks race (needs `hotfire bench`), Gateway safeguards counters, Ask Hotfire chat
 ## F-017 Rename to Hotfire [doing]
 Brief: docs/brief.md · ADR: docs/adr/0002-name-hotfire.md · Needs: none
 - [ ] Python package `mst/` becomes `hotfire/`; PyPI/project name `hotfire`; commands `hotfire` and `mst` (alias, one release)
