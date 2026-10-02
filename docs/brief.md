@@ -38,10 +38,10 @@ Status: approved
 ## Decisions and trade-offs
 - First user is Abhishek on Omarchy: daily real use; we accept that the public installer waits for v2.
 - v1 = endpoint + thin Learn: passes the acceptance test; we accept the classifier "wow" and dashboards waiting for v2.
-- Name stays MX Studio; the command is `mst`: no clash with Modular's `max` CLI, and the name can grow into a full studio; we accept 'MX' still sounding like Max. Package name stays `mxstudio` (`mst` is taken on PyPI). Never `msty` (a competing local-AI app).
+- Name is **Hotfire** (2026-10-02, ADR 0002), console "Hotfire Mission Control"; command `hotfire`, `mst` kept as an alias for one release. Replaces "MX Studio", which is taken (Moxa MXstudio) and reads as a Modular product.
 - Security = LAN HTTPS + per-app keys: Caddy with its internal CA at https://<host>.local, revocable per-app keys in our own SQLite checked via Caddy forward_auth, LiteLLM routing on its master key only (no Postgres): other devices can use it safely; we accept trusting Caddy's CA once per client device.
 - Lifecycle = load on demand + idle unload (keep_alive-style, with pinning to stay on): register many models without filling RAM; we accept a cold-start wait (30s+) on the first call after idle.
-- Look = new direction, not Terminal Ledger: a flagship identity; we accept a design round before any UI is built.
+- Look = "Graphite" (Geist + Geist Mono, Lucide icons, near-monochrome with colour for live signal and per-section hues, dark-grey contrast chrome) with one signature moment per page (live tiles, pull cloud, patch bay, drag race, safeguards). Canvas: https://claude.ai/artifact/21NSyXKpzcrqanmqr8bEe5
 - Fresh core on fh-saas, porting useful modules (resolver, HF/MAX compat, downloads, notebooks, import-model wiring) from the old FastAPI code: matches the house stack and drops the single-model design and evidence-gate ceremony; we accept rework before new features ship and fh-saas tenancy that a local app barely needs (one local tenant).
 
 ## Open questions
