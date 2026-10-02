@@ -55,7 +55,10 @@ def alive(pid):
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
-    return Path(f"/proc/{pid}/stat").read_text().split()[2] != "Z"
+    try:  # the process can vanish between the kill(0) and this read
+        return Path(f"/proc/{pid}/stat").read_text().split()[2] != "Z"
+    except FileNotFoundError:
+        return False
 
 
 async def wait_dead(pid):
