@@ -23,6 +23,20 @@ CREATE TABLE IF NOT EXISTS models (
     custom_arch_path TEXT,
     created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS requests (
+    id INTEGER PRIMARY KEY,
+    ts REAL NOT NULL,
+    app TEXT,
+    model TEXT,
+    route TEXT NOT NULL,
+    status INTEGER NOT NULL,
+    prompt_tokens INTEGER,
+    completion_tokens INTEGER,
+    ttft_ms REAL,
+    duration_ms REAL NOT NULL,
+    estimated INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS requests_ts ON requests (ts);
 CREATE TABLE IF NOT EXISTS keys (
     app TEXT PRIMARY KEY,
     prefix TEXT NOT NULL,

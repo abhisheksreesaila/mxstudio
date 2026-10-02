@@ -80,3 +80,36 @@ async def test_console_fonts_are_served_locally(http):
         assert f"/console/{font}" in css
         r = await http.get(f"/console/{font}")
         assert r.status_code == 200 and r.headers["content-type"] == "font/woff2" and r.content[:4] == b"wOF2"
+
+
+async def test_requests_are_recorded_with_app_model_and_tokens(http, key):
+    from test_gateway import CHAT, auth
+    await http.post("/v1/chat/completions", json=CHAT, headers=auth(key))
+    await http.post("/v1/chat/completions", json={**CHAT, "stream": True}, headers=auth(key))
+    await http.get("/v1/models", headers=auth("mst-wrong"))
+    rows = (await http.get("/admin/requests", headers=ADMIN)).json()
+    assert [r["status"] for r in rows[:3]] == [401, 200, 200]
+    streamed, plain = rows[1], rows[2]
+    assert plain["app"] == "myapp" and plain["model"] == "tiny" and plain["completion_tokens"] == 12
+    assert streamed["completion_tokens"] == 3 and streamed["estimated"] is True
+    assert streamed["ttft_ms"] is not None and streamed["duration_ms"] >= streamed["ttft_ms"]
+
+
+async def test_overview_metrics_and_info(http, key):
+    from test_gateway import CHAT, auth
+    await http.post("/v1/chat/completions", json=CHAT, headers=auth(key))
+    m = (await http.get("/admin/metrics", headers=ADMIN)).json()
+    assert m["requests"] == 1 and "gpus" in m and "ttft_p50_ms" in m
+    info = (await http.get("/admin/info", headers=ADMIN)).json()
+    assert {"max_version", "uptime_seconds", "active_keys", "lan_endpoint"} <= set(info)
+    assert info["active_keys"] == 1
+    assert (await http.get("/admin/metrics")).status_code == 403
+    assert (await http.get("/admin/requests")).status_code == 403
+
+
+async def test_ttft_and_decode_speed_come_only_from_streamed_replies(http, key):
+    """A non-streamed reply arrives in one piece: its first byte is the whole answer, not the first token."""
+    from test_gateway import CHAT, auth
+    await http.post("/v1/chat/completions", json=CHAT, headers=auth(key))
+    plain = (await http.get("/admin/requests", headers=ADMIN)).json()[0]
+    assert plain["ttft_ms"] is None and plain["completion_tokens"] == 12

@@ -7,6 +7,7 @@ import json
 import os
 import signal
 import socket
+import time
 from pathlib import Path
 
 import httpx
@@ -15,11 +16,12 @@ from fasthtml.common import FastHTML
 from starlette.requests import Request
 from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 
-from mst import keys
+from mst import keys, metrics
 from mst.store import Store, mst_home
 from mst.supervisor import StartFailed, Supervisor, UnknownModel
 
 log = logging.getLogger("mst.gateway")
+ROUTE_NAMES = {"/v1/chat/completions": "chat", "/v1/completions": "completions", "/v1/embeddings": "embeddings"}
 PROXIED = ("/v1/chat/completions", "/v1/completions", "/v1/embeddings")
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 ADMIN_HEADER = "x-mst-admin"
@@ -122,6 +124,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             while True:
                 await asyncio.sleep(reap_interval)
                 try:
+                    metrics.prune(store)
                     await supervisor.reap_idle()
                 except Exception:  # a failed sweep must not end the loop
                     log.exception("idle sweep failed")
@@ -138,6 +141,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             await supervisor.stop_all()
             await proxy.aclose()
 
+    boot = time.monotonic()
     # a literal secret_key stops FastHTML writing a .sesskey file; the gateway uses no sessions
     app = FastHTML(lifespan=lifespan, secret_key="mst-gateway-unused", default_hdrs=False)
     # no read timeout: cold starts and long generations are normal
@@ -178,8 +182,12 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
 
     @app.get("/v1/models")
     def list_models(request: Request):
-        if authenticate(request) is None:
+        started = time.monotonic()
+        app_name = authenticate(request)
+        if app_name is None:
+            note(None, None, "models", 401, started)
             return unauthorized()
+        note(app_name, None, "models", 200, started)
         states = {s["name"]: s for s in supervisor.status()}
         data = [{"id": m.name, "object": "model", "created": 0, "owned_by": "mst",
                  "mst": {"state": states.get(m.name, {}).get("state", "cold"), "repo_id": m.repo_id,
@@ -188,7 +196,11 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         return JSONResponse({"object": "list", "data": data})
 
     async def proxy_route(request: Request):
-        if authenticate(request) is None:
+        started = time.monotonic()
+        route = ROUTE_NAMES[request.url.path]
+        app_name = authenticate(request)
+        if app_name is None:
+            note(None, None, route, 401, started)
             return unauthorized()
         raw = await request.body()
         try:
@@ -197,14 +209,17 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             if not isinstance(name, str):
                 raise TypeError
         except (ValueError, KeyError, TypeError):
+            note(app_name, None, route, 400, started)
             return openai_error(400, "Request body must be JSON with a string `model` field.",
                                 "invalid_request_body")
         try:
             base = await supervisor.ensure_running(name)
         except UnknownModel:
+            note(app_name, name, route, 404, started)
             return openai_error(404, f"The model `{name}` is not registered. Run `mst pull {name}`.",
                                 "model_not_found")
         except StartFailed as e:
+            note(app_name, name, route, 503, started)
             return openai_error(503, f"Model `{name}` failed to start: {e}", "model_unavailable",
                                 "server_error")
         in_flight = contextlib.AsyncExitStack()
@@ -218,17 +233,30 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                 proxy.build_request("POST", target, content=raw, headers=headers), stream=True)
         except httpx.TransportError as e:
             await in_flight.aclose()
+            note(app_name, name, route, 502, started)
             return openai_error(502, f"Model `{name}` is not answering: {e}", "bad_gateway", "server_error")
 
         passthrough = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP_BY_HOP}
 
+        streamed = "text/event-stream" in upstream.headers.get("content-type", "")
+        meter = metrics.StreamMeter() if streamed else metrics.JsonMeter()
+
         async def body_iter():
+            first: float | None = None
             try:
                 async for chunk in upstream.aiter_raw():
+                    if first is None:
+                        first = time.monotonic()
+                    meter.feed(chunk)
                     yield chunk
             finally:
                 await upstream.aclose()
                 await in_flight.aclose()
+                if not streamed:
+                    meter.finish()
+                # TTFT (and so decode speed) only means something when tokens arrive one by one
+                note(app_name, name, route, upstream.status_code, started, meter=meter,
+                     ttft_ms=(first - started) * 1000 if streamed and first is not None else None)
 
         return StreamingResponse(body_iter(), status_code=upstream.status_code, headers=passthrough)
 
@@ -241,6 +269,35 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             return unauthorized()
         return openai_error(404, f"mst does not serve /v1/{path}. Supported: /v1/models, "
                                  + ", ".join(PROXIED) + ".", "unknown_route")
+
+    def note(app_name, model, route, status, started, meter=None, ttft_ms=None):
+        """Record one /v1 request for the console. A metrics failure never fails the request."""
+        try:
+            metrics.record(store, app=app_name, model=model, route=route, status=status,
+                           prompt_tokens=meter.prompt_tokens if meter else None,
+                           completion_tokens=meter.completion_tokens if meter else None,
+                           ttft_ms=ttft_ms, duration_ms=(time.monotonic() - started) * 1000,
+                           estimated=bool(meter and meter.estimated))
+        except Exception:
+            log.exception("could not record request metrics")
+
+    @app.get("/admin/requests")
+    def admin_requests(request: Request):
+        if not admin_only(request):
+            return admin_refused()
+        try:
+            limit = max(1, min(500, int(request.query_params.get("limit", "50"))))
+        except ValueError:
+            limit = 50
+        return JSONResponse(metrics.recent(store, limit))
+
+    @app.get("/admin/metrics")
+    async def admin_metrics(request: Request):
+        if not admin_only(request):
+            return admin_refused()
+        out = metrics.summary(store, window=300)
+        out["gpus"] = await asyncio.to_thread(metrics.gpus)
+        return JSONResponse(out)
 
     def admin_refused() -> Response:
         return Response("admin is only served to this machine", status_code=403)
@@ -301,7 +358,18 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         if not admin_only(request):
             return admin_refused()
         base = f"http://{request.headers.get('host', '127.0.0.1')}"
-        return JSONResponse({"host": socket.gethostname(), "endpoint": f"{base}/v1", "docs": f"{base}/docs"})
+        from mst import expose
+        from mst.port import mst_max_version
+        exposed = expose.status()["caddy"]
+        try:
+            lan_host = (expose.expose_dir() / "host").read_text().strip() if exposed else None
+        except OSError:
+            lan_host = None
+        active = sum(1 for k in keys.list_keys(store) if k.revoked_at is None and not k.app.startswith("_"))
+        return JSONResponse({"host": socket.gethostname(), "endpoint": f"{base}/v1", "docs": f"{base}/docs",
+                             "lan_endpoint": f"https://{lan_host}:{expose.EXPOSE_PORT}/v1" if lan_host else None,
+                             "max_version": mst_max_version(), "uptime_seconds": round(time.monotonic() - boot),
+                             "active_keys": active})
 
     @app.get("/favicon.ico")
     def favicon():

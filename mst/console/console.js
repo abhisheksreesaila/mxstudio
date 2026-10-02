@@ -14,8 +14,6 @@
     { label: "Settings", items: [["gateway", "Gateway (LiteLLM)"], ["daemon", "Daemon"]] },
   ];
   const SOON = {
-    overview: ["Overview", "Gauges for throughput, time to first token, GPU memory and requests are coming next (F-013).", "mst ls"],
-    activity: ["Activity log", "Every request with its app, model, tokens and latency is coming with F-013.", "tail -f ~/.mst/logs/daemon.log"],
     pull: ["Pull a model", "Pulling from the console is coming. For now, from a terminal:", "mst pull qwen2.5-0.5b"],
     ports: ["Ports", "Porting an unsupported architecture starts from a terminal:", "mst port <hugging-face-repo>"],
     keys: ["API keys", "Managing keys here is coming with F-014. For now:", "mst keys ls · mst keys new <app> · mst keys revoke <app>"],
@@ -40,6 +38,9 @@
     busy: false,
     note: "",
     log: "",
+    info: null,
+    metrics: null,
+    requests: null,
   };
 
   // -- tiny DOM helper ------------------------------------------------------------------------
@@ -52,7 +53,7 @@
       else if (k === "style") el.style.cssText = v; // CSSOM, which the console's CSP allows (style="" attributes it blocks)
       else el.setAttribute(k, v === true ? "" : String(v));
     }
-    for (const c of children.flat()) {
+    for (const c of children.flat(Infinity)) {
       if (c === null || c === undefined || c === false) continue;
       el.append(c instanceof Node ? c : document.createTextNode(String(c)));
     }
@@ -78,6 +79,12 @@
   async function refresh(fromPoll) {
     try {
       state.models = await api("GET", "/admin/models");
+      if (state.page === "overview") {
+        [state.metrics, state.requests] = await Promise.all([api("GET", "/admin/metrics"), api("GET", "/admin/requests?limit=10")]);
+        if (!state.info || !fromPoll) await loadInfo();
+      } else if (state.page === "activity") {
+        state.requests = await api("GET", "/admin/requests?limit=200");
+      }
       state.error = null;
     } catch (e) {
       state.error = e;
@@ -88,6 +95,7 @@
   async function loadInfo() {
     try {
       const info = await api("GET", "/admin/info");
+      state.info = info;
       $("host").textContent = `mst@${info.host}`;
       $("crumb-host").textContent = `mst@${info.host}`;
       $("title-host").textContent = `mst@${info.host}`;
@@ -246,9 +254,114 @@
   function renderView(keepFocus) {
     const view = $("view");
     const focused = keepFocus && document.activeElement && document.activeElement.type === "search" && view.contains(document.activeElement);
-    if (state.page === "models") $("title").textContent = "Models";
-    view.replaceChildren(...(state.page === "models" ? renderModels() : renderSoon(state.page)));
+    const pages = { models: ["Models", renderModels], overview: ["Overview", renderOverview], activity: ["Activity log", renderActivity] };
+    const [title, fn] = pages[state.page] || [null, () => renderSoon(state.page)];
+    if (title) $("title").textContent = title;
+    view.replaceChildren(...fn());
     if (focused) { const input = view.querySelector("input[type=search]"); input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  }
+
+  // -- overview and activity -------------------------------------------------------------------
+  const fmt = (v, digits = 0) => (v === null || v === undefined ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: digits }));
+  function niceMax(v, floor) { // the gauge's full scale: `floor`, or the next 1/2/5 × 10^n at or above v
+    if (v <= floor) return floor;
+    const e = 10 ** Math.floor(Math.log10(v));
+    return [1, 2, 5, 10].map((m) => m * e).find((x) => x >= v);
+  }
+  function gauge(label, scope, value, unit, max, note) {
+    const ns = "http://www.w3.org/2000/svg";
+    const el = (tag, attrs) => { const e = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
+    const arc = 213.6; // length of the semicircle below
+    const frac = value === null ? 0 : Math.max(0, Math.min(1, value / max));
+    const svgEl = el("svg", { viewBox: "0 0 160 92", class: "gauge-svg", role: "img", "aria-label": `${label}: ${value === null ? "no data" : fmt(value, 1) + " " + unit}` });
+    svgEl.append(
+      el("path", { d: "M 12 84 A 68 68 0 0 1 148 84", fill: "none", class: "gauge-track", "stroke-width": "10" }),
+      el("path", { d: "M 12 84 A 68 68 0 0 1 148 84", fill: "none", class: "gauge-fill", "stroke-width": "10", "stroke-dasharray": `${(arc * frac).toFixed(1)} ${arc}` }));
+    const big = el("text", { x: "80", y: "72", "text-anchor": "middle", class: "gauge-value" }); big.textContent = value === null ? "—" : fmt(value, value < 10 ? 1 : 0);
+    const small = el("text", { x: "80", y: "88", "text-anchor": "middle", class: "gauge-unit" }); small.textContent = unit;
+    svgEl.append(big, small);
+    return h("div", { class: "gauge" },
+      h("div", { class: "gauge-head" }, h("span", {}, label), h("span", { class: "mono" }, scope)),
+      svgEl,
+      h("div", { class: "gauge-foot mono" }, h("span", {}, "0"), h("span", {}, note), h("span", {}, fmt(max))));
+  }
+  function duration2(seconds) {
+    if (seconds === null || seconds === undefined) return "—";
+    const d = Math.floor(seconds / 86400), hh = Math.floor(seconds % 86400 / 3600), mm = Math.floor(seconds % 3600 / 60);
+    return d ? `${d}d ${hh}h` : hh ? `${hh}h ${mm}m` : `${mm}m ${Math.floor(seconds % 60)}s`;
+  }
+  function requestsTable(rows, compact) {
+    if (!rows || rows.length === 0) {
+      return h("div", { class: "empty" }, h("h2", {}, "No requests yet"),
+        h("p", {}, "Requests to /v1 show up here: which app, which model, tokens and latency."),
+        h("div", { class: "code" }, "curl http://127.0.0.1:11435/v1/models -H 'Authorization: Bearer $MST_API_KEY'"));
+    }
+    const time = (ts) => new Date(ts * 1000).toLocaleTimeString([], { hour12: false });
+    const tokens = (r) => r.completion_tokens === null ? "—" : `${fmt(r.prompt_tokens)} → ${r.estimated ? "~" : ""}${fmt(r.completion_tokens)}`;
+    return h("table", { class: "grid static" },
+      h("thead", {}, h("tr", {}, ["Time", "App", "Model", "Route", "Status", "Tokens in → out", "TTFT", compact ? null : "Duration"].filter(Boolean).map((t) => h("th", {}, t)))),
+      h("tbody", {}, rows.map((r) => h("tr", {},
+        h("td", { class: "mono" }, time(r.ts)),
+        h("td", {}, r.app || h("span", { class: "muted" }, "no key")),
+        h("td", { class: "mono" }, r.model || "—"),
+        h("td", { class: "mono" }, r.route),
+        h("td", { class: `mono ${r.status < 400 ? "ok" : "bad"}` }, String(r.status)),
+        h("td", { class: "mono", title: r.estimated ? "~ counted from streamed chunks" : null }, tokens(r)),
+        h("td", { class: "mono" }, r.ttft_ms === null ? "—" : `${fmt(r.ttft_ms)} ms`),
+        compact ? null : h("td", { class: "mono" }, `${fmt(r.duration_ms)} ms`)))));
+  }
+  function renderOverview() {
+    const m = state.metrics, info = state.info || {};
+    if (!m) return [h("div", { class: "soon" }, h("p", {}, "Loading…"))];
+    const models = state.models || [];
+    const loaded = models.filter((x) => x.state === "ready").length;
+    const gpus = m.gpus || [];
+    const usedGb = gpus.reduce((a, g) => a + g.used_mb, 0) / 1024, totalGb = gpus.reduce((a, g) => a + g.total_mb, 0) / 1024;
+    const essentials = [
+      ["Local endpoint", info.endpoint || "—"],
+      ["LAN endpoint", info.lan_endpoint || "not exposed (mst expose)"],
+      ["MAX", info.max_version || "unknown"],
+      ["Hardware", gpus.length ? `${gpus.length} × ${gpus[0].name.replace("NVIDIA GeForce ", "")}` : "no NVIDIA GPU found"],
+      ["Daemon", `up ${duration2(info.uptime_seconds)}`],
+      ["Models", `${loaded} loaded of ${models.length}`],
+      ["API keys", `${fmt(info.active_keys)} active`],
+      ["API reference", info.docs || "/docs"],
+    ];
+    const byModel = Object.entries(m.by_model || {});
+    return [
+      h("div", { class: "commands", role: "toolbar", "aria-label": "Overview commands" },
+        h("button", { class: "cmd", type: "button", onClick: () => { location.hash = "models"; } }, "Go to models"),
+        h("button", { class: "cmd", type: "button", onClick: () => { location.hash = "activity"; } }, "Activity log"),
+        h("button", { class: "cmd", type: "button", onClick: () => refresh() }, "Refresh")),
+      h("section", { class: "essentials", "aria-label": "Essentials" }, h("h2", { class: "section-title" }, "Essentials"),
+        h("dl", { class: "essentials-grid" }, essentials.map(([k, v]) => [h("dt", {}, k), h("dd", { class: "mono" }, v)]))),
+      h("section", { "aria-label": "Live gauges" }, h("h2", { class: "section-title" }, "Last 5 minutes"),
+        h("div", { class: "gauges" },
+          gauge("Decode throughput", "p50, all models", m.decode_tps_p50, "tok/s", niceMax(m.decode_tps_p50 || 0, 100), `${fmt(m.requests)} requests`),
+          gauge("Time to first token", "p50", m.ttft_p50_ms, "ms", niceMax(m.ttft_p50_ms || 0, 200), m.ttft_p95_ms === null ? "p95 —" : `p95 ${fmt(m.ttft_p95_ms)} ms`),
+          gauge("GPU memory", gpus.length ? `${gpus.length} GPU${gpus.length > 1 ? "s" : ""}` : "none", gpus.length ? usedGb : null, "GB", Math.max(1, Math.round(totalGb)), gpus.map((g) => `GPU ${g.index} ${g.util}%`).join(" · ") || "—"),
+          gauge("Requests", "per minute", m.per_minute, "req/min", niceMax(m.per_minute || 0, 10), `${(m.error_rate * 100).toFixed(1)}% errors`))),
+      byModel.length ? h("section", { "aria-label": "By model" }, h("h2", { class: "section-title" }, "By model"),
+        h("table", { class: "grid static" },
+          h("thead", {}, h("tr", {}, ["Model", "Requests", "Errors", "TTFT p50", "TTFT p95", "Decode p50"].map((t) => h("th", {}, t)))),
+          h("tbody", {}, byModel.map(([name, s]) => h("tr", {},
+            h("td", { class: "mono" }, name), h("td", { class: "mono" }, fmt(s.requests)), h("td", { class: "mono" }, fmt(s.errors)),
+            h("td", { class: "mono" }, s.ttft_p50_ms === null ? "—" : `${fmt(s.ttft_p50_ms)} ms`),
+            h("td", { class: "mono" }, s.ttft_p95_ms === null ? "—" : `${fmt(s.ttft_p95_ms)} ms`),
+            h("td", { class: "mono" }, s.decode_tps_p50 === null ? "—" : `${fmt(s.decode_tps_p50)} tok/s`)))))) : null,
+      h("section", { "aria-label": "Recent requests" },
+        h("div", { class: "section-row" }, h("h2", { class: "section-title" }, "Recent requests"), h("a", { href: "#activity" }, "View all")),
+        requestsTable(state.requests, true)),
+    ].filter(Boolean);
+  }
+  function renderActivity() {
+    if (state.requests === null) return [h("div", { class: "soon" }, h("p", {}, "Loading…"))];
+    return [
+      h("div", { class: "commands", role: "toolbar", "aria-label": "Activity commands" },
+        h("button", { class: "cmd", type: "button", onClick: () => refresh() }, "Refresh")),
+      h("p", { class: "subtitle" }, "The last 200 requests to /v1. Kept for 7 days. ~ means tokens were counted from streamed chunks."),
+      requestsTable(state.requests, false),
+    ];
   }
 
   function renderBanner() {
@@ -337,7 +450,7 @@
   }
 
   // -- wiring ---------------------------------------------------------------------------------
-  window.addEventListener("hashchange", () => { state.page = location.hash.slice(1) || "models"; render(); });
+  window.addEventListener("hashchange", () => { state.page = location.hash.slice(1) || "models"; render(); refresh(); });
   document.querySelector("[data-action=toggle-menu]").addEventListener("click", (e) => {
     const open = $("menu").classList.toggle("open");
     e.currentTarget.setAttribute("aria-expanded", open ? "true" : "false");

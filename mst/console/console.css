@@ -80,6 +80,29 @@ h1 { margin: 4px 0 2px; font-size: 22px; font-weight: 600; }
 .menu-filter input { width: 100%; height: 28px; border: 1px solid var(--input-border); border-radius: 2px; padding: 0 8px; font-size: 13px; }
 .skeleton td span { display: block; height: 12px; background: var(--line-soft); }
 
+/* overview */
+.section-title { font-size: 15px; font-weight: 600; margin: 22px 0 8px; }
+.section-row { display: flex; align-items: baseline; gap: 12px; }
+.section-row a { font-size: 13px; }
+.essentials { background: var(--surface); border: 1px solid var(--line); padding: 0 16px 12px; }
+.essentials .section-title { margin-top: 12px; }
+.essentials-grid { display: grid; grid-template-columns: 140px minmax(0, 1fr) 140px minmax(0, 1fr); row-gap: 8px; column-gap: 12px; margin: 0; }
+.essentials-grid dt { color: var(--muted); }
+.essentials-grid dd { margin: 0; word-break: break-all; }
+.gauges { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--surface); border: 1px solid var(--line); }
+.gauge { padding: 12px 14px 10px; border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; }
+.gauge:last-child { border-right: 0; }
+.gauge-head, .gauge-foot { align-self: stretch; display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+.gauge-foot { font-size: 11.5px; }
+.gauge-svg { width: 100%; max-width: 200px; height: auto; margin: 4px 0; }
+.gauge-track { stroke: var(--line-soft); }
+.gauge-fill { stroke: var(--accent); }
+.gauge-value { fill: var(--text); font-family: var(--mono); font-size: 24px; }
+.gauge-unit { fill: var(--muted); font-family: var(--mono); font-size: 10px; }
+.grid.static tbody tr { cursor: default; }
+.grid td.ok { color: var(--ok); } .grid td.bad { color: var(--bad-text); font-weight: 600; }
+.muted { color: var(--muted); }
+
 /* empty / notices */
 .empty { background: var(--surface); border: 1px solid var(--line); padding: 32px; text-align: center; }
 .empty h2 { margin: 0 0 6px; font-size: 18px; }
@@ -131,5 +154,10 @@ h1 { margin: 4px 0 2px; font-size: 22px; font-weight: 600; }
   .page { padding: 12px 16px 24px; }
   .filters input { width: 100%; }
   .grid .col-wide { display: none; }
+  .gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gauge:nth-child(2) { border-right: 0; }
+  .gauge:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .essentials-grid { grid-template-columns: 120px minmax(0, 1fr); }
+  .grid.static { display: block; overflow-x: auto; }
   .blade { position: fixed; inset: 40px 0 0 0; width: auto; height: auto; z-index: 5; }
 }
