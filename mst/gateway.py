@@ -252,6 +252,8 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
     async def admin_stop(request: Request, name: str):
         if not admin_only(request):
             return Response("admin is only served to this machine", status_code=403)
+        if store.get_model(name) is None:
+            return openai_error(404, f"The model `{name}` is not registered.", "model_not_found")
         await supervisor.stop(name)
         return JSONResponse({"name": name, "state": "cold"})
 

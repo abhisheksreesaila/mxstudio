@@ -231,9 +231,12 @@ def start(*, host: str, litellm: bool = True, store: Store | None = None) -> dic
 
 
 def _port_free(port: int) -> bool:
+    """Only a live listener makes a port busy; TIME_WAIT leftovers don't stop LiteLLM (uvicorn reuses them)."""
     with socket.socket() as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             s.bind(("127.0.0.1", port))
+            s.listen()
         except OSError:
             return False
     return True

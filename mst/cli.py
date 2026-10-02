@@ -168,6 +168,11 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
                 no_wait: bool = typer.Option(False, "--no-wait", help="Register and start the daemon; load on first request.")) -> None:
     """Pull if needed, start the daemon, load the model and print how to call it."""
     from mst import expose, serve
+    try:  # before any download: a typo shouldn't cost gigabytes first
+        seconds = parse_duration(keep_alive) if keep_alive else None
+    except ValueError:
+        typer.echo(f"error: --keep-alive {keep_alive!r} is not a duration (try 90s, 10m or 1h)")
+        raise typer.Exit(1)
     store = Store.open()
     found = store.get_model(model) or next((m for m in store.models() if m.repo_id == model), None)
     if found is None:
@@ -180,13 +185,12 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
             typer.echo(f"error: {e}")
             raise typer.Exit(1)
         typer.echo(f"pulled {found.name} ({found.repo_id}@{found.revision[:8]})")
-        expose.refresh_if_running(store)
+        try:
+            if expose.refresh_if_running(store):
+                typer.echo("restarted LiteLLM so the LAN endpoint lists it")
+        except expose.ExposeError as e:
+            typer.echo(f"warning: could not refresh the LAN endpoint ({e}). Run: mst expose")
     name = found.name
-    try:
-        seconds = parse_duration(keep_alive) if keep_alive else None
-    except ValueError:
-        typer.echo(f"error: --keep-alive {keep_alive!r} is not a duration (try 90s, 10m or 1h)")
-        raise typer.Exit(1)
     if pin or seconds is not None:
         store.set_lifecycle(name, pinned=pin, keep_alive=seconds)
     try:

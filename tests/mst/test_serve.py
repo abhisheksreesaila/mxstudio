@@ -135,3 +135,20 @@ def test_bad_keep_alive_is_a_one_line_error(daemon_env):
 def test_stop_without_daemon_is_calm(daemon_env):
     assert runner.invoke(app, ["stop", "tiny"]).exit_code == 0
     assert runner.invoke(app, ["stop", "--all"]).exit_code == 0
+
+
+def test_a_bad_keep_alive_is_refused_before_any_download(monkeypatch):
+    from mst import resolve
+    def boom(*a, **k):
+        raise AssertionError("pull must not run")
+    monkeypatch.setattr(resolve, "pull", boom)
+    result = runner.invoke(app, ["serve", "not-registered", "--keep-alive", "10mm"])
+    assert result.exit_code == 1 and "keep-alive" in result.output
+    for bad in ["-5m", "infm"]:
+        assert runner.invoke(app, ["serve", "not-registered", "--keep-alive", bad]).exit_code == 1
+
+
+def test_stopping_an_unknown_model_says_so(daemon_env):
+    runner.invoke(app, ["serve", "tiny", "--no-wait"])
+    result = runner.invoke(app, ["stop", "typo"])
+    assert result.exit_code == 1 and "not registered" in result.output

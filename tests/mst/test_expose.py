@@ -277,3 +277,18 @@ def test_reserved_key_names_are_a_one_line_error():
     result = runner.invoke(app, ["keys", "new", "_litellm"])
     assert result.exit_code == 1
     assert "reserved" in result.output
+
+
+def test_a_port_with_only_time_wait_sockets_counts_as_free(litellm_port):
+    """After LiteLLM served Caddy and was stopped, its port sits in TIME_WAIT; a restart must still work."""
+    import socket
+    server = socket.socket()
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(("127.0.0.1", litellm_port))
+    server.listen()
+    client = socket.create_connection(("127.0.0.1", litellm_port))
+    conn, _ = server.accept()
+    conn.close()  # the server side closes first, leaving TIME_WAIT on the listening port
+    client.close()
+    server.close()
+    assert expose._port_free(litellm_port)

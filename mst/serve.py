@@ -23,7 +23,8 @@ class DaemonError(Exception):
 def daemon_running() -> bool:
     try:
         r = httpx.get(f"{daemon_url()}/health", timeout=1.0)
-        return r.status_code == 200 and r.json().get("service") == "mst"
+        body = r.json()
+        return r.status_code == 200 and isinstance(body, dict) and body.get("service") == "mst"
     except (httpx.HTTPError, ValueError):
         return False
 
@@ -44,6 +45,8 @@ def ensure_daemon(timeout: float = 30.0) -> bool:
         if proc.poll() is not None:
             break
         time.sleep(0.1)
+    if daemon_running():  # lost a start race to another `mst serve`; its daemon is fine
+        return False
     tail = (logs / "daemon.log").read_text(errors="replace")[-600:]
     raise DaemonError(f"the mst daemon did not start. Last log lines ({logs / 'daemon.log'}):\n{tail}")
 

@@ -1,6 +1,7 @@
 """The one SQLite file that remembers registered models and per-app keys."""
 from __future__ import annotations
 
+import math
 import os
 import sqlite3
 import time
@@ -125,6 +126,8 @@ def parse_duration(text: str) -> int:
     """'90s', '10m', '1h' or a bare number of seconds."""
     text = text.strip().lower()
     units = {"s": 1, "m": 60, "h": 3600}
-    if text and text[-1] in units:
-        return int(float(text[:-1]) * units[text[-1]])
-    return int(text)
+    number, unit = (text[:-1], units[text[-1]]) if text and text[-1] in units else (text, 1)
+    value = float(number) * unit
+    if not math.isfinite(value) or value < 0:
+        raise ValueError(f"{text!r} is not a duration")
+    return int(value)
