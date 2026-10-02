@@ -23,3 +23,12 @@ jupyterlab = ">=4.6.4,<5"
 [pypi-dependencies]
 fh-saas = ">=0.9.14, <0.10"
 mxstudio = { path = ".", editable = true }
+
+[feature.gateway.dependencies]
+python = "3.12.*"
+
+[feature.gateway.pypi-dependencies]
+litellm = { version = ">=1.80", extras = ["proxy"] }
+
+[environments]
+gateway = { features = ["gateway"], no-default-feature = true }
