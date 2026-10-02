@@ -96,3 +96,18 @@ Brief: docs/brief.md · Design: docs/design/console.md (gauges from option B) ·
 Brief: docs/brief.md · Design: docs/design/console.md · Needs: F-012
 - [ ] API keys grid (app, prefix, created, last used, status); New key shows the key once in the blade; Revoke with confirmation
 - [ ] Network page shows expose status, LAN URL, the CA path, and Expose/Stop buttons
+
+## F-015 Command-line parity for agents [todo]
+Brief: docs/brief.md · Needs: F-013
+- [ ] `mst set <model> --pin | --unpin | --keep-alive 10m` changes any setting the console has
+- [ ] `--json` on every read command: `mst ls`, `mst keys ls`, `mst metrics`, `mst requests`, `mst status`
+- [ ] `mst metrics [--range 5m|1h|24h|7d]` and `mst requests [--limit N]` print the console's numbers as a table
+- [ ] `mst console [page]` opens the console; `mst serve`, `mst ls` and `mst status` print the matching console link
+- [ ] `mst status`: daemon, endpoints, models, keys, expose, in one screen
+
+## F-016 Console redesign: icons, colour, Metrics and API pages [todo]
+Brief: docs/brief.md · Design: canvas row 2 (D1–D4) · Needs: F-013, the person's OK on the canvas
+- [ ] Selawik bundled (Segoe UI first in the stack), Fluent UI icons on menu, commands and tiles, coloured service chips
+- [ ] Overview: summary tiles with sparklines, throughput chart, models card, CLI card
+- [ ] Metrics page: time range, per-model series, decode/TTFT/requests/GPU memory charts
+- [ ] API reference page in the console skin replaces /docs (Scalar), with examples using real model names and a Try it box
