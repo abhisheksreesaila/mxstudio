@@ -1,6 +1,8 @@
 """`mst`: the MX Studio command line."""
 from __future__ import annotations
 
+import subprocess
+
 import typer
 
 from mst.store import Store, format_duration
@@ -25,6 +27,25 @@ def list_models() -> None:
     for m in models:
         keep = "-" if m.pinned else format_duration(m.keep_alive)
         typer.echo(f"{m.name:<24} {m.source:<13} {'yes' if m.pinned else 'no':<7} {keep:<10} {m.repo_id}")
+
+
+@app.command("learn")
+def learn_model(
+    model: str = typer.Argument(..., help="A registered model name or a Hugging Face repo id."),
+    no_open: bool = typer.Option(False, "--no-open", help="Write the notebook but don't launch Jupyter Lab."),
+) -> None:
+    """Build a notebook about a model from Hugging Face metadata and open it in Jupyter Lab."""
+    from mst import learn
+    try:
+        path = learn.write_notebook(model)
+    except Exception as exc:
+        typer.echo(f"could not build a notebook for {model}: {exc}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"wrote {path}")
+    if not no_open:
+        subprocess.Popen(["jupyter", "lab", str(path)], start_new_session=True,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        typer.echo("opening in Jupyter Lab")
 
 
 def main() -> None:
