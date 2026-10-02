@@ -4,9 +4,12 @@ from __future__ import annotations
 import math
 import os
 import sqlite3
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+
+from hotfire.settings import env
 
 DEFAULT_KEEP_ALIVE = 300  # seconds, like Ollama's keep_alive
 
@@ -48,8 +51,21 @@ CREATE TABLE IF NOT EXISTS keys (
 """
 
 
-def mst_home() -> Path:
-    home = Path(os.environ.get("MST_HOME", Path.home() / ".mst")).expanduser()
+def _migrate_legacy_home(new: Path) -> None:
+    """Move ~/.mst to ~/.hotfire once, when only the old folder exists."""
+    old = Path.home() / ".mst"
+    if not new.exists() and old.is_dir():
+        old.rename(new)
+        print(f"hotfire: moved {old} to {new}", file=sys.stderr)
+
+
+def hotfire_home() -> Path:
+    configured = env("HOME")
+    if configured:
+        home = Path(configured).expanduser()
+    else:
+        home = Path.home() / ".hotfire"
+        _migrate_legacy_home(home)
     home.mkdir(parents=True, exist_ok=True)
     home.chmod(0o700)
     return home
@@ -86,7 +102,7 @@ class Store:
 
     @classmethod
     def open(cls) -> "Store":
-        return cls(mst_home() / "mst.db")
+        return cls(hotfire_home() / "mst.db")
 
     def add_model(self, *, name: str, repo_id: str, revision: str, source: str,
                   architecture: str, weights_path: str | None = None,

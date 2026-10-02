@@ -7,7 +7,7 @@ from fakes import CATALOG, make_hf
 from typer.testing import CliRunner
 
 from hotfire import cli, port
-from hotfire.store import Store, mst_home
+from hotfire.store import Store, hotfire_home
 
 runner = CliRunner()
 
@@ -41,7 +41,7 @@ class Runner:
 def test_ensure_skills_clones_then_pulls():
     r = Runner()
     path = port.ensure_skills(runner=r)
-    assert path == mst_home() / "skills" / "modular"
+    assert path == hotfire_home() / "skills" / "modular"
     assert r.calls[0][:4] == ["git", "clone", "--depth", "1"]
     assert port.list_skills(path) == ["debug-model", "import-model"]
     port.ensure_skills(runner=r)
@@ -70,7 +70,7 @@ def test_pick_donor_falls_back_to_llama():
 
 
 def fake_fetch(repo_id, revision):
-    p = mst_home() / "dl-config.json"
+    p = hotfire_home() / "dl-config.json"
     p.write_text(json.dumps({"architectures": ["WeirdForCausalLM"], "model_type": "weird",
                              "hidden_size": 64, "num_hidden_layers": 2, "vocab_size": 10, "extra": 1}))
     return p
@@ -83,7 +83,7 @@ def test_prepare_creates_workspace(tmp_path):
     res = port.prepare("acme/weird", catalog=CAT, hf=make_hf(), runner=Runner(),
                        fetch_config=fake_fetch, arch_dir=archs)
     ws = res.workspace
-    assert ws == mst_home() / "ports" / "weird"
+    assert ws == hotfire_home() / "ports" / "weird"
     assert json.loads((ws / "config.json").read_text())["model_type"] == "weird"
     md = (ws / "PORT.md").read_text()
     for needle in ("WeirdForCausalLM", "acme/weird", "abc123", "hidden_size", "LlamaForCausalLM",
@@ -100,7 +100,7 @@ def test_prepare_creates_workspace(tmp_path):
 def test_prepare_supported_model_makes_no_workspace():
     res = port.prepare("qwen2.5-0.5b", catalog=CATALOG, hf=make_hf(), runner=Runner(), fetch_config=fake_fetch)
     assert res.workspace is None and "mst pull" in res.message
-    assert not (mst_home() / "ports").exists()
+    assert not (hotfire_home() / "ports").exists()
 
 
 def make_port(d, with_arch=True):

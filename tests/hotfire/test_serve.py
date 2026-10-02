@@ -24,8 +24,8 @@ def free_port() -> int:
 @pytest.fixture
 def daemon_env(monkeypatch):
     port = free_port()
-    monkeypatch.setenv("MST_PORT", str(port))
-    monkeypatch.setenv("MST_MAX_CMD", shlex.join([sys.executable, FAKE]))
+    monkeypatch.setenv("HOTFIRE_PORT", str(port))
+    monkeypatch.setenv("HOTFIRE_MAX_CMD", shlex.join([sys.executable, FAKE]))
     Store.open().add_model(name="tiny", repo_id="org/tiny", revision="abc123", source="hf-supported",
                            architecture="Qwen2ForCausalLM")
     yield f"http://127.0.0.1:{port}"
@@ -33,8 +33,8 @@ def daemon_env(monkeypatch):
 
 
 def mst_home_path() -> Path:
-    from hotfire.store import mst_home
-    return mst_home()
+    from hotfire.store import hotfire_home
+    return hotfire_home()
 
 
 def key_from(output: str) -> str:

@@ -53,11 +53,11 @@ async def test_crashed_leader_group_is_killed_on_stop(sup, monkeypatch, tmp_path
     assert await wait_dead(gpid)
 
 
-async def test_pid_files_are_per_child(sup, mst_home):  # noqa: F811
+async def test_pid_files_are_per_child(sup, hotfire_home):  # noqa: F811
     await sup.ensure_running("tiny")
     old = st(sup)["pid"]
     await sup.stop("tiny")
     await sup.ensure_running("tiny")
     new = st(sup)["pid"]
     assert old != new
-    assert {p.name for p in (mst_home / "run").glob("*.pid")} == {f"tiny.{new}.pid"}
+    assert {p.name for p in (hotfire_home / "run").glob("*.pid")} == {f"tiny.{new}.pid"}

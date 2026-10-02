@@ -37,10 +37,10 @@ def test_full_repo_id_of_curated_model_uses_alias():
 
 
 @pytest.mark.parametrize("output", ["", "not json", "{}", '{"architectures": {}}'])
-def test_invalid_catalog_is_not_cached(mst_home, output):
+def test_invalid_catalog_is_not_cached(hotfire_home, output):
     with pytest.raises(r.ResolveError):
         r.load_catalog(runner=lambda: output)
-    assert not (mst_home / "max_catalog.json").exists()
+    assert not (hotfire_home / "max_catalog.json").exists()
 
 
 def test_missing_max_binary_is_a_resolve_error(monkeypatch):

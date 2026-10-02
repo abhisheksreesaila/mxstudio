@@ -10,7 +10,7 @@ runner = CliRunner()
 
 
 def test_status_without_daemon_says_so_and_json_is_only_json(monkeypatch):
-    monkeypatch.setenv("MST_PORT", "1")
+    monkeypatch.setenv("HOTFIRE_PORT", "1")
     out = runner.invoke(app, ["status"]).output
     assert "not running" in out and "not exposed" in out and "http://127.0.0.1:1/console" in out
     data = json.loads(runner.invoke(app, ["status", "--json"]).output)

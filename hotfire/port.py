@@ -1,7 +1,7 @@
 """`mst port`: set up a workspace for bringing an architecture MAX does not support into MAX.
 
 Modular publishes agent skills (github.com/modular/skills) for this; we keep a clone in
-MST_HOME/skills/modular, make a workspace with the model's config and a PORT.md naming the
+HOTFIRE_HOME/skills/modular, make a workspace with the model's config and a PORT.md naming the
 closest supported "donor" architecture, and print the command that starts Claude Code there.
 Ported in simplified form from notebooks/mxstudio/architectures.py.
 """
@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Callable
 
 from hotfire import resolve
-from hotfire.store import Model, Store, mst_home
+from hotfire.store import Model, Store, hotfire_home
 
 SKILLS_REPO = "https://github.com/modular/skills"
 ENTRY_SKILL = "import-model"
@@ -58,9 +58,9 @@ def list_skills(root: Path) -> list[str]:
 
 
 def ensure_skills(*, runner: Runner | None = None) -> Path:
-    """Clone Modular's skills into MST_HOME/skills/modular, or fast-forward an existing clone."""
+    """Clone Modular's skills into HOTFIRE_HOME/skills/modular, or fast-forward an existing clone."""
     runner = runner or _run
-    dest = mst_home() / "skills" / "modular"
+    dest = hotfire_home() / "skills" / "modular"
     if (dest / ".git").exists():
         code, out = runner(["git", "pull", "--ff-only"], cwd=dest)
         if code != 0 and not list_skills(dest):
@@ -315,7 +315,7 @@ def prepare(ref: str, *, catalog: dict | None = None, hf=None, runner: Runner | 
     skills = list_skills(skills_root)
     if ENTRY_SKILL not in skills:
         raise PortError(f"Modular's skills in {skills_root} have no {ENTRY_SKILL} skill")
-    workspace = mst_home() / "ports" / _workspace_name(ref, res.repo_id)
+    workspace = hotfire_home() / "ports" / _workspace_name(ref, res.repo_id)
     workspace.mkdir(parents=True, exist_ok=True)
     cfg_path = (fetch_config or _download_config)(res.repo_id, res.revision)
     shutil.copyfile(cfg_path, workspace / "config.json")

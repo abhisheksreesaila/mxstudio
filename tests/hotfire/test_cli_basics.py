@@ -12,11 +12,11 @@ def test_help_lists_core_commands():
     assert "ls" in result.output
 
 
-def test_ls_with_no_models_says_so(mst_home):
+def test_ls_with_no_models_says_so(hotfire_home):
     result = runner.invoke(app, ["ls"])
     assert result.exit_code == 0
     assert "no models yet" in result.output
-    assert (mst_home / "mst.db").exists()
+    assert (hotfire_home / "mst.db").exists()
 
 
 def test_ls_shows_registered_models():

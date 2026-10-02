@@ -72,7 +72,7 @@ def test_pull_unsupported_downloads_nothing():
     assert hf.downloads == [] and store.models() == []
 
 
-def test_catalog_is_cached_in_mst_home(mst_home):
+def test_catalog_is_cached_in_mst_home(hotfire_home):
     calls = []
 
     def runner():
@@ -82,6 +82,6 @@ def test_catalog_is_cached_in_mst_home(mst_home):
     assert r.load_catalog(runner=runner) == CATALOG
     assert r.load_catalog(runner=runner) == CATALOG
     assert len(calls) == 1
-    assert (mst_home / "max_catalog.json").exists()
+    assert (hotfire_home / "max_catalog.json").exists()
     r.load_catalog(runner=runner, refresh=True)
     assert len(calls) == 2

@@ -79,10 +79,10 @@ async def test_sweep_orphans_kills_children_of_a_dead_daemon(store, clock):
     assert await wait_dead(pid)
 
 
-async def test_sweep_never_kills_a_reused_pid(store, clock, mst_home):
-    (mst_home / "run").mkdir(parents=True)
+async def test_sweep_never_kills_a_reused_pid(store, clock, hotfire_home):
+    (hotfire_home / "run").mkdir(parents=True)
     victim = await asyncio.create_subprocess_exec("sleep", "30", start_new_session=True)
-    (mst_home / "run" / "tiny.pid").write_text(f"{victim.pid} {victim.pid}")
+    (hotfire_home / "run" / "tiny.pid").write_text(f"{victim.pid} {victim.pid}")
     make(store, clock).sweep_orphans()
     assert alive(victim.pid)
     victim.kill()
@@ -95,7 +95,7 @@ async def test_sweep_leaves_live_children_of_this_supervisor(sup):
     assert st(sup)["state"] == "ready"
 
 
-async def test_health_timeout_leaves_no_process_or_pid_file(store, clock, monkeypatch, tmp_path, mst_home):
+async def test_health_timeout_leaves_no_process_or_pid_file(store, clock, monkeypatch, tmp_path, hotfire_home):
     pidfile = tmp_path / "child.pid"
     monkeypatch.setenv("FAKE_MAX_PID_FILE", str(pidfile))
     monkeypatch.setenv("FAKE_MAX_DELAY", "30")
@@ -103,7 +103,7 @@ async def test_health_timeout_leaves_no_process_or_pid_file(store, clock, monkey
     with pytest.raises(StartFailed):
         await s.ensure_running("tiny")
     assert await wait_dead(int(pidfile.read_text()))
-    assert list((mst_home / "run").glob("*.pid")) == []
+    assert list((hotfire_home / "run").glob("*.pid")) == []
 
 
 async def test_waiters_share_one_failure_and_next_call_retries(sup, monkeypatch):

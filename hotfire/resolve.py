@@ -15,7 +15,7 @@ from typing import Callable
 
 import httpx
 
-from hotfire.store import Model, Store, mst_home
+from hotfire.store import Model, Store, hotfire_home
 
 # Short names -> HF repo ids. Each architecture here is in MAX's catalog.
 CURATED = {
@@ -94,8 +94,8 @@ def _run_max_list() -> str:
 
 
 def load_catalog(*, runner: Callable[[], str] = _run_max_list, refresh: bool = False) -> dict:
-    """MAX's architectures -> {example_repo_ids, supported_encodings}, cached in MST_HOME."""
-    cache = mst_home() / "max_catalog.json"
+    """MAX's architectures -> {example_repo_ids, supported_encodings}, cached in HOTFIRE_HOME."""
+    cache = hotfire_home() / "max_catalog.json"
     if not refresh and cache.exists() and time.time() - cache.stat().st_mtime < CATALOG_TTL:
         return json.loads(cache.read_text())
     try:

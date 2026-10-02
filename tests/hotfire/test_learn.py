@@ -86,8 +86,8 @@ def test_missing_config_degrades_gracefully():
 def test_sample_code_uses_env_and_covers_three_styles():
     nb = build()
     code = "\n".join(c.source for c in nb.cells if c.cell_type == "code")
-    assert 'os.environ.get("MST_BASE_URL", "http://127.0.0.1:11435/v1")' in code
-    assert 'os.environ["MST_API_KEY"]' in code
+    assert 'os.environ.get("HOTFIRE_BASE_URL", "http://127.0.0.1:11435/v1")' in code
+    assert 'os.environ["HOTFIRE_API_KEY"]' in code
     assert "from openai import OpenAI" in code
     assert "stream=True" in code
     assert "import httpx" in code
@@ -108,24 +108,24 @@ def test_max_implementation_pointer(tmp_path):
     assert "was not found in the installed `max` package" in missing
 
 
-def test_cli_writes_notebook_for_registered_model(mst_home, monkeypatch):
+def test_cli_writes_notebook_for_registered_model(hotfire_home, monkeypatch):
     Store.open().add_model(name="qwen2.5-0.5b", repo_id="Qwen/Qwen2.5-0.5B-Instruct", revision="rev1",
                            source="max-catalog", architecture="Qwen2ForCausalLM")
     fake = FakeHF()
     monkeypatch.setattr(learn, "default_source", lambda: fake)
     result = runner.invoke(app, ["learn", "qwen2.5-0.5b", "--no-open"])
     assert result.exit_code == 0, result.output
-    path = mst_home / "notebooks" / "qwen2.5-0.5b.ipynb"
+    path = hotfire_home / "notebooks" / "qwen2.5-0.5b.ipynb"
     assert path.exists() and str(path) in result.output
     nbformat.validate(nbformat.read(path, as_version=4))
     assert fake.calls == [("info", "Qwen/Qwen2.5-0.5B-Instruct", "rev1")]
 
 
-def test_cli_accepts_raw_repo_id(mst_home, monkeypatch):
+def test_cli_accepts_raw_repo_id(hotfire_home, monkeypatch):
     monkeypatch.setattr(learn, "default_source", lambda: FakeHF())
     result = runner.invoke(app, ["learn", "Qwen/Qwen2.5-0.5B-Instruct", "--no-open"])
     assert result.exit_code == 0, result.output
-    assert (mst_home / "notebooks" / "qwen2.5-0.5b.ipynb").exists()
+    assert (hotfire_home / "notebooks" / "qwen2.5-0.5b.ipynb").exists()
 
 
 def test_cli_reports_hf_failure(monkeypatch):

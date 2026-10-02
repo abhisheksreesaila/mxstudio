@@ -14,7 +14,7 @@ def add(name="tiny"):
 
 
 def test_ls_json_is_only_json_with_lifecycle_and_null_state_without_daemon(monkeypatch):
-    monkeypatch.setenv("MST_PORT", "1")  # nothing listens
+    monkeypatch.setenv("HOTFIRE_PORT", "1")  # nothing listens
     assert json.loads(runner.invoke(app, ["ls", "--json"]).output) == []
     add()
     row = json.loads(runner.invoke(app, ["ls", "--json"]).output)[0]
@@ -23,7 +23,7 @@ def test_ls_json_is_only_json_with_lifecycle_and_null_state_without_daemon(monke
 
 
 def test_ls_human_output_ends_with_the_console_link(monkeypatch):
-    monkeypatch.setenv("MST_PORT", "1")
+    monkeypatch.setenv("HOTFIRE_PORT", "1")
     add()
     assert runner.invoke(app, ["ls"]).output.strip().endswith("http://127.0.0.1:1/console#models")
 

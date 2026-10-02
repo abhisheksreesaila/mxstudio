@@ -88,10 +88,10 @@ def logs_cmd(model: str = typer.Argument(..., help="A registered model name"),
              lines: int = typer.Option(50, "--lines", "-n", min=1, help="How many trailing lines."),
              follow: bool = typer.Option(False, "--follow", "-f", help="Keep printing new lines until Ctrl-C.")) -> None:
     """Tail a model's server log (MX Studio's own log file; works without the daemon)."""
-    from hotfire.store import mst_home
+    from hotfire.store import hotfire_home
     if Store.open().get_model(model) is None:
         _fail(f"no model named {model}. See: mst ls")
-    path = mst_home() / "logs" / f"{model}.log"
+    path = hotfire_home() / "logs" / f"{model}.log"
     try:
         with open(path, "rb") as f:
             tail = f.read().decode(errors="replace").splitlines()[-lines:]
@@ -384,15 +384,15 @@ def daemon() -> None:
     import uvicorn
 
     from hotfire.gateway import create_app
-    from hotfire.settings import DAEMON_HOST, DAEMON_PORT
+    from hotfire.settings import DAEMON_HOST, DAEMON_PORT, env
     from hotfire.supervisor import Supervisor
 
     import os
     import shlex
 
     store = Store.open()
-    max_command = tuple(shlex.split(os.environ.get("MST_MAX_CMD", "max")))
-    port = int(os.environ.get("MST_PORT", DAEMON_PORT))
+    max_command = tuple(shlex.split(env("MAX_CMD", "max")))
+    port = int(env("PORT", str(DAEMON_PORT)))
     uvicorn.run(create_app(store, Supervisor(store, max_command=max_command)), host=DAEMON_HOST, port=port,
                 log_level="info")
 

@@ -21,8 +21,8 @@ from pathlib import Path
 import yaml
 
 from hotfire import keys
-from hotfire.settings import DAEMON_HOST, DAEMON_PORT, EXPOSE_PORT, LITELLM_PORT, daemon_url
-from hotfire.store import Model, Store, mst_home
+from hotfire.settings import env, DAEMON_HOST, DAEMON_PORT, EXPOSE_PORT, LITELLM_PORT, daemon_url
+from hotfire.store import Model, Store, hotfire_home
 
 PROCESSES = ("caddy", "litellm")
 UPSTREAM_APP = "_litellm"  # the reserved key LiteLLM uses to call the daemon
@@ -31,7 +31,7 @@ HOSTNAME = re.compile(r"[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?|\[[0-9A-Fa
 # orig_uri.path is decoded, so '%' is checked on the raw request URI instead.
 UNCLEAN = " || ".join([*(f'{{http.request.orig_uri.path}}.contains("{s}")' for s in ("/.", "//", "\\\\")),
                        '{http.request.orig_uri}.contains("%")'])
-SETTLE_SECONDS = float(os.environ.get("MST_EXPOSE_SETTLE", "1.0"))
+SETTLE_SECONDS = float(env("EXPOSE_SETTLE", "1.0"))
 _upstream_key_for_tests: str | None = None
 
 
@@ -102,7 +102,7 @@ def render_litellm_config(models: list[Model]) -> str:
     def route(name: str) -> dict:
         return {"model_name": name,
                 "litellm_params": {"model": f"openai/{name}", "api_base": f"{daemon_url()}/v1",
-                                   "api_key": "os.environ/MST_UPSTREAM_KEY"}}
+                                   "api_key": "os.environ/HOTFIRE_UPSTREAM_KEY"}}
     config = {
         # No wildcard route: LiteLLM would expand it into every OpenAI model it knows.
         "model_list": [route(m.name) for m in models],
@@ -122,7 +122,7 @@ def refresh_if_running(store: Store | None = None) -> bool:
 
 
 def expose_dir() -> Path:
-    path = mst_home() / "expose"
+    path = hotfire_home() / "expose"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -157,7 +157,7 @@ def _master_key() -> str:
 
 
 def _command(name: str, configs: dict[str, Path]) -> list[str]:
-    override = os.environ.get(f"MST_{name.upper()}_CMD")
+    override = env(f"{name.upper()}_CMD")
     if override:
         return shlex.split(override)
     if name == "caddy":
@@ -209,9 +209,9 @@ def start(*, host: str, litellm: bool = True, store: Store | None = None) -> dic
     if litellm:
         if not _port_free(LITELLM_PORT):
             raise ExposeError(f"port {LITELLM_PORT} is already in use, so LiteLLM can't start there "
-                              "(set MST_LITELLM_PORT to another port)")
-        litellm_env["MST_UPSTREAM_KEY"] = keys.create_key(store, UPSTREAM_APP, rotate=True, internal=True)
-        _upstream_key_for_tests = litellm_env["MST_UPSTREAM_KEY"]
+                              "(set HOTFIRE_LITELLM_PORT to another port)")
+        litellm_env["HOTFIRE_UPSTREAM_KEY"] = keys.create_key(store, UPSTREAM_APP, rotate=True, internal=True)
+        _upstream_key_for_tests = litellm_env["HOTFIRE_UPSTREAM_KEY"]
     started = []
     for name in PROCESSES:
         if name == "litellm" and not litellm:
@@ -254,7 +254,7 @@ def _port_free(port: int) -> bool:
 
 def _wait_for_port(port: int, proc: subprocess.Popen, log_path: Path, store: Store) -> None:
     """LiteLLM takes seconds to import; report a later failure (e.g. port taken) instead of claiming success."""
-    deadline = time.monotonic() + float(os.environ.get("MST_LITELLM_BOOT_SECONDS", "60"))
+    deadline = time.monotonic() + float(env("LITELLM_BOOT_SECONDS", "60"))
     while time.monotonic() < deadline:
         if proc.poll() is not None:
             stop(store=store)

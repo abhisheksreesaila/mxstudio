@@ -10,7 +10,7 @@ import httpx
 
 from hotfire import keys
 from hotfire.settings import daemon_url
-from hotfire.store import Store, mst_home
+from hotfire.store import Store, hotfire_home
 
 DEFAULT_APP = "default"
 ADMIN = {"X-Mst-Admin": "1"}
@@ -33,7 +33,7 @@ def ensure_daemon(timeout: float = 30.0) -> bool:
     """Start `mst daemon` in the background unless it already answers. True if it was started now."""
     if daemon_running():
         return False
-    logs = mst_home() / "logs"
+    logs = hotfire_home() / "logs"
     logs.mkdir(parents=True, exist_ok=True)
     with open(logs / "daemon.log", "ab") as log:
         proc = subprocess.Popen([sys.executable, "-m", "hotfire", "daemon"], stdout=log, stderr=subprocess.STDOUT,
@@ -116,7 +116,7 @@ def first_key(store: Store) -> str | None:
 
 def usage(name: str, key: str | None) -> str:
     base = f"{daemon_url()}/v1"
-    shown = key or "$MST_API_KEY"
+    shown = key or "$HOTFIRE_API_KEY"
     lines = [f"endpoint  {base}   (API reference: {daemon_url()}/docs)"]
     if key:
         lines.append(f"key       {key}   (app '{DEFAULT_APP}'; shown once, keep it)")

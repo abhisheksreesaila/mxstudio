@@ -17,7 +17,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from hotfire import keys, metrics
-from hotfire.store import Store, mst_home
+from hotfire.store import Store, hotfire_home
 from hotfire.supervisor import StartFailed, Supervisor, UnknownModel
 
 log = logging.getLogger("hotfire.gateway")
@@ -353,7 +353,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             return admin_refused()
         if store.get_model(name) is None:
             return openai_error(404, f"The model `{name}` is not registered.", "model_not_found")
-        path = mst_home() / "logs" / f"{name}.log"
+        path = hotfire_home() / "logs" / f"{name}.log"
         try:
             with open(path, "rb") as f:
                 f.seek(0, os.SEEK_END)

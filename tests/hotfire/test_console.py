@@ -48,8 +48,8 @@ async def test_patch_rejects_bad_values_and_unknown_models(http):
 
 
 async def test_model_log_tail(http, store, monkeypatch, tmp_path):
-    from hotfire.store import mst_home
-    logs = mst_home() / "logs"
+    from hotfire.store import hotfire_home
+    logs = hotfire_home() / "logs"
     logs.mkdir(parents=True, exist_ok=True)
     (logs / "tiny.log").write_text("line\n" * 2000 + "boom: cannot load model\n")
     r = await http.get("/admin/models/tiny/log", headers=ADMIN)

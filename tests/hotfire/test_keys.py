@@ -73,11 +73,11 @@ def test_app_names_are_simple_identifiers():
             create_key(Store.open(), bad)
 
 
-def test_store_files_are_private_to_the_owner(mst_home):
+def test_store_files_are_private_to_the_owner(hotfire_home):
     from hotfire.store import Store
     Store.open()
-    assert (mst_home.stat().st_mode & 0o777) == 0o700
-    assert ((mst_home / "mst.db").stat().st_mode & 0o777) == 0o600
+    assert (hotfire_home.stat().st_mode & 0o777) == 0o700
+    assert ((hotfire_home / "mst.db").stat().st_mode & 0o777) == 0o600
 
 
 def test_concurrent_first_keys_never_hand_out_a_dead_key(tmp_path):

@@ -112,11 +112,11 @@ async def test_status_is_starting_while_waiting_for_health(sup, monkeypatch):
     await task
 
 
-async def test_start_failure_includes_log_tail(sup, monkeypatch, mst_home):
+async def test_start_failure_includes_log_tail(sup, monkeypatch, hotfire_home):
     monkeypatch.setenv("FAKE_MAX_FAIL", "1")
     with pytest.raises(StartFailed, match="cannot load model"):
         await sup.ensure_running("tiny")
-    assert "cannot load model" in (mst_home / "logs" / "tiny.log").read_text()
+    assert "cannot load model" in (hotfire_home / "logs" / "tiny.log").read_text()
     assert st(sup, "tiny")["state"] == "cold"
 
 

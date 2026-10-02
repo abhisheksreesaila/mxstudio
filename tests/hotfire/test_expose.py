@@ -12,8 +12,8 @@ from hotfire.store import Store
 
 runner = CliRunner()
 # A stand-in LiteLLM: records its environment and opens the LiteLLM port like the real one.
-FAKE_LITELLM_TEMPLATE = FAKE_LITELLM = (f"sh -c 'env > \"$MST_HOME/litellm.env\"; exec {sys.executable} -m http.server "
-                f"$MST_LITELLM_PORT --bind 127.0.0.1'")
+FAKE_LITELLM_TEMPLATE = FAKE_LITELLM = (f"sh -c 'env > \"$HOTFIRE_HOME/litellm.env\"; exec {sys.executable} -m http.server "
+                f"$HOTFIRE_LITELLM_PORT --bind 127.0.0.1'")
 
 
 @pytest.fixture(autouse=True)
@@ -25,7 +25,7 @@ def litellm_port(monkeypatch):
         port = s.getsockname()[1]
     monkeypatch.setattr(expose, "LITELLM_PORT", port)
     # LiteLLM gets a minimal env, so the fake can't read its port from it: bake it in per test.
-    monkeypatch.setattr(sys.modules[__name__], "FAKE_LITELLM", FAKE_LITELLM_TEMPLATE.replace("$MST_LITELLM_PORT", str(port)))
+    monkeypatch.setattr(sys.modules[__name__], "FAKE_LITELLM", FAKE_LITELLM_TEMPLATE.replace("$HOTFIRE_LITELLM_PORT", str(port)))
     return port
 
 
@@ -64,22 +64,22 @@ def test_litellm_config_lists_each_registered_model_and_routes_it_to_the_daemon(
     first = config["model_list"][0]["litellm_params"]
     assert first["model"] == "openai/qwen2.5-0.5b"
     assert first["api_base"] == "http://127.0.0.1:11435/v1"
-    assert first["api_key"] == "os.environ/MST_UPSTREAM_KEY"
+    assert first["api_key"] == "os.environ/HOTFIRE_UPSTREAM_KEY"
     assert config["general_settings"]["master_key"] == "os.environ/LITELLM_MASTER_KEY"
 
 
-def test_expose_dry_run_writes_configs_and_prints_the_url(mst_home):
+def test_expose_dry_run_writes_configs_and_prints_the_url(hotfire_home):
     result = runner.invoke(app, ["expose", "--dry-run", "--host", "box.local"])
     assert result.exit_code == 0, result.output
     assert "https://box.local:8443/v1" in result.output
-    assert (mst_home / "expose" / "Caddyfile").exists()
-    assert (mst_home / "expose" / "litellm.yaml").exists()
+    assert (hotfire_home / "expose" / "Caddyfile").exists()
+    assert (hotfire_home / "expose" / "litellm.yaml").exists()
     assert "root.crt" in result.output  # how to trust the CA on another device
 
 
-def test_expose_starts_and_stops_both_processes(mst_home, monkeypatch):
-    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM)
+def test_expose_starts_and_stops_both_processes(hotfire_home, monkeypatch):
+    monkeypatch.setenv("HOTFIRE_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("HOTFIRE_LITELLM_CMD", FAKE_LITELLM)
     result = runner.invoke(app, ["expose", "--host", "box.local"])
     assert result.exit_code == 0, result.output
     running = expose.status()
@@ -90,26 +90,26 @@ def test_expose_starts_and_stops_both_processes(mst_home, monkeypatch):
     assert expose.status() == {"caddy": False, "litellm": False}
 
 
-def test_expose_no_litellm_starts_only_caddy(mst_home, monkeypatch):
-    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM)
+def test_expose_no_litellm_starts_only_caddy(hotfire_home, monkeypatch):
+    monkeypatch.setenv("HOTFIRE_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("HOTFIRE_LITELLM_CMD", FAKE_LITELLM)
     result = runner.invoke(app, ["expose", "--no-litellm", "--host", "box.local"])
     assert result.exit_code == 0, result.output
     assert expose.status() == {"caddy": True, "litellm": False}
     runner.invoke(app, ["expose", "--stop"])
 
 
-def test_refresh_restarts_litellm_with_new_models_only_when_exposed(mst_home, monkeypatch):
-    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM)
+def test_refresh_restarts_litellm_with_new_models_only_when_exposed(hotfire_home, monkeypatch):
+    monkeypatch.setenv("HOTFIRE_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("HOTFIRE_LITELLM_CMD", FAKE_LITELLM)
     assert expose.refresh_if_running() is False
     runner.invoke(app, ["expose", "--host", "box.local"])
     Store.open().add_model(name="smollm2-1.7b", repo_id="HuggingFaceTB/SmolLM2-1.7B-Instruct", revision="r",
                            source="hf-supported", architecture="LlamaForCausalLM")
     assert expose.refresh_if_running() is True
-    config = yaml.safe_load((mst_home / "expose" / "litellm.yaml").read_text())
+    config = yaml.safe_load((hotfire_home / "expose" / "litellm.yaml").read_text())
     assert [m["model_name"] for m in config["model_list"]] == ["smollm2-1.7b"]
-    assert "https://box.local:8443" in (mst_home / "expose" / "Caddyfile").read_text()
+    assert "https://box.local:8443" in (hotfire_home / "expose" / "Caddyfile").read_text()
     runner.invoke(app, ["expose", "--stop"])
 
 
@@ -137,10 +137,10 @@ def test_bad_hostnames_are_refused():
             expose.render_caddyfile(hosts=[bad], port=8443, litellm=True)
 
 
-def test_master_key_is_private_never_empty_and_never_printed(mst_home, monkeypatch):
-    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM)
-    d = mst_home / "expose"
+def test_master_key_is_private_never_empty_and_never_printed(hotfire_home, monkeypatch):
+    monkeypatch.setenv("HOTFIRE_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("HOTFIRE_LITELLM_CMD", FAKE_LITELLM)
+    d = hotfire_home / "expose"
     d.mkdir(parents=True)
     (d / "litellm_master_key").write_text("")  # left behind by a crash
     result = runner.invoke(app, ["expose", "--host", "box.local"])
@@ -151,10 +151,10 @@ def test_master_key_is_private_never_empty_and_never_printed(mst_home, monkeypat
     runner.invoke(app, ["expose", "--stop"])
 
 
-def test_upstream_key_is_reserved_rotated_and_revoked_on_stop(mst_home, monkeypatch):
+def test_upstream_key_is_reserved_rotated_and_revoked_on_stop(hotfire_home, monkeypatch):
     from hotfire import keys
-    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM)
+    monkeypatch.setenv("HOTFIRE_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("HOTFIRE_LITELLM_CMD", FAKE_LITELLM)
     with pytest.raises(ValueError):
         keys.create_key(Store.open(), expose.UPSTREAM_APP)  # users can't take the reserved name
     runner.invoke(app, ["expose", "--host", "box.local"])
@@ -168,9 +168,9 @@ def test_upstream_key_is_reserved_rotated_and_revoked_on_stop(mst_home, monkeypa
     assert keys.verify_key(store, second) is None
 
 
-def test_a_reused_pid_is_not_mistaken_for_our_process(mst_home):
+def test_a_reused_pid_is_not_mistaken_for_our_process(hotfire_home):
     import os
-    d = mst_home / "expose"
+    d = hotfire_home / "expose"
     d.mkdir(parents=True)
     (d / "caddy.pid").write_text(f"{os.getpid()} 1")  # some other live process, wrong start time
     assert expose.status()["caddy"] is False
@@ -178,37 +178,37 @@ def test_a_reused_pid_is_not_mistaken_for_our_process(mst_home):
     assert os.getpid()  # still alive
 
 
-def test_a_process_that_dies_at_once_is_reported_with_its_log(mst_home, monkeypatch):
-    monkeypatch.setenv("MST_CADDY_CMD", "sh -c 'echo address already in use; exit 1'")
+def test_a_process_that_dies_at_once_is_reported_with_its_log(hotfire_home, monkeypatch):
+    monkeypatch.setenv("HOTFIRE_CADDY_CMD", "sh -c 'echo address already in use; exit 1'")
     result = runner.invoke(app, ["expose", "--no-litellm", "--host", "box.local"])
     assert result.exit_code == 1
     assert "caddy exited" in result.output
     assert "address already in use" in result.output
 
 
-def test_a_missing_binary_is_a_one_line_error(mst_home, monkeypatch):
-    monkeypatch.setenv("MST_CADDY_CMD", "/nonexistent/caddy")
+def test_a_missing_binary_is_a_one_line_error(hotfire_home, monkeypatch):
+    monkeypatch.setenv("HOTFIRE_CADDY_CMD", "/nonexistent/caddy")
     result = runner.invoke(app, ["expose", "--no-litellm", "--host", "box.local"])
     assert result.exit_code == 1
     assert "not found" in result.output
 
 
-def test_litellm_gets_only_the_env_it_needs(mst_home, monkeypatch):
-    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM.replace('"$MST_HOME', f'"{mst_home}'))
+def test_litellm_gets_only_the_env_it_needs(hotfire_home, monkeypatch):
+    monkeypatch.setenv("HOTFIRE_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("HOTFIRE_LITELLM_CMD", FAKE_LITELLM.replace('"$HOTFIRE_HOME', f'"{hotfire_home}'))
     monkeypatch.setenv("OPENAI_API_KEY", "sk-should-not-leak")
     result = runner.invoke(app, ["expose", "--host", "box.local"])
     assert result.exit_code == 0, result.output
-    env = (mst_home / "litellm.env").read_text()
-    assert "LITELLM_MASTER_KEY=" in env and "MST_UPSTREAM_KEY=" in env
+    env = (hotfire_home / "litellm.env").read_text()
+    assert "LITELLM_MASTER_KEY=" in env and "HOTFIRE_UPSTREAM_KEY=" in env
     assert "sk-should-not-leak" not in env
     runner.invoke(app, ["expose", "--stop"])
 
 
-def test_litellm_that_never_opens_its_port_is_an_error(mst_home, monkeypatch):
-    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_BOOT_SECONDS", "1")
+def test_litellm_that_never_opens_its_port_is_an_error(hotfire_home, monkeypatch):
+    monkeypatch.setenv("HOTFIRE_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("HOTFIRE_LITELLM_CMD", "sleep 60")
+    monkeypatch.setenv("HOTFIRE_LITELLM_BOOT_SECONDS", "1")
     result = runner.invoke(app, ["expose", "--host", "box.local"])
     assert result.exit_code == 1
     assert "did not open port" in result.output
@@ -250,10 +250,10 @@ def test_live_caddy_refuses_dot_segment_paths(tmp_path):
         proc.wait(timeout=10)
 
 
-def test_a_busy_litellm_port_is_refused_before_anything_starts(mst_home, monkeypatch, litellm_port):
+def test_a_busy_litellm_port_is_refused_before_anything_starts(hotfire_home, monkeypatch, litellm_port):
     import socket
-    monkeypatch.setenv("MST_CADDY_CMD", "sleep 60")
-    monkeypatch.setenv("MST_LITELLM_CMD", FAKE_LITELLM)
+    monkeypatch.setenv("HOTFIRE_CADDY_CMD", "sleep 60")
+    monkeypatch.setenv("HOTFIRE_LITELLM_CMD", FAKE_LITELLM)
     with socket.socket() as squatter:
         squatter.bind(("127.0.0.1", litellm_port))
         squatter.listen()
@@ -268,9 +268,9 @@ def test_percent_encoded_paths_are_refused():
     assert '{http.request.orig_uri}.contains("%")' in text
 
 
-def test_hosts_are_deduplicated(mst_home):
+def test_hosts_are_deduplicated(hotfire_home):
     expose.write_configs(host="localhost", litellm=True)
-    assert "https://localhost:8443, https://localhost:8443" not in (mst_home / "expose" / "Caddyfile").read_text()
+    assert "https://localhost:8443, https://localhost:8443" not in (hotfire_home / "expose" / "Caddyfile").read_text()
 
 
 def test_reserved_key_names_are_a_one_line_error():

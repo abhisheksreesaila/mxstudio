@@ -17,7 +17,7 @@ from typing import AsyncIterator, Callable
 
 import httpx
 
-from .store import Store, mst_home
+from .store import Store, hotfire_home
 
 HOST = "127.0.0.1"
 LOG_TAIL_BYTES = 2000
@@ -138,7 +138,7 @@ class Supervisor:
             await self.stop(name)
 
     def acquire_lock(self) -> None:
-        """Take MST_HOME/run/daemon.lock for the life of this process, or raise DaemonAlreadyRunning.
+        """Take HOTFIRE_HOME/run/daemon.lock for the life of this process, or raise DaemonAlreadyRunning.
 
         Call before sweep_orphans: only the daemon holding the lock may kill leftover children."""
         if self._lock_file is not None:
@@ -148,11 +148,11 @@ class Supervisor:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             f.close()
-            raise DaemonAlreadyRunning("another mst daemon is already running for this MST_HOME") from None
+            raise DaemonAlreadyRunning("another mst daemon is already running for this HOTFIRE_HOME") from None
         self._lock_file = f
 
     def sweep_orphans(self) -> list[int]:
-        """Kill children recorded in MST_HOME/run that a dead daemon left behind. Call at startup."""
+        """Kill children recorded in HOTFIRE_HOME/run that a dead daemon left behind. Call at startup."""
         mine = {c.proc.pid for c in self._children.values()}
         killed = []
         for f in self._run_dir().glob("*.pid"):
@@ -260,12 +260,12 @@ class Supervisor:
         return f"http://{HOST}:{child.port}/v1"
 
     def _log_path(self, name: str) -> Path:
-        logs = mst_home() / "logs"
+        logs = hotfire_home() / "logs"
         logs.mkdir(parents=True, exist_ok=True)
         return logs / f"{name}.log"
 
     def _run_dir(self) -> Path:
-        run = mst_home() / "run"
+        run = hotfire_home() / "run"
         run.mkdir(parents=True, exist_ok=True)
         return run
 

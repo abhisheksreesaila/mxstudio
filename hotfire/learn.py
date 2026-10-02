@@ -15,7 +15,7 @@ from nbformat.v4 import new_code_cell, new_markdown_cell, new_notebook
 
 from hotfire.resolve import CURATED, model_name
 from hotfire.settings import daemon_url
-from hotfire.store import Store, mst_home
+from hotfire.store import Store, hotfire_home
 
 CARD_LIMIT = 6000
 
@@ -249,8 +249,8 @@ def _trim(text: str, limit: int = CARD_LIMIT) -> str:
 def _setup_code(model_id: str) -> str:
     return (
         "import os\n"
-        f'BASE_URL = os.environ.get("MST_BASE_URL", "{daemon_url()}/v1")\n'
-        'API_KEY = os.environ["MST_API_KEY"]  # create one with: mst keys new <app>\n'
+        f'BASE_URL = os.environ.get("HOTFIRE_BASE_URL", "{daemon_url()}/v1")\n'
+        'API_KEY = os.environ["HOTFIRE_API_KEY"]  # create one with: mst keys new <app>\n'
         f'MODEL = "{model_id}"\n'
         "print(BASE_URL, MODEL)"
     )
@@ -324,8 +324,8 @@ def build_notebook(*, model_id: str, repo_id: str, source: HFSource, revision: s
 
     cells.append(new_markdown_cell(_max_cell(arch, max_finder)))
     cells += [
-        new_markdown_cell("## Try it\n\nThese cells talk to your local `mst` endpoint. Set `MST_API_KEY` "
-                          "(and optionally `MST_BASE_URL`) in the environment before starting Jupyter."
+        new_markdown_cell("## Try it\n\nThese cells talk to your local `mst` endpoint. Set `HOTFIRE_API_KEY` "
+                          "(and optionally `HOTFIRE_BASE_URL`) in the environment before starting Jupyter."
                           + ("" if registered else f"\n\n**This model is not pulled yet:** run `mst pull {model_id}` "
                              "first, or the endpoint will not know the name below.")),
         new_code_cell(_setup_code(model_id)),
@@ -361,7 +361,7 @@ def write_notebook(ref: str, source: HFSource | None = None,
     name, repo_id, revision, registered = resolve(ref)
     nb = build_notebook(model_id=name, repo_id=repo_id, source=source or default_source(),
                         revision=revision, registered=registered, max_finder=max_finder)
-    out = mst_home() / "notebooks" / f"{name}.ipynb"
+    out = hotfire_home() / "notebooks" / f"{name}.ipynb"
     out.parent.mkdir(parents=True, exist_ok=True)
     nbformat.write(nb, out)
     return out
