@@ -57,7 +57,7 @@ def alive(pid):
         return False
     try:  # the process can vanish between the kill(0) and this read
         return Path(f"/proc/{pid}/stat").read_text().split()[2] != "Z"
-    except FileNotFoundError:
+    except OSError:  # ENOENT or ESRCH, depending on when it went
         return False
 
 
