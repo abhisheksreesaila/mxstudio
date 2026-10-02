@@ -116,9 +116,9 @@ Brief: docs/brief.md · Design: design-system/DESIGN-SYSTEM.md (Graphite) + canv
 - [ ] API keys and Network pages: keys table with new/revoke; the patch-bay diagram from real expose and port data
 - [ ] motion per the design system, all off under prefers-reduced-motion; page transitions between menu pages
 - [ ] later tickets, not this one: Pull page (needs pull progress from the daemon), Benchmarks race (needs `hotfire bench`), Gateway safeguards counters, Ask Hotfire chat
-## F-017 Rename to Hotfire [doing]
+## F-017 Rename to Hotfire [done]
 Brief: docs/brief.md · ADR: docs/adr/0002-name-hotfire.md · Needs: none
-- [ ] Python package `mst/` becomes `hotfire/`; PyPI/project name `hotfire`; commands `hotfire` and `mst` (alias, one release)
-- [ ] state folder `~/.hotfire` (an existing `~/.mst` is moved on first run); `HOTFIRE_HOME`, `HOTFIRE_PORT`, … with `MST_*` read as a fallback
-- [ ] every user-facing string says Hotfire / `hotfire …` (CLI output, console title, notebooks, docs, README); console title "Hotfire Mission Control"
-- [ ] full test suite passes; `hotfire --help` and `mst --help` both work
+- [x] Python package `mst/` becomes `hotfire/`; PyPI/project name `hotfire`; commands `hotfire` and `mst` (alias, one release)
+- [x] state folder `~/.hotfire` (an existing `~/.mst` is moved on first run); `HOTFIRE_HOME`, `HOTFIRE_PORT`, … with `MST_*` read as a fallback
+- [x] every user-facing string says Hotfire / `hotfire …` (CLI output, console title, notebooks, docs, README); console title "Hotfire Mission Control"
+- [x] full test suite passes; `hotfire --help` and `mst --help` both work

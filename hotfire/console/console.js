@@ -298,7 +298,7 @@
     if (!rows || rows.length === 0) {
       return h("div", { class: "empty" }, h("h2", {}, "No requests yet"),
         h("p", {}, "Requests to /v1 show up here: which app, which model, tokens and latency."),
-        h("div", { class: "code" }, `curl ${(state.info && state.info.endpoint) || location.origin + "/v1"}/models -H "Authorization: Bearer $MST_API_KEY"`));
+        h("div", { class: "code" }, `curl ${(state.info && state.info.endpoint) || location.origin + "/v1"}/models -H "Authorization: Bearer $HOTFIRE_API_KEY"`));
     }
     const time = (ts) => new Date(ts * 1000).toLocaleTimeString([], { hour12: false });
     const tokens = (r) => r.completion_tokens === null ? "—" : `${fmt(r.prompt_tokens)} → ${r.estimated ? "~" : ""}${fmt(r.completion_tokens)}`;

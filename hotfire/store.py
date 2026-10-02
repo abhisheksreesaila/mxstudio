@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import fcntl
 import os
 import sqlite3
 import sys
@@ -51,12 +52,39 @@ CREATE TABLE IF NOT EXISTS keys (
 """
 
 
-def _migrate_legacy_home(new: Path) -> None:
-    """Move ~/.hotfire to ~/.hotfire once, when only the old folder exists."""
+def _old_daemon_running(old: Path) -> bool:
+    """A pre-rename daemon still holds ~/.mst/run/daemon.lock: moving its folder would split its state."""
+    lock = old / "run" / "daemon.lock"
+    if not lock.exists():
+        return False
+    try:
+        with open(lock, "a") as f:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(f, fcntl.LOCK_UN)
+    except OSError:
+        return True
+    return False
+
+
+def _migrate_legacy_home(new: Path) -> Path:
+    """Move ~/.mst to ~/.hotfire once, when only the old folder exists. Returns the folder to use."""
     old = Path.home() / ".mst"
-    if not new.exists() and old.is_dir():
+    if new.exists() or not old.is_dir():
+        return new
+    if _old_daemon_running(old):
+        print(f"hotfire: an older daemon is still using {old}; using it until that daemon stops "
+              f"(then run any hotfire command to move it to {new})", file=sys.stderr)
+        return old
+    try:
         old.rename(new)
-        print(f"hotfire: moved {old} to {new}", file=sys.stderr)
+    except FileNotFoundError:  # another hotfire command moved it a moment ago
+        return new
+    except OSError as e:  # a mount point or another device: rename can't do it
+        print(f"hotfire: could not move {old} to {new} ({e.strerror}); move it by hand. "
+              f"Using {old} for now.", file=sys.stderr)
+        return old
+    print(f"hotfire: moved {old} to {new}", file=sys.stderr)
+    return new
 
 
 def hotfire_home() -> Path:
@@ -64,8 +92,7 @@ def hotfire_home() -> Path:
     if configured:
         home = Path(configured).expanduser()
     else:
-        home = Path.home() / ".hotfire"
-        _migrate_legacy_home(home)
+        home = _migrate_legacy_home(Path.home() / ".hotfire")
     home.mkdir(parents=True, exist_ok=True)
     home.chmod(0o700)
     return home

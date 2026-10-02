@@ -250,7 +250,7 @@ def _setup_code(model_id: str) -> str:
     return (
         "import os\n"
         f'BASE_URL = os.environ.get("HOTFIRE_BASE_URL", "{daemon_url()}/v1")\n'
-        'API_KEY = os.environ["HOTFIRE_API_KEY"]  # create one with: hotfire keys new <app>\n'
+        'API_KEY = (os.environ.get("HOTFIRE_API_KEY") or os.environ["MST_API_KEY"])  # create one with: hotfire keys new <app>\n'
         f'MODEL = "{model_id}"\n'
         "print(BASE_URL, MODEL)"
     )

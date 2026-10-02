@@ -37,7 +37,7 @@ Architecture decision: [docs/adr/0001](docs/adr/0001-mst-core-architecture.md)
 | **Console** | `http://127.0.0.1:11435/console`: Azure-style operations console (resource menu, models grid, settings blade). This machine only. | `hotfire/console/` |
 | **Port** | For unsupported architectures: clones `modular/skills`, picks a donor architecture, and writes `PORT.md` plus the `claude '/import-model …'` command. | `hotfire/port.py` |
 
-State lives in `~/.hotfire/` (override with `MST_HOME`): `mst.db` (models, key hashes), `logs/`,
+State lives in `~/.hotfire/` (override with `HOTFIRE_HOME`; the old `MST_HOME` still works): `mst.db` (models, key hashes), `logs/`,
 `run/`, `notebooks/`, `ports/` and `expose/`. Weights stay in the Hugging Face cache.
 
 ---
@@ -158,4 +158,4 @@ pixi run hotfire expose --stop && pixi run hotfire stop --all
 - LiteLLM lives in its own pixi environment: `pixi install -e gateway`.
 - The legacy core (`notebooks/mxstudio`, `mxs` command, old docs) is still in the repo until
   `hotfire` has passed the live checks above. It will be removed after that, with your OK.
-- Ports: daemon `MST_PORT` (11435), LiteLLM `MST_LITELLM_PORT` (4000), HTTPS `MST_EXPOSE_PORT` (8443).
+- Ports: daemon `HOTFIRE_PORT` (11435), LiteLLM `HOTFIRE_LITELLM_PORT` (4000), HTTPS `HOTFIRE_EXPOSE_PORT` (8443). The old `MST_*` names are still read as a fallback.

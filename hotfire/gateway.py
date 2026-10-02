@@ -76,11 +76,11 @@ def openapi_spec(model_names: list[str]) -> dict:
         "openapi": "3.1.0",
         "info": {"title": "Hotfire API", "version": "1.0.0",
                  "description": "OpenAI-compatible endpoint for local models on Modular MAX. "
-                                "Point any OpenAI client at `/v1` with an `hotfire keys new <app>` key."},
+                                "Point any OpenAI client at `/v1` with a `hotfire keys new <app>` key."},
         "servers": [{"url": "/"}],
         "paths": {
             "/v1/models": {"get": {"summary": "List models", "security": secured, "responses": {
-                "200": {"description": "Registered models, with load state in the `hotfire` field",
+                "200": {"description": "Registered models, with load state in the `mst` field",
                         "content": {"application/json": {"schema": {"type": "object"}}}},
                 "401": {"description": "Missing or invalid key"}}}},
             "/v1/chat/completions": {"post": {"summary": "Create a chat completion", "security": secured,
