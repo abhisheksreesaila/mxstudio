@@ -76,6 +76,38 @@ def set_model(model: str = typer.Argument(..., help="A registered model name"),
     typer.echo(f"console  {report.console_link('models')}")
 
 
+@app.command("metrics")
+def metrics_cmd(range_: str = typer.Option("5m", "--range", help="Window: " + ", ".join(report.RANGES) + "."),
+                as_json: bool = JSON) -> None:
+    """The console's numbers: requests, errors, latency, per model, and GPUs. Works without the daemon."""
+    from mst import metrics
+    if range_ not in report.RANGES:
+        _fail(f"--range {range_!r} is not one of {', '.join(report.RANGES)}")
+    data = metrics.summary(Store.open(), window=report.RANGES[range_])
+    gpus = metrics.gpus()
+    if as_json:
+        typer.echo(report.dump({"range": range_, **data, "gpus": gpus}))
+        return
+    typer.echo(report.metrics_text(data, range_, gpus))
+    typer.echo(f"\nconsole  {report.console_link('metrics')}")
+
+
+@app.command("requests")
+def requests_cmd(limit: int = typer.Option(20, "--limit", min=1, help="How many recent requests."),
+                 as_json: bool = JSON) -> None:
+    """The activity log, newest first. Works without the daemon."""
+    from mst import metrics
+    rows = metrics.recent(Store.open(), limit)
+    if as_json:
+        typer.echo(report.dump(rows))
+        return
+    if not rows:
+        typer.echo("no requests yet")
+    else:
+        typer.echo(report.requests_text(rows))
+    typer.echo(f"\nconsole  {report.console_link('activity')}")
+
+
 @keys_app.command("new")
 def keys_new(app_name: str = typer.Argument(..., metavar="APP"),
              rotate: bool = typer.Option(False, "--rotate", help="Revoke the app's current key and issue a new one.")) -> None:
