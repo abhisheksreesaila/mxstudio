@@ -73,6 +73,21 @@ async def test_passes_model_path_port_and_revision(sup, monkeypatch, tmp_path):
     assert args[args.index("--model-path") + 1] == "org/tiny"
     assert args[args.index("--huggingface-model-revision") + 1] == "abc123"
     assert args[args.index("--port") + 1] == str(st(sup, "tiny")["port"])
+    assert args[args.index("--served-model-name") + 1] == "tiny"  # clients ask for the mst name
+
+
+async def test_downloaded_model_loads_from_its_local_snapshot(sup, monkeypatch, tmp_path):
+    snapshot = tmp_path / "snapshot"
+    snapshot.mkdir()
+    sup.store.add_model(name="tiny", repo_id="org/tiny", revision="abc123", source="hf-supported",
+                        architecture="Qwen2ForCausalLM", weights_path=str(snapshot))
+    f = tmp_path / "args.json"
+    monkeypatch.setenv("FAKE_MAX_ARGS_FILE", str(f))
+    await sup.ensure_running("tiny")
+    args = json.loads(f.read_text())
+    assert args[args.index("--model-path") + 1] == str(snapshot)
+    assert "--huggingface-model-revision" not in args
+    assert "--weight-path" not in args
 
 
 async def test_unknown_model(sup):

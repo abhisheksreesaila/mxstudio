@@ -46,3 +46,4 @@ sweep-serving-*/
 .mxstudio/
 *.db
 jobs.db
+.claude/worktrees/

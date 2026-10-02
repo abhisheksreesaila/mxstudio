@@ -136,9 +136,11 @@ class Supervisor:
         return logs / f"{name}.log"
 
     def _command(self, model, port: int) -> list[str]:
-        cmd = [*self.max_command, "serve", "--model-path", model.repo_id, "--port", str(port)]
-        if model.weights_path:
-            cmd += ["--weight-path", model.weights_path]
+        # A pulled model loads from its pinned local snapshot, so serving needs no network.
+        cmd = [*self.max_command, "serve", "--port", str(port), "--served-model-name", model.name]
+        if model.weights_path and Path(model.weights_path).is_dir():
+            return cmd + ["--model-path", model.weights_path]
+        cmd += ["--model-path", model.repo_id]
         if model.revision:
             cmd += ["--huggingface-model-revision", model.revision]
         return cmd
