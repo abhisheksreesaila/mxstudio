@@ -88,9 +88,12 @@ def pull(ref: str = typer.Argument(..., help="Short name (qwen2.5-0.5b) or Huggi
     if port_dir is not None:
         from mst import port
         try:
-            model = port.register(ref, port_dir)
-        except (port.PortError, resolve.PullError) as e:
-            typer.echo(str(e))
+            model = port.register(ref, port_dir, name=name)
+        except resolve.PullError as e:
+            typer.echo(e.resolution.message)
+            raise typer.Exit(1)
+        except (port.PortError, resolve.ResolveError) as e:
+            typer.echo(f"error: {e}")
             raise typer.Exit(1)
         typer.echo(f"registered port {model.name} ({model.repo_id}@{model.revision[:8]}, custom architecture {model.custom_arch_path})")
         return
@@ -115,8 +118,8 @@ def port_model(ref: str = typer.Argument(..., help="Short name or Hugging Face r
     from mst import port
     try:
         result = port.prepare(ref)
-    except port.PortError as e:
-        typer.echo(str(e))
+    except (port.PortError, resolve.ResolveError) as e:
+        typer.echo(f"error: {e}")
         raise typer.Exit(1)
     if result.workspace is None:
         typer.echo(result.message)

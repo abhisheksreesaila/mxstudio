@@ -1,4 +1,5 @@
 import json
+import shlex
 from pathlib import Path
 
 import pytest
@@ -78,6 +79,7 @@ def fake_fetch(repo_id, revision):
 def test_prepare_creates_workspace(tmp_path):
     archs = tmp_path / "a"
     (archs / "llama3").mkdir(parents=True)
+    (archs / "llama3_modulev3").mkdir()
     res = port.prepare("acme/weird", catalog=CAT, hf=make_hf(), runner=Runner(),
                        fetch_config=fake_fetch, arch_dir=archs)
     ws = res.workspace
@@ -85,11 +87,13 @@ def test_prepare_creates_workspace(tmp_path):
     assert json.loads((ws / "config.json").read_text())["model_type"] == "weird"
     md = (ws / "PORT.md").read_text()
     for needle in ("WeirdForCausalLM", "acme/weird", "abc123", "hidden_size", "LlamaForCausalLM",
-                   str(archs / "llama3"), "compare"):
+                   str(archs / "llama3"), "compare", "llama3_modulev3", "Choose the lane",
+                   "scripts/scaffold.py acme/weird --start-from llama3_modulev3 --output-dir",
+                   "<output_dir>/<slug>", "pixi run max serve", "skill root", "MAX versions"):
         assert needle in md
     link = ws / ".claude" / "skills" / "import-model"
     assert link.is_symlink() and (link / "SKILL.md").exists()
-    assert res.command == f'cd {ws} && claude "/import-model acme/weird"'
+    assert res.command == f"cd {shlex.quote(str(ws))} && claude '/import-model acme/weird'"
     assert res.skills == ["debug-model", "import-model"]
 
 
@@ -133,7 +137,7 @@ def test_cli_port_prints_command(monkeypatch):
     _patch(monkeypatch, make_hf(), Runner())
     out = runner.invoke(cli.app, ["port", "acme/weird"])
     assert out.exit_code == 0, out.output
-    assert "import-model" in out.output and 'claude "/import-model acme/weird"' in out.output
+    assert "import-model" in out.output and "claude '/import-model acme/weird'" in out.output
 
 
 def test_cli_port_supported_suggests_pull(monkeypatch):
@@ -151,3 +155,76 @@ def test_cli_pull_port_registers(monkeypatch, tmp_path):
     assert Store.open().get_model("weird").source == "port"
     bad = runner.invoke(cli.app, ["pull", "acme/weird", "--port", str(tmp_path / "nope")])
     assert bad.exit_code == 1
+
+
+def test_prepare_twice_overwrites_cleanly():
+    kw = dict(catalog=CAT, hf=make_hf(), runner=Runner(), fetch_config=fake_fetch, arch_dir=None)
+    first = port.prepare("acme/weird", **kw)
+    (first.workspace / "PORT.md").write_text("stale")
+    second = port.prepare("acme/weird", **kw)
+    assert "Choose the lane" in (second.workspace / "PORT.md").read_text()
+    assert (second.workspace / ".claude" / "skills" / "import-model").is_symlink()
+
+
+def test_port_dir_without_architectures_is_rejected(tmp_path):
+    d = make_port(tmp_path / "weird")
+    (d / "__init__.py").write_text("x = 1\n")
+    with pytest.raises(port.PortError, match="ARCHITECTURES"):
+        port.check_port_dir(d)
+
+
+def test_port_dir_name_must_be_importable(tmp_path):
+    with pytest.raises(port.PortError, match="identifier"):
+        port.check_port_dir(make_port(tmp_path / "my-port"))
+    with pytest.raises(port.PortError, match="identifier"):
+        port.check_port_dir(make_port(tmp_path / "a:b" / "weird"))
+
+
+def test_register_refuses_to_replace_another_repos_model(tmp_path):
+    Store.open().add_model(name="weird", repo_id="other/weird", revision="r", source="hf", architecture="X")
+    d = make_port(tmp_path / "weird")
+    with pytest.raises(port.resolve.PullError, match="already registered"):
+        port.register("acme/weird", d, catalog=CAT, hf=make_hf())
+    assert Store.open().get_model("weird").repo_id == "other/weird"
+    m = port.register("acme/weird", d, catalog=CAT, hf=make_hf(), name="weird2")
+    assert m.name == "weird2"
+
+
+def test_cli_pull_port_collision_and_name(monkeypatch, tmp_path):
+    _patch(monkeypatch, make_hf(), Runner())
+    Store.open().add_model(name="weird", repo_id="other/weird", revision="r", source="hf", architecture="X")
+    d = make_port(tmp_path / "weird")
+    out = runner.invoke(cli.app, ["pull", "acme/weird", "--port", str(d)])
+    assert out.exit_code == 1 and "--name" in out.output
+    ok = runner.invoke(cli.app, ["pull", "acme/weird", "--port", str(d), "--name", "weird-port"])
+    assert ok.exit_code == 0 and Store.open().get_model("weird-port").source == "port"
+
+
+def _boom_hf():
+    hf = make_hf()
+
+    def boom(*a, **k):
+        raise port.resolve.ResolveError("could not reach Hugging Face")
+    hf.inspect = boom
+    return hf
+
+
+def test_cli_pull_port_hf_error_is_not_a_traceback(monkeypatch, tmp_path):
+    _patch(monkeypatch, _boom_hf(), Runner())
+    out = runner.invoke(cli.app, ["pull", "acme/weird", "--port", str(make_port(tmp_path / "weird"))])
+    assert out.exit_code == 1 and "could not reach" in out.output
+    assert isinstance(out.exception, SystemExit)
+
+
+def test_cli_pull_port_without_safetensors(monkeypatch, tmp_path):
+    from fakes import FakeHF
+    hf = FakeHF({"acme/weird": ("WeirdForCausalLM", ["config.json", "pytorch_model.bin"])})
+    _patch(monkeypatch, hf, Runner())
+    out = runner.invoke(cli.app, ["pull", "acme/weird", "--port", str(make_port(tmp_path / "weird"))])
+    assert out.exit_code == 1 and "safetensors" in out.output and isinstance(out.exception, SystemExit)
+
+
+def test_cli_port_hf_error_is_not_a_traceback(monkeypatch):
+    _patch(monkeypatch, _boom_hf(), Runner())
+    out = runner.invoke(cli.app, ["port", "acme/weird"])
+    assert out.exit_code == 1 and "could not reach" in out.output and isinstance(out.exception, SystemExit)

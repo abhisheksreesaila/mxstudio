@@ -11,6 +11,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -78,6 +79,15 @@ class Donor:
     architecture: str
     source_dir: Path | None
     reason: str
+    v3_dir: Path | None = None
+
+    @property
+    def slug(self) -> str | None:
+        return self.source_dir.name if self.source_dir else None
+
+    @property
+    def v3_slug(self) -> str | None:
+        return self.v3_dir.name if self.v3_dir else None
 
 
 def max_architectures_dir() -> Path | None:
@@ -113,6 +123,11 @@ def _source_dir(arch: str, arch_dir: Path | None) -> Path | None:
     return min(hits, key=lambda d: len(d.name)) if hits else None
 
 
+def _v3_twin(src: Path | None) -> Path | None:
+    twin = src.with_name(src.name + "_modulev3") if src else None
+    return twin if twin and twin.is_dir() else None
+
+
 def pick_donor(arch: str | None, model_type: str | None, catalog: dict, *,
                arch_dir: Path | None = None) -> Donor:
     """Closest supported architecture: shared name prefix with the target (and its model_type),
@@ -131,12 +146,16 @@ def pick_donor(arch: str | None, model_type: str | None, catalog: dict, *,
             best, best_score = cand, score
     if best is None:
         fb = FALLBACK_DONOR if FALLBACK_DONOR in catalog or not catalog else sorted(catalog)[0]
-        return Donor(fb, _source_dir(fb, arch_dir),
+        src = _source_dir(fb, arch_dir)
+        return Donor(fb, src,
                      f"fallback: nothing in MAX's catalog shares a name with {arch or model_type}; "
-                     f"{fb} is the most common decoder-only starting point")
-    return Donor(best, _source_dir(best, arch_dir),
+                     f"{fb} is the most common decoder-only starting point",
+                     _v3_twin(src))
+    src = _source_dir(best, arch_dir)
+    return Donor(best, src,
                  f"its name ({_norm(best)}) matches the start of {arch or model_type} "
-                 f"({', '.join(targets)}), so it is the same family at a nearby version")
+                 f"({', '.join(targets)}), so it is the same family at a nearby version",
+                 _v3_twin(src))
 
 
 # ---- prepare -------------------------------------------------------------
@@ -165,39 +184,84 @@ def _link_skills(workspace: Path, skills_root: Path, names: list[str]) -> None:
         link.symlink_to(skills_root / n, target_is_directory=True)
 
 
-def _port_md(res: resolve.Resolution, config: dict, donor: Donor) -> str:
+def mst_max_version() -> str | None:
+    try:
+        from importlib.metadata import version
+        return version("max")
+    except Exception:
+        return None
+
+
+def skill_max_range(skills_root: Path) -> str | None:
+    try:
+        m = re.search(r'^max\s*=\s*"([^"]+)"', (skills_root / ENTRY_SKILL / "pixi.toml").read_text(), re.M)
+    except OSError:
+        return None
+    return m.group(1) if m else None
+
+
+def _port_md(res: resolve.Resolution, config: dict, donor: Donor, *, skills_root: Path,
+             workspace: Path) -> str:
     fields = "\n".join(f"- `{k}`: `{json.dumps(config[k])}`" for k in KEY_FIELDS if k in config)
-    where = (f"`{donor.source_dir}`" if donor.source_dir else
-             "not found; look under `max/pipelines/architectures/` in your installed MAX package")
+    skill = skills_root / ENTRY_SKILL
+    v2 = f"`{donor.slug}` at `{donor.source_dir}`" if donor.source_dir else "none found"
+    v3 = (f"`{donor.v3_slug}` at `{donor.v3_dir}`" if donor.v3_dir else
+          "no `_modulev3` twin; check whether a natively-V3 architecture fits (the skill names `olmo3`)")
+    start = donor.v3_slug or donor.slug or "<slug>"
+    ours, theirs = mst_max_version() or "unknown", skill_max_range(skills_root) or "unknown"
     return f"""# Port {res.repo_id} to MAX
 
 - Target architecture: `{res.architecture}` (config `model_type`: `{config.get('model_type', '?')}`)
 - Hugging Face: https://huggingface.co/{res.repo_id} at revision `{res.revision}`
 - The full config is in `config.json` next to this file.
+- Source of truth: the `{ENTRY_SKILL}` skill (`{skill}/SKILL.md`). Follow it over this file.
 
 ## Key config fields
 
 {fields}
 
-## Closest supported donor: `{donor.architecture}`
+## 1. Choose the lane first
 
-Why: {donor.reason}.
+MAX has two model APIs, and the donor must be on the same lane as the port.
+- **ModuleV3** (default for single-GPU ports): donor {v3}
+- **V2** (only if the model needs distributed machinery ModuleV3 lacks): donor {v2}
 
-Its implementation: {where}
+Closest supported architecture in MAX's catalog: `{donor.architecture}`. Why: {donor.reason}.
 
-## The loop
+## 2. Scaffold from the donor
 
-1. Inspect: read `config.json` and the model's HF modeling code; list what differs from the donor.
-2. Adapt from donor: scaffold a port directory from the donor's files and edit them, one layer at a time.
-3. Load weights: map the checkpoint's tensor names onto your graph; loading must be strict.
-4. Compile: build the graph with `max`; fix shape and dtype errors.
-5. Generate: `max serve --model-path {res.repo_id} --custom-architectures <port dir>` and send a prompt.
+From the skill root (`pixi install` there once):
+
+```
+cd {shlex.quote(str(skill))}
+pixi run python scripts/scaffold.py {res.repo_id} --start-from {start} --output-dir <output_dir>
+```
+
+The port dir is `<output_dir>/<slug>` (the slug folder holding `arch.py` and an `__init__.py`
+that exposes `ARCHITECTURES`). That folder is what `--custom-architectures` takes and what
+`mst pull --port` registers.
+
+## 3. The loop
+
+1. Inspect: read `config.json` and the HF modeling code; list what differs from the donor.
+2. Adapt from donor: edit the scaffolded files one layer at a time.
+3. Load weights: map checkpoint tensor names onto your graph; loading must be strict.
+4. Compile: fix shape and dtype errors.
+5. Generate: from the skill root, `pixi run max serve --model-path {res.repo_id} --custom-architectures <port dir>`
+   (cold compile takes 5 to 25 minutes), then send a prompt.
 6. Compare with the HF reference: compare logits and layer outputs against `transformers`.
-   If output is wrong (gibberish, diverges later), use the `debug-model` skill.
-7. Repeat from 2 until the greedy tokens match.
+   If output is wrong, use the `debug-model` skill.
+7. Repeat from 2 until greedy tokens match.
 
-Finished? Register it: `mst pull {res.repo_id} --port <port dir>`
-(the port dir must hold `arch.py` and an `__init__.py` that exposes `ARCHITECTURES`).
+## MAX versions
+
+The skill's pixi env uses `max {theirs}`. `mst serve` runs the port with the MAX installed for mst
+(`{ours}`). A port that works in one can break in the other; re-test after `mst pull --port`.
+
+## Finished?
+
+`mst pull {res.repo_id} --port <port dir>` (add `--name <name>` to pick the registered name).
+Workspace: `{workspace}`
 """
 
 
@@ -223,9 +287,10 @@ def prepare(ref: str, *, catalog: dict | None = None, hf=None, runner: Runner | 
     config = json.loads((workspace / "config.json").read_text())
     donor = pick_donor(res.architecture, config.get("model_type"), catalog,
                        arch_dir=arch_dir or max_architectures_dir())
-    (workspace / "PORT.md").write_text(_port_md(res, config, donor))
+    (workspace / "PORT.md").write_text(
+        _port_md(res, config, donor, skills_root=skills_root, workspace=workspace))
     _link_skills(workspace, skills_root, skills)
-    command = f'cd {workspace} && claude "/{ENTRY_SKILL} {res.repo_id}"'
+    command = f'cd {shlex.quote(str(workspace))} && claude {shlex.quote(f"/{ENTRY_SKILL} {res.repo_id}")}'
     return PortResult(res, workspace, command, skills, donor, message=res.message)
 
 
@@ -234,6 +299,9 @@ def prepare(ref: str, *, catalog: dict | None = None, hf=None, runner: Runner | 
 def check_port_dir(path: Path) -> None:
     if not path.is_dir():
         raise PortError(f"{path} is not a directory")
+    if ":" in str(path) or not path.name.isidentifier():
+        raise PortError(f"{path}: MAX imports the port dir by its folder name, so the name must be a "
+                        f"valid Python identifier and the path must not contain ':'")
     missing = [f for f in ("arch.py", "__init__.py") if not (path / f).is_file()]
     if missing:
         raise PortError(f"{path} is missing {', '.join(missing)}; the {ENTRY_SKILL} skill produces "
@@ -243,16 +311,24 @@ def check_port_dir(path: Path) -> None:
 
 
 def register(ref: str, port_dir: Path, *, store: Store | None = None, catalog: dict | None = None,
-             hf=None) -> Model:
-    """Register a finished port: weights come from the pinned HF snapshot, the architecture from port_dir."""
+             hf=None, name: str | None = None) -> Model:
+    """Register a finished port: weights come from the pinned HF snapshot, the architecture from port_dir.
+
+    Raises PortError for a bad port dir or weights; resolve.PullError / ResolveError as `pull` does.
+    """
     port_dir = Path(port_dir).expanduser().resolve()
     check_port_dir(port_dir)
     hf = hf or resolve.HubClient()
     res = resolve.resolve(ref, catalog=catalog, hf=hf)
-    if res.kind not in ("unsupported", "max-catalog", "hf-supported"):
-        raise PortError(res.message)
-    weights = hf.download(res.repo_id, res.revision, resolve.snapshot_patterns(res.files))
+    if not (res.supported or res.kind == "unsupported"):
+        raise resolve.PullError(res)
     store = store or Store.open()
-    return store.add_model(name=resolve.model_name(ref, res.repo_id), repo_id=res.repo_id,
+    name = name or resolve.model_name(ref, res.repo_id)
+    resolve.check_name_free(store, name, ref, res)
+    try:
+        weights = resolve.download_snapshot(res, hf)
+    except ValueError as e:
+        raise PortError(f"{res.repo_id}: {e}; MAX needs safetensors") from e
+    return store.add_model(name=name, repo_id=res.repo_id,
                            revision=res.revision, source="port", architecture=res.architecture or "unknown",
                            weights_path=str(weights), custom_arch_path=str(port_dir))
