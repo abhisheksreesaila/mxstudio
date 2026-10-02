@@ -73,7 +73,7 @@ async def test_passes_model_path_port_and_revision(sup, monkeypatch, tmp_path):
     assert args[args.index("--model-path") + 1] == "org/tiny"
     assert args[args.index("--huggingface-model-revision") + 1] == "abc123"
     assert args[args.index("--port") + 1] == str(st(sup, "tiny")["port"])
-    assert args[args.index("--served-model-name") + 1] == "tiny"  # clients ask for the mst name
+    assert args[args.index("--served-model-name") + 1] == "tiny"  # clients ask for the hotfire name
 
 
 async def test_downloaded_model_loads_from_its_local_snapshot(sup, monkeypatch, tmp_path):

@@ -84,7 +84,7 @@ def _run_max_list() -> str:
     try:
         proc = subprocess.run(["max", "list", "--json"], capture_output=True, text=True, timeout=120)
     except FileNotFoundError:
-        raise ResolveError("`max` not found: run mst inside the pixi env (pixi run mst ...)") from None
+        raise ResolveError("`max` not found: run hotfire inside the pixi env (pixi run hotfire ...)") from None
     except subprocess.TimeoutExpired:
         raise ResolveError("`max list --json` timed out; try again") from None
     if proc.returncode != 0:
@@ -177,7 +177,7 @@ def resolve(ref: str, *, catalog: dict | None = None, hf=None) -> Resolution:
     if entry is None:
         return Resolution("unsupported", repo_id, info.sha, arch, files=info.files, message=(
             f"{repo_id} uses {arch or 'an unknown architecture'}, which MAX does not support yet. "
-            f"Next step: mst port {ref}"))
+            f"Next step: hotfire port {ref}"))
     if not any(f.endswith(".safetensors") for f in info.files):
         return Resolution("no-safetensors", repo_id, info.sha, arch, files=info.files, message=(
             f"{repo_id} has no .safetensors weights (MAX needs safetensors); "
@@ -219,7 +219,7 @@ def check_name_free(store: Store, name: str, ref: str, res: Resolution) -> None:
     if existing and existing.repo_id.lower() != res.repo_id.lower():
         raise PullError(Resolution("name-taken", res.repo_id, res.revision, res.architecture, message=(
             f"name '{name}' is already registered for {existing.repo_id}; "
-            f"pick another with: mst pull {ref} --name <name>")))
+            f"pick another with: hotfire pull {ref} --name <name>")))
 
 
 def download_snapshot(res: Resolution, hf) -> str:

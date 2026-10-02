@@ -99,7 +99,7 @@ def test_prepare_creates_workspace(tmp_path):
 
 def test_prepare_supported_model_makes_no_workspace():
     res = port.prepare("qwen2.5-0.5b", catalog=CATALOG, hf=make_hf(), runner=Runner(), fetch_config=fake_fetch)
-    assert res.workspace is None and "mst pull" in res.message
+    assert res.workspace is None and "hotfire pull" in res.message
     assert not (hotfire_home() / "ports").exists()
 
 
@@ -144,7 +144,7 @@ def test_cli_port_supported_suggests_pull(monkeypatch):
     _patch(monkeypatch, make_hf(), Runner())
     monkeypatch.setattr("hotfire.resolve.load_catalog", lambda **kw: CATALOG)
     out = runner.invoke(cli.app, ["port", "qwen2.5-0.5b"])
-    assert out.exit_code == 0 and "mst pull qwen2.5-0.5b" in out.output
+    assert out.exit_code == 0 and "hotfire pull qwen2.5-0.5b" in out.output
 
 
 def test_cli_pull_port_registers(monkeypatch, tmp_path):

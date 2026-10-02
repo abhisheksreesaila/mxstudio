@@ -159,9 +159,9 @@ def test_model_name_for_pulled_and_unpulled_models(monkeypatch):
     # curated alias, not pulled yet
     nb = learn.build_notebook(model_id="qwen2.5-0.5b", repo_id="Qwen/Qwen2.5-0.5B-Instruct",
                               source=FakeHF(), registered=False, max_finder=lambda a: [])
-    assert "mst pull qwen2.5-0.5b" in text_of(nb)
+    assert "hotfire pull qwen2.5-0.5b" in text_of(nb)
     assert learn.resolve("qwen2.5-0.5b") == ("qwen2.5-0.5b", "Qwen/Qwen2.5-0.5B-Instruct", None, False)
-    assert learn.resolve("Qwen/Qwen2.5-0.5B-Instruct")[0] == "qwen2.5-0.5b"  # curated alias, as mst pull registers it
+    assert learn.resolve("Qwen/Qwen2.5-0.5B-Instruct")[0] == "qwen2.5-0.5b"  # curated alias, as hotfire pull registers it
     assert learn.resolve("Foo/Bar-7B")[0] == "bar-7b"
     # pulled: looked up by repo id returns the registered name
     Store.open().add_model(name="qwen2.5-0.5b", repo_id="Qwen/Qwen2.5-0.5B-Instruct", revision="r",
@@ -169,7 +169,7 @@ def test_model_name_for_pulled_and_unpulled_models(monkeypatch):
     assert learn.resolve("Qwen/Qwen2.5-0.5B-Instruct") == ("qwen2.5-0.5b", "Qwen/Qwen2.5-0.5B-Instruct", "r", True)
     nb = learn.build_notebook(model_id="qwen2.5-0.5b", repo_id="x/y", source=FakeHF(),
                               max_finder=lambda a: [])
-    assert "mst pull" not in text_of(nb)
+    assert "hotfire pull" not in text_of(nb)
 
 
 def test_base_url_default_comes_from_settings(monkeypatch):

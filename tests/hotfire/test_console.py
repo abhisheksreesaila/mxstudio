@@ -7,7 +7,7 @@ ADMIN = {"X-Mst-Admin": "1"}
 async def test_console_page_is_served_to_this_machine(http):
     r = await http.get("/console")
     assert r.status_code == 200
-    assert "MX Studio" in r.text and "/console/console.js" in r.text
+    assert "Hotfire" in r.text and "/console/console.js" in r.text
     js = await http.get("/console/console.js")
     assert js.status_code == 200 and "X-Mst-Admin" in js.text
     css = await http.get("/console/console.css")

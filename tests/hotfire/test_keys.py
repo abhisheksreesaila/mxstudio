@@ -87,7 +87,7 @@ def test_concurrent_first_keys_never_hand_out_a_dead_key(tmp_path):
     from hotfire.keys import KeyExists, create_key, verify_key
     from hotfire.store import Store
     results, barrier = [], threading.Barrier(8)
-    # One connection each, like separate `mst serve` processes. Opened up front: a thread that
+    # One connection each, like separate `hotfire serve` processes. Opened up front: a thread that
     # failed before the barrier would leave the others waiting forever (this test once hung).
     stores = [Store.open() for _ in range(8)]
 

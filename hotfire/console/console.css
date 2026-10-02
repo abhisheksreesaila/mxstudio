@@ -1,5 +1,5 @@
-/* MX Studio console: the "Azure Blade" system (design-system/DESIGN-SYSTEM.md). */
-/* Fonts ship with mst (SIL Open Font License): the console makes no outside requests. */
+/* Hotfire Mission Control: the "Azure Blade" system (design-system/DESIGN-SYSTEM.md). */
+/* Fonts ship with hotfire (SIL Open Font License): the console makes no outside requests. */
 @font-face { font-family: 'Source Sans 3'; font-weight: 400; font-display: swap; src: url(/console/source-sans-3-400.woff2) format('woff2'); }
 @font-face { font-family: 'Source Sans 3'; font-weight: 600; font-display: swap; src: url(/console/source-sans-3-600.woff2) format('woff2'); }
 @font-face { font-family: 'Source Code Pro'; font-weight: 400; font-display: swap; src: url(/console/source-code-pro-400.woff2) format('woff2'); }

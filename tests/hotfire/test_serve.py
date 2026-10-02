@@ -1,4 +1,4 @@
-"""`mst serve` end to end: a real daemon process, backed by the fake max binary."""
+"""`hotfire serve` end to end: a real daemon process, backed by the fake max binary."""
 import shlex
 import socket
 import sys
@@ -60,7 +60,7 @@ def test_second_serve_reuses_the_daemon_and_does_not_print_a_new_key(daemon_env)
     second = runner.invoke(app, ["serve", "tiny"])
     assert second.exit_code == 0, second.output
     assert "mst-" not in second.output.replace(key_from(first.output)[:12], "")
-    assert "mst keys new" in second.output
+    assert "hotfire keys new" in second.output
 
 
 def test_pin_and_keep_alive_are_recorded(daemon_env):
@@ -114,7 +114,7 @@ def test_admin_routes_refuse_browser_pages(daemon_env):
 
 
 def test_concurrent_serves_print_one_working_key(daemon_env):
-    import subprocess  # two real `mst serve` processes racing, as from two terminals
+    import subprocess  # two real `hotfire serve` processes racing, as from two terminals
     procs = [subprocess.Popen([sys.executable, "-m", "hotfire", "serve", "tiny"], stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT, text=True) for _ in range(2)]
     outs = [p.communicate(timeout=60)[0] for p in procs]

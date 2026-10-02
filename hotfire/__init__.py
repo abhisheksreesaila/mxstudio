@@ -1,1 +1,1 @@
-"""MX Studio core: the `mst` command, the model supervisor and the gateway."""
+"""Hotfire core: the `hotfire` command, the model supervisor and the gateway."""

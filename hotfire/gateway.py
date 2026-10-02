@@ -30,7 +30,7 @@ CONSOLE_FONTS = {"source-sans-3-400.woff2", "source-sans-3-600.woff2",
                  "source-code-pro-400.woff2", "source-code-pro-500.woff2"}
 CONSOLE_ASSETS = {"console.css", "console.js"} | CONSOLE_FONTS
 LOG_TAIL_BYTES = 8000
-# no-cache: an upgraded mst never shows a stale console. The rest: no other site can frame the
+# no-cache: an upgraded hotfire never shows a stale console. The rest: no other site can frame the
 # console (clickjacking Load/Stop) and the page loads nothing from anywhere but the daemon.
 CONSOLE_HEADERS = {"Cache-Control": "no-cache", "X-Frame-Options": "DENY",
                    "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; "
@@ -39,7 +39,7 @@ CONSOLE_HEADERS = {"Cache-Control": "no-cache", "X-Frame-Options": "DENY",
 HOP_BY_HOP = {"content-length", "transfer-encoding", "connection", "content-encoding"}
 
 SCALAR_PAGE = """<!doctype html>
-<html><head><meta charset="utf-8"><title>MX Studio API</title>
+<html><head><meta charset="utf-8"><title>Hotfire API</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body><div id="app"></div>
 <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
@@ -70,17 +70,17 @@ def openapi_spec(model_names: list[str]) -> dict:
     ok = {"200": {"description": "OpenAI-compatible response (an SSE stream when `stream` is true)",
                   "content": {"application/json": {"schema": {"type": "object"}}}},
           "401": {"description": "Missing or invalid key"},
-          "404": {"description": "Model not registered: run `mst pull <name>`"},
+          "404": {"description": "Model not registered: run `hotfire pull <name>`"},
           "503": {"description": "The model failed to start; the message has the log tail"}}
     return {
         "openapi": "3.1.0",
-        "info": {"title": "MX Studio API", "version": "1.0.0",
+        "info": {"title": "Hotfire API", "version": "1.0.0",
                  "description": "OpenAI-compatible endpoint for local models on Modular MAX. "
-                                "Point any OpenAI client at `/v1` with an `mst keys new <app>` key."},
+                                "Point any OpenAI client at `/v1` with an `hotfire keys new <app>` key."},
         "servers": [{"url": "/"}],
         "paths": {
             "/v1/models": {"get": {"summary": "List models", "security": secured, "responses": {
-                "200": {"description": "Registered models, with load state in the `mst` field",
+                "200": {"description": "Registered models, with load state in the `hotfire` field",
                         "content": {"application/json": {"schema": {"type": "object"}}}},
                 "401": {"description": "Missing or invalid key"}}}},
             "/v1/chat/completions": {"post": {"summary": "Create a chat completion", "security": secured,
@@ -100,7 +100,7 @@ def openapi_spec(model_names: list[str]) -> dict:
             "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer"}},
             "schemas": {
                 "ModelName": {"type": "string", "enum": model_names,
-                              "description": "A registered model. Add more with `mst pull`."},
+                              "description": "A registered model. Add more with `hotfire pull`."},
                 "ChatRequest": {"type": "object", "required": ["model", "messages"], "properties": {
                     "model": ref("ModelName"),
                     "messages": {"type": "array", "items": {
@@ -154,7 +154,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         return keys.verify_key(store, _bearer(request))
 
     def unauthorized() -> JSONResponse:
-        return openai_error(401, "Incorrect API key provided. Create one with `mst keys new <app>`.",
+        return openai_error(401, "Incorrect API key provided. Create one with `hotfire keys new <app>`.",
                             "invalid_api_key", "authentication_error")
 
     def loopback_only(request: Request) -> bool:
@@ -166,7 +166,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                 and host in LOOPBACK)
 
     def admin_only(request: Request) -> bool:
-        """Admin calls come from the mst CLI. The custom header can't be sent cross-site without a
+        """Admin calls come from the hotfire CLI. The custom header can't be sent cross-site without a
         CORS preflight (which the gateway never grants), so browser pages can't reach these routes."""
         origin = request.headers.get("origin")
         origin_ok = origin is None or origin.split("://", 1)[-1].rsplit(":", 1)[0].strip("[]") in LOOPBACK
@@ -219,7 +219,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             base = await supervisor.ensure_running(name)
         except UnknownModel:
             note(app_name, name, route, 404, started)
-            return openai_error(404, f"The model `{name}` is not registered. Run `mst pull {name}`.",
+            return openai_error(404, f"The model `{name}` is not registered. Run `hotfire pull {name}`.",
                                 "model_not_found")
         except StartFailed as e:
             note(app_name, name, route, 503, started)
@@ -277,7 +277,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
     def unknown_v1(request: Request, path: str):
         if authenticate(request) is None:
             return unauthorized()
-        return openai_error(404, f"mst does not serve /v1/{path}. Supported: /v1/models, "
+        return openai_error(404, f"hotfire does not serve /v1/{path}. Supported: /v1/models, "
                                  + ", ".join(PROXIED) + ".", "unknown_route")
 
     def note(app_name, model, route, status, started, meter=None, ttft_ms=None):
@@ -408,7 +408,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         try:
             base = await supervisor.ensure_running(name)
         except UnknownModel:
-            return openai_error(404, f"The model `{name}` is not registered. Run `mst pull {name}`.",
+            return openai_error(404, f"The model `{name}` is not registered. Run `hotfire pull {name}`.",
                                 "model_not_found")
         except StartFailed as e:
             return openai_error(503, f"Model `{name}` failed to start: {e}", "model_unavailable", "server_error")

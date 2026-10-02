@@ -1,4 +1,4 @@
-"""`mst port`: set up a workspace for bringing an architecture MAX does not support into MAX.
+"""`hotfire port`: set up a workspace for bringing an architecture MAX does not support into MAX.
 
 Modular publishes agent skills (github.com/modular/skills) for this; we keep a clone in
 HOTFIRE_HOME/skills/modular, make a workspace with the model's config and a PORT.md naming the
@@ -186,7 +186,7 @@ def _link_skills(workspace: Path, skills_root: Path, names: list[str]) -> None:
 
 
 def mst_max_version() -> str | None:
-    """The MAX that mst serves with, read from conda-meta (importlib.metadata can't see it here)."""
+    """The MAX that hotfire serves with, read from conda-meta (importlib.metadata can't see it here)."""
     for f in sorted(Path(sys.prefix, "conda-meta").glob("max-[0-9]*.json")):
         try:
             meta = json.loads(f.read_text())
@@ -274,7 +274,7 @@ pixi run python scripts/scaffold.py {res.repo_id} --start-from {start} --output-
 {lane_note}
 The port dir is `<output_dir>/<slug>` (the slug folder holding `arch.py` and an `__init__.py`
 that exposes `ARCHITECTURES`). That folder is what `--custom-architectures` takes and what
-`mst pull --port` registers.
+`hotfire pull --port` registers.
 
 ## 3. The loop
 
@@ -290,12 +290,12 @@ that exposes `ARCHITECTURES`). That folder is what `--custom-architectures` take
 
 ## MAX versions
 
-The skill's pixi env uses `max {theirs}`. `mst serve` runs the port with the MAX installed for mst
-(`{ours}`). A port that works in one can break in the other; re-test after `mst pull --port`.
+The skill's pixi env uses `max {theirs}`. `hotfire serve` runs the port with the MAX installed for hotfire
+(`{ours}`). A port that works in one can break in the other; re-test after `hotfire pull --port`.
 
 ## Finished?
 
-`mst pull {res.repo_id} --port <port dir>` (add `--name <name>` to pick the registered name).
+`hotfire pull {res.repo_id} --port <port dir>` (add `--name <name>` to pick the registered name).
 Workspace: `{workspace}`
 """
 
@@ -307,7 +307,7 @@ def prepare(ref: str, *, catalog: dict | None = None, hf=None, runner: Runner | 
     res = resolve.resolve(ref, catalog=catalog, hf=hf)
     if res.supported:
         return PortResult(res, message=f"{res.repo_id} ({res.architecture}) is already supported by MAX. "
-                                       f"Next step: mst pull {ref}")
+                                       f"Next step: hotfire pull {ref}")
     if res.kind != "unsupported":
         raise PortError(res.message)
     catalog = catalog if catalog is not None else resolve.load_catalog()

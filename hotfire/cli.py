@@ -1,4 +1,4 @@
-"""`mst`: the MX Studio command line."""
+"""`hotfire`: the Hotfire command line."""
 from __future__ import annotations
 
 import time
@@ -12,7 +12,7 @@ from hotfire import expose, keys
 from hotfire import report, resolve
 from hotfire.store import Store, format_duration, parse_duration
 
-app = typer.Typer(help="MX Studio: local models on Modular MAX you can see into and reshape.",
+app = typer.Typer(help="Hotfire: local models on Modular MAX you can see into and reshape.",
                   no_args_is_help=True, add_completion=False,
                   epilog="Exit codes: 0 ok, 1 refused (one `error:` line on stderr), 2 bad usage.")
 
@@ -31,7 +31,7 @@ def _fail(message: str) -> NoReturn:
 
 @app.callback()
 def _root() -> None:
-    """Keeps `mst` a command group even while it has one command."""
+    """Keeps `hotfire` a command group even while it has one command."""
 
 
 @app.command("ls")
@@ -44,7 +44,7 @@ def list_models(as_json: bool = JSON) -> None:
         typer.echo(report.dump(report.models_data(models, states, serve.daemon_running())))
         return
     if not models:
-        typer.echo("no models yet. Try: mst serve qwen2.5-0.5b")
+        typer.echo("no models yet. Try: hotfire serve qwen2.5-0.5b")
         return
     typer.echo(f"{'NAME':<24} {'STATE':<9} {'SOURCE':<13} {'PINNED':<7} {'KEEP-ALIVE':<10} REPO")
     for m in models:
@@ -71,7 +71,7 @@ def set_model(model: str = typer.Argument(..., help="A registered model name"),
         _fail(f"--keep-alive {keep_alive!r} is not a duration (try 90s, 10m or 1h)")
     store = Store.open()
     if store.get_model(model) is None:
-        _fail(f"no model named {model}. See: mst ls")
+        _fail(f"no model named {model}. See: hotfire ls")
     store.set_lifecycle(model, pinned=True if pin else False if unpin else None, keep_alive=seconds)
     m = store.get_model(model)
     if as_json:
@@ -87,10 +87,10 @@ def set_model(model: str = typer.Argument(..., help="A registered model name"),
 def logs_cmd(model: str = typer.Argument(..., help="A registered model name"),
              lines: int = typer.Option(50, "--lines", "-n", min=1, help="How many trailing lines."),
              follow: bool = typer.Option(False, "--follow", "-f", help="Keep printing new lines until Ctrl-C.")) -> None:
-    """Tail a model's server log (MX Studio's own log file; works without the daemon)."""
+    """Tail a model's server log (Hotfire's own log file; works without the daemon)."""
     from hotfire.store import hotfire_home
     if Store.open().get_model(model) is None:
-        _fail(f"no model named {model}. See: mst ls")
+        _fail(f"no model named {model}. See: hotfire ls")
     path = hotfire_home() / "logs" / f"{model}.log"
     try:
         with open(path, "rb") as f:
@@ -104,7 +104,7 @@ def logs_cmd(model: str = typer.Argument(..., help="A registered model name"),
                 else:
                     time.sleep(0.5)
     except FileNotFoundError:
-        _fail(f"no log yet for {model}. Start it with: mst serve {model}")
+        _fail(f"no log yet for {model}. Start it with: hotfire serve {model}")
     except KeyboardInterrupt:
         pass
 
@@ -186,12 +186,12 @@ def keys_new(app_name: str = typer.Argument(..., metavar="APP"),
 @keys_app.command("ls")
 def keys_ls(as_json: bool = JSON) -> None:
     """List keys (never the secret)."""
-    rows = [k for k in keys.list_keys(Store.open()) if not k.app.startswith("_")]  # hide mst's own keys
+    rows = [k for k in keys.list_keys(Store.open()) if not k.app.startswith("_")]  # hide hotfire's own keys
     if as_json:
         typer.echo(report.dump(report.keys_data(rows)))
         return
     if not rows:
-        typer.echo("no keys yet. Try: mst keys new <app>")
+        typer.echo("no keys yet. Try: hotfire keys new <app>")
         return
 
     when = report.when
@@ -205,7 +205,7 @@ def keys_ls(as_json: bool = JSON) -> None:
 def keys_revoke(app_name: str = typer.Argument(..., metavar="APP")) -> None:
     """Disable an app's key."""
     if app_name.startswith("_"):
-        _fail(f"{app_name} is managed by mst (mst expose --stop revokes it)")
+        _fail(f"{app_name} is managed by hotfire (hotfire expose --stop revokes it)")
     if not keys.revoke_key(Store.open(), app_name):
         _fail(f"no active key for {app_name}")
     typer.echo(f"revoked the key for {app_name}")
@@ -215,7 +215,7 @@ def keys_revoke(app_name: str = typer.Argument(..., metavar="APP")) -> None:
 def pull(ref: str = typer.Argument(..., help="Short name (qwen2.5-0.5b) or Hugging Face repo id"),
          dry_run: bool = typer.Option(False, "--dry-run", help="Only resolve; download nothing"),
          name: str = typer.Option(None, "--name", help="Register under this name"),
-         port_dir: Path = typer.Option(None, "--port", help="Register a finished port (from `mst port`) instead")) -> None:
+         port_dir: Path = typer.Option(None, "--port", help="Register a finished port (from `hotfire port`) instead")) -> None:
     """Resolve a model, download it at a pinned revision and register it."""
     if port_dir is not None:
         from hotfire import port
@@ -258,7 +258,7 @@ def port_model(ref: str = typer.Argument(..., help="Short name or Hugging Face r
     typer.echo(f"Workspace: {result.workspace} (config.json, PORT.md, .claude/skills)")
     typer.echo("Start the port with:")
     typer.echo(f"  {result.command}")
-    typer.echo(f"When it works: mst pull {ref} --port <port dir>")
+    typer.echo(f"When it works: hotfire pull {ref} --port <port dir>")
 
 
 @app.command("learn")
@@ -308,13 +308,13 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
             if expose.refresh_if_running(store):
                 typer.echo("restarted LiteLLM so the LAN endpoint lists it")
         except expose.ExposeError as e:
-            typer.echo(f"warning: could not refresh the LAN endpoint ({e}). Run: mst expose", err=True)
+            typer.echo(f"warning: could not refresh the LAN endpoint ({e}). Run: hotfire expose", err=True)
     name = found.name
     if pin or seconds is not None:
         store.set_lifecycle(name, pinned=pin, keep_alive=seconds)
     try:
         if serve.ensure_daemon():
-            typer.echo("started the mst daemon")
+            typer.echo("started the hotfire daemon")
         if not no_wait:
             typer.echo(f"loading {name} (the first load compiles the model and can take a minute)…")
             started = time.monotonic()
@@ -324,7 +324,7 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
         _fail(str(e))
     typer.echo("")
     typer.echo(serve.usage(name, serve.first_key(store)))
-    typer.echo(f"\nmanage it in the console: {report.console_link('models')}   (or: mst status, mst set {name} --pin)")
+    typer.echo(f"\nmanage it in the console: {report.console_link('models')}   (or: hotfire status, hotfire set {name} --pin)")
 
 
 @app.command("stop")
@@ -373,7 +373,7 @@ def expose_cmd(host: str = typer.Option(None, help="Hostname clients use. Defaul
     typer.echo(f"configs    {configs['caddyfile']}  {configs['litellm']}")
     if litellm:
         typer.echo(f"litellm    http://127.0.0.1:{expose.LITELLM_PORT}/ui (this machine only)")
-    typer.echo("keys       mst keys new <app>   (send it as: Authorization: Bearer <key>)")
+    typer.echo("keys       hotfire keys new <app>   (send it as: Authorization: Bearer <key>)")
     typer.echo(f"trust      copy {expose.ca_root_path()} to each client (this machine too) and trust it once")
     typer.echo("           Linux: sudo trust anchor root.crt · or pass it as the CA bundle (curl --cacert root.crt)")
 

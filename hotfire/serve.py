@@ -30,7 +30,7 @@ def daemon_running() -> bool:
 
 
 def ensure_daemon(timeout: float = 30.0) -> bool:
-    """Start `mst daemon` in the background unless it already answers. True if it was started now."""
+    """Start `hotfire daemon` in the background unless it already answers. True if it was started now."""
     if daemon_running():
         return False
     logs = hotfire_home() / "logs"
@@ -45,17 +45,17 @@ def ensure_daemon(timeout: float = 30.0) -> bool:
         if proc.poll() is not None:
             break
         time.sleep(0.1)
-    if daemon_running():  # lost a start race to another `mst serve`; its daemon is fine
+    if daemon_running():  # lost a start race to another `hotfire serve`; its daemon is fine
         return False
     tail = (logs / "daemon.log").read_text(errors="replace")[-600:]
-    raise DaemonError(f"the mst daemon did not start. Last log lines ({logs / 'daemon.log'}):\n{tail}")
+    raise DaemonError(f"the hotfire daemon did not start. Last log lines ({logs / 'daemon.log'}):\n{tail}")
 
 
 def _admin(path: str, timeout: float | None) -> httpx.Response:
     try:
         r = httpx.post(f"{daemon_url()}/admin/{path}", headers=ADMIN, timeout=timeout)
     except httpx.HTTPError as e:
-        raise DaemonError(f"could not reach the mst daemon at {daemon_url()}: {e}")
+        raise DaemonError(f"could not reach the hotfire daemon at {daemon_url()}: {e}")
     if r.status_code != 200:
         try:
             message = r.json()["error"]["message"]
@@ -110,7 +110,7 @@ def first_key(store: Store) -> str | None:
         return None
     try:
         return keys.create_key(store, DEFAULT_APP)
-    except keys.KeyExists:  # another `mst serve` made it a moment ago and printed it
+    except keys.KeyExists:  # another `hotfire serve` made it a moment ago and printed it
         return None
 
 
@@ -121,7 +121,7 @@ def usage(name: str, key: str | None) -> str:
     if key:
         lines.append(f"key       {key}   (app '{DEFAULT_APP}'; shown once, keep it)")
     else:
-        lines.append("key       use your app's key (mst keys ls), or make one: mst keys new <app>")
+        lines.append("key       use your app's key (hotfire keys ls), or make one: hotfire keys new <app>")
     lines += [
         "",
         f"curl {base}/chat/completions -H 'Authorization: Bearer {shown}' \\",

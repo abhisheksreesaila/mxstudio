@@ -34,13 +34,13 @@ def _hash(plaintext: str) -> str:
 
 
 def create_key(store: Store, app: str, *, rotate: bool = False, internal: bool = False) -> str:
-    """`internal` keys (names starting with '_') belong to mst itself, e.g. LiteLLM's upstream key."""
+    """`internal` keys (names starting with '_') belong to hotfire itself, e.g. LiteLLM's upstream key."""
     if not APP_NAME.fullmatch(app):
         raise ValueError(f"app name {app!r} must be letters, digits, '.', '_' or '-'")
     if app.startswith("_") and not internal:
-        raise ValueError(f"app names starting with '_' are reserved for mst")
+        raise ValueError(f"app names starting with '_' are reserved for hotfire")
     plaintext = "mst-" + secrets.token_urlsafe(32)
-    # Check and write in one write transaction, so two racing `mst serve` runs can't both
+    # Check and write in one write transaction, so two racing `hotfire serve` runs can't both
     # "create" a key and leave the first one printed but already overwritten.
     store.db.execute("BEGIN IMMEDIATE")
     try:

@@ -1,4 +1,4 @@
-# MX Studio design system: "Azure Blade"
+# Hotfire design system: "Azure Blade"
 
 Chosen in F-010 (2026-10-02). Flat, hairline-ruled, Azure-portal navigation. Canvas:
 https://claude.ai/artifact/21NSyXKpzcrqanmqr8bEe5 (option C).
@@ -29,7 +29,7 @@ https://claude.ai/artifact/21NSyXKpzcrqanmqr8bEe5 (option C).
 | `--bad-border` / `--bad-soft` | `#f1bbbc` / `#fdf3f4` | error banner |
 
 Type: **Source Sans 3** (400/600) for UI, **Source Code Pro** (400/500) for ids, paths, numbers.
-Both ship as woff2 files with mst (`mst/console/`, SIL OFL): the console makes no outside requests.
+Both ship as woff2 files with hotfire (`hotfire/console/`, SIL OFL): the console makes no outside requests.
 Sizes: 22 page title, 20 blade title, 14 body/table, 13 secondary, 12.5 mono.
 Radius: 0 everywhere except inputs/buttons (2px) and filter chips (12px). No shadows except the
 blade's left edge (`-6px 0 16px rgba(0,0,0,.06)`).
@@ -39,7 +39,7 @@ blade's left edge (`-6px 0 16px rgba(0,0,0,.06)`).
 - **Top bar** (40px, `--accent`): product name, host, global search, sample/status note.
 - **Resource menu** (228px, white, right rule): filter input, groups (bold 13px label), items
   14px; active item = `--accent-soft` background + 3px inset accent bar + 600 weight.
-- **Breadcrumb + title**: `Home > mst@<host>`, title `mst@<host> | <Page>`, muted subtitle.
+- **Breadcrumb + title**: `Home > hotfire@<host>`, title `hotfire@<host> | <Page>`, muted subtitle.
 - **Command bar**: borderless 36px text buttons between two hairlines; primary action in accent
   colour; vertical rule separates action groups.
 - **Filter row**: text filter (280px) + chips `Field == value`, count on the right.

@@ -1,4 +1,4 @@
-// MX Studio console. Plain JS; talks to the daemon's /admin routes on the same origin.
+// Hotfire Mission Control. Plain JS; talks to the daemon's /admin routes on the same origin.
 // Every piece of data (model names, logs) goes in as text nodes, never as HTML.
 (() => {
   "use strict";
@@ -14,15 +14,15 @@
     { label: "Settings", items: [["gateway", "Gateway (LiteLLM)"], ["daemon", "Daemon"]] },
   ];
   const SOON = {
-    pull: ["Pull a model", "Pulling from the console is coming. For now, from a terminal:", "mst pull qwen2.5-0.5b"],
-    ports: ["Ports", "Porting an unsupported architecture starts from a terminal:", "mst port <hugging-face-repo>"],
-    keys: ["API keys", "Managing keys here is coming with F-014. For now:", "mst keys ls · mst keys new <app> · mst keys revoke <app>"],
-    network: ["Network (expose)", "The LAN endpoint page is coming with F-014. For now:", "mst expose · mst expose --stop"],
-    metrics: ["Metrics", "Charts per model are coming after the Overview gauges.", "mst ls"],
+    pull: ["Pull a model", "Pulling from the console is coming. For now, from a terminal:", "hotfire pull qwen2.5-0.5b"],
+    ports: ["Ports", "Porting an unsupported architecture starts from a terminal:", "hotfire port <hugging-face-repo>"],
+    keys: ["API keys", "Managing keys here is coming with F-014. For now:", "hotfire keys ls · hotfire keys new <app> · hotfire keys revoke <app>"],
+    network: ["Network (expose)", "The LAN endpoint page is coming with F-014. For now:", "hotfire expose · hotfire expose --stop"],
+    metrics: ["Metrics", "Charts per model are coming after the Overview gauges.", "hotfire ls"],
     benchmarks: ["Benchmarks", "Prefill, decode and time-to-first-token comparisons are planned for v2.", ""],
-    logs: ["Logs", "Each model's log is on its Logs tab (Models › a model › Logs). Files live in:", "~/.mst/logs/"],
+    logs: ["Logs", "Each model's log is on its Logs tab (Models › a model › Logs). Files live in:", "~/.hotfire/logs/"],
     gateway: ["Gateway (LiteLLM)", "LiteLLM routes and health will show here. Its own UI runs on this machine only:", "http://127.0.0.1:4000/ui"],
-    daemon: ["Daemon", "Daemon settings will show here. Restart it from a terminal:", "mst stop --all && mst serve <model>"],
+    daemon: ["Daemon", "Daemon settings will show here. Restart it from a terminal:", "hotfire stop --all && hotfire serve <model>"],
   };
 
   const state = {
@@ -100,9 +100,9 @@
       const info = await api("GET", "/admin/info");
       state.info = info;
       state.infoAt = Date.now();
-      $("host").textContent = `mst@${info.host}`;
-      $("crumb-host").textContent = `mst@${info.host}`;
-      $("title-host").textContent = `mst@${info.host}`;
+      $("host").textContent = `hotfire@${info.host}`;
+      $("crumb-host").textContent = `hotfire@${info.host}`;
+      $("title-host").textContent = `hotfire@${info.host}`;
     } catch (_) { /* the banner covers a dead daemon */ }
   }
 
@@ -166,7 +166,7 @@
   }
   function cliFor(m) {
     const e = effective(m);
-    return e.pinned ? `mst serve ${m.name} --pin` : `mst serve ${m.name} --keep-alive ${duration(e.keep_alive)}`;
+    return e.pinned ? `hotfire serve ${m.name} --pin` : `hotfire serve ${m.name} --keep-alive ${duration(e.keep_alive)}`;
   }
 
   function select(name) {
@@ -226,7 +226,7 @@
       return [commands, h("div", { class: "empty" },
         h("h2", {}, "No models yet"),
         h("p", {}, "Serve your first model from a terminal. It shows up here as soon as it is registered."),
-        h("div", { class: "code" }, "mst serve qwen2.5-0.5b"))];
+        h("div", { class: "code" }, "hotfire serve qwen2.5-0.5b"))];
     }
     const nextState = { all: "ready", ready: "cold", cold: "starting", starting: "crashed", crashed: "all" };
     const filters = h("div", { class: "filters" },
@@ -326,7 +326,7 @@
     const usedGb = gpus.reduce((a, g) => a + g.used_mb, 0) / 1024, totalGb = gpus.reduce((a, g) => a + g.total_mb, 0) / 1024;
     const essentials = [
       ["Local endpoint", info.endpoint || "—"],
-      ["LAN endpoint", info.lan_endpoint || "not exposed (mst expose)"],
+      ["LAN endpoint", info.lan_endpoint || "not exposed (hotfire expose)"],
       ["MAX", info.max_version || "unknown"],
       ["Hardware", state.error ? "unknown while the daemon is down" : gpus.length ? `${gpus.length} × ${gpus[0].name.replace("NVIDIA GeForce ", "")}` : "no NVIDIA GPU found"],
       ["Daemon", state.error ? "not answering" : `up ${duration2(uptime)}`],
@@ -375,8 +375,8 @@
     const banner = $("banner");
     banner.hidden = !state.error;
     if (state.error) banner.replaceChildren(
-      h("strong", {}, "The mst daemon isn't answering. "),
-      "Start it with ", h("span", { class: "mono" }, "mst serve <model>"), " or ", h("span", { class: "mono" }, "mst daemon"),
+      h("strong", {}, "The hotfire daemon isn't answering. "),
+      "Start it with ", h("span", { class: "mono" }, "hotfire serve <model>"), " or ", h("span", { class: "mono" }, "hotfire daemon"),
       ". This page retries every few seconds.");
   }
 
@@ -405,7 +405,7 @@
         h("div", { class: "field" }, h("label", {}, "The same from a terminal"), h("div", { class: "code" }, cliFor(m))));
     } else if (state.tab === "logs") {
       body = [h("pre", { class: "log" }, state.log || "No log yet. It appears once the model has been started."),
-        h("p", { class: "help" }, `~/.mst/logs/${m.name}.log (last 8 KB)`)];
+        h("p", { class: "help" }, `~/.hotfire/logs/${m.name}.log (last 8 KB)`)];
     } else {
       body = h("dl", { class: "facts" },
         h("dt", {}, "State"), h("dd", {}, badge(m.state)),

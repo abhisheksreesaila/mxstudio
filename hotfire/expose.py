@@ -1,4 +1,4 @@
-"""`mst expose`: put the daemon on the LAN behind Caddy (HTTPS + key check) and LiteLLM.
+"""`hotfire expose`: put the daemon on the LAN behind Caddy (HTTPS + key check) and LiteLLM.
 
 Request path: client → Caddy (tls internal, forward_auth → daemon /auth/check)
 → LiteLLM (routing, master key) → daemon → max serve. With --no-litellm, Caddy
@@ -40,7 +40,7 @@ class ExposeError(Exception):
 
 
 def lan_endpoint() -> str | None:
-    """https endpoint on the LAN when `mst expose` is running, else None."""
+    """https endpoint on the LAN when `hotfire expose` is running, else None."""
     if not status()["caddy"]:
         return None
     try:
@@ -113,7 +113,7 @@ def render_litellm_config(models: list[Model]) -> str:
 
 
 def refresh_if_running(store: Store | None = None) -> bool:
-    """Restart LiteLLM with the current model list, if `mst expose` is running with it."""
+    """Restart LiteLLM with the current model list, if `hotfire expose` is running with it."""
     if not status()["litellm"]:
         return False
     host = (expose_dir() / "host").read_text().strip()
@@ -223,7 +223,7 @@ def start(*, host: str, litellm: bool = True, store: Store | None = None) -> dic
                                         stdin=subprocess.DEVNULL, start_new_session=True)
             except FileNotFoundError as e:
                 stop(store=store)
-                raise ExposeError(f"{name} not found ({e.filename}). Install it, then run mst expose again.")
+                raise ExposeError(f"{name} not found ({e.filename}). Install it, then run hotfire expose again.")
         _pid_file(name).write_text(f"{proc.pid} {_start_time(proc.pid)}")
         started.append((name, proc, log_path))
     deadline = time.monotonic() + SETTLE_SECONDS

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """F-011 live acceptance: three small models behind one keyed HTTPS endpoint.
 
-Run on the real machine with memory free:  pixi run python scripts/mst_acceptance.py
+Run on the real machine with memory free:  pixi run python scripts/hotfire_acceptance.py
 It pulls (if needed) and serves the models, exposes them through Caddy + LiteLLM,
 then checks chat, streaming, concurrent use, idle unload and reload over HTTPS.
 """
@@ -18,20 +18,20 @@ import urllib.request
 import httpx
 from openai import AsyncOpenAI
 
-from mst import expose
-from mst.settings import EXPOSE_PORT, daemon_url
+from hotfire import expose
+from hotfire.settings import EXPOSE_PORT, daemon_url
 
 MODELS = ["qwen2.5-0.5b", "smollm2-1.7b", "qwen2.5-1.5b"]
 IDLE_MODEL = "qwen2.5-0.5b"  # gets a short keep-alive so we can watch it unload and come back
 
 
-def mst(*args: str) -> str:
-    print(f"$ mst {' '.join(args)}", flush=True)
-    result = subprocess.run(["mst", *args], capture_output=True, text=True)
+def hotfire(*args: str) -> str:
+    print(f"$ hotfire {' '.join(args)}", flush=True)
+    result = subprocess.run(["hotfire", *args], capture_output=True, text=True)
     print(result.stdout.rstrip())
     if result.returncode != 0:
         print(result.stderr.rstrip(), file=sys.stderr)
-        raise SystemExit(f"FAIL: mst {' '.join(args)} exited {result.returncode}")
+        raise SystemExit(f"FAIL: hotfire {' '.join(args)} exited {result.returncode}")
     return result.stdout
 
 
@@ -66,13 +66,13 @@ async def run(host: str, idle_wait: int) -> None:
         print(f"{'PASS' if ok else 'FAIL'}  {name}  {detail}", flush=True)
 
     for m in MODELS:
-        mst("pull", m)
-    mst("serve", MODELS[1], "--pin", "--no-wait")
-    mst("serve", MODELS[2], "--no-wait")
-    mst("serve", IDLE_MODEL, "--keep-alive", "60s", "--no-wait")
-    out = mst("keys", "new", "acceptance", "--rotate")
+        hotfire("pull", m)
+    hotfire("serve", MODELS[1], "--pin", "--no-wait")
+    hotfire("serve", MODELS[2], "--no-wait")
+    hotfire("serve", IDLE_MODEL, "--keep-alive", "60s", "--no-wait")
+    out = hotfire("keys", "new", "acceptance", "--rotate")
     key = next(tok for tok in out.split() if tok.startswith("mst-"))
-    mst("expose", "--host", host)
+    hotfire("expose", "--host", host)
     await asyncio.sleep(15)  # LiteLLM boot
 
     base = f"https://{host}:{EXPOSE_PORT}/v1"

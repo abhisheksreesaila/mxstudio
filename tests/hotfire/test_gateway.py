@@ -116,7 +116,7 @@ async def test_unknown_model_404_names_pull(http, key):
     assert r.status_code == 404
     err = r.json()["error"]
     assert err["code"] == "model_not_found" and err["type"] == "invalid_request_error"
-    assert "mst pull nope" in err["message"]
+    assert "hotfire pull nope" in err["message"]
 
 
 async def test_missing_model_is_400(http, key):

@@ -1,4 +1,4 @@
-"""Formatting and data helpers for the read commands (`mst status`, `metrics`, `requests`, `--json`)."""
+"""Formatting and data helpers for the read commands (`hotfire status`, `metrics`, `requests`, `--json`)."""
 from __future__ import annotations
 
 import json
@@ -27,7 +27,7 @@ def when(t: float | None) -> str:
 
 
 def lan_endpoint() -> str | None:
-    """https endpoint on the LAN when `mst expose` is running, else None."""
+    """https endpoint on the LAN when `hotfire expose` is running, else None."""
     from hotfire import expose
     return expose.lan_endpoint()
 
@@ -39,7 +39,7 @@ def format_uptime(seconds: int) -> str:
 
 
 def status_data(store, info: dict | None, states: dict[str, str]) -> dict:
-    """Everything `mst status` shows. Models are 'cold' when the daemon isn't running."""
+    """Everything `hotfire status` shows. Models are 'cold' when the daemon isn't running."""
     from hotfire import expose, keys
     from hotfire.port import mst_max_version
     models = store.models()
@@ -59,8 +59,8 @@ def status_data(store, info: dict | None, states: dict[str, str]) -> dict:
 def status_text(d: dict) -> str:
     daemon = d["daemon"]
     up = (f"running, up {format_uptime(daemon['uptime_seconds'])}" if daemon["running"]
-          else "not running (mst serve <model> starts it)")
-    lan = d["lan"]["endpoint"] or "not exposed (mst expose)"
+          else "not running (hotfire serve <model> starts it)")
+    lan = d["lan"]["endpoint"] or "not exposed (hotfire expose)"
     by = ", ".join(f"{n} {s}" for s, n in sorted(d["models"]["by_state"].items())) or "none"
     return "\n".join([f"{'daemon':<10}{up}", f"{'endpoint':<10}{d['endpoint']}", f"{'console':<10}{d['console']}",
                       f"{'lan':<10}{lan}", f"{'models':<10}{d['models']['total']} ({by})",

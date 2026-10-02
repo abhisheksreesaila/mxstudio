@@ -29,7 +29,7 @@ def test_unsupported_names_architecture_and_port():
     res = r.resolve("acme/weird", catalog=CATALOG, hf=make_hf())
     assert res.kind == "unsupported"
     assert res.architecture == "WeirdForCausalLM"
-    assert "mst port acme/weird" in res.message
+    assert "hotfire port acme/weird" in res.message
 
 
 def test_missing_repo():

@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS keys (
 
 
 def _migrate_legacy_home(new: Path) -> None:
-    """Move ~/.mst to ~/.hotfire once, when only the old folder exists."""
+    """Move ~/.hotfire to ~/.hotfire once, when only the old folder exists."""
     old = Path.home() / ".mst"
     if not new.exists() and old.is_dir():
         old.rename(new)

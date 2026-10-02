@@ -7,7 +7,7 @@ Tokens and components: `design-system/DESIGN-SYSTEM.md`.
 ## Where it lives
 Served by the daemon at `http://127.0.0.1:11435/console` (loopback-only, like `/docs`). Plain HTML,
 CSS and JavaScript; the page calls the daemon's `/admin/*` routes with the `X-Mst-Admin: 1`
-header (same origin, so no CORS). Nothing is reachable through `mst expose`.
+header (same origin, so no CORS). Nothing is reachable through `hotfire expose`.
 
 ## Pages (resource menu)
 - Overview · Activity log
@@ -17,13 +17,13 @@ header (same origin, so no CORS). Nothing is reachable through `mst expose`.
 - Settings: Gateway (LiteLLM), Daemon
 
 ## Honest controls only
-The blade shows only settings mst really has: **pin** and **unload after idle**. Device,
+The blade shows only settings hotfire really has: **pin** and **unload after idle**. Device,
 encoding and max length appear once the supervisor supports them (not as dead controls).
 
 ## States to build
 - Empty: no models yet → the grid says so with a "Serve model" call to action.
 - Loading: grid rows as skeleton lines; a model in `starting` shows elapsed time.
-- Error: daemon unreachable → a full-width banner with `mst serve` / `mst daemon` hint;
+- Error: daemon unreachable → a full-width banner with `hotfire serve` / `hotfire daemon` hint;
   a crashed model's blade opens on the Logs tab with the log tail.
 - Long content: long model names truncate with a title tooltip; blade body scrolls.
 - Narrow screens: under 900px the blade becomes a full-width sheet over the grid and the

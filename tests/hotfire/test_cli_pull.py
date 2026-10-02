@@ -25,7 +25,7 @@ def test_pull_unsupported_prints_architecture_and_port(monkeypatch):
     _patch(monkeypatch, hf)
     result = runner.invoke(cli.app, ["pull", "acme/weird"])
     assert result.exit_code == 1
-    assert "WeirdForCausalLM" in result.output and "mst port acme/weird" in result.output
+    assert "WeirdForCausalLM" in result.output and "hotfire port acme/weird" in result.output
     assert hf.downloads == []
 
 

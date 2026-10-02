@@ -30,7 +30,7 @@ class SupervisorError(Exception):
 
 class UnknownModel(SupervisorError):
     def __init__(self, name: str):
-        super().__init__(f"unknown model {name!r}: register it with `mst pull`")
+        super().__init__(f"unknown model {name!r}: register it with `hotfire pull`")
         self.name = name
 
 
@@ -148,7 +148,7 @@ class Supervisor:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             f.close()
-            raise DaemonAlreadyRunning("another mst daemon is already running for this HOTFIRE_HOME") from None
+            raise DaemonAlreadyRunning("another hotfire daemon is already running for this HOTFIRE_HOME") from None
         self._lock_file = f
 
     def sweep_orphans(self) -> list[int]:
