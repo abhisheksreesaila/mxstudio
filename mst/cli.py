@@ -4,11 +4,12 @@ from __future__ import annotations
 import time
 import subprocess
 from pathlib import Path
+from typing import NoReturn
 
 import typer
 
 from mst import expose, keys
-from mst import resolve
+from mst import report, resolve
 from mst.store import Store, format_duration, parse_duration
 
 app = typer.Typer(help="MX Studio: local models on Modular MAX you can see into and reshape.",
@@ -17,6 +18,11 @@ app = typer.Typer(help="MX Studio: local models on Modular MAX you can see into 
 
 keys_app = typer.Typer(help="Per-app API keys.", no_args_is_help=True)
 app.add_typer(keys_app, name="keys")
+
+
+def _fail(message: str) -> NoReturn:
+    typer.echo(f"error: {message}")
+    raise typer.Exit(1)
 
 
 @app.callback()
@@ -38,6 +44,29 @@ def list_models() -> None:
         keep = "-" if m.pinned else format_duration(m.keep_alive)
         state = states.get(m.name, "-")
         typer.echo(f"{m.name:<24} {state:<9} {m.source:<13} {'yes' if m.pinned else 'no':<7} {keep:<10} {m.repo_id}")
+
+
+@app.command("set")
+def set_model(model: str = typer.Argument(..., help="A registered model name"),
+              pin: bool = typer.Option(False, "--pin", help="Keep it loaded; never unload when idle."),
+              unpin: bool = typer.Option(False, "--unpin", help="Let it unload when idle again."),
+              keep_alive: str = typer.Option(None, "--keep-alive", help="Unload after this idle time: 90s, 10m, 1h.")) -> None:
+    """Change a model's pin and keep-alive (what the console's Models page edits)."""
+    if pin and unpin:
+        _fail("--pin and --unpin together make no sense")
+    if not (pin or unpin or keep_alive):
+        _fail("nothing to change. Use --pin, --unpin or --keep-alive 10m")
+    try:
+        seconds = parse_duration(keep_alive) if keep_alive else None
+    except ValueError:
+        _fail(f"--keep-alive {keep_alive!r} is not a duration (try 90s, 10m or 1h)")
+    store = Store.open()
+    if store.get_model(model) is None:
+        _fail(f"no model named {model}. See: mst ls")
+    store.set_lifecycle(model, pinned=True if pin else False if unpin else None, keep_alive=seconds)
+    m = store.get_model(model)
+    typer.echo(f"{m.name}: {report.lifecycle(m)}")
+    typer.echo(f"console  {report.console_link('models')}")
 
 
 @keys_app.command("new")
