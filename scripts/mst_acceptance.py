@@ -36,7 +36,8 @@ def mst(*args: str) -> str:
 
 
 def model_state(name: str) -> str:
-    with urllib.request.urlopen(f"{daemon_url()}/admin/status") as r:
+    req = urllib.request.Request(f"{daemon_url()}/admin/status", headers={"X-Mst-Admin": "1"})
+    with urllib.request.urlopen(req) as r:
         return {m["name"]: m["state"] for m in json.load(r)}.get(name, "missing")
 
 
