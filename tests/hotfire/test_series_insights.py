@@ -102,3 +102,11 @@ def test_error_rate_over_two_percent_ignores_401(tmp_path):
     for i in range(100):
         rec(low, ts=NOW - 30 - i, model="a", status=500 if i == 0 else 200)
     assert insights.compute(low, models(a=("ready", False)), now=NOW) == []
+
+
+def test_idle_rule_skips_models_that_are_starting_or_busy(tmp_path):
+    store = Store(tmp_path / "mst.db")
+    rows = [{"name": "boot", "state": "starting", "pinned": False},
+            {"name": "busy", "state": "ready", "pinned": False, "idle_seconds": None, "in_flight": 1},
+            {"name": "quiet", "state": "ready", "pinned": False, "idle_seconds": None, "in_flight": 0}]
+    assert [i["id"] for i in insights.compute(store, rows, now=NOW)] == ["idle:quiet"]

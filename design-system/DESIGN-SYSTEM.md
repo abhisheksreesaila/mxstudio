@@ -37,6 +37,19 @@ calm graphite chrome, white cards, and colour that means something (a section's 
 | `--ok` / `--warn` / `--bad` | `#16a34a` / `#d97706` / `#dc2626` | same | `#22c55e` / `#f59e0b` / `#ef4444` |
 | `--code` / `--code-text` | `#0d0d10` / `#e4e4e7` | same | `#000000` / `#e4e4e7` |
 
+### Code and accents
+The same in every theme. The console takes them from these custom properties, never as bare hex.
+
+| Token | Value | Used for |
+|---|---|---|
+| `--cp-str` / `--cp-num` / `--cp-kw` | `#ce9178` / `#b5cea8` / `#569cd6` | code panel (API page): strings, numbers, keywords |
+| `--cp-com` / `--cp-key` / `--cp-fn` / `--cp-txt` | `#6a9955` / `#9cdcfe` / `#dcdcaa` / `#d4d4d4` | code panel: comments, keys, functions, plain text |
+| `--accent` | `#0090ff` | focus ring, active tab underline, info tint |
+| `--accent-text` | `#0070d6` (dark theme `#52a9ff`) | text on the accent tint (info pill, POST badge) |
+| `--magenta` | `#c239b3` | the key name in the `Authorization` line |
+
+The code panel background is `--code`. `--tk-*` colours are the light-on-card variants used by inline code blocks.
+
 **Tokyo Night (Omarchy) theme, optional:** on a machine running Omarchy, Hotfire can read
 `~/.local/state/omarchy/current/theme/colors.toml` and map it (background → page, dark_background → chrome,
 lighter_background → card, accent → primary, its colours → hues and signals), with JetBrains Mono as the

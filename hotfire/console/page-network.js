@@ -54,6 +54,9 @@ export function networkPage(ctx) {
   const host = h("div", {});
   ctx.body.replaceChildren(host);
   let net = null, failed = null, sig = "";
+  const narrow = window.matchMedia("(max-width: 640px)");
+  const onNarrow = () => { sig = ""; load(); };
+  narrow.addEventListener("change", onNarrow);
 
   const node = (x, y, w, hgt, { title, lines, icon: ic, color, on, state, lock }) => h("div", { class: on ? "node" : "node off", style: { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${hgt}px`, "--c": color } },
     h("div", { class: "nh" }, h("span", { class: "chip26" }, icon(ic, 14, "currentColor", 1.8)), h("span", {}, title), lock ? icon("lock", 13, "currentColor", 2) : null,
@@ -67,6 +70,45 @@ export function networkPage(ctx) {
   }
   const curve = (x1, y1, x2, y2) => { const mid = (x1 + x2) / 2; return `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`; };
 
+  // phone width: one column. apps, Caddy, LiteLLM, daemon top to bottom, then the jacks hanging off a bus on the left
+  function drawStacked(net, shown) {
+    const { expose: ex, ports, apps } = net, exposed = net.exposed, lite = ex.litellm, recent = net.recent_requests > 0;
+    const W = 322, NH = 100, GAP = 30, JH = 64, JGAP = 12, JX = 44, n = shown.length;
+    const app = apps.length ? { title: `${apps.length} app${apps.length > 1 ? "s" : ""}`, lines: [apps.slice(0, 3).map((a) => a.app).join(", "), `${ago(apps[0].last_ts)} · ${apps[0].requests} in 24 h`], icon: "bot" }
+      : { title: "your apps", lines: ["any OpenAI client", "one key per app"], icon: "laptop" };
+    const col = [];
+    col.push({ k: "apps", ...app, color: HUE.network, on: true, state: "" });
+    if (exposed) {
+      col.push({ k: "caddy", title: "Caddy", icon: "shield-check", color: HUE.gateway, on: true, state: "running", lock: true, lines: [`:${ports.caddy} · HTTPS, own CA`, "checks every key", "only 4 routes pass"] });
+      col.push({ k: "lite", title: "LiteLLM", icon: "route", color: HUE.gateway, on: lite, state: lite ? "running" : "not used", lines: [`127.0.0.1:${ports.litellm}`, "routes by model name", "master key, local only"] });
+    }
+    col.push({ k: "daemon", title: "daemon", icon: "server", color: HUE.daemon, on: true, state: "running", lines: [`127.0.0.1:${ports.daemon}`, "loads on demand", "unloads when idle"] });
+    const cables = [], boxes = [];
+    col.forEach((c, i) => {
+      const y = 16 + i * (NH + GAP);
+      boxes.push(node(0, y, W, NH, c));
+      if (i) {
+        const flowing = recent ? "flow" : "idle";
+        const mode = !exposed ? (recent ? "flow" : "off") : (c.k === "lite" || (c.k === "daemon" && !lite)) && !lite ? "off" : flowing;
+        cables.push(...cable(`M ${W / 2} ${y - GAP} V ${y}`, c.k === "daemon" ? HUE.daemon : HUE.gateway, mode));
+      }
+    });
+    const dBottom = 16 + (col.length - 1) * (NH + GAP) + NH;
+    shown.forEach((m, i) => {
+      const jy = dBottom + GAP + i * (JH + JGAP), color = colorOf(m.name), live = m.state === "ready", starting = m.state === "starting";
+      const bx = 6 + (n - 1 - i) * 4, cy = jy + JH / 2;
+      boxes.push(h("div", { class: live ? "jack" : starting ? "jack starting" : "jack cold", style: { left: `${JX}px`, top: `${jy}px`, width: `${W - JX}px`, height: `${JH}px`, "--c": color } },
+        h("span", { class: "ring" }), h("div", { style: "min-width:0" }, h("div", { class: "jn mono trunc", title: m.name }, m.name),
+          h("div", { class: "jp mono" }, m.port ? ["127.0.0.1:", h("span", { style: { color, fontWeight: 500 } }, String(m.port))] : starting ? "starting…" : "not loaded"))));
+      cables.push(...cable(`M ${bx} ${dBottom - NH / 2 + i * 2} V ${cy - 10} Q ${bx} ${cy} ${bx + 10} ${cy} H ${JX}`, color, live ? (m.recent > 0 ? "flow" : "idle") : "off"));
+    });
+    const H = dBottom + GAP + n * (JH + JGAP) + 4;
+    const svg = s("svg", { class: "cables", viewBox: `0 0 ${W} ${H}`, width: W, height: H, "aria-hidden": "true" }, ...cables);
+    const stage = h("div", { class: "bay-stage", style: { height: `${H}px`, width: `${W}px` } }, svg, ...boxes);
+    ctx.setSub(`${exposed ? `exposed at ${net.lan_endpoint || "your LAN"}` : "this machine only"} · daemon :${ports.daemon} · ${net.models.filter((m) => m.state === "ready").length} of ${net.models.length} models loaded`);
+    host.replaceChildren(factsRow(net), h("section", { class: "panel bay" }, stage));
+  }
+
   function draw() {
     if (failed) { host.replaceChildren(h("div", { class: "panel empty" }, h("h2", {}, "Could not read the network state"), h("p", {}, failed))); return; }
     if (!net) { host.replaceChildren(h("div", { class: "panel empty" }, h("p", {}, "Loading…"))); return; }
@@ -79,26 +121,32 @@ export function networkPage(ctx) {
       exposed ? h("button", { class: "btn", type: "button", onClick: stopExpose }, icon("square", 14), "Stop exposing")
         : h("button", { class: "btn primary", type: "button", onClick: exposeDialog }, icon("globe", 15), "Expose"));
 
-    const shown = models.slice(0, 6);
+    const shown = models.slice(0, 8);
     const n = shown.length;
-    const H = Math.max(560, 250 + n * 84 + 24);
+    if (narrow.matches) { drawStacked(net, shown); return; }
+    const JH = 70, JGAP = 12; // a jack and the space between jacks
+    const H = Math.max(500, 120 + n * (JH + JGAP));
+    const MID = H / 2;
     const clients = apps.length ? apps.slice(0, 4).map((a) => ({ title: a.app, lines: [`key: ${a.app}`, `${ago(a.last_ts)} · ${a.requests} in 24 h`], icon: "bot" }))
       : [{ title: "your apps", lines: ["any OpenAI client", "one key per app"], icon: "laptop" }];
-    const CH = 90, GAP = 24, CW = 190, MID = 270;
+    const CH = 90, GAP = 24, CW = 154;
     const startY = MID - (clients.length * CH + (clients.length - 1) * GAP) / 2;
-    const caddy = { x: 290, y: MID - 58, w: 200, h: 116 }, lite_ = { x: 540, y: MID - 58, w: 200, h: 116 }, daemon = { x: 800, y: 50, w: 210, h: 116 };
+    // four columns, every box centred on the same line: apps, Caddy, LiteLLM, daemon; the model jacks fan out to the right
+    const caddy = { x: 204, y: MID - 58, w: 186, h: 116 }, lite_ = { x: 426, y: MID - 58, w: 186, h: 116 }, daemon = { x: 648, y: MID - 58, w: 180, h: 116 };
+    const jackX = 892, jackW = 190;
     const cables = [], boxes = [];
-    const into = daemon.y + 22; // where a cable from the left enters the daemon
+    const into = MID; // where a cable from the left enters the daemon
     clients.forEach((c, i) => {
       const y = startY + i * (CH + GAP);
-      boxes.push(node(20, y, CW, CH, { ...c, color: HUE.network, on: true, state: "" }));
-      if (exposed) cables.push(...cable(curve(20 + CW, y + CH / 2, caddy.x, MID - 30 + (clients.length > 1 ? (i * 60) / (clients.length - 1) : 30)), HUE.network, recent ? "flow" : "idle"));
-      else cables.push(...cable(curve(20 + CW, y + CH / 2, daemon.x, into), HUE.daemon, recent ? "flow" : "off"));
+      boxes.push(node(16, y, CW, CH, { ...c, color: HUE.network, on: true, state: "" }));
+      if (exposed) cables.push(...cable(curve(16 + CW, y + CH / 2, caddy.x, MID - 30 + (clients.length > 1 ? (i * 60) / (clients.length - 1) : 30)), HUE.network, recent ? "flow" : "idle"));
+      else cables.push(...cable(curve(16 + CW, y + CH / 2, daemon.x, into - 30 + (clients.length > 1 ? (i * 60) / (clients.length - 1) : 30)), HUE.daemon, recent ? "flow" : "off"));
     });
     if (exposed) {
       cables.push(...cable(curve(caddy.x + caddy.w, MID, lite_.x, MID), HUE.gateway, lite ? (recent ? "flow" : "idle") : "off"));
       cables.push(...cable(curve(lite_.x + lite_.w, MID, daemon.x, into), HUE.daemon, lite ? (recent ? "flow" : "idle") : "off"));
-      if (!lite) cables.push(...cable(`M ${caddy.x + caddy.w / 2} ${caddy.y} C ${caddy.x + caddy.w / 2} 70, 700 ${into}, ${daemon.x} ${into}`, HUE.daemon, recent ? "flow" : "idle"));
+      // without LiteLLM, Caddy goes straight to the daemon, arching over the LiteLLM box
+      if (!lite) cables.push(...cable(`M ${caddy.x + caddy.w / 2} ${caddy.y} C ${caddy.x + caddy.w / 2} ${caddy.y - 50}, ${daemon.x + daemon.w / 2} ${daemon.y - 50}, ${daemon.x + daemon.w / 2} ${daemon.y}`, HUE.daemon, recent ? "flow" : "idle"));
     }
     boxes.push(
       node(caddy.x, caddy.y, caddy.w, caddy.h, { title: "Caddy", icon: "shield-check", color: HUE.gateway, on: exposed, state: exposed ? "running" : "stopped", lock: true,
@@ -107,29 +155,27 @@ export function networkPage(ctx) {
         lines: [`127.0.0.1:${ports.litellm}`, "routes by model name", "master key, local only"] }),
       node(daemon.x, daemon.y, daemon.w, daemon.h, { title: "daemon", icon: "server", color: HUE.daemon, on: true, state: "running",
         lines: [`127.0.0.1:${ports.daemon}`, "loads on demand", "unloads when idle"] }));
+    const top = MID - (n * JH + (n - 1) * JGAP) / 2;
     shown.forEach((m, i) => {
-      const jy = 250 + i * 84, color = colorOf(m.name), live = m.state === "ready";
-      boxes.push(h("div", { class: live ? "jack" : "jack cold", style: { left: `${daemon.x}px`, top: `${jy}px`, "--c": color } },
+      const jy = top + i * (JH + JGAP), color = colorOf(m.name), live = m.state === "ready", starting = m.state === "starting";
+      boxes.push(h("div", { class: live ? "jack" : starting ? "jack starting" : "jack cold", style: { left: `${jackX}px`, top: `${jy}px`, width: `${jackW}px`, height: `${JH}px`, "--c": color } },
         h("span", { class: "ring" }), h("div", { style: "min-width:0" }, h("div", { class: "jn mono trunc", title: m.name }, m.name),
-          h("div", { class: "jp mono" }, m.port ? ["127.0.0.1:", h("span", { style: { color, fontWeight: 500 } }, String(m.port))] : m.state === "starting" ? "starting…" : "not loaded · no port"))));
-      // a bus down the left of the jacks: lower jacks turn further out and start higher, so no cable crosses another
-      const y1 = daemon.y + 54 + (n - 1 - i) * 10, busX = daemon.x - 26 - i * 8, y2 = jy + 35;
-      const d = `M ${daemon.x} ${y1} H ${busX + 10} Q ${busX} ${y1} ${busX} ${y1 + 10} V ${y2 - 10} Q ${busX} ${y2} ${busX + 10} ${y2} H ${daemon.x}`;
-      cables.push(...cable(d, color, live ? (m.recent > 0 ? "flow" : "idle") : "off"));
+          h("div", { class: "jp mono" }, m.port ? ["127.0.0.1:", h("span", { style: { color, fontWeight: 500 } }, String(m.port))] : starting ? "starting…" : "not loaded"))));
+      cables.push(...cable(curve(daemon.x + daemon.w, MID, jackX, jy + JH / 2), color, live ? (m.recent > 0 ? "flow" : "idle") : "off"));
     });
     const svg = s("svg", { class: "cables", viewBox: `0 0 ${SIZE.w} ${H}`, width: SIZE.w, height: H, "aria-hidden": "true" }, ...cables);
-    const stage = h("div", { class: "bay-stage", style: { height: `${H}px` } }, svg,
-      h("div", { class: "zone mono", style: "left:20px;top:24px" }, "Your apps"),
-      h("div", { class: "zone mono", style: "left:290px;top:24px" }, `This machine · ${net.host}`), ...boxes);
+    const stage = h("div", { class: "bay-stage", style: { height: `${H}px`, width: `${SIZE.w}px` } }, svg,
+      h("div", { class: "zone mono", style: "left:16px;top:24px" }, "Your apps"),
+      h("div", { class: "zone mono", style: "left:204px;top:24px" }, `This machine · ${net.host}`), ...boxes);
 
-    const facts = h("div", { class: "net-facts" },
-      fact("Local endpoint", `http://127.0.0.1:${ports.daemon}/v1`, `http://127.0.0.1:${ports.daemon}/v1`),
-      fact("LAN endpoint", net.lan_endpoint || "not exposed", net.lan_endpoint),
-      fact("Local CA", net.ca_exists ? net.ca_path : "created the first time you expose", net.ca_exists ? net.ca_path : null));
-    host.replaceChildren(facts, h("section", { class: "panel bay" }, stage),
+    host.replaceChildren(factsRow(net), h("section", { class: "panel bay" }, stage), h("div", { class: "bay-hint mono" }, "scroll →"),
       h("div", { class: "bay-legend mono" }, h("span", {}, "moving dots = requests in the last minute"), h("span", {}, "each model gets its own loopback port, chosen free at start"),
         h("span", {}, "loopback and LAN requests can't be told apart"), h("span", { class: "end" }, "$ hotfire status · hotfire expose")));
   }
+  const factsRow = (net) => h("div", { class: "net-facts" },
+    fact("Local endpoint", `http://127.0.0.1:${net.ports.daemon}/v1`, `http://127.0.0.1:${net.ports.daemon}/v1`),
+    fact("LAN endpoint", net.lan_endpoint || "not exposed", net.lan_endpoint),
+    fact("Local CA", net.ca_exists ? net.ca_path : "created the first time you expose", net.ca_exists ? net.ca_path : null));
   const fact = (k, v, copyValue) => h("div", { class: "panel" }, h("div", { class: "k" }, k),
     h("div", { class: "v" }, h("span", { class: "t mono", title: v }, v), copyValue ? copyButton(() => copyValue, "Copy", "ghost") : null));
 
@@ -142,5 +188,5 @@ export function networkPage(ctx) {
   window.addEventListener(CHANGED, load);
   const timer = setInterval(load, 3000);
   load();
-  return { update() {}, destroy() { clearInterval(timer); window.removeEventListener(CHANGED, load); } };
+  return { update() {}, destroy() { clearInterval(timer); window.removeEventListener(CHANGED, load); narrow.removeEventListener("change", onNarrow); } };
 }

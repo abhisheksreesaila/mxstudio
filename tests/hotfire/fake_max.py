@@ -52,6 +52,7 @@ class H(BaseHTTPRequestHandler):
                       {"index": 0, "text": f"hello from {model}", "finish_reason": "stop"})
             return self._json({"id": "cmpl-1", "object": "chat.completion" if chat else "text_completion",
                                "created": 1, "model": model, "choices": [choice],
+                               "seen_limits": {k: body.get(k) for k in ("max_tokens", "max_completion_tokens") if k in body},
                                "usage": {"prompt_tokens": 4, "completion_tokens": 12, "total_tokens": 16}})
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")

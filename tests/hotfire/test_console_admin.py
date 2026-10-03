@@ -147,9 +147,21 @@ async def test_try_chat_goes_through_the_gateway_as_the_console(http, store):
     assert "data:" in streamed.text and "[DONE]" in streamed.text
 
 
+async def test_try_chat_always_enforces_the_token_cap(http):
+    from hotfire.gateway import TRY_MAX_TOKENS
+    base = {"model": "tiny", "messages": [{"role": "user", "content": "hi"}]}
+    for extra in ({}, {"max_tokens": TRY_MAX_TOKENS * 100}, {"max_completion_tokens": 999999},
+                  {"max_tokens": 16, "max_completion_tokens": 999999}):
+        r = await http.post("/admin/try/chat", headers=ADMIN, json={**base, **extra})
+        assert r.status_code == 200, extra
+        seen = r.json()["seen_limits"]
+        assert seen["max_tokens"] <= TRY_MAX_TOKENS and "max_completion_tokens" not in seen, (extra, seen)
+    assert (await http.post("/admin/try/chat", headers=ADMIN, json={**base, "max_tokens": 16})).json()["seen_limits"]["max_tokens"] == 16
+
+
 async def test_try_chat_validates_the_body(http):
     for body in ({}, {"model": "tiny"}, {"model": 3, "messages": []}, {"model": "tiny", "messages": "hi"},
-                 {"model": "tiny", "messages": [], "max_tokens": 100000}):
+                 {"model": "tiny", "messages": [], "max_tokens": "lots"}):
         assert (await http.post("/admin/try/chat", headers=ADMIN, json=body)).status_code == 400, body
     r = await http.post("/admin/try/chat", headers=ADMIN, json={"model": "nope", "messages": [{"role": "user", "content": "x"}]})
     assert r.status_code == 404 and r.json()["error"]["code"] == "model_not_found"

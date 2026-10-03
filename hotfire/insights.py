@@ -29,8 +29,8 @@ def compute(store: Store, models: list[dict], now: float | None = None) -> list[
 def _idle(store: Store, models: list[dict], now: float) -> list[dict]:
     out = []
     for m in models:
-        if m["state"] not in ("ready", "starting"):
-            continue  # a model that isn't in memory costs nothing
+        if m["state"] != "ready" or m.get("in_flight"):
+            continue  # not in memory costs nothing; starting or serving a request is not idle
         idle = m.get("idle_seconds")
         if idle is not None and idle < DAY:
             continue  # loaded, but only recently: the table may not know about it yet

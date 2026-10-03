@@ -433,12 +433,16 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         try:
             body = json.loads(raw)
             ok = (isinstance(body, dict) and isinstance(body.get("model"), str) and isinstance(body.get("messages"), list)
-                  and body["messages"] and type(body.get("max_tokens", 1)) is int and 0 < body.get("max_tokens", 1) <= TRY_MAX_TOKENS)
+                  and body["messages"] and type(body.get("max_tokens", 1)) is int and body.get("max_tokens", 1) > 0)
+            if ok:  # the cap is always enforced: missing is filled in, too large is clamped, the newer alias is dropped
+                body["max_tokens"] = min(body.get("max_tokens", TRY_MAX_TOKENS), TRY_MAX_TOKENS)
+                body.pop("max_completion_tokens", None)
+                raw = json.dumps(body).encode()
         except ValueError:
             ok = False
         if not ok:
             return openai_error(400, f"Send JSON with `model`, a non-empty `messages` list and optionally "
-                                     f"`max_tokens` (1 to {TRY_MAX_TOKENS}) and `stream`.", "invalid_request_body")
+                                     f"`max_tokens` (a positive integer, capped at {TRY_MAX_TOKENS}) and `stream`.", "invalid_request_body")
         return await forward(raw, "console", "chat", "/v1/chat/completions", "application/json", time.monotonic())
 
     def model_row(model, live: dict) -> dict:
