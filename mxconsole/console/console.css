@@ -718,7 +718,6 @@ dialog.dlg[open] { animation: palin 120ms ease-out both; }
 .pull-search .input { height: 38px; padding-left: 34px; font-size: 14px; }
 .pull-form .btn { height: 38px; background: var(--page-btn); color: var(--page-btn-text); border-color: var(--page-btn-line); }
 .pull-err { min-height: 20px; font-size: 13px; margin-bottom: 4px; color: var(--bad); }
-:root[data-theme="contrast"] .pull-err { color: #ff8a8a; }
 .pull-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 20px; font-size: 12px; color: var(--page-muted); }
 .chip-btn {
   display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px;
@@ -729,12 +728,11 @@ dialog.dlg[open] { animation: palin 120ms ease-out both; }
 .pull-recent-title { margin: 28px 0 12px; color: var(--page-text); }
 
 /* the stage: a cloud rains shards into a churning cartridge */
-:root { --hue-pull: #12a594; }
-.pull-stage-panel { overflow: hidden; background: linear-gradient(180deg, color-mix(in srgb, var(--hue-pull) 8%, var(--card)), var(--card) 55%); }
+.pull-stage-panel { overflow: hidden; background: linear-gradient(180deg, color-mix(in srgb, var(--hue) 8%, var(--card)), var(--card) 55%); }
 .pull-stage { position: relative; height: 524px; max-width: 460px; margin: 0 auto; --fall: 2.8s; --churn-a: 7s; --churn-b: 5s; }
 .stage-from { position: absolute; left: 20px; top: 16px; font-size: 12px; color: var(--muted); }
 .pull-stage .cloud { position: absolute; left: 50%; top: 40px; width: 270px; height: 125px; margin-left: -135px; animation: pull-drift 6s ease-in-out infinite; }
-.cloud-shape { fill: var(--card); stroke: var(--hue-pull); stroke-width: 2.5; }
+.cloud-shape { fill: var(--card); stroke: var(--hue); stroke-width: 2.5; }
 .cloud-label { fill: var(--text-2); font: 13px "Geist Mono", monospace; }
 .shards { position: absolute; left: 0; right: 0; top: 150px; height: 190px; pointer-events: none; }
 .shard {
@@ -745,13 +743,13 @@ dialog.dlg[open] { animation: palin 120ms ease-out both; }
 .churn { position: absolute; left: 50%; top: 322px; width: 160px; height: 160px; margin-left: -80px; }
 .ring { position: absolute; inset: 0; width: 160px; height: 160px; }
 .ring circle { fill: none; }
-.ring.a circle { stroke: var(--hue-pull); stroke-width: 3; stroke-dasharray: 14 10; }
-.ring.b circle { stroke: #7c66ff; stroke-width: 2; stroke-dasharray: 6 8; }
+.ring.a circle { stroke: var(--hue); stroke-width: 3; stroke-dasharray: 14 10; }
+.ring.b circle { stroke: var(--hue-2); stroke-width: 2; stroke-dasharray: 6 8; }
 .is-running .ring.a { animation: pull-spin var(--churn-a) linear infinite; }
 .is-running .ring.b { animation: pull-spin var(--churn-b) linear infinite reverse; }
 .cart { position: absolute; left: 50px; top: 38px; width: 60px; height: 84px; border-radius: 10px; border: 2px solid var(--text); background: var(--card); overflow: hidden; }
 .is-failed .cart { border-color: var(--bad); }
-.fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(180deg, #7c66ff, var(--hue-pull)); transition: height 0.7s ease-out; }
+.fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(180deg, var(--hue-2), var(--hue)); transition: height 0.7s ease-out; }
 .is-failed .fill { background: color-mix(in srgb, var(--bad) 55%, var(--card)); }
 .cart-label { position: absolute; left: 0; right: 0; top: 8px; text-align: center; font-size: 9px; font-weight: 500; color: var(--text); }
 .tick { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: #fff; padding-top: 22px; }
@@ -762,7 +760,7 @@ dialog.dlg[open] { animation: palin 120ms ease-out both; }
 .cap-l { font-size: 13px; white-space: nowrap; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 .cap-r { font-size: 13px; min-width: 36px; text-align: right; }
 .bar { flex-grow: 1; height: 8px; border-radius: 4px; background: var(--sunk); overflow: hidden; }
-.bar-in { height: 8px; width: 0; border-radius: 4px; background: linear-gradient(90deg, #7c66ff, var(--hue-pull)); transition: width 0.7s ease-out; }
+.bar-in { height: 8px; width: 0; border-radius: 4px; background: linear-gradient(90deg, var(--hue-2), var(--hue)); transition: width 0.7s ease-out; }
 .bar-in.failed { background: var(--bad); }
 @keyframes pull-rain { 0% { transform: translateY(-20px); opacity: 0; } 15% { opacity: 1; } 80% { opacity: 1; } 100% { transform: translateY(170px); opacity: 0; } }
 @keyframes pull-spin { to { transform: rotate(360deg); } }
@@ -775,7 +773,7 @@ dialog.dlg[open] { animation: palin 120ms ease-out both; }
 .pull-side .section-title .sub { color: var(--muted); }
 .pull-step { display: flex; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--card-line-2); }
 .pull-step.next { opacity: 0.5; }
-.pull-step .dot-ic { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: color-mix(in srgb, var(--hue-pull) 14%, transparent); color: var(--hue-pull); }
+.pull-step .dot-ic { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: color-mix(in srgb, var(--hue) 14%, transparent); color: var(--hue); }
 .pull-step.next .dot-ic { background: var(--sunk); color: var(--muted); }
 .pull-step.now .dot-ic svg { animation: pull-spin 1.2s linear infinite; }
 .pull-step.failed .dot-ic, .pull-step.cancelled .dot-ic { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }

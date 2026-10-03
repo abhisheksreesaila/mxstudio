@@ -3,12 +3,12 @@
 // the shard rate follows the download speed, the cartridge fill follows the percentage, and the
 // motion stops when the pull is done, failed or cancelled. prefers-reduced-motion turns the motion
 // off in CSS; the numbers and the fill still update.
-import { h, s, icon, api, ADMIN, store, toast, copyButton, terminalBox, ago, HUE } from "./core.js";
+import { h, s, icon, api, ADMIN, store, toast, copyButton, terminalBox, ago, HUE, SIGNAL } from "./core.js";
 
 const POLL_MS = 1000;
 const SHARDS = 14;
 const FINISHED = ["done", "failed", "cancelled", "unsupported"];
-const SHARD_COLOURS = [HUE.pull, "#7c66ff", "#0090ff", "#e09d00"];
+const SHARD_COLOURS = [HUE.pull, SIGNAL[0], SIGNAL[1], HUE.keys];
 const CLOUD = "M 70 100 C 30 100 20 60 55 52 C 55 20 105 10 120 40 C 135 15 190 20 190 55 C 225 55 230 100 195 100 Z";
 const STEP_ICON = { done: "check", now: "loader-circle", next: "circle-dashed", failed: "x", cancelled: "x" };
 
@@ -118,10 +118,11 @@ export function pullPage(ctx) {
     autocomplete: "off", spellcheck: "false", value: ui.prefill });
   const datalist = h("datalist", { id: "pull-suggest" });
   const go = h("button", { class: "btn primary", type: "submit" }, icon("download", 15), "Pull");
+  const hubBadge = h("span", { class: "pill warn", id: "pull-test-hub", hidden: true, title: "This daemon pulls from a fake Hugging Face (MXC_FAKE_HUB). Nothing real is downloaded." }, "test hub");
   const formErr = h("div", { class: "bad-text pull-err", role: "alert" });
   const chips = h("div", { class: "pull-chips" });
   const form = h("form", { class: "pull-form", onSubmit: (e) => { e.preventDefault(); start(input.value.trim()); } },
-    h("label", { class: "pull-search" }, h("span", { class: "sr-only" }, "Model to pull"), h("span", { class: "ic" }, icon("search", 15)), input, datalist), go);
+    h("label", { class: "pull-search" }, h("span", { class: "sr-only" }, "Model to pull"), h("span", { class: "ic" }, icon("search", 15)), input, datalist), go, hubBadge);
 
   const cancelBtn = h("button", { class: "btn danger", type: "button", hidden: true, onClick: cancel }, icon("x", 15), "Cancel");
   const anotherBtn = h("button", { class: "btn primary", type: "button", hidden: true, onClick: () => { ui.selected = null; input.value = ""; input.focus(); draw(); } }, icon("plus", 15), "Pull another");
@@ -131,12 +132,12 @@ export function pullPage(ctx) {
   const files = h("div", { class: "pull-files" });
   const note = h("div", {});
   const twin = h("div", {});
-  const side = h("section", { class: "panel pull-side" },
+  const side = h("section", { class: "panel pull-side", style: { "--hue": HUE.pull } },
     h("h2", { class: "section-title" }, "What is happening", h("span", { class: "sub", id: "pull-title" }, "")), steps, files, note, twin);
   const recent = h("section", { class: "panel pull-recent scroll-x" });
   ctx.body.replaceChildren(
     form, formErr, chips,
-    h("div", { class: "pull-grid" }, h("section", { class: "panel pull-stage-panel" }, stageView.root), side),
+    h("div", { class: "pull-grid" }, h("section", { class: "panel pull-stage-panel", style: { "--hue": HUE.pull, "--hue-2": SIGNAL[0] } }, stageView.root), side),
     h("h2", { class: "section-title pull-recent-title" }, "Recent pulls", h("span", { class: "sub" }, "kept after a restart")), recent);
 
   function current() { return pickFocus(ui.pulls, ui.selected); }
@@ -242,6 +243,7 @@ export function pullPage(ctx) {
     const job = current();
     ctx.setSub(job && job.status === "running" ? `${job.repo_id || job.ref} · ${headline(job).toLowerCase()}` : "pinned revision · safetensors only · resumable");
     stageView.draw(job);
+    hubBadge.hidden = !ui.fakeHub;
     cancelBtn.hidden = !isRunning(job);
     anotherBtn.hidden = !job || isRunning(job);
     formErr.textContent = ui.formError || (ui.error ? `Could not reach the daemon: ${ui.error}` : "");
@@ -254,7 +256,7 @@ export function pullPage(ctx) {
   async function load() {
     try {
       const body = await api("GET", "/admin/pulls");
-      ui.pulls = body.pulls; ui.curated = body.curated || {}; ui.error = null;
+      ui.pulls = body.pulls; ui.curated = body.curated || {}; ui.fakeHub = !!body.fake_hub; ui.error = null;
     } catch (e) { ui.error = e.message; }
     draw();
   }

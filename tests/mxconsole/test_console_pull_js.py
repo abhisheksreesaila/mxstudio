@@ -69,3 +69,12 @@ def test_a_typed_ref_gets_its_own_palette_row():
     assert [(r["label"], r["cli"]) for r in rows] == [("Pull acme/weird", "mxc pull acme/weird")]
     assert node('m.pullRowFor("pull")', "palette.js") == [] and node('m.pullRowFor("serve acme/x")', "palette.js") == []
     assert node('m.pullRowFor("pull a model please")', "palette.js") == []
+
+
+def test_the_pull_page_takes_its_colours_from_the_tokens():
+    import re
+    js = (CONSOLE_DIR / "page-pull.js").read_text()
+    css = (CONSOLE_DIR / "console.css").read_text()
+    assert not re.findall(r"#[0-9a-fA-F]{6}\b", js), "page-pull.js uses SIGNAL/HUE from core.js, not hex"
+    assert "--hue-pull" not in css and "#ff8a8a" not in css
+    assert "test hub" in js and "fake_hub" in js
