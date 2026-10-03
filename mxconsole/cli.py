@@ -1,4 +1,4 @@
-"""`mxc`: the MX Console command line."""
+"""`mxc`: the mxconsole command line."""
 from __future__ import annotations
 
 import time
@@ -12,7 +12,7 @@ from mxconsole import expose, keys
 from mxconsole import report, resolve
 from mxconsole.store import Store, format_duration, parse_duration
 
-app = typer.Typer(help="MX Console: local models on Modular MAX you can see into and reshape.",
+app = typer.Typer(help="mxconsole: local models on Modular MAX you can see into and reshape.",
                   no_args_is_help=True, add_completion=False,
                   epilog="Exit codes: 0 ok, 1 refused (one `error:` line on stderr), 2 bad usage.")
 
@@ -87,7 +87,7 @@ def set_model(model: str = typer.Argument(..., help="A registered model name"),
 def logs_cmd(model: str = typer.Argument(..., help="A registered model name"),
              lines: int = typer.Option(50, "--lines", "-n", min=1, help="How many trailing lines."),
              follow: bool = typer.Option(False, "--follow", "-f", help="Keep printing new lines until Ctrl-C.")) -> None:
-    """Tail a model's server log (MX Console's own log file; works without the daemon)."""
+    """Tail a model's server log (mxconsole's own log file; works without the daemon)."""
     from mxconsole.store import mxc_home
     if Store.open().get_model(model) is None:
         _fail(f"no model named {model}. See: mxc ls")
@@ -160,7 +160,7 @@ def bench_cmd(models: list[str] = typer.Argument(None, help="Registered model na
         _fail("no models yet. Try: mxc serve qwen2.5-0.5b")
     try:
         if serve.ensure_daemon() and not as_json:
-            typer.echo("started the MX Console daemon")
+            typer.echo("started the mxconsole daemon")
         started = bench.start(None if all_ else list(dict.fromkeys(models)), runs)
         if not as_json:
             typer.echo(f"benchmarking {len(started['models'])} model{'s' if len(started['models']) != 1 else ''}: "
@@ -251,7 +251,7 @@ def keys_new(app_name: str = typer.Argument(..., metavar="APP"),
 @keys_app.command("ls")
 def keys_ls(as_json: bool = JSON) -> None:
     """List keys (never the secret)."""
-    rows = [k for k in keys.list_keys(Store.open()) if not k.app.startswith("_")]  # hide MX Console's own keys
+    rows = [k for k in keys.list_keys(Store.open()) if not k.app.startswith("_")]  # hide mxconsole's own keys
     if as_json:
         typer.echo(report.dump(report.keys_data(rows)))
         return
@@ -270,7 +270,7 @@ def keys_ls(as_json: bool = JSON) -> None:
 def keys_revoke(app_name: str = typer.Argument(..., metavar="APP")) -> None:
     """Disable an app's key."""
     if app_name.startswith("_"):
-        _fail(f"{app_name} is managed by MX Console (mxc expose --stop revokes it)")
+        _fail(f"{app_name} is managed by mxconsole (mxc expose --stop revokes it)")
     if not keys.revoke_key(Store.open(), app_name):
         _fail(f"no active key for {app_name}")
     typer.echo(f"revoked the key for {app_name}")
@@ -386,7 +386,7 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
         store.set_lifecycle(name, pinned=pin, keep_alive=seconds)
     try:
         if serve.ensure_daemon():
-            typer.echo("started the MX Console daemon")
+            typer.echo("started the mxconsole daemon")
         if not no_wait:
             typer.echo(f"loading {name} (the first load compiles the model and can take a minute)…")
             started = time.monotonic()

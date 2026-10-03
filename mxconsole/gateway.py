@@ -33,10 +33,11 @@ CONSOLE_SCRIPTS = {"page-bench.js", "theme.js", "main.js", "core.js", "icons.js"
                    "page-overview.js", "page-models.js", "page-metrics.js", "page-api.js", "page-keys.js",
                    "page-network.js", "page-activity.js", "page-ports.js", "page-logs.js", "page-gateway.js",
                    "page-daemon.js", "page-pull.js"}
-CONSOLE_ASSETS = {"console.css"} | CONSOLE_SCRIPTS | CONSOLE_FONTS
+CONSOLE_IMAGES = {"favicon.svg"}
+CONSOLE_ASSETS = {"console.css"} | CONSOLE_SCRIPTS | CONSOLE_FONTS | CONSOLE_IMAGES
 LOG_TAIL_BYTES = 8000
 TRY_MAX_TOKENS = 1024  # the API page's "Try it" is for a quick look, not for load
-# no-cache: an upgraded MX Console never shows a stale console. The rest: no other site can frame the
+# no-cache: an upgraded mxconsole never shows a stale console. The rest: no other site can frame the
 # console (clickjacking Load/Stop) and the page loads nothing from anywhere but the daemon.
 CONSOLE_HEADERS = {"Cache-Control": "no-cache", "X-Frame-Options": "DENY",
                    "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; "
@@ -71,7 +72,7 @@ def openapi_spec(model_names: list[str]) -> dict:
           "503": {"description": "The model failed to start; the message has the log tail"}}
     return {
         "openapi": "3.1.0",
-        "info": {"title": "MX Console API", "version": "1.0.0",
+        "info": {"title": "mxconsole API", "version": "1.0.0",
                  "description": "OpenAI-compatible endpoint for local models on Modular MAX. "
                                 "Point any OpenAI client at `/v1` with a `mxc keys new <app>` key."},
         "servers": [{"url": "/"}],
@@ -295,7 +296,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         counters.bump("unknown_route")
         if authenticate(request) is None:
             return unauthorized()
-        return openai_error(404, f"MX Console does not serve /v1/{path}. Supported: /v1/models, "
+        return openai_error(404, f"mxconsole does not serve /v1/{path}. Supported: /v1/models, "
                                  + ", ".join(PROXIED) + ".", "unknown_route")
 
     def note(app_name, model, route, status, started, meter=None, ttft_ms=None):
@@ -547,7 +548,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             return Response("the console is only served to this machine", status_code=403)
         if asset not in CONSOLE_ASSETS:  # a fixed list: no path ever reaches the filesystem
             return Response("not found", status_code=404)
-        media = "font/woff2" if asset in CONSOLE_FONTS else None
+        media = "font/woff2" if asset in CONSOLE_FONTS else "image/svg+xml" if asset in CONSOLE_IMAGES else None
         return FileResponse(CONSOLE_DIR / asset, headers=CONSOLE_HEADERS, media_type=media)
 
     @app.get("/admin/status")

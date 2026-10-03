@@ -1,4 +1,4 @@
-// MX Console, the things the console can do to a model. The palette, the Models page and the
+// mxconsole, the things the console can do to a model. The palette, the Models page and the
 // insights all call these, so each one has one behaviour and one CLI twin.
 import { api, refresh, toast } from "./core.js";
 

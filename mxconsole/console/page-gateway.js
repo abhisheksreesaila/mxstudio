@@ -23,7 +23,7 @@ export function illustration(kind, colour) {
 const plural = (n, one, many) => `${fmt(n)} ${n === 1 ? one : many}`;
 function safeguards(g) {
   return [
-    ["lock", HUE.daemon, "Encrypted on your LAN", "HTTPS with MX Console's own certificate authority. Trust it once per device.",
+    ["lock", HUE.daemon, "Encrypted on your LAN", "HTTPS with mxconsole's own certificate authority. Trust it once per device.",
       g.tls.on ? { text: `HTTPS on · ${g.tls.endpoint}`, on: true } : { text: "LAN exposure is off: nothing listens beyond this machine", on: true }],
     ["key", HUE.keys, "One key per app", "Revoke one app without touching the others. Keys are stored only as hashes.",
       { text: `${g.keys.active} active · ${g.keys.revoked} revoked · ${plural(g.unauthorized_today, "request", "requests")} refused today (401)`, on: true }],

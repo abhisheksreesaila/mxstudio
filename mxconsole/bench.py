@@ -394,7 +394,7 @@ def _call(method: str, path: str, **kw) -> dict:
     try:
         r = httpx.request(method, f"{daemon_url()}{path}", headers=ADMIN, timeout=10.0, **kw)
     except httpx.HTTPError as e:
-        raise BenchError(f"could not reach the MX Console daemon at {daemon_url()}: {e}")
+        raise BenchError(f"could not reach the mxconsole daemon at {daemon_url()}: {e}")
     if r.status_code >= 400:
         try:
             raise BenchError(r.json()["error"]["message"])

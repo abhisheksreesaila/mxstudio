@@ -1,4 +1,4 @@
-// MX Console: wires the shell, the pages and the palette together.
+// mxconsole: wires the shell, the pages and the palette together.
 import { startPolling } from "./core.js";
 import { mountShell } from "./shell.js";
 import { installPaletteShortcut } from "./palette.js";

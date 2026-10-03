@@ -1,7 +1,7 @@
 // Lucide icons (ISC licence, https://lucide.dev), only the ones the console uses.
 // Each is a list of [tag, attributes]; icon() builds real SVG nodes from it, never an HTML string.
 const PATHS = {"activity":[["path",{"d":"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"}]],"arrow-up-right":[["path",{"d":"M7 7h10v10"}],
-["path",{"d":"M7 17 17 7"}]],"book-open":[["path",{"d":"M12 7v14"}],
+["path",{"d":"M7 17 17 7"}]],"menu":[["path",{"d":"M4 5h16"}],["path",{"d":"M4 12h16"}],["path",{"d":"M4 19h16"}]],"book-open":[["path",{"d":"M12 7v14"}],
 ["path",{"d":"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"}]],"bot":[["path",{"d":"M12 8V4H8"}],
 ["rect",{"width":"16","height":"12","x":"4","y":"8","rx":"2"}],
 ["path",{"d":"M2 14h2"}],

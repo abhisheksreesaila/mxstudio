@@ -34,11 +34,11 @@ def _hash(plaintext: str) -> str:
 
 
 def create_key(store: Store, app: str, *, rotate: bool = False, internal: bool = False) -> str:
-    """`internal` keys (names starting with '_') belong to MX Console itself, e.g. LiteLLM's upstream key."""
+    """`internal` keys (names starting with '_') belong to mxconsole itself, e.g. LiteLLM's upstream key."""
     if not APP_NAME.fullmatch(app):
         raise ValueError(f"app name {app!r} must be letters, digits, '.', '_' or '-'")
     if app.startswith("_") and not internal:
-        raise ValueError(f"app names starting with '_' are reserved for MX Console")
+        raise ValueError(f"app names starting with '_' are reserved for mxconsole")
     plaintext = "mst-" + secrets.token_urlsafe(32)
     # Check and write in one write transaction, so two racing `mxc serve` runs can't both
     # "create" a key and leave the first one printed but already overwritten.

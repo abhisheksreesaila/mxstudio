@@ -1,4 +1,4 @@
-// Ports: every listener MX Console owns, with its state and what talks to it. Data from /admin/system.
+// Ports: every listener mxconsole owns, with its state and what talks to it. Data from /admin/system.
 import { h, api, HUE, chip } from "./core.js";
 
 const STATE = { listening: ["Listening", "var(--ok)"], off: ["Off", "var(--faint)"], starting: ["Starting", "var(--warn)"], crashed: ["Crashed", "var(--bad)"] };
@@ -9,7 +9,7 @@ export function portsPage(ctx) {
   let data = null, failed = null;
 
   const draw = () => {
-    ctx.setSub("every port MX Console opens · most are loopback only, so nothing else on your network can reach them");
+    ctx.setSub("every port mxconsole opens · most are loopback only, so nothing else on your network can reach them");
     if (failed) { host.replaceChildren(h("div", { class: "panel empty" }, h("h2", {}, "Could not load the ports"), h("p", {}, failed))); return; }
     if (!data) { host.replaceChildren(h("div", { class: "panel empty" }, h("p", {}, "Loading…"))); return; }
     const rows = data.listeners.map((l) => {

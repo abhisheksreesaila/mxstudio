@@ -158,14 +158,14 @@ def _model_children(proc_root) -> list[dict]:
 # -- the crew ------------------------------------------------------------------------------------
 def collect(rows: list[dict] | None = None, *, proc_root: str | Path = "/proc", daemon: int | None = None,
             expose_pids: dict[str, int | None] | None = None, health=None) -> list[dict]:
-    """Every background process MX Console owns. `rows` is the supervisor's status (inside the daemon);
+    """Every background process mxconsole owns. `rows` is the supervisor's status (inside the daemon);
     without it the models come from pid files and /proc, so `mxc ps` works with the daemon down.
     `health()` says whether a daemon with no readable pid (started before pids were recorded) answers."""
     daemon = daemon if daemon is not None else daemon_pid(proc_root)
     pids = expose_pids if expose_pids is not None else {n: expose._running_pid(n) for n in expose.PROCESSES}
     ports = {"daemon": daemon_port(), "caddy": EXPOSE_PORT, "litellm": LITELLM_PORT}
     crew = []
-    for kind, label, pid in (("daemon", "MX Console daemon", daemon), ("caddy", "Caddy", pids.get("caddy")),
+    for kind, label, pid in (("daemon", "mxconsole daemon", daemon), ("caddy", "Caddy", pids.get("caddy")),
                              ("litellm", "LiteLLM", pids.get("litellm"))):
         stats = proc_stats(pid, proc_root) if pid else None
         unknown = kind == "daemon" and not stats and health is not None and health()
@@ -193,7 +193,7 @@ def listeners(crew: list[dict]) -> list[dict]:
         return "listening" if by[i]["state"] == "running" else "off"
 
     rows = [
-        {"name": "MX Console daemon", "kind": "daemon", "host": DAEMON_HOST, "port": by["daemon"]["port"],
+        {"name": "mxconsole daemon", "kind": "daemon", "host": DAEMON_HOST, "port": by["daemon"]["port"],
          "exposed": False, "state": state("daemon"),
          "talks_to": "the mxc CLI, this console, your apps on this machine, LiteLLM and Caddy's key check"},
         {"name": "LiteLLM", "kind": "litellm", "host": "127.0.0.1", "port": by["litellm"]["port"], "exposed": False,

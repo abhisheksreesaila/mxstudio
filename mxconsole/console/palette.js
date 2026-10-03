@@ -1,4 +1,4 @@
-// MX Console, the ⌘K palette. Every row is a console action with its CLI twin on the right.
+// mxconsole, the ⌘K palette. Every row is a console action with its CLI twin on the right.
 // Enter runs it through the admin API; ⌘C copies the command. Things the console can't do itself
 // (pull a model, serve one that isn't registered) copy the command instead, and the row says so.
 import { $, h, icon, store, toast, copyText, getTheme, setTheme, THEMES, isMac } from "./core.js";

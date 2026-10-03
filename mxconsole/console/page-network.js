@@ -19,10 +19,10 @@ export async function exposeDialog() {
   host.addEventListener("input", twin);
   twin();
   const { dlg, close } = openDialog(
-    h("h2", {}, "Expose MX Console to your LAN?"),
+    h("h2", {}, "Expose mxconsole to your LAN?"),
     h("div", { class: "warnbox" }, icon("triangle-alert", 16), h("div", {},
       "Other devices on this network will be able to reach your models at ", h("span", { class: "mono" }, `https://${net.default_host}:${net.ports.caddy}/v1`),
-      ", with an app key. MX Console starts Caddy (HTTPS from its own local CA, every key checked) and LiteLLM. Each device trusts the CA once.")),
+      ", with an app key. mxconsole starts Caddy (HTTPS from its own local CA, every key checked) and LiteLLM. Each device trusts the CA once.")),
     h("label", { class: "field" }, "Hostname clients use", host),
     h("div", { style: "display:flex;align-items:center;gap:10px;font-size:13.5px" }, lite, "Route through LiteLLM"),
     term, err, status,
@@ -44,7 +44,7 @@ export async function exposeDialog() {
 export async function stopExpose() {
   try {
     await api("POST", "/admin/expose/stop");
-    toast("Stopped exposing. MX Console is on this machine only again.");
+    toast("Stopped exposing. mxconsole is on this machine only again.");
   } catch (e) { toast(`Could not stop: ${e.message}`, 7000); }
   window.dispatchEvent(new Event(CHANGED));
 }

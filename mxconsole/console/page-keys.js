@@ -25,7 +25,7 @@ export function newKeyDialog() {
     }
   } },
   h("h2", {}, "New API key"),
-  h("p", {}, "One key per app. MX Console shows it once and stores only a hash, so a lost key means a new one."),
+  h("p", {}, "One key per app. mxconsole shows it once and stores only a hash, so a lost key means a new one."),
   h("label", { class: "field" }, "App name", input), err,
   terminalBox(["mxc keys new my-app"], "same from the terminal"),
   h("div", { class: "row" }, h("button", { class: "btn", type: "button", onClick: () => dlg.close() }, "Cancel"), create));

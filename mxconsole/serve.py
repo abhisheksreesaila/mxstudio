@@ -48,14 +48,14 @@ def ensure_daemon(timeout: float = 30.0) -> bool:
     if daemon_running():  # lost a start race to another `mxc serve`; its daemon is fine
         return False
     tail = (logs / "daemon.log").read_text(errors="replace")[-600:]
-    raise DaemonError(f"the MX Console daemon did not start. Last log lines ({logs / 'daemon.log'}):\n{tail}")
+    raise DaemonError(f"the mxconsole daemon did not start. Last log lines ({logs / 'daemon.log'}):\n{tail}")
 
 
 def _admin(path: str, timeout: float | None) -> httpx.Response:
     try:
         r = httpx.post(f"{daemon_url()}/admin/{path}", headers=ADMIN, timeout=timeout)
     except httpx.HTTPError as e:
-        raise DaemonError(f"could not reach the MX Console daemon at {daemon_url()}: {e}")
+        raise DaemonError(f"could not reach the mxconsole daemon at {daemon_url()}: {e}")
     if r.status_code != 200:
         try:
             message = r.json()["error"]["message"]

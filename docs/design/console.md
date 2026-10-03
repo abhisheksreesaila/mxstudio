@@ -1,4 +1,4 @@
-# Design handoff: MX Console (the console)
+# Design handoff: mxconsole (the console)
 
 Built in **Graphite** (F-016): tokens and components in `design-system/DESIGN-SYSTEM.md`, canvas
 https://claude.ai/artifact/21NSyXKpzcrqanmqr8bEe5. This replaces the earlier Azure Blade skeleton (F-010, F-012).
@@ -40,4 +40,11 @@ memory is not shown (MAX doesn't report it per model); the number strip shows GP
 
 ## Later (not in F-016)
 Pull page (needs pull progress from the daemon), Benchmarks race (needs `mxc bench`), Gateway safeguard
-counters, the "Ask MX Console" chat on Metrics, pinning tiles to a personal dashboard.
+counters, the "Ask mxconsole" chat on Metrics, pinning tiles to a personal dashboard.
+
+## Round 3 (2026-10-03): wordmark, menu, links
+Canvas: https://claude.ai/artifact/21NSyXKpzcrqanmqr8bEe5, page "Round 3".
+- **Wordmark: A · Ligature (chosen).** `mxconsole`, one lowercase word: "mx" Geist 800 in chrome text, "console" Geist 300 in chrome muted, tracking −0.055em. The mark is a 48-unit black rounded square; the m's last arch runs into the x's falling stroke (white, 4.2 stroke), with a green daemon dot (`--ok`). Same drawing as `console/favicon.svg`.
+- **Menu:** ☰ (or `[`) folds it to a 60 px icon rail; the choice is kept in `localStorage["mxc.menu"]`. Labels become tooltips; group labels become hairlines. At ≤900 px the same button slides the full menu over the page.
+- **Links:** ↗ only for links that leave the console (new tab). The top bar's API reference is a console page: book icon, no arrow.
+- **Layout:** R2 blades, R3 agent deck and R4 map are still open; not built.

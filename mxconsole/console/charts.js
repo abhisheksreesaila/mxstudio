@@ -1,4 +1,4 @@
-// MX Console, charts: oscilloscope traces, line charts, stacked bars. Plain SVG, no library.
+// mxconsole, charts: oscilloscope traces, line charts, stacked bars. Plain SVG, no library.
 import { h, s, fmt } from "./core.js";
 
 let patternId = 0;

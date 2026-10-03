@@ -69,7 +69,7 @@ def test_listeners_cover_every_port_and_say_who_talks_to_it(tmp_path):
     crew = system.collect([{"name": "tiny", "state": "ready", "port": 5555, "pid": 11}], proc_root=tmp_path,
                           daemon=10, expose_pids={"caddy": None, "litellm": None})
     rows = {r["name"]: r for r in system.listeners(crew)}
-    assert rows["MX Console daemon"]["state"] == "listening" and rows["MX Console daemon"]["host"] == "127.0.0.1"
+    assert rows["mxconsole daemon"]["state"] == "listening" and rows["mxconsole daemon"]["host"] == "127.0.0.1"
     assert rows["Caddy"]["state"] == "off" and rows["Caddy"]["exposed"] and rows["LiteLLM"]["state"] == "off"
     assert rows["max serve · tiny"]["port"] == 5555 and rows["max serve · tiny"]["talks_to"] == "the daemon only"
     assert all(r["talks_to"] for r in rows.values())

@@ -20,7 +20,7 @@ export function daemonPage(ctx) {
   }
   function stopExposing() {
     const { dlg, close } = openDialog(
-      h("h2", {}, "Stop exposing MX Console?"),
+      h("h2", {}, "Stop exposing mxconsole?"),
       h("p", { class: "hint" }, "Caddy and LiteLLM stop. Other devices on your network lose access; this machine keeps working."),
       h("div", { class: "row" }, h("button", { class: "btn", type: "button", onClick: () => dlg.close() }, "Cancel"),
         h("button", { class: "btn danger", type: "button", onClick: async () => {

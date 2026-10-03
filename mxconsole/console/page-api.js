@@ -25,10 +25,10 @@ export function highlight(code, lang) {
 const ENDPOINTS = [
   { group: "Models", method: "GET", path: "/v1/models", desc: "Lists every registered model with its live state (ready, starting, cold) in an `mst` field. A cold model costs nothing until its first request.", fields: [], statuses: [200, 401] },
   { group: "Inference", method: "POST", path: "/v1/chat/completions", desc: "Chat with a model. A cold model loads on this request (the response waits for it); set stream to true for server-sent events.",
-    fields: [["model", "string", true, "A registered MX Console name, for example qwen2.5-0.5b."], ["messages", "array", true, "Objects with role (system, user, assistant) and content."],
+    fields: [["model", "string", true, "A registered mxconsole name, for example qwen2.5-0.5b."], ["messages", "array", true, "Objects with role (system, user, assistant) and content."],
       ["stream", "boolean", false, "Send tokens as server-sent events. Default false."], ["max_tokens", "integer", false, "Upper bound on generated tokens."], ["temperature", "number", false, "0 to 2. Default 1."]], statuses: [200, 401, 404, 503] },
   { group: "Inference", method: "POST", path: "/v1/completions", desc: "Plain text completion, for base models.",
-    fields: [["model", "string", true, "A registered MX Console name."], ["prompt", "string", true, "The text to continue."], ["stream", "boolean", false, "Server-sent events when true."], ["max_tokens", "integer", false, "Upper bound on generated tokens."]], statuses: [200, 401, 404, 503] },
+    fields: [["model", "string", true, "A registered mxconsole name."], ["prompt", "string", true, "The text to continue."], ["stream", "boolean", false, "Server-sent events when true."], ["max_tokens", "integer", false, "Upper bound on generated tokens."]], statuses: [200, 401, 404, 503] },
   { group: "Inference", method: "POST", path: "/v1/embeddings", desc: "Vectors from an embedding model such as all-minilm-l6.",
     fields: [["model", "string", true, "An embedding model."], ["input", "string | array", true, "Text or a list of texts."]], statuses: [200, 401, 404, 503] },
   { group: "Service", method: "GET", path: "/health", desc: "Liveness of the daemon. No key needed.", fields: [], statuses: [200] },
@@ -112,7 +112,7 @@ export function apiPage(ctx) {
       h("div", {},
         h("div", { class: "pills" }, h("span", { class: "pill ok" }, icon("shield-check", 12, "currentColor", 2), "OpenAI-compatible"), h("span", { class: "pill" }, "v1"),
           h("span", { class: "pill info" }, `${live} model${live === 1 ? "" : "s"} registered`)),
-        h("p", { class: "lead" }, "Point any OpenAI SDK at the base URL and send an app key. Models load on their first request and unload when idle; the model field is the MX Console name you see on the Models page."),
+        h("p", { class: "lead" }, "Point any OpenAI SDK at the base URL and send an app key. Models load on their first request and unload when idle; the model field is the mxconsole name you see on the Models page."),
         h("div", { class: "k" }, "Base URL"),
         urlRow(base, "this machine"),
         info.lan_endpoint ? urlRow(info.lan_endpoint, "LAN · HTTPS", "info")

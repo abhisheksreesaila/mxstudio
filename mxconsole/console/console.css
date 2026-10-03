@@ -1,4 +1,4 @@
-/* MX Console: Graphite (design-system/DESIGN-SYSTEM.md).
+/* mxconsole: Graphite (design-system/DESIGN-SYSTEM.md).
    Themes are custom properties on <html data-theme>: contrast (default), light, dark.
    Nothing is inline in the markup (the CSP forbids it); JS sets colours through the CSSOM. */
 
@@ -69,11 +69,14 @@ svg { display: block; flex-shrink: 0; }
   position: sticky; top: 0; z-index: 30; height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
   background: var(--chrome); color: var(--chrome-text); border-bottom: 1px solid var(--chrome-line);
 }
-.mark {
-  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px;
-  background: var(--primary); color: var(--on-primary); font-size: 14px; font-weight: 600;
-}
-.product { font-size: 14px; font-weight: 600; }
+.brand { display: inline-flex; align-items: center; gap: 9px; color: var(--chrome-text); }
+.brand:hover { text-decoration: none; }
+.mark rect { fill: #0a0a0b; }
+.mark path { fill: none; stroke: #ffffff; stroke-width: 4.2; stroke-linecap: round; stroke-linejoin: round; }
+.mark circle { fill: var(--ok); }
+.topbar .mark { box-shadow: 0 0 0 1px var(--chrome-line); border-radius: 7px; }
+.wordmark { font-size: 18px; font-weight: 300; letter-spacing: -0.055em; line-height: 1; color: var(--chrome-muted); }
+.wordmark b { font-weight: 800; color: var(--chrome-text); }
 .crumb-sep { color: var(--chrome-muted); }
 .hostchip { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; white-space: nowrap; }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent); }
@@ -97,7 +100,7 @@ svg { display: block; flex-shrink: 0; }
 .topbar .ghost { color: var(--chrome-text); }
 .topbar .ghost:hover { background: var(--chrome-hover); }
 .avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #7c66ff, #0090ff); flex-shrink: 0; }
-.menu-toggle { display: none; }
+.menu-toggle { width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 8px; }
 
 .shell { display: flex; flex-grow: 1; min-height: 0; }
 .menu {
@@ -119,6 +122,11 @@ svg { display: block; flex-shrink: 0; }
 .menu-card { margin: auto 12px 12px; padding: 12px; border: 1px solid var(--chrome-line); border-radius: 10px; background: var(--chrome-sunk); }
 .menu-card .t { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; }
 .menu-card .c { font-size: 11.5px; color: var(--chrome-muted); margin-top: 6px; line-height: 1.6; }
+.menu { transition: width 0.2s ease; }
+.menu.rail { width: 60px; overflow-x: hidden; }
+.menu.rail .menu-item { width: 44px; padding: 0 10px; }
+.menu.rail .menu-item .lbl, .menu.rail .menu-card { display: none; }
+.menu.rail .menu-label { height: 1px; padding: 0; margin: 8px 12px; overflow: hidden; color: transparent; background: var(--chrome-line); }
 .scrim-menu { position: fixed; inset: 52px 0 0 0; z-index: 25; background: var(--scrim); }
 
 .main { flex-grow: 1; min-width: 0; padding: 28px 36px 40px; transition: padding-right 0.24s; }
@@ -524,9 +532,13 @@ dialog.dlg[open] { animation: palin 120ms ease-out both; }
   .main.sheet-open { padding-right: 36px; }
 }
 @media (max-width: 900px) {
-  .menu-toggle { display: inline-flex; }
   .menu { position: fixed; top: 52px; bottom: 30px; left: 0; z-index: 26; height: auto; transform: translateX(-100%); transition: transform 0.2s; }
   .menu.open { transform: none; box-shadow: var(--sheet); }
+  .menu.rail { width: 232px; }
+  .menu.rail .menu-item { width: calc(100% - 16px); }
+  .menu.rail .menu-item .lbl { display: inline; }
+  .menu.rail .menu-label { height: auto; padding: 14px 12px 6px; margin: 0; color: var(--chrome-muted); background: none; }
+  .wordmark { display: none; }
   .search-btn span.lbl { display: none; }
   .search-btn { width: auto; margin-left: auto; }
   .topbar .docs, .topbar .avatar { display: none; }
@@ -548,7 +560,7 @@ dialog.dlg[open] { animation: palin 120ms ease-out both; }
   .main { padding: 18px 16px 32px; }
   .page-title { font-size: 26px; }
   .topbar { padding: 0 12px; gap: 8px; }
-  .topbar .crumb-sep, .topbar .product { display: none; }
+  .topbar .crumb-sep { display: none; }
   .tiles { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(190px, auto); }
   .t-activity, .t-network { grid-column: span 1; }
   .lane { grid-template-columns: 1fr; gap: 8px; }

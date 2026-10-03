@@ -186,7 +186,7 @@ def _link_skills(workspace: Path, skills_root: Path, names: list[str]) -> None:
 
 
 def mst_max_version() -> str | None:
-    """The MAX that MX Console serves with, read from conda-meta (importlib.metadata can't see it here)."""
+    """The MAX that mxconsole serves with, read from conda-meta (importlib.metadata can't see it here)."""
     for f in sorted(Path(sys.prefix, "conda-meta").glob("max-[0-9]*.json")):
         try:
             meta = json.loads(f.read_text())
@@ -290,7 +290,7 @@ that exposes `ARCHITECTURES`). That folder is what `--custom-architectures` take
 
 ## MAX versions
 
-The skill's pixi env uses `max {theirs}`. `mxc serve` runs the port with the MAX installed for MX Console
+The skill's pixi env uses `max {theirs}`. `mxc serve` runs the port with the MAX installed for mxconsole
 (`{ours}`). A port that works in one can break in the other; re-test after `mxc pull --port`.
 
 ## Finished?

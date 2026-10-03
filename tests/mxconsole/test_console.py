@@ -7,11 +7,28 @@ ADMIN = {"X-Mst-Admin": "1"}
 async def test_console_page_is_served_to_this_machine(http):
     r = await http.get("/console")
     assert r.status_code == 200
-    assert "MX Console" in r.text and "/console/main.js" in r.text
+    assert "<title>mxconsole</title>" in r.text and "/console/main.js" in r.text
     js = await http.get("/console/core.js")
     assert js.status_code == 200 and "X-Mst-Admin" in js.text
     css = await http.get("/console/console.css")
     assert css.status_code == 200 and "--page" in css.text and 'data-theme="dark"' in css.text
+
+
+def test_the_product_is_one_lowercase_word_everywhere_people_read_it():
+    """The name is mxconsole, never "MX Console": in every console asset and in every CLI message."""
+    from pathlib import Path
+    from mxconsole.gateway import CONSOLE_DIR
+    package = CONSOLE_DIR.parent
+    readable = [*CONSOLE_DIR.glob("*.js"), *CONSOLE_DIR.glob("*.html"), *CONSOLE_DIR.glob("*.css"), *package.glob("*.py")]
+    offenders = [p.name for p in readable if "MX Console" in p.read_text()]
+    assert offenders == []
+
+
+async def test_the_tab_shows_the_mx_mark(http):
+    page = (await http.get("/console")).text
+    assert '<link rel="icon" href="/console/favicon.svg"' in page
+    r = await http.get("/console/favicon.svg")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("image/svg+xml") and "<svg" in r.text
 
 
 async def test_console_is_refused_through_a_proxy_or_a_foreign_host(http):

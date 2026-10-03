@@ -1,4 +1,4 @@
-// MX Console, shared pieces: DOM helpers, admin API calls, polling, formatting, theme.
+// mxconsole, shared pieces: DOM helpers, admin API calls, polling, formatting, theme.
 // Every piece of data (model names, logs, request fields) goes in as a text node, never as HTML.
 import { icon } from "./icons.js";
 
@@ -47,7 +47,7 @@ export const $ = (id) => document.getElementById(id);
 export const clear = (el) => el.replaceChildren();
 export { icon };
 
-/** An app name as shown in lists. Names starting with "_" or "console" are MX Console's own traffic: the
+/** An app name as shown in lists. Names starting with "_" or "console" are mxconsole's own traffic: the
  *  benchmark gets the gauge icon, muted. Both still count in the gauges, because the GPU really was busy. */
 export function appLabel(name) {
   if (!name) return h("span", { class: "muted" }, "no key");

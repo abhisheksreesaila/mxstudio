@@ -21,7 +21,7 @@ const logUrl = (id) => (id.startsWith("model:") ? `/admin/models/${encodeURIComp
 export function logsPage(ctx) {
   const host = h("div", {});
   ctx.body.replaceChildren(host);
-  ctx.setSub("the commands you will need, and the logs of everything MX Console runs");
+  ctx.setSub("the commands you will need, and the logs of everything mxconsole runs");
 
   const cmdTable = h("section", { class: "panel scroll-x" }, h("table", { class: "grid sys-table" },
     h("thead", {}, h("tr", {}, h("th", {}, "Command"), h("th", {}, "What it does"), h("th", {}, ""))),

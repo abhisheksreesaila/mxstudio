@@ -39,7 +39,7 @@ Status: approved
 - 2026-10-03: the person asked to wire up the designed signature pages too, so `mxc bench` and the Benchmarks page move into v1 (tested against the stand-in model; real numbers come with the live run).
 - First user is Abhishek on Omarchy: daily real use; we accept that the public installer waits for v2.
 - v1 = endpoint + thin Learn: passes the acceptance test; we accept the classifier "wow" and dashboards waiting for v2.
-- Name is **MX Console** (2026-10-03, ADR 0003, superseding Hotfire): it is a console, and "MX" ties it to MAX/Mojo. Command `mxc`; `hotfire` and `mst` stay as aliases for one release.
+- Name is **mxconsole** (2026-10-03, ADR 0003, superseding Hotfire): it is a console, and "MX" ties it to MAX/Mojo. Command `mxc`; `hotfire` and `mst` stay as aliases for one release.
 - Security = LAN HTTPS + per-app keys: Caddy with its internal CA at https://<host>.local, revocable per-app keys in our own SQLite checked via Caddy forward_auth, LiteLLM routing on its master key only (no Postgres): other devices can use it safely; we accept trusting Caddy's CA once per client device.
 - Lifecycle = load on demand + idle unload (keep_alive-style, with pinning to stay on): register many models without filling RAM; we accept a cold-start wait (30s+) on the first call after idle.
 - Look = "Graphite" (Geist + Geist Mono, Lucide icons, near-monochrome with colour for live signal and per-section hues, dark-grey contrast chrome) with one signature moment per page (live tiles, pull cloud, patch bay, drag race, safeguards). Canvas: https://claude.ai/artifact/21NSyXKpzcrqanmqr8bEe5

@@ -40,7 +40,7 @@ class DaemonSource:
         try:
             return httpx.request(method, f"{daemon_url()}/admin/pulls{path}", headers=ADMIN, timeout=10.0, **kw)
         except httpx.HTTPError as e:
-            raise PullFailed(f"could not reach the MX Console daemon at {daemon_url()}: {e}")
+            raise PullFailed(f"could not reach the mxconsole daemon at {daemon_url()}: {e}")
 
     def start(self, ref, name):
         r = self._call("POST", "", json={"ref": ref, **({"name": name} if name else {})})
@@ -131,7 +131,7 @@ def run(ref: str, name: str | None, as_json: bool, *, source=None, display: Disp
     try:
         if source is None:
             if serve.ensure_daemon() and not as_json:
-                print("started the MX Console daemon", file=sys.stderr)
+                print("started the mxconsole daemon", file=sys.stderr)
             source = DaemonSource()
         job = source.start(ref, name)
     except (PullFailed, serve.DaemonError) as e:
