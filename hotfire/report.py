@@ -7,7 +7,7 @@ import time
 from hotfire.settings import daemon_url
 from hotfire.store import Model, format_duration
 
-PAGES = ("overview", "models", "activity", "metrics", "keys", "network")
+PAGES = ("overview", "models", "activity", "metrics", "keys", "network", "api")
 
 
 def console_link(page: str | None = None) -> str:

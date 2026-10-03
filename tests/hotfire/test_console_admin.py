@@ -161,3 +161,32 @@ async def test_docs_redirects_to_the_console_api_page(http):
     assert "scalar" not in (await http.get("/docs", follow_redirects=True)).text.lower()
     assert (await http.get("/docs", headers={"X-Forwarded-For": "192.168.1.20"})).status_code == 403
     assert (await http.get("/openapi.json")).status_code == 200  # the spec stays
+
+
+async def test_only_listed_console_files_are_served(http):
+    from hotfire.gateway import CONSOLE_ASSETS, CONSOLE_DIR
+    assert "console.css" in CONSOLE_ASSETS and "geist-variable.woff2" in CONSOLE_ASSETS
+    assert not any("source-" in a for a in CONSOLE_ASSETS)
+    for asset in sorted(CONSOLE_ASSETS):
+        assert (CONSOLE_DIR / asset).is_file(), asset  # nothing listed is missing
+        r = await http.get(f"/console/{asset}")
+        assert r.status_code == 200, asset
+    on_disk = {p.name for p in CONSOLE_DIR.iterdir() if p.name not in ("index.html", "LICENSE-fonts.txt")}
+    assert on_disk == set(CONSOLE_ASSETS)  # nothing unlisted ships, nothing listed is missing
+    for bad in ("index.html", "LICENSE-fonts.txt", "console.js", "source-sans-3-400.woff2", "..%2Fgateway.py", "%2e%2e/gateway.py"):
+        assert (await http.get(f"/console/{bad}")).status_code == 404, bad
+
+
+def test_console_code_never_writes_html_or_loads_from_elsewhere():
+    """Data goes in as text nodes; the CSP is default-src 'self'. Both are cheap to break by accident."""
+    import re
+    from hotfire.gateway import CONSOLE_DIR
+    banned = re.compile(r"innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function|setAttribute\(\s*['\"]style['\"]")
+    for path in CONSOLE_DIR.glob("*.js"):
+        text = path.read_text()
+        assert not banned.search(text), f"{path.name} writes HTML or an inline style"
+        assert not re.search(r"(fetch|import)\(\s*['\"`]https?:", text), f"{path.name} loads from another origin"
+    for name in ("index.html", "console.css"):
+        text = (CONSOLE_DIR / name).read_text()
+        assert "http://" not in text and "https://" not in text, f"{name} points outside the daemon"
+        assert not re.search(r"<style|\sstyle=\"|<script(?![^>]*\ssrc=)", text), f"{name} has inline code the CSP blocks"

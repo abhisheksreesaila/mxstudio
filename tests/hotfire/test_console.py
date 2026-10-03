@@ -7,17 +7,17 @@ ADMIN = {"X-Mst-Admin": "1"}
 async def test_console_page_is_served_to_this_machine(http):
     r = await http.get("/console")
     assert r.status_code == 200
-    assert "Hotfire" in r.text and "/console/console.js" in r.text
-    js = await http.get("/console/console.js")
+    assert "Hotfire" in r.text and "/console/main.js" in r.text
+    js = await http.get("/console/core.js")
     assert js.status_code == 200 and "X-Mst-Admin" in js.text
     css = await http.get("/console/console.css")
-    assert css.status_code == 200 and "--accent" in css.text
+    assert css.status_code == 200 and "--page" in css.text and 'data-theme="dark"' in css.text
 
 
 async def test_console_is_refused_through_a_proxy_or_a_foreign_host(http):
     assert (await http.get("/console", headers={"X-Forwarded-For": "192.168.1.20"})).status_code == 403
     assert (await http.get("/console", headers={"Host": "evil.example"})).status_code == 403
-    assert (await http.get("/console/console.js", headers={"Host": "evil.example"})).status_code == 403
+    assert (await http.get("/console/main.js", headers={"Host": "evil.example"})).status_code == 403
 
 
 async def test_console_assets_cannot_escape_their_folder(http):
@@ -65,7 +65,7 @@ async def test_admin_info_for_the_top_bar(http):
 
 
 async def test_console_cannot_be_framed_and_loads_nothing_from_elsewhere(http):
-    for path in ("/console", "/console/console.js", "/console/console.css"):
+    for path in ("/console", "/console/main.js", "/console/console.css"):
         r = await http.get(path)
         assert r.headers["x-frame-options"] == "DENY"
         csp = r.headers["content-security-policy"]
@@ -76,7 +76,7 @@ async def test_console_cannot_be_framed_and_loads_nothing_from_elsewhere(http):
 
 async def test_console_fonts_are_served_locally(http):
     css = (await http.get("/console/console.css")).text
-    for font in ("source-sans-3-400.woff2", "source-sans-3-600.woff2", "source-code-pro-400.woff2", "source-code-pro-500.woff2"):
+    for font in ("geist-variable.woff2", "geist-mono-variable.woff2"):
         assert f"/console/{font}" in css
         r = await http.get(f"/console/{font}")
         assert r.status_code == 200 and r.headers["content-type"] == "font/woff2" and r.content[:4] == b"wOF2"

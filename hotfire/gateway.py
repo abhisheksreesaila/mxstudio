@@ -27,9 +27,12 @@ PROXIED = ("/v1/chat/completions", "/v1/completions", "/v1/embeddings")
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 ADMIN_HEADER = "x-mst-admin"
 CONSOLE_DIR = Path(__file__).parent / "console"
-CONSOLE_FONTS = {"source-sans-3-400.woff2", "source-sans-3-600.woff2",
-                 "source-code-pro-400.woff2", "source-code-pro-500.woff2"}
-CONSOLE_ASSETS = {"console.css", "console.js"} | CONSOLE_FONTS
+CONSOLE_FONTS = {"geist-variable.woff2", "geist-mono-variable.woff2"}
+# An explicit list: the console is never a directory server. Add a file here when you add one to console/.
+CONSOLE_SCRIPTS = {"theme.js", "main.js", "core.js", "icons.js", "charts.js", "shell.js", "palette.js", "actions.js",
+                   "page-overview.js", "page-models.js", "page-metrics.js", "page-api.js", "page-keys.js",
+                   "page-network.js", "page-activity.js"}
+CONSOLE_ASSETS = {"console.css"} | CONSOLE_SCRIPTS | CONSOLE_FONTS
 LOG_TAIL_BYTES = 8000
 TRY_MAX_TOKENS = 1024  # the API page's "Try it" is for a quick look, not for load
 # no-cache: an upgraded hotfire never shows a stale console. The rest: no other site can frame the

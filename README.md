@@ -30,11 +30,11 @@ Architecture decision: [docs/adr/0001](docs/adr/0001-mst-core-architecture.md)
 |---|---|---|
 | **Resolver** | `qwen2.5-0.5b` → HF repo → architecture → is it in MAX's catalog (`max list --json`)? Downloads safetensors at a pinned commit. | `hotfire/resolve.py` |
 | **Supervisor** (the "hypervisor") | One `max serve` child per model on a free loopback port. Starts it on demand (concurrent callers share one start), stops it after `keep_alive` idle (default 5m) unless pinned, never mid-request. Cleans up orphans after a crash. | `hotfire/supervisor.py` |
-| **Gateway** (`hotfire daemon`) | OpenAI-compatible `/v1/*` on `127.0.0.1:11435`. Checks the Bearer key, routes by `model`, streams through, and serves the API reference at `/docs` (Scalar). Admin routes are for the CLI only. | `hotfire/gateway.py` |
+| **Gateway** (`hotfire daemon`) | OpenAI-compatible `/v1/*` on `127.0.0.1:11435`. Checks the Bearer key, routes by `model`, streams through, and serves the console (Mission Control, with the API reference) at `/console`; `/docs` redirects to it. Admin routes are for the CLI and the console only. | `hotfire/gateway.py` |
 | **Keys** | `mst-…` keys, one per app, stored only as SHA-256 hashes. Shown once. | `hotfire/keys.py` |
 | **Expose** | Writes and runs Caddy (`tls internal`, forward_auth) and LiteLLM (its own pixi env, master key, no Postgres) as your user. | `hotfire/expose.py` |
 | **Learn** | A Jupyter notebook built only from the Hugging Face API: model card, config table, parameter breakdown, sample code, and a pointer to MAX's source. | `hotfire/learn.py` |
-| **Console** | `http://127.0.0.1:11435/console`: Azure-style operations console (resource menu, models grid, settings blade). This machine only. | `hotfire/console/` |
+| **Console** | `http://127.0.0.1:11435/console`: Hotfire Mission Control in the Graphite style (live strip, models table with a side sheet, metrics, API keys, network patch bay, API reference, ⌘K palette). This machine only. | `hotfire/console/` |
 | **Port** | For unsupported architectures: clones `modular/skills`, picks a donor architecture, and writes `PORT.md` plus the `claude '/import-model …'` command. | `hotfire/port.py` |
 
 State lives in `~/.hotfire/` (override with `HOTFIRE_HOME`; the old `MST_HOME` still works): `mst.db` (models, key hashes), `logs/`,
@@ -100,9 +100,9 @@ pixi run hotfire serve qwen2.5-0.5b
 ✅ You see `pulled …`, `started the hotfire daemon`, `loading …`, `qwen2.5-0.5b is ready (Ns)`, then the
 endpoint `http://127.0.0.1:11435/v1`, a key `mst-…` (**save it**: `export HOTFIRE_API_KEY=mst-…`), and
 a curl and a Python snippet. Paste the curl and expect a JSON reply.
-✅ Open http://127.0.0.1:11435/docs and you should see the API reference.
-✅ Open http://127.0.0.1:11435/console: the operations console lists your models. Click one to open its
-blade: Overview, Settings (pin, unload after idle; Apply saves) and Logs.
+✅ Open http://127.0.0.1:11435/docs and you should land on the console's API reference.
+✅ Open http://127.0.0.1:11435/console: Mission Control lists your models. Click one to open its
+side sheet: Overview, Settings (keep loaded, unload after idle; Apply saves), Logs and Requests. ⌘K runs any action.
 ❌ If loading fails: the error includes the tail of `~/.hotfire/logs/qwen2.5-0.5b.log`.
 
 ### 4. Several models, on demand
