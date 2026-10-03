@@ -14,9 +14,10 @@ import httpx
 import logging
 from fasthtml.common import FastHTML
 from starlette.requests import Request
-from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
+from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
-from hotfire import keys, metrics
+from hotfire import expose, insights, keys, metrics
+from hotfire.settings import DAEMON_PORT
 from hotfire.store import Store, hotfire_home
 from hotfire.supervisor import StartFailed, Supervisor, UnknownModel
 
@@ -30,6 +31,7 @@ CONSOLE_FONTS = {"source-sans-3-400.woff2", "source-sans-3-600.woff2",
                  "source-code-pro-400.woff2", "source-code-pro-500.woff2"}
 CONSOLE_ASSETS = {"console.css", "console.js"} | CONSOLE_FONTS
 LOG_TAIL_BYTES = 8000
+TRY_MAX_TOKENS = 1024  # the API page's "Try it" is for a quick look, not for load
 # no-cache: an upgraded hotfire never shows a stale console. The rest: no other site can frame the
 # console (clickjacking Load/Stop) and the page loads nothing from anywhere but the daemon.
 CONSOLE_HEADERS = {"Cache-Control": "no-cache", "X-Frame-Options": "DENY",
@@ -37,15 +39,6 @@ CONSOLE_HEADERS = {"Cache-Control": "no-cache", "X-Frame-Options": "DENY",
                                               "form-action 'none'; object-src 'none'",
                    "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"}
 HOP_BY_HOP = {"content-length", "transfer-encoding", "connection", "content-encoding"}
-
-SCALAR_PAGE = """<!doctype html>
-<html><head><meta charset="utf-8"><title>Hotfire API</title>
-<meta name="viewport" content="width=device-width, initial-scale=1"></head>
-<body><div id="app"></div>
-<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
-<script>Scalar.createApiReference('#app', {url: '/openapi.json'})</script>
-</body></html>"""
-
 
 def openai_error(status: int, message: str, code: str, type_: str = "invalid_request_error") -> JSONResponse:
     return JSONResponse({"error": {"message": message, "type": type_, "param": None, "code": code}},
@@ -205,7 +198,11 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         if app_name is None:
             note(None, None, route, 401, started)
             return unauthorized()
-        raw = await request.body()
+        return await forward(await request.body(), app_name, route, request.url.path,
+                             request.headers.get("content-type", "application/json"), started)
+
+    async def forward(raw: bytes, app_name: str, route: str, path: str, content_type: str, started: float):
+        """Send one authenticated /v1 request to its model and stream the answer back."""
         try:
             body = json.loads(raw)
             name = body["model"]
@@ -228,10 +225,9 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         started = time.monotonic()  # model latency from here: a cold start isn't counted as TTFT
         in_flight = contextlib.AsyncExitStack()
         await in_flight.enter_async_context(supervisor.request(name))  # never reaped mid-request
-        target = base + request.url.path.removeprefix("/v1")
+        target = base + path.removeprefix("/v1")
         # identity: the body is passed through raw, so it must never arrive compressed
-        headers = {"content-type": request.headers.get("content-type", "application/json"),
-                   "accept-encoding": "identity"}
+        headers = {"content-type": content_type, "accept-encoding": "identity"}
         try:
             upstream = await proxy.send(
                 proxy.build_request("POST", target, content=raw, headers=headers), stream=True)
@@ -299,18 +295,148 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             limit = max(1, min(500, int(request.query_params.get("limit", "50"))))
         except ValueError:
             limit = 50
-        return JSONResponse(metrics.recent(store, limit))
+        return JSONResponse(metrics.recent(store, limit, model=request.query_params.get("model")))
 
     @app.get("/admin/metrics")
     async def admin_metrics(request: Request):
         if not admin_only(request):
             return admin_refused()
-        out = metrics.summary(store, window=300)
+        try:
+            window = metrics.range_seconds(request.query_params.get("range", "5m"))
+        except ValueError as e:
+            return openai_error(400, str(e), "invalid_range")
+        out = metrics.summary(store, window=window)
         out["gpus"] = await asyncio.to_thread(metrics.gpus)
         return JSONResponse(out)
 
+    @app.get("/admin/series")
+    def admin_series(request: Request):
+        if not admin_only(request):
+            return admin_refused()
+        try:
+            return JSONResponse(metrics.series(store, request.query_params.get("range", "1h")))
+        except ValueError as e:
+            return openai_error(400, str(e), "invalid_range")
+
+    @app.get("/admin/insights")
+    def admin_insights(request: Request):
+        if not admin_only(request):
+            return admin_refused()
+        return JSONResponse(insights.compute(store, supervisor.status()))
+
     def admin_refused() -> Response:
         return Response("admin is only served to this machine", status_code=403)
+
+    # -- keys -----------------------------------------------------------------------------------
+    def key_row(k: keys.KeyInfo) -> dict:
+        return {"app": k.app, "prefix": k.prefix, "created_at": k.created_at, "last_used_at": k.last_used_at,
+                "revoked_at": k.revoked_at, "status": "revoked" if k.revoked_at else "active"}
+
+    @app.get("/admin/keys")
+    def admin_keys(request: Request):
+        if not admin_only(request):
+            return admin_refused()
+        return JSONResponse([key_row(k) for k in keys.list_keys(store) if not k.app.startswith("_")])
+
+    @app.post("/admin/keys")
+    async def admin_key_new(request: Request):
+        if not admin_only(request):
+            return admin_refused()
+        try:
+            body = json.loads(await request.body())
+            app_name = body["app"]
+            if not isinstance(app_name, str):
+                raise TypeError
+            plaintext = keys.create_key(store, app_name)
+        except keys.KeyExists as e:
+            return openai_error(409, str(e), "key_exists")
+        except (ValueError, KeyError, TypeError) as e:
+            msg = str(e) if isinstance(e, ValueError) and "app name" in str(e) else \
+                "Send JSON like {\"app\": \"my-app\"}: letters, digits, '.', '_' or '-'."
+            return openai_error(400, msg, "invalid_request_body")
+        return JSONResponse({"app": app_name, "key": plaintext}, status_code=201)  # the only time it is shown
+
+    @app.delete("/admin/keys/{app_name}")
+    def admin_key_revoke(request: Request, app_name: str):
+        if not admin_only(request):
+            return admin_refused()
+        if app_name.startswith("_") or not keys.revoke_key(store, app_name):
+            return openai_error(404, f"There is no active key for `{app_name}`.", "key_not_found")
+        return JSONResponse({"app": app_name, "status": "revoked"})
+
+    # -- network --------------------------------------------------------------------------------
+    @app.get("/admin/network")
+    def admin_network(request: Request):
+        if not admin_only(request):
+            return admin_refused()
+        now = time.time()
+        live = {row["name"]: row for row in supervisor.status()}
+        recent = store.db.execute("SELECT model, COUNT(*) AS n FROM requests WHERE ts >= ? GROUP BY model",
+                                  (now - 60,)).fetchall()
+        per_model = {r["model"]: r["n"] for r in recent}
+        apps = store.db.execute(
+            """SELECT app, COUNT(*) AS requests, MAX(ts) AS last_ts FROM requests
+               WHERE ts >= ? AND app IS NOT NULL AND app NOT LIKE '\\_%' ESCAPE '\\' AND app != 'console'
+               GROUP BY app ORDER BY last_ts DESC LIMIT 8""", (now - 86400,)).fetchall()
+        status = expose.status()
+        return JSONResponse({
+            "host": socket.gethostname(), "expose": status, "exposed": status["caddy"],
+            "lan_endpoint": expose.lan_endpoint(), "default_host": expose.default_host(),
+            "ca_path": str(expose.ca_root_path()), "ca_exists": expose.ca_root_path().exists(),
+            "ports": {"daemon": DAEMON_PORT, "litellm": expose.LITELLM_PORT, "caddy": expose.EXPOSE_PORT},
+            "models": [{"name": m.name, "state": live.get(m.name, {}).get("state", "cold"),
+                        "port": live.get(m.name, {}).get("port"), "recent": per_model.get(m.name, 0)}
+                       for m in store.models()],
+            "apps": [dict(a) for a in apps],
+            "recent_requests": sum(per_model.values()),
+        })
+
+    @app.post("/admin/expose")
+    async def admin_expose(request: Request):
+        if not admin_only(request):
+            return admin_refused()
+        try:
+            body = json.loads(await request.body() or b"{}")
+        except ValueError:
+            body = None
+        host = body.get("host", expose.default_host()) if isinstance(body, dict) else None
+        litellm = body.get("litellm", True) if isinstance(body, dict) else None
+        if not isinstance(host, str) or not isinstance(litellm, bool):
+            return openai_error(400, "Send JSON like {\"host\": \"box.local\", \"litellm\": true} (both optional).",
+                                "invalid_request_body")
+        try:
+            # starting LiteLLM takes seconds: keep the event loop free
+            await asyncio.to_thread(expose.start, host=host, litellm=litellm, store=store)
+        except ValueError as e:
+            return openai_error(400, str(e), "invalid_host")
+        except expose.ExposeError as e:
+            return openai_error(500, str(e), "expose_failed", "server_error")
+        return JSONResponse({"exposed": True, "lan_endpoint": expose.lan_endpoint(), "host": host})
+
+    @app.post("/admin/expose/stop")
+    async def admin_expose_stop(request: Request):
+        if not admin_only(request):
+            return admin_refused()
+        await asyncio.to_thread(expose.stop, store=store)
+        return JSONResponse({"exposed": False})
+
+    # -- try it ---------------------------------------------------------------------------------
+    @app.post("/admin/try/chat")
+    async def admin_try_chat(request: Request):
+        """The API page's "Try it": one chat request sent as the console, so the browser needs no app key."""
+        if not admin_only(request):
+            return admin_refused()
+        raw = await request.body()
+        try:
+            body = json.loads(raw)
+            ok = (isinstance(body, dict) and isinstance(body.get("model"), str) and isinstance(body.get("messages"), list)
+                  and body["messages"] and type(body.get("max_tokens", 1)) is int and 0 < body.get("max_tokens", 1) <= TRY_MAX_TOKENS)
+        except ValueError:
+            ok = False
+        if not ok:
+            return openai_error(400, f"Send JSON with `model`, a non-empty `messages` list and optionally "
+                                     f"`max_tokens` (1 to {TRY_MAX_TOKENS}) and `stream`.", "invalid_request_body")
+        return await forward(raw, "console", "chat", "/v1/chat/completions", "application/json", time.monotonic())
 
     def model_row(model, live: dict) -> dict:
         return {"name": model.name, "repo_id": model.repo_id, "revision": model.revision,
@@ -368,13 +494,13 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         if not admin_only(request):
             return admin_refused()
         base = f"http://{request.headers.get('host', '127.0.0.1')}"
-        from hotfire import expose
         from hotfire.port import mst_max_version
         active = sum(1 for k in keys.list_keys(store) if k.revoked_at is None and not k.app.startswith("_"))
+        today = time.mktime(time.localtime()[:3] + (0, 0, 0, 0, 0, -1))  # local midnight
         return JSONResponse({"host": socket.gethostname(), "endpoint": f"{base}/v1", "docs": f"{base}/docs",
                              "lan_endpoint": expose.lan_endpoint(),
                              "max_version": mst_max_version(), "uptime_seconds": round(time.monotonic() - boot),
-                             "active_keys": active})
+                             "active_keys": active, "blocked_today": metrics.count_status(store, 401, today)})
 
     @app.get("/favicon.ico")
     def favicon():
@@ -441,6 +567,6 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
     def docs(request: Request):
         if not loopback_only(request):
             return Response("docs are only served to this machine", status_code=403)
-        return HTMLResponse(SCALAR_PAGE)
+        return RedirectResponse("/console#api", status_code=307)  # the API reference lives in the console
 
     return app

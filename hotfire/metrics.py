@@ -22,8 +22,9 @@ def record(store: Store, *, app: str | None, model: str | None, route: str, stat
          ttft_ms, duration_ms, int(estimated)))
 
 
-def recent(store: Store, limit: int = 50) -> list[dict]:
-    rows = store.db.execute("SELECT * FROM requests ORDER BY ts DESC, id DESC LIMIT ?", (limit,))
+def recent(store: Store, limit: int = 50, model: str | None = None) -> list[dict]:
+    where, args = ("WHERE model = ?", (model,)) if model else ("", ())
+    rows = store.db.execute(f"SELECT * FROM requests {where} ORDER BY ts DESC, id DESC LIMIT ?", (*args, limit))
     return [{**dict(r), "estimated": bool(r["estimated"])} for r in rows]
 
 
@@ -67,6 +68,47 @@ def summary(store: Store, window: float = 300, now: float | None = None) -> dict
     models = sorted({r["model"] for r in rows if r["model"]})
     out["by_model"] = {m: _stats([r for r in rows if r["model"] == m]) for m in models}
     return out
+
+
+RANGES = {"5m": (300, 10), "1h": (3600, 60), "24h": (86400, 1800), "7d": (7 * 86400, 3 * 3600)}
+
+
+def range_seconds(name: str) -> int:
+    if name not in RANGES:
+        raise ValueError(f"range must be one of {', '.join(RANGES)}")
+    return RANGES[name][0]
+
+
+def series(store: Store, range_name: str, now: float | None = None) -> dict:
+    """Requests bucketed in time, per model: the data behind the console's traces and charts."""
+    span = range_seconds(range_name)
+    step = RANGES[range_name][1]
+    now = time.time() if now is None else now
+    count = span // step
+    first = (int(now) // step - count + 1) * step  # buckets sit on the clock; the last one holds `now`
+    rows = store.db.execute("SELECT * FROM requests WHERE ts >= ? AND model IS NOT NULL", (first,)).fetchall()
+    grouped: dict[str, list[list]] = {}
+    for r in rows:
+        i = int(r["ts"] - first) // step
+        if 0 <= i < count:
+            grouped.setdefault(r["model"], [[] for _ in range(count)])[i].append(r)
+    models = {}
+    for name, buckets in sorted(grouped.items()):
+        out = []
+        for i, group in enumerate(buckets):
+            st = _stats(group)
+            out.append({"t": first + i * step, "requests": st["requests"], "errors": st["errors"],
+                        "ok": st["requests"] - st["errors"], "ttft_p50_ms": st["ttft_p50_ms"],
+                        "decode_tps_p50": st["decode_tps_p50"]})
+        models[name] = out
+    return {"range": range_name, "bucket_seconds": step, "start": first, "end": first + count * step,
+            "buckets": [first + i * step for i in range(count)], "models": models}
+
+
+def count_status(store: Store, status: int, since: float) -> int:
+    row = store.db.execute("SELECT COUNT(*) AS n FROM requests WHERE status = ? AND ts >= ?",
+                           (status, since)).fetchone()
+    return row["n"]
 
 
 class StreamMeter:

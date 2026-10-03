@@ -147,12 +147,6 @@ async def test_openapi_lists_paths_and_registered_models(http):
     assert sorted(spec["components"]["schemas"]["ModelName"]["enum"]) == ["other", "tiny"]
 
 
-async def test_docs_page_renders_scalar(http):
-    r = await http.get("/docs")
-    assert r.status_code == 200
-    assert "@scalar/api-reference" in r.text and "/openapi.json" in r.text
-
-
 async def test_docs_only_for_loopback(store, sup):
     async with client(create_app(store, sup), host="192.168.1.20") as c:
         assert (await c.get("/docs")).status_code == 403
