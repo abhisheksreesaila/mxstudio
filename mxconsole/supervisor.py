@@ -149,6 +149,10 @@ class Supervisor:
         except BlockingIOError:
             f.close()
             raise DaemonAlreadyRunning("another MX Console daemon is already running for this MXC_HOME") from None
+        f.seek(0)
+        f.truncate()
+        f.write(str(os.getpid()))  # so `mxc ps` can tell which process is the daemon
+        f.flush()
         self._lock_file = f
 
     def sweep_orphans(self) -> list[int]:
