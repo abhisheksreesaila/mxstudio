@@ -1,15 +1,15 @@
-# Hotfire (`hotfire`)
+# MX Console (`mxc`)
 
 Local models on **Modular MAX** that you can see into and reshape.
 
-`hotfire` serves small models behind **one secure, OpenAI-compatible endpoint**. It loads each
+`mxc` serves small models behind **one secure, OpenAI-compatible endpoint**. It loads each
 model on its first request, unloads it when idle, and writes a notebook that explains the
 model. If a model's architecture isn't supported yet, it sets up a workspace to port it with
 Modular's own skills.
 
-- **As easy as Ollama:** `hotfire serve qwen2.5-0.5b` gives you a working endpoint.
+- **As easy as Ollama:** `mxc serve qwen2.5-0.5b` gives you a working endpoint.
 - **Safe on your network:** HTTPS through Caddy, one revocable key per app, LiteLLM for routing.
-- **Not a black box:** `hotfire learn` shows the architecture, a parameter breakdown, and where
+- **Not a black box:** `mxc learn` shows the architecture, a parameter breakdown, and where
   MAX's Python implementation of the model lives so you can read and change it.
 
 Brief: [docs/brief.md](docs/brief.md) · Tickets: [docs/plan.md](docs/plan.md) ·
@@ -20,24 +20,24 @@ Architecture decision: [docs/adr/0001](docs/adr/0001-mst-core-architecture.md)
 ## How it works
 
 ```
- your apps ──HTTPS──▶ Caddy :8443 ──▶ LiteLLM :4000 ──▶ hotfire daemon :11435 ──▶ max serve (one per model)
+ your apps ──HTTPS──▶ Caddy :8443 ──▶ LiteLLM :4000 ──▶ mxc daemon :11435 ──▶ max serve (one per model)
  (LAN or local)        │  TLS (own CA)     routing by        on-demand start,     loopback ports,
-                       │  key check ───────▶ /auth/check      idle unload, pin     served by hotfire name
+                       │  key check ───────▶ /auth/check      idle unload, pin     served by mxc name
                        └ only /v1/models, /v1/chat/completions, /v1/completions, /v1/embeddings
 ```
 
 | Piece | What it does | Code |
 |---|---|---|
-| **Resolver** | `qwen2.5-0.5b` → HF repo → architecture → is it in MAX's catalog (`max list --json`)? Downloads safetensors at a pinned commit. | `hotfire/resolve.py` |
-| **Supervisor** (the "hypervisor") | One `max serve` child per model on a free loopback port. Starts it on demand (concurrent callers share one start), stops it after `keep_alive` idle (default 5m) unless pinned, never mid-request. Cleans up orphans after a crash. | `hotfire/supervisor.py` |
-| **Gateway** (`hotfire daemon`) | OpenAI-compatible `/v1/*` on `127.0.0.1:11435`. Checks the Bearer key, routes by `model`, streams through, and serves the console (Mission Control, with the API reference) at `/console`; `/docs` redirects to it. Admin routes are for the CLI and the console only. | `hotfire/gateway.py` |
-| **Keys** | `mst-…` keys, one per app, stored only as SHA-256 hashes. Shown once. | `hotfire/keys.py` |
-| **Expose** | Writes and runs Caddy (`tls internal`, forward_auth) and LiteLLM (its own pixi env, master key, no Postgres) as your user. | `hotfire/expose.py` |
-| **Learn** | A Jupyter notebook built only from the Hugging Face API: model card, config table, parameter breakdown, sample code, and a pointer to MAX's source. | `hotfire/learn.py` |
-| **Console** | `http://127.0.0.1:11435/console`: Hotfire Mission Control in the Graphite style (live strip, models table with a side sheet, metrics, API keys, network patch bay, API reference, ⌘K palette). This machine only. | `hotfire/console/` |
-| **Port** | For unsupported architectures: clones `modular/skills`, picks a donor architecture, and writes `PORT.md` plus the `claude '/import-model …'` command. | `hotfire/port.py` |
+| **Resolver** | `qwen2.5-0.5b` → HF repo → architecture → is it in MAX's catalog (`max list --json`)? Downloads safetensors at a pinned commit. | `mxconsole/resolve.py` |
+| **Supervisor** (the "hypervisor") | One `max serve` child per model on a free loopback port. Starts it on demand (concurrent callers share one start), stops it after `keep_alive` idle (default 5m) unless pinned, never mid-request. Cleans up orphans after a crash. | `mxconsole/supervisor.py` |
+| **Gateway** (`mxc daemon`) | OpenAI-compatible `/v1/*` on `127.0.0.1:11435`. Checks the Bearer key, routes by `model`, streams through, and serves the console (Mission Control, with the API reference) at `/console`; `/docs` redirects to it. Admin routes are for the CLI and the console only. | `mxconsole/gateway.py` |
+| **Keys** | `mst-…` keys, one per app, stored only as SHA-256 hashes. Shown once. | `mxconsole/keys.py` |
+| **Expose** | Writes and runs Caddy (`tls internal`, forward_auth) and LiteLLM (its own pixi env, master key, no Postgres) as your user. | `mxconsole/expose.py` |
+| **Learn** | A Jupyter notebook built only from the Hugging Face API: model card, config table, parameter breakdown, sample code, and a pointer to MAX's source. | `mxconsole/learn.py` |
+| **Console** | `http://127.0.0.1:11435/console`: MX Console in the Graphite style (live strip, models table with a side sheet, metrics, API keys, network patch bay, API reference, ⌘K palette). This machine only. | `mxconsole/console/` |
+| **Port** | For unsupported architectures: clones `modular/skills`, picks a donor architecture, and writes `PORT.md` plus the `claude '/import-model …'` command. | `mxconsole/port.py` |
 
-State lives in `~/.hotfire/` (override with `HOTFIRE_HOME`; the old `MST_HOME` still works): `mst.db` (models, key hashes), `logs/`,
+State lives in `~/.mxc/` (override with `MXC_HOME`; the old `HOTFIRE_HOME` and `MST_HOME` still work; an existing `~/.hotfire` or `~/.mst` is moved here once): `mst.db` (models, key hashes), `logs/`,
 `run/`, `notebooks/`, `ports/` and `expose/`. Weights stay in the Hugging Face cache.
 
 ---
@@ -45,19 +45,19 @@ State lives in `~/.hotfire/` (override with `HOTFIRE_HOME`; the old `MST_HOME` s
 ## Commands
 
 ```bash
-pixi run hotfire serve qwen2.5-0.5b              # pull if needed → start daemon → load → print URL, key, curl, Python
-pixi run hotfire serve smollm2-1.7b --pin        # never unloads
-pixi run hotfire serve qwen2.5-1.5b --keep-alive 10m
-pixi run hotfire ls                              # registered models + live state (cold/starting/ready/crashed)
-pixi run hotfire stop qwen2.5-0.5b               # unload one now
-pixi run hotfire stop --all                      # unload everything, stop the daemon
+pixi run mxc serve qwen2.5-0.5b              # pull if needed → start daemon → load → print URL, key, curl, Python
+pixi run mxc serve smollm2-1.7b --pin        # never unloads
+pixi run mxc serve qwen2.5-1.5b --keep-alive 10m
+pixi run mxc ls                              # registered models + live state (cold/starting/ready/crashed)
+pixi run mxc stop qwen2.5-0.5b               # unload one now
+pixi run mxc stop --all                      # unload everything, stop the daemon
 
-pixi run hotfire pull <name-or-hf-repo> [--dry-run] [--name N]   # resolve + download only
-pixi run hotfire keys new my-app | ls | revoke my-app            # one key per app (printed once)
-pixi run hotfire learn qwen2.5-0.5b [--no-open]                  # notebook → Jupyter Lab
-pixi run hotfire expose [--host box.local] [--no-litellm] | --stop
-pixi run hotfire port <hf-repo>                                  # workspace for an unsupported architecture
-pixi run hotfire daemon                                          # the gateway in the foreground (hotfire serve starts it for you)
+pixi run mxc pull <name-or-hf-repo> [--dry-run] [--name N]   # resolve + download only
+pixi run mxc keys new my-app | ls | revoke my-app            # one key per app (printed once)
+pixi run mxc learn qwen2.5-0.5b [--no-open]                  # notebook → Jupyter Lab
+pixi run mxc expose [--host box.local] [--no-litellm] | --stop
+pixi run mxc port <hf-repo>                                  # workspace for an unsupported architecture
+pixi run mxc daemon                                          # the gateway in the foreground (mxc serve starts it for you)
 ```
 
 Short names: `qwen2.5-0.5b`, `qwen2.5-1.5b`, `qwen2.5-3b`, `smollm2-1.7b`, `all-minilm-l6`,
@@ -89,40 +89,40 @@ sudo rm -r /etc/mxstudio        # old deployment env files, Caddyfile, install m
 
 ### 2. Tests (no GPU)
 ```bash
-pixi run pytest tests/hotfire -q
+pixi run pytest tests/mxconsole -q
 ```
 ✅ `175 passed`.
 
 ### 3. One model, local endpoint
 ```bash
-pixi run hotfire serve qwen2.5-0.5b
+pixi run mxc serve qwen2.5-0.5b
 ```
-✅ You see `pulled …`, `started the hotfire daemon`, `loading …`, `qwen2.5-0.5b is ready (Ns)`, then the
-endpoint `http://127.0.0.1:11435/v1`, a key `mst-…` (**save it**: `export HOTFIRE_API_KEY=mst-…`), and
+✅ You see `pulled …`, `started the MX Console daemon`, `loading …`, `qwen2.5-0.5b is ready (Ns)`, then the
+endpoint `http://127.0.0.1:11435/v1`, a key `mst-…` (**save it**: `export MXC_API_KEY=mst-…`), and
 a curl and a Python snippet. Paste the curl and expect a JSON reply.
 ✅ Open http://127.0.0.1:11435/docs and you should land on the console's API reference.
 ✅ Open http://127.0.0.1:11435/console: Mission Control lists your models. Click one to open its
 side sheet: Overview, Settings (keep loaded, unload after idle; Apply saves), Logs and Requests. ⌘K runs any action.
-❌ If loading fails: the error includes the tail of `~/.hotfire/logs/qwen2.5-0.5b.log`.
+❌ If loading fails: the error includes the tail of `~/.mxc/logs/qwen2.5-0.5b.log`.
 
 ### 4. Several models, on demand
 ```bash
-pixi run hotfire serve smollm2-1.7b --pin
-pixi run hotfire serve qwen2.5-1.5b --keep-alive 2m
-pixi run hotfire ls
+pixi run mxc serve smollm2-1.7b --pin
+pixi run mxc serve qwen2.5-1.5b --keep-alive 2m
+pixi run mxc ls
 ```
-✅ `ls` shows all three as `ready`. Wait 2–3 minutes, run `hotfire ls` again, and `qwen2.5-1.5b`
+✅ `ls` shows all three as `ready`. Wait 2–3 minutes, run `mxc ls` again, and `qwen2.5-1.5b`
 is `cold`, the others aren't. Call it again (curl with `"model": "qwen2.5-1.5b"`) and it comes
 back after a cold start.
 
 ### 5. Secure LAN endpoint
 ```bash
-pixi run hotfire expose
+pixi run mxc expose
 ```
 ✅ It prints `https://<your-host>.local:8443/v1` and the path to Caddy's `root.crt`. Then:
 ```bash
 curl --cacert ~/.local/share/caddy/pki/authorities/local/root.crt \
-  https://$(hostname).local:8443/v1/models -H "Authorization: Bearer $HOTFIRE_API_KEY"
+  https://$(hostname).local:8443/v1/models -H "Authorization: Bearer $MXC_API_KEY"
 ```
 ✅ This lists your models. With a wrong key you get `401`, and
 `https://…:8443/model/info` gives `404`, because LiteLLM's admin API is never exposed.
@@ -130,7 +130,7 @@ curl --cacert ~/.local/share/caddy/pki/authorities/local/root.crt \
 
 ### 6. The whole acceptance run in one script
 ```bash
-pixi run python scripts/hotfire_acceptance.py
+pixi run python scripts/mxc_acceptance.py
 ```
 ✅ It ends with `N/N checks passed`. That covers chat and streaming on all three models over HTTPS, all three at
 once, a bad key refused, idle unload and reload, and a pinned model staying up. It prints a curl line for
@@ -138,24 +138,24 @@ a **second device**: copy `root.crt` there, run the line, and you get a reply. T
 
 ### 7. Learn and port
 ```bash
-pixi run hotfire learn qwen2.5-0.5b          # opens Jupyter Lab; run the "Try it" cells with HOTFIRE_API_KEY set
-pixi run hotfire port allenai/OLMoE-1B-7B-0125-Instruct   # prints the donor, workspace and Claude command
+pixi run mxc learn qwen2.5-0.5b          # opens Jupyter Lab; run the "Try it" cells with MXC_API_KEY set
+pixi run mxc port allenai/OLMoE-1B-7B-0125-Instruct   # prints the donor, workspace and Claude command
 ```
 ✅ The notebook shows the model card, a config table, a parameter breakdown (estimate ≈ actual)
 and MAX's source folder for the architecture. `port` prints a workspace with `PORT.md`.
 
 ### When you're done
 ```bash
-pixi run hotfire expose --stop && pixi run hotfire stop --all
+pixi run mxc expose --stop && pixi run mxc stop --all
 ```
 
 ---
 
 ## Development
 
-- New code is in `hotfire/`; tests are in `tests/hotfire/` and use a fake `max` (`tests/hotfire/fake_max.py`), so they
-  need no GPU. Run them with `pixi run pytest tests/hotfire -q`.
+- New code is in `mxconsole/`; tests are in `tests/mxconsole/` and use a fake `max` (`tests/mxconsole/fake_max.py`), so they
+  need no GPU. Run them with `pixi run pytest tests/mxconsole -q`.
 - LiteLLM lives in its own pixi environment: `pixi install -e gateway`.
 - The legacy core (`notebooks/mxstudio`, `mxs` command, old docs) is still in the repo until
-  `hotfire` has passed the live checks above. It will be removed after that, with your OK.
-- Ports: daemon `HOTFIRE_PORT` (11435), LiteLLM `HOTFIRE_LITELLM_PORT` (4000), HTTPS `HOTFIRE_EXPOSE_PORT` (8443). The old `MST_*` names are still read as a fallback.
+  `mxc` has passed the live checks above. It will be removed after that, with your OK.
+- Ports: daemon `MXC_PORT` (11435), LiteLLM `MXC_LITELLM_PORT` (4000), HTTPS `MXC_EXPOSE_PORT` (8443). The old `HOTFIRE_*` and `MST_*` names are still read as a fallback.

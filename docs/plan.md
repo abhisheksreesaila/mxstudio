@@ -3,8 +3,8 @@
 <!-- Tickets, one per vertical slice (each independently shippable and testable).
 Status is one of: todo, doing, review, done, blocked. A blocked ticket gets a
 "Blocked:" line saying exactly what the person has to do.
-Architecture: docs/adr/0001-mst-core-architecture.md. New code lives in `hotfire/`,
-tests in `tests/hotfire/`. The old `notebooks/mxstudio` stays untouched until mst replaces it. -->
+Architecture: docs/adr/0001-mst-core-architecture.md. New code lives in `mxconsole/`,
+tests in `tests/mxconsole/`. The old `notebooks/mxstudio` stays untouched until mst replaces it. -->
 
 ## F-001 mst skeleton, store and `mst ls` [done]
 Brief: docs/brief.md · Needs: none
@@ -72,7 +72,7 @@ Brief: docs/brief.md · Design: docs/design/console.md
 - [x] visual direction chosen: Azure Blade (option C), tokens in design-system/DESIGN-SYSTEM.md
 
 ## F-011 Live acceptance on this machine [blocked]
-Blocked: stop the other agents to free RAM, then run `pixi run python scripts/hotfire_acceptance.py` (downloads ~6 GB the first time). For the second-device check, copy ~/.local/share/caddy/pki/authorities/local/root.crt to that device and run the curl line the script prints.
+Blocked: stop the other agents to free RAM, then run `pixi run python scripts/mxc_acceptance.py` (downloads ~6 GB the first time). For the second-device check, copy ~/.local/share/caddy/pki/authorities/local/root.crt to that device and run the curl line the script prints.
 - [ ] 3 small models (qwen2.5-0.5b, smollm2-1.7b, qwen2.5-1.5b) answer through one keyed HTTPS endpoint
 - [ ] an idle model unloads and comes back on the next request
 - [ ] the same call works from a second device on the LAN

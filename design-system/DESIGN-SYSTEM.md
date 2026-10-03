@@ -1,4 +1,4 @@
-# Hotfire design system: Graphite
+# MX Console design system: Graphite
 
 Chosen 2026-10-02 after four rounds (canvas: https://claude.ai/artifact/21NSyXKpzcrqanmqr8bEe5, pages
 "Graphite · base" and "Graphite · personality"). The console is an instrument for watching models run:
@@ -11,12 +11,12 @@ calm graphite chrome, white cards, and colour that means something (a section's 
    colour (its trace, dot, bars). Everything else is greyscale.
 3. **One signature moment per page.** Live tiles, the pull cloud, the patch bay, the drag race, the
    safeguards. Never more than one per page; the rest stays quiet.
-4. **Every view is a command.** Each page and action shows its CLI twin (`hotfire …`); ⌘K runs the same.
+4. **Every view is a command.** Each page and action shows its CLI twin (`mxc …`); ⌘K runs the same.
 5. **Motion explains state,** never decorates; all of it stops under `prefers-reduced-motion`.
 
 ## Type
 - UI: **Geist** 400/500/600/700. Numbers, ids, paths, commands: **Geist Mono** 400/500. Both SIL OFL;
-  ship the woff2 files with Hotfire (no font CDN at runtime).
+  ship the woff2 files with MX Console (no font CDN at runtime).
 - Scale: page title 30/600 (tracking -0.035em) · section 15/600 · body 13.5–14 · labels 12.5 · mono
   meta 11.5–12.5 · big numbers 26–34/600 tabular (tracking -0.03 to -0.04em) · menu group labels mono 10.5
   uppercase, tracking 0.08em.
@@ -50,7 +50,7 @@ The same in every theme. The console takes them from these custom properties, ne
 
 The code panel background is `--code`. `--tk-*` colours are the light-on-card variants used by inline code blocks.
 
-**Tokyo Night (Omarchy) theme, optional:** on a machine running Omarchy, Hotfire can read
+**Tokyo Night (Omarchy) theme, optional:** on a machine running Omarchy, MX Console can read
 `~/.local/state/omarchy/current/theme/colors.toml` and map it (background → page, dark_background → chrome,
 lighter_background → card, accent → primary, its colours → hues and signals), with JetBrains Mono as the
 UI font. Shown as G5 on the canvas.
@@ -76,7 +76,7 @@ Lucide (ISC), 16px in menus and buttons (15 in chips), stroke 1.6 (1.8 on colour
 24px tinted square of the section hue.
 
 ## Components
-- **Top bar** (52): mark, product, `/ hotfire@host` with a live dot, centred ⌘K search, theme switch, Docs, avatar.
+- **Top bar** (52): mark, product, `/ mxc@host` with a live dot, centred ⌘K search, theme switch, Docs, avatar.
 - **Menu** (232): mono group labels, items 32 high, hue chip + label; active = `--sunk`-equivalent on chrome
   + weight 500. A bottom card: "Every view is a command" with three example commands.
 - **Status bar** (30, mono 11.5): daemon uptime · local endpoint · LAN endpoint · MAX version · GPU memory ·
@@ -96,7 +96,7 @@ Lucide (ISC), 16px in menus and buttons (15 in chips), stroke 1.6 (1.8 on colour
   bay: devices → Caddy → LiteLLM → daemon → a jack per model port, flowing cables) · Benchmarks (drag race
   with an optional synthesized "vroom" on click, speedometer, results table) · Gateway (six safeguards as
   solid friendly illustrations with counters + "the crew" of background processes with heartbeats) ·
-  Metrics (bold colour blocks, "what you should care about", later the Ask Hotfire chat).
+  Metrics (bold colour blocks, "what you should care about", later the Ask MX Console chat).
 
 ## Motion
 Page change 180 ms fade + 6 px rise · sheet 240 ms spring · palette 120 ms scale from 98% · traces scroll
