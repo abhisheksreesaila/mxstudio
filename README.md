@@ -58,7 +58,18 @@ pixi run mxc learn qwen2.5-0.5b [--no-open]                  # notebook → Jupy
 pixi run mxc expose [--host box.local] [--no-litellm] | --stop
 pixi run mxc port <hf-repo>                                  # workspace for an unsupported architecture
 pixi run mxc daemon                                          # the gateway in the foreground (mxc serve starts it for you)
+
+pixi run mxc status                                          # daemon, endpoints, models, keys, LAN, MAX version on one screen
+pixi run mxc set qwen2.5-0.5b --pin | --unpin | --keep-alive 10m   # any console setting, from the terminal
+pixi run mxc bench --all [--runs 5]                          # same workload on every model: decode, prefill, TTFT
+pixi run mxc metrics --range 1h | mxc requests --limit 50     # the console's numbers and activity log
+pixi run mxc logs qwen2.5-0.5b -f                            # follow a model's log
+pixi run mxc ps                                              # the crew: daemon, Caddy, LiteLLM, each max serve
+pixi run mxc console [page]                                  # open the web console (overview, models, metrics, benchmarks, pull, …)
 ```
+
+Every read command takes `--json` (JSON only on stdout). Errors are one `error:` line on stderr;
+exit codes are 0 ok, 1 refused, 2 bad usage. `hotfire` and `mst` still work as aliases.
 
 Short names: `qwen2.5-0.5b`, `qwen2.5-1.5b`, `qwen2.5-3b`, `smollm2-1.7b`, `all-minilm-l6`,
 and `llama3.2-1b` (gated: accept the license on HF and set `HF_TOKEN`). Any HF repo id
