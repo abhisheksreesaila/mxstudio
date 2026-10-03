@@ -12,3 +12,6 @@ Claude reads this at the start of each session. -->
 - 2026-10-03 · Appended CSS blocks from parallel agents can leave a media query unclosed and silently swallow later blocks; a brace-balance test on console.css now guards it.
 - 2026-10-03 · Don't drop a workaround from old code as 'environment-specific' without testing on the real hardware: MAX 26.5 device graph capture crashes on this native Linux box too (CUDA_ERROR_INVALID_DEVICE), not just WSL.
 - 2026-10-03 · Concurrent starts read the same nvidia-smi snapshot: placement must count what this process already placed, not just live free memory.
+- 2026-10-03 · The product is written as one lowercase word, mxconsole (mx carries the weight), never "MX Console"; the command stays mxc.
+- 2026-10-03 · ↗ only on links that leave the console and open a new tab; a link to our own page (the API reference) gets no arrow.
+- 2026-10-03 · The menu must collapse to an icon rail (☰ in the top bar), with tooltips on hover.
