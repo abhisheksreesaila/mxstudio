@@ -193,8 +193,12 @@ class HubClient:
         def fetch(filename: str) -> Path:
             if halt.is_set():
                 raise PullCancelled()
-            path = hf_hub_download(repo_id, filename, revision=revision, token=self.token,
-                                   tqdm_class=progress_bar(filename, progress, halt))
+            try:
+                path = hf_hub_download(repo_id, filename, revision=revision, token=self.token,
+                                       tqdm_class=progress_bar(filename, progress, halt))
+            except BaseException:
+                stop.set()  # stop the siblings now, not after the earlier files finish
+                raise
             if progress is not None:
                 size = Path(path).stat().st_size
                 progress(filename, size, size)

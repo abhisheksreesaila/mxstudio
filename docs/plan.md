@@ -130,12 +130,12 @@ Brief: docs/brief.md · ADR: docs/adr/0003-name-mx-console.md · Needs: none
 - [x] every user-facing string says MX Console / `mxc …`; the web UI title is "MX Console"
 - [x] full suite passes; `mxc --help`, `hotfire --help`, `mst --help` all work
 
-## F-019 Pull with progress: CLI and the Pull page [todo]
+## F-019 Pull with progress: CLI and the Pull page [done]
 Brief: docs/brief.md · Design: DESIGN-SYSTEM.md "Signature pages" (Pull) + canvas P2 · Needs: F-018
-- [ ] the daemon runs pulls as background jobs with progress (bytes per file, overall %, speed, step: resolve → architecture → download → verify → register); one at a time per model
-- [ ] `mxc pull <ref>` shows a live progress bar in the terminal (and `--json` lines for agents); Ctrl-C cancels cleanly
-- [ ] console Pull page: search box (curated names + any HF repo id), the cloud-churn animation driven by real progress, the step list, per-file rows, cancel; finished pulls appear in Models
-- [ ] tested with a fake Hugging Face client; nothing big is downloaded
+- [x] the daemon runs pulls as background jobs with progress (bytes per file, overall %, speed, step: resolve → architecture → download → verify → register); one at a time per model
+- [x] `mxc pull <ref>` shows a live progress bar in the terminal (and `--json` lines for agents); Ctrl-C cancels cleanly
+- [x] console Pull page: search box (curated names + any HF repo id), the cloud-churn animation driven by real progress, the step list, per-file rows, cancel; finished pulls appear in Models
+- [x] tested with a fake Hugging Face client; nothing big is downloaded
 
 ## F-020 Benchmarks: `mxc bench` and the drag race [done]
 Brief: docs/brief.md · Design: canvas P5 · Needs: F-018
