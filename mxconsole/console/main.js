@@ -9,10 +9,14 @@ import { apiPage } from "./page-api.js";
 import { keysPage } from "./page-keys.js";
 import { networkPage } from "./page-network.js";
 import { activityPage, soonPage } from "./page-activity.js";
+import { portsPage } from "./page-ports.js";
+import { logsPage } from "./page-logs.js";
+import { gatewayPage } from "./page-gateway.js";
+import { daemonPage } from "./page-daemon.js";
 
 mountShell({
   overview: overviewPage, activity: activityPage, models: modelsPage, keys: keysPage, network: networkPage, api: apiPage, metrics: metricsPage,
-  pull: soonPage("pull"), ports: soonPage("ports"), benchmarks: soonPage("benchmarks"), logs: soonPage("logs"), gateway: soonPage("gateway"), daemon: soonPage("daemon"),
+  pull: soonPage("pull"), ports: portsPage, benchmarks: soonPage("benchmarks"), logs: logsPage, gateway: gatewayPage, daemon: daemonPage,
 });
 installPaletteShortcut();
 startPolling();

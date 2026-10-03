@@ -16,7 +16,7 @@ from fasthtml.common import FastHTML
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
-from mxconsole import expose, insights, keys, metrics
+from mxconsole import admin_system, expose, insights, keys, metrics, system
 from mxconsole.settings import DAEMON_PORT
 from mxconsole.store import Store, mxc_home
 from mxconsole.supervisor import StartFailed, Supervisor, UnknownModel
@@ -31,7 +31,8 @@ CONSOLE_FONTS = {"geist-variable.woff2", "geist-mono-variable.woff2"}
 # An explicit list: the console is never a directory server. Add a file here when you add one to console/.
 CONSOLE_SCRIPTS = {"theme.js", "main.js", "core.js", "icons.js", "charts.js", "shell.js", "palette.js", "actions.js",
                    "page-overview.js", "page-models.js", "page-metrics.js", "page-api.js", "page-keys.js",
-                   "page-network.js", "page-activity.js"}
+                   "page-network.js", "page-activity.js", "page-ports.js", "page-logs.js", "page-gateway.js",
+                   "page-daemon.js"}
 CONSOLE_ASSETS = {"console.css"} | CONSOLE_SCRIPTS | CONSOLE_FONTS
 LOG_TAIL_BYTES = 8000
 TRY_MAX_TOKENS = 1024  # the API page's "Try it" is for a quick look, not for load
@@ -161,7 +162,15 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         return (bool(request.client) and request.client.host in LOOPBACK and not proxied
                 and host in LOOPBACK)
 
+    counters = system.Counters()  # what only the daemon sees: admin refusals, unknown /v1 routes
+
     def admin_only(request: Request) -> bool:
+        allowed = admin_allowed(request)
+        if not allowed:
+            counters.bump("admin_refused")
+        return allowed
+
+    def admin_allowed(request: Request) -> bool:
         """Admin calls come from the mxc CLI. The custom header can't be sent cross-site without a
         CORS preflight (which the gateway never grants), so browser pages can't reach these routes."""
         origin = request.headers.get("origin")
@@ -274,6 +283,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
 
     @app.route("/v1/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
     def unknown_v1(request: Request, path: str):
+        counters.bump("unknown_route")
         if authenticate(request) is None:
             return unauthorized()
         return openai_error(404, f"MX Console does not serve /v1/{path}. Supported: /v1/models, "
@@ -577,4 +587,6 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             return Response("docs are only served to this machine", status_code=403)
         return RedirectResponse("/console#api", status_code=307)  # the API reference lives in the console
 
+    admin_system.register(app, store, supervisor, admin_only, counters=counters,
+                          refused=admin_refused, error=openai_error)
     return app

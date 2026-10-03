@@ -150,6 +150,20 @@ def status_cmd(as_json: bool = JSON) -> None:
     typer.echo(report.dump(data) if as_json else report.status_text(data))
 
 
+@app.command("ps")
+def ps_cmd(as_json: bool = JSON) -> None:
+    """The crew: daemon, Caddy, LiteLLM and each `max serve`, with pid, port, memory and uptime. Works without the daemon."""
+    from mxconsole import serve, system
+    crew = system.collect()
+    states = serve.live_states()
+    for c in crew:  # the daemon knows starting/ready; pid files only know "running"
+        if c["kind"] == "model" and c["name"] in states:
+            c["state"] = states[c["name"]]
+    typer.echo(report.dump(crew) if as_json else system.ps_text(crew))
+    if not as_json:
+        typer.echo(f"\nconsole  {report.console_link('daemon')}")
+
+
 @app.command("console")
 def console_cmd(page: str = typer.Argument("overview", help="One of: " + ", ".join(report.PAGES)),
                 no_open: bool = typer.Option(False, "--no-open", help="Only print the link.")) -> None:
