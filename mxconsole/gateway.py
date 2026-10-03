@@ -16,7 +16,7 @@ from fasthtml.common import FastHTML
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
-from mxconsole import expose, insights, keys, metrics
+from mxconsole import admin_bench, expose, insights, keys, metrics
 from mxconsole.settings import DAEMON_PORT
 from mxconsole.store import Store, mxc_home
 from mxconsole.supervisor import StartFailed, Supervisor, UnknownModel
@@ -33,6 +33,7 @@ CONSOLE_SCRIPTS = {"theme.js", "main.js", "core.js", "icons.js", "charts.js", "s
                    "page-overview.js", "page-models.js", "page-metrics.js", "page-api.js", "page-keys.js",
                    "page-network.js", "page-activity.js"}
 CONSOLE_ASSETS = {"console.css"} | CONSOLE_SCRIPTS | CONSOLE_FONTS
+CONSOLE_ASSETS |= {"page-bench.js"}  # F-020
 LOG_TAIL_BYTES = 8000
 TRY_MAX_TOKENS = 1024  # the API page's "Try it" is for a quick look, not for load
 # no-cache: an upgraded MX Console never shows a stale console. The rest: no other site can frame the
@@ -509,6 +510,8 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                              "lan_endpoint": expose.lan_endpoint(),
                              "max_version": mst_max_version(), "uptime_seconds": round(time.monotonic() - boot),
                              "active_keys": active, "blocked_today": metrics.count_status(store, 401, today)})
+
+    admin_bench.register(app, store, supervisor, admin_only)
 
     @app.get("/favicon.ico")
     def favicon():

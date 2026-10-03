@@ -141,6 +141,57 @@ def requests_cmd(limit: int = typer.Option(20, "--limit", min=1, help="How many 
     typer.echo(f"\nconsole  {report.console_link('activity')}")
 
 
+@app.command("bench")
+def bench_cmd(models: list[str] = typer.Argument(None, help="Registered model names (see: mxc ls)."),
+              all_: bool = typer.Option(False, "--all", help="Benchmark every registered model."),
+              runs: int = typer.Option(5, "--runs", min=1, max=50, help="Timed runs per model, after one warm-up."),
+              as_json: bool = JSON) -> None:
+    """Race your models: the same streamed workload for each, through the daemon, fastest first."""
+    from mxconsole import bench, serve
+    if all_ and models:
+        _fail("name models or use --all, not both")
+    if not all_ and not models:
+        _fail("name models or use --all (see: mxc ls)")
+    store = Store.open()
+    unknown = [m for m in models or [] if store.get_model(m) is None]
+    if unknown:
+        _fail(f"no model named {unknown[0]}. See: mxc ls")
+    if all_ and not store.models():
+        _fail("no models yet. Try: mxc serve qwen2.5-0.5b")
+    try:
+        if serve.ensure_daemon() and not as_json:
+            typer.echo("started the MX Console daemon")
+        started = bench.start(None if all_ else list(dict.fromkeys(models)), runs)
+        if not as_json:
+            typer.echo(f"benchmarking {len(started['models'])} model{'s' if len(started['models']) != 1 else ''}: "
+                       f"~{bench.estimate_tokens(bench.PROMPT)} tokens in, up to {bench.MAX_TOKENS} out, batch 1, "
+                       f"{runs} runs after a warm-up")
+        seen: dict[str, str] = {}
+
+        def show(progress: dict) -> None:
+            if as_json:
+                return
+            for m in progress["models"]:
+                line = bench.progress_line(m, progress["runs"])
+                if seen.get(m["name"]) != line:
+                    seen[m["name"]] = line
+                    typer.echo(line)
+
+        run = bench.follow(started["id"], show)
+        if not as_json:  # the last states, in case the run finished between two polls
+            show({"runs": run["runs"], "models": [{"name": r["model"], "state": r["status"], "done": r["runs_ok"],
+                                                    "error": r["error"], "decode_tps": r["decode_tps"]} for r in run["results"]]})
+    except (serve.DaemonError, bench.BenchError) as e:
+        _fail(str(e))
+    if as_json:
+        typer.echo(report.dump(run))
+    else:
+        typer.echo("\n" + bench.results_text(run))
+        typer.echo(f"\nconsole  {report.console_link('benchmarks')}")
+    if run["status"] == "failed":
+        raise typer.Exit(1)
+
+
 @app.command("status")
 def status_cmd(as_json: bool = JSON) -> None:
     """One screen: daemon, endpoints, models, keys, MAX version. Works without the daemon."""
