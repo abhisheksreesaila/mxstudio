@@ -50,6 +50,7 @@ export function mountShell(pages) {
     markMenu(route.page);
     $("menu").classList.remove("open");
     $("menu-scrim").hidden = true;
+    drawMenuToggle();
     view.classList.remove("enter");
     void view.offsetWidth; // restart the 180 ms fade + rise
     view.classList.add("enter");
@@ -75,12 +76,14 @@ function buildTopbar() {
   themeBtn = h("button", { class: "ghost", type: "button", onClick: () => { cycleTheme(); drawThemeIcon(); } });
   const menuBtn = h("button", { class: "ghost menu-toggle", type: "button", "aria-label": "Collapse the menu", "aria-expanded": "true",
     title: "Collapse or open the menu ( [ )", onClick: toggleMenu }, icon("menu", 18));
-  $("menu-scrim").addEventListener("click", () => { $("menu").classList.remove("open"); $("menu-scrim").hidden = true; });
+  $("menu-scrim").addEventListener("click", () => { $("menu").classList.remove("open"); $("menu-scrim").hidden = true; drawMenuToggle(); });
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "[" || e.metaKey || e.ctrlKey || e.altKey || e.target.closest("input, textarea, select, [contenteditable]")) return;
+    if (e.key !== "[" || e.metaKey || e.ctrlKey || e.altKey || (e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable]"))) return;
+    if (document.querySelector("dialog[open], .overlay")) return; // a modal owns the keyboard
     e.preventDefault();
     toggleMenu();
   });
+  window.matchMedia("(max-width: 900px)").addEventListener("change", drawMenuToggle);
   $("topbar").replaceChildren(
     menuBtn,
     h("a", { class: "brand", href: "#overview", "aria-label": "mxconsole, home" }, brandMark(26),
@@ -110,6 +113,7 @@ function toggleMenu() {
   if (narrow()) {
     const open = menu.classList.toggle("open");
     $("menu-scrim").hidden = !open;
+    drawMenuToggle();
     return;
   }
   const rail = menu.classList.toggle("rail");
@@ -117,10 +121,11 @@ function toggleMenu() {
   drawMenuToggle();
 }
 function drawMenuToggle() {
-  const rail = $("menu").classList.contains("rail");
-  const btn = $("topbar").querySelector(".menu-toggle");
-  btn.setAttribute("aria-expanded", rail ? "false" : "true");
-  btn.setAttribute("aria-label", rail ? "Open the menu" : "Collapse the menu");
+  const menu = $("menu"), btn = $("topbar").querySelector(".menu-toggle");
+  if (!btn) return;
+  const shown = narrow() ? menu.classList.contains("open") : !menu.classList.contains("rail");
+  btn.setAttribute("aria-expanded", shown ? "true" : "false");
+  btn.setAttribute("aria-label", shown ? (narrow() ? "Hide the menu" : "Collapse the menu") : (narrow() ? "Show the menu" : "Open the menu"));
 }
 
 export function drawThemeIcon() {

@@ -1,4 +1,4 @@
-# MX Console design system: Graphite
+# mxconsole design system: Graphite
 
 Chosen 2026-10-02 after four rounds (canvas: https://claude.ai/artifact/21NSyXKpzcrqanmqr8bEe5, pages
 "Graphite · base" and "Graphite · personality"). The console is an instrument for watching models run:
@@ -16,7 +16,7 @@ calm graphite chrome, white cards, and colour that means something (a section's 
 
 ## Type
 - UI: **Geist** 400/500/600/700. Numbers, ids, paths, commands: **Geist Mono** 400/500. Both SIL OFL;
-  ship the woff2 files with MX Console (no font CDN at runtime).
+  ship the woff2 files with mxconsole (no font CDN at runtime).
 - Scale: page title 30/600 (tracking -0.035em) · section 15/600 · body 13.5–14 · labels 12.5 · mono
   meta 11.5–12.5 · big numbers 26–34/600 tabular (tracking -0.03 to -0.04em) · menu group labels mono 10.5
   uppercase, tracking 0.08em.
@@ -50,7 +50,7 @@ The same in every theme. The console takes them from these custom properties, ne
 
 The code panel background is `--code`. `--tk-*` colours are the light-on-card variants used by inline code blocks.
 
-**Tokyo Night (Omarchy) theme, optional:** on a machine running Omarchy, MX Console can read
+**Tokyo Night (Omarchy) theme, optional:** on a machine running Omarchy, mxconsole can read
 `~/.local/state/omarchy/current/theme/colors.toml` and map it (background → page, dark_background → chrome,
 lighter_background → card, accent → primary, its colours → hues and signals), with JetBrains Mono as the
 UI font. Shown as G5 on the canvas.
@@ -96,7 +96,7 @@ Lucide (ISC), 16px in menus and buttons (15 in chips), stroke 1.6 (1.8 on colour
   bay: devices → Caddy → LiteLLM → daemon → a jack per model port, flowing cables) · Benchmarks (drag race
   with an optional synthesized "vroom" on click, speedometer, results table) · Gateway (six safeguards as
   solid friendly illustrations with counters + "the crew" of background processes with heartbeats) ·
-  Metrics (bold colour blocks, "what you should care about", later the Ask MX Console chat).
+  Metrics (bold colour blocks, "what you should care about", later the Ask mxconsole chat).
 
 ## Motion
 Page change 180 ms fade + 6 px rise · sheet 240 ms spring · palette 120 ms scale from 98% · traces scroll

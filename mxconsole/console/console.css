@@ -71,7 +71,7 @@ svg { display: block; flex-shrink: 0; }
 }
 .brand { display: inline-flex; align-items: center; gap: 9px; color: var(--chrome-text); }
 .brand:hover { text-decoration: none; }
-.mark rect { fill: #0a0a0b; }
+.mark rect { fill: #0a0a0b; } /* the mark is always a black tile, whatever the theme (like the favicon) */
 .mark path { fill: none; stroke: #ffffff; stroke-width: 4.2; stroke-linecap: round; stroke-linejoin: round; }
 .mark circle { fill: var(--ok); }
 .topbar .mark { box-shadow: 0 0 0 1px var(--chrome-line); border-radius: 7px; }
@@ -122,11 +122,13 @@ svg { display: block; flex-shrink: 0; }
 .menu-card { margin: auto 12px 12px; padding: 12px; border: 1px solid var(--chrome-line); border-radius: 10px; background: var(--chrome-sunk); }
 .menu-card .t { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; }
 .menu-card .c { font-size: 11.5px; color: var(--chrome-muted); margin-top: 6px; line-height: 1.6; }
-.menu { transition: width 0.2s ease; }
-.menu.rail { width: 60px; overflow-x: hidden; }
-.menu.rail .menu-item { width: 44px; padding: 0 10px; }
-.menu.rail .menu-item .lbl, .menu.rail .menu-card { display: none; }
-.menu.rail .menu-label { height: 1px; padding: 0; margin: 8px 12px; overflow: hidden; color: transparent; background: var(--chrome-line); }
+@media (min-width: 901px) { /* the icon rail is a wide-screen state; phones always slide the full menu over */
+  .menu { transition: width 0.2s ease; }
+  .menu.rail { width: 60px; overflow-x: hidden; }
+  .menu.rail .menu-item { width: 44px; padding: 0 10px; }
+  .menu.rail .menu-item .lbl, .menu.rail .menu-card { display: none; }
+  .menu.rail .menu-label { height: 1px; padding: 0; margin: 8px 12px; overflow: hidden; color: transparent; background: var(--chrome-line); }
+}
 .scrim-menu { position: fixed; inset: 52px 0 0 0; z-index: 25; background: var(--scrim); }
 
 .main { flex-grow: 1; min-width: 0; padding: 28px 36px 40px; transition: padding-right 0.24s; }
@@ -534,10 +536,6 @@ dialog.dlg[open] { animation: palin 120ms ease-out both; }
 @media (max-width: 900px) {
   .menu { position: fixed; top: 52px; bottom: 30px; left: 0; z-index: 26; height: auto; transform: translateX(-100%); transition: transform 0.2s; }
   .menu.open { transform: none; box-shadow: var(--sheet); }
-  .menu.rail { width: 232px; }
-  .menu.rail .menu-item { width: calc(100% - 16px); }
-  .menu.rail .menu-item .lbl { display: inline; }
-  .menu.rail .menu-label { height: auto; padding: 14px 12px 6px; margin: 0; color: var(--chrome-muted); background: none; }
   .wordmark { display: none; }
   .search-btn span.lbl { display: none; }
   .search-btn { width: auto; margin-left: auto; }
