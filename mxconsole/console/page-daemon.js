@@ -55,7 +55,7 @@ export function daemonPage(ctx) {
   function draw() {
     ctx.setSub("background processes keeping things running · the same list as mxc ps");
     const exposed = data && data.crew.some((c) => (c.kind === "caddy" || c.kind === "litellm") && c.state === "running");
-    ctx.actions.replaceChildren(exposed ? act("Stop exposing", "square", stopExposing, "btn") : null);
+    ctx.actions.replaceChildren(...(exposed ? [act("Stop exposing", "square", stopExposing, "btn")] : []));
     if (failed) { host.replaceChildren(h("div", { class: "panel empty" }, h("h2", {}, "Could not load the crew"), h("p", {}, failed))); return; }
     if (!data) { host.replaceChildren(h("div", { class: "panel empty" }, h("p", {}, "Loading…"))); return; }
     const running = new Set(data.crew.filter((c) => c.kind === "model").map((c) => c.name));
