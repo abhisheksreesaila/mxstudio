@@ -2,7 +2,10 @@
 FAKE_MAX_ARGS_FILE (write argv there), FAKE_MAX_STARTS_FILE (append a line per start).
 It also answers POST /v1/{chat/completions,completions,embeddings}, echoing the requested model:
 stream=true gives SSE chunks then `data: [DONE]`. FAKE_MAX_CHUNK_DELAY (s between chunks).
-FAKE_MAX_GZIP gzips JSON replies when the caller accepts gzip."""
+FAKE_MAX_GZIP gzips JSON replies when the caller accepts gzip.
+Benchmark knobs (streamed replies): FAKE_MAX_TOKENS_OUT (chunks to stream, capped by max_tokens; unset keeps
+the three words), FAKE_MAX_TTFT_DELAY (s before the first chunk), FAKE_MAX_MODEL_DELAYS ("a=0.004,b=0.01":
+per-model chunk delay), FAKE_MAX_USAGE (end with a usage block when the caller asks for it)."""
 import json
 import os
 import sys
@@ -57,14 +60,23 @@ class H(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.end_headers()
-        for word in ("hello", " from ", model):
+        delays = dict(p.split("=", 1) for p in os.environ.get("FAKE_MAX_MODEL_DELAYS", "").split(",") if "=" in p)
+        delay = float(delays.get(model, os.environ.get("FAKE_MAX_CHUNK_DELAY", "0")))
+        out = os.environ.get("FAKE_MAX_TOKENS_OUT")
+        words = ["tok"] * min(int(out), body.get("max_tokens") or int(out)) if out else ["hello", " from ", model]
+        time.sleep(float(os.environ.get("FAKE_MAX_TTFT_DELAY", "0")))
+        for word in words:
             delta = ({"index": 0, "delta": {"content": word}, "finish_reason": None} if chat else
                      {"index": 0, "text": word, "finish_reason": None})
             chunk = {"id": "cmpl-1", "object": "chat.completion.chunk" if chat else "text_completion",
                      "created": 1, "model": model, "choices": [delta]}
             self.wfile.write(f"data: {json.dumps(chunk)}\n\n".encode())
             self.wfile.flush()
-            time.sleep(float(os.environ.get("FAKE_MAX_CHUNK_DELAY", "0")))
+            time.sleep(delay)
+        if os.environ.get("FAKE_MAX_USAGE") and (body.get("stream_options") or {}).get("include_usage"):
+            usage = {"prompt_tokens": max(1, len(json.dumps(body.get("messages", ""))) // 4),
+                     "completion_tokens": len(words), "total_tokens": 0}
+            self.wfile.write(f"data: {json.dumps({'id': 'cmpl-1', 'model': model, 'choices': [], 'usage': usage})}\n\n".encode())
         self.wfile.write(b"data: [DONE]\n\n")
         self.wfile.flush()
 

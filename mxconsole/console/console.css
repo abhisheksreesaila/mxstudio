@@ -636,4 +636,77 @@ dialog.dlg[open] { animation: palin 120ms ease-out both; }
   .crew-row .act { grid-column: 3; grid-row: 1; }
   .sys-viewer-bar .select, .sys-viewer-bar .search { width: 100%; max-width: none; flex: 1 1 100%; }
   .sys-follow { margin-left: 0; }
+
+/* ---- benchmarks page ------------------------------------------------------------------------- */
+/* The race track is always dark artwork, whatever the theme. */
+.race { --track: #1f1f23; --end: 140px; position: relative; border-radius: 16px; overflow: hidden; background: var(--track); padding: 22px 0 18px; min-width: 0; color: #fff; }
+.top-row { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; margin-bottom: 16px; }
+.race-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 0 20px 16px; }
+.race-head .t { font-size: 15px; font-weight: 600; }
+.race-head .w { font-size: 12px; opacity: 0.65; }
+.race-head .race-btn { margin-left: auto; background: #fff; color: #0a0a0b; border-color: #fff; }
+.race-head .race-btn:hover { background: #e4e4e7; }
+.race-head .snd { opacity: 0.55; font-weight: 400; }
+.track { position: relative; margin: 0 20px; border-radius: 10px; overflow: hidden; background: repeating-linear-gradient(90deg, #2a2a30 0 60px, #26262b 60px 120px); }
+.track .finish { position: absolute; top: 0; bottom: 0; right: var(--end); width: 14px; background: repeating-linear-gradient(0deg, #fff 0 7px, #18181b 7px 14px); }
+.lane-r { position: relative; height: 74px; border-bottom: 2px dashed rgba(255, 255, 255, 0.25); }
+.lane-r:last-child { border-bottom: 0; }
+.lane-r .who { position: absolute; left: 14px; top: 8px; font-size: 12px; color: rgba(255, 255, 255, 0.75); }
+.lane-r .zone { position: absolute; left: 10px; right: calc(var(--end) + 14px); top: 24px; height: 46px; }
+.lane-r .car { position: absolute; left: 0; top: 0; will-change: transform; }
+.track.racing .car-svg { animation: bench-wobble 0.4s linear infinite; }
+.lane-r .res { position: absolute; right: 16px; top: 14px; text-align: right; color: #fff; width: calc(var(--end) - 24px); }
+.lane-r .res .v { font-size: 22px; font-weight: 700; }
+.lane-r .res .u { font-size: 12px; opacity: 0.7; }
+.lane-r .res .pos { font-size: 11px; opacity: 0.7; }
+.race-none { margin: 0 20px; padding: 28px 16px; border-radius: 10px; background: #2a2a30; font-size: 13.5px; color: rgba(255, 255, 255, 0.8); }
+.dnf { margin: 12px 20px 0; font-size: 11.5px; color: rgba(255, 255, 255, 0.6); }
+.top-speed { padding: 18px; display: flex; flex-direction: column; align-items: center; }
+.top-speed .tt { font-size: 14px; font-weight: 600; align-self: flex-start; }
+.top-speed .cap { font-size: 12px; color: var(--muted); text-align: center; overflow-wrap: anywhere; }
+.gauge { position: relative; width: 200px; height: 150px; margin-top: 8px; }
+.gauge .gauge-track { stroke: var(--sunk); }
+.gauge .tick { stroke: var(--muted); }
+.gauge .needle { position: absolute; left: 97px; top: 40px; width: 6px; height: 62px; border-radius: 3px; background: var(--text); transform-origin: 3px 60px; transform: rotate(-120deg); }
+.gauge .read { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; }
+.gauge .read .n { font-size: 28px; font-weight: 700; }
+.gauge .read .u { font-size: 12px; color: var(--muted); }
+.gauge .lo, .gauge .hi { position: absolute; bottom: -2px; font-size: 10.5px; color: var(--muted); }
+.gauge .lo { left: 18px; }
+.gauge .hi { right: 10px; }
+.bench-block { margin-bottom: 16px; }
+.bench-table .who-cell { display: inline-flex; align-items: center; gap: 8px; }
+.bench-table .place { font-size: 11px; color: var(--muted); }
+.bench-table td.lead { font-weight: 700; }
+.bench-table .foot { padding: 10px 14px; border-top: 1px solid var(--card-line-2); font-size: 11.5px; color: var(--muted); }
+#bench-history .names { font-size: 12px; }
+#bench-history tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.bench-progress { padding: 14px 16px; }
+.bench-progress .ph { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.bench-progress .ph .t { font-size: 14px; font-weight: 600; }
+.bench-progress .ph .s { font-size: 12px; color: var(--muted); }
+.bench-progress .ph svg { animation: bench-spin 1s linear infinite; }
+.prow { display: grid; grid-template-columns: 10px minmax(120px, 200px) minmax(80px, 1fr) minmax(0, 300px); gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--card-line-2); font-size: 13px; }
+.prow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow .st { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.prow .bar { height: 6px; border-radius: 3px; background: var(--sunk); overflow: hidden; }
+.prow .bar > div { height: 6px; border-radius: 3px; background: var(--c); transition: width 0.4s; }
+.prow .bar.loading > div { width: 40% !important; animation: bench-slide 1.2s ease-in-out infinite alternate; }
+.bench-empty .chip40 { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; margin-bottom: 12px; background: color-mix(in srgb, var(--hue) 12%, transparent); color: var(--hue); }
+.bench-empty .empty-actions { margin-top: 16px; }
+@keyframes bench-wobble { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+@keyframes bench-spin { to { transform: rotate(360deg); } }
+@keyframes bench-slide { from { transform: translateX(0); } to { transform: translateX(150%); } }
+@media (max-width: 1100px) {
+  .top-row { grid-template-columns: minmax(0, 1fr); }
+  .top-speed { max-width: 340px; }
+}
+@media (max-width: 640px) {
+  .race { --end: 96px; }
+  .race-head { padding: 0 14px 14px; }
+  .track, .race-none, .dnf { margin-left: 14px; margin-right: 14px; }
+  .lane-r .res .v { font-size: 18px; }
+  .race-head .race-btn { margin-left: 0; flex: 1 1 100%; }
+  .prow { grid-template-columns: 10px minmax(0, 1fr); }
+  .prow .bar, .prow .st { grid-column: 1 / -1; }
 }

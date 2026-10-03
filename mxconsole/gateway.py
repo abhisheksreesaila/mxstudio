@@ -16,7 +16,7 @@ from fasthtml.common import FastHTML
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
-from mxconsole import admin_system, expose, insights, keys, metrics, system
+from mxconsole import admin_bench, admin_system, expose, insights, keys, metrics, system
 from mxconsole.settings import DAEMON_PORT
 from mxconsole.store import Store, mxc_home
 from mxconsole.supervisor import StartFailed, Supervisor, UnknownModel
@@ -29,7 +29,7 @@ ADMIN_HEADER = "x-mst-admin"
 CONSOLE_DIR = Path(__file__).parent / "console"
 CONSOLE_FONTS = {"geist-variable.woff2", "geist-mono-variable.woff2"}
 # An explicit list: the console is never a directory server. Add a file here when you add one to console/.
-CONSOLE_SCRIPTS = {"theme.js", "main.js", "core.js", "icons.js", "charts.js", "shell.js", "palette.js", "actions.js",
+CONSOLE_SCRIPTS = {"page-bench.js", "theme.js", "main.js", "core.js", "icons.js", "charts.js", "shell.js", "palette.js", "actions.js",
                    "page-overview.js", "page-models.js", "page-metrics.js", "page-api.js", "page-keys.js",
                    "page-network.js", "page-activity.js", "page-ports.js", "page-logs.js", "page-gateway.js",
                    "page-daemon.js"}
@@ -519,6 +519,8 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                              "lan_endpoint": expose.lan_endpoint(),
                              "max_version": mst_max_version(), "uptime_seconds": round(time.monotonic() - boot),
                              "active_keys": active, "blocked_today": metrics.count_status(store, 401, today)})
+
+    admin_bench.register(app, store, supervisor, admin_only)
 
     @app.get("/favicon.ico")
     def favicon():

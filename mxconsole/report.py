@@ -7,7 +7,7 @@ import time
 from mxconsole.settings import daemon_url
 from mxconsole.store import Model, format_duration
 
-PAGES = ("overview", "models", "activity", "metrics", "keys", "network", "api", "ports", "logs", "gateway", "daemon")
+PAGES = ("overview", "models", "activity", "metrics", "keys", "network", "api", "ports", "logs", "gateway", "daemon", "benchmarks", "pull")
 
 
 def console_link(page: str | None = None) -> str:

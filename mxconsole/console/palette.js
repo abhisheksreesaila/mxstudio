@@ -5,6 +5,7 @@ import { $, h, icon, store, toast, copyText, getTheme, setTheme, THEMES, isMac }
 import { loadModel, stopModel, setPinned, cli } from "./actions.js";
 import { newKeyDialog } from "./page-keys.js";
 import { exposeDialog, stopExpose } from "./page-network.js";
+import { startBench } from "./page-bench.js";
 
 const PAGES = [
   ["overview", "Overview", "layout-dashboard", "mxc console overview"], ["activity", "Activity", "activity", "mxc console activity"],
@@ -28,6 +29,7 @@ export function buildActions() {
     : { group: "Suggested", icon: "globe", label: "Expose on the LAN…", cli: "mxc expose", run: () => { location.hash = "network"; exposeDialog(); } });
   rows.push({ group: "Suggested", icon: "download", label: "Pull a model…", cli: "mxc pull <model>", copyOnly: true,
     note: "The console can't pull models yet: paste the command in a terminal." });
+  rows.push({ group: "Suggested", icon: "gauge", label: "Run benchmark", cli: "mxc bench --all", run: () => { location.hash = "benchmarks"; return startBench(); } });
   for (const m of store.models || []) {
     const running = m.state !== "cold";
     rows.push(running
