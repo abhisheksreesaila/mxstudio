@@ -122,3 +122,10 @@ Brief: docs/brief.md · ADR: docs/adr/0002-name-hotfire.md · Needs: none
 - [x] state folder `~/.hotfire` (an existing `~/.mst` is moved on first run); `HOTFIRE_HOME`, `HOTFIRE_PORT`, … with `MST_*` read as a fallback
 - [x] every user-facing string says Hotfire / `hotfire …` (CLI output, console title, notebooks, docs, README); console title "Hotfire Mission Control"
 - [x] full test suite passes; `hotfire --help` and `mst --help` both work
+
+## F-018 Rename to MX Console [doing]
+Brief: docs/brief.md · ADR: docs/adr/0003-name-mx-console.md · Needs: none
+- [ ] package `hotfire/` becomes `mxconsole/`; project name `mxconsole`; commands `mxc` (primary), `hotfire` and `mst` (aliases)
+- [ ] state `~/.mxc` (moves `~/.hotfire`, else `~/.mst`, with the existing safety rules); env `MXC_*` → `HOTFIRE_*` → `MST_*`
+- [ ] every user-facing string says MX Console / `mxc …`; the web UI title is "MX Console"
+- [ ] full suite passes; `mxc --help`, `hotfire --help`, `mst --help` all work
