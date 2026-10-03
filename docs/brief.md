@@ -18,7 +18,7 @@ Status: approved
   1. Serve: `mst serve <model>` resolves MAX catalog → Hugging Face (supported arch) → Modular's import-model skill (unsupported arch), and starts it. Several small models (≤3B) run at once.
   2. Secure endpoint: one OpenAI-compatible endpoint, with LiteLLM routing by model name and Caddy in front for HTTPS and keys, plus a page listing endpoints and models.
   3. Learn: `mst learn <model>` opens a Jupyter notebook generated from Hugging Face API metadata (model card, config, architecture) with sample code against the live endpoint.
-- Out of scope for v1: benchmark dashboards, hardware-fit advice, LoRA, the classifier conversion and other malleability, plugins, public installer, big models (>3B), non-Linux testing.
+- Out of scope for v1: hardware-fit advice, LoRA, the classifier conversion and other malleability, plugins, public installer, big models (>3B), non-Linux testing.
 
 ## How it should look and feel
 - Three words: transparent, fast, exciting (assumed)
@@ -36,6 +36,7 @@ Status: approved
 - Second risk: Modular's import-model skill does not reliably produce a working port; v1 treats it as a guided, best-effort path.
 
 ## Decisions and trade-offs
+- 2026-10-03: the person asked to wire up the designed signature pages too, so `mxc bench` and the Benchmarks page move into v1 (tested against the stand-in model; real numbers come with the live run).
 - First user is Abhishek on Omarchy: daily real use; we accept that the public installer waits for v2.
 - v1 = endpoint + thin Learn: passes the acceptance test; we accept the classifier "wow" and dashboards waiting for v2.
 - Name is **MX Console** (2026-10-03, ADR 0003, superseding Hotfire): it is a console, and "MX" ties it to MAX/Mojo. Command `mxc`; `hotfire` and `mst` stay as aliases for one release.

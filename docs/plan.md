@@ -129,3 +129,25 @@ Brief: docs/brief.md · ADR: docs/adr/0003-name-mx-console.md · Needs: none
 - [x] state `~/.mxc` (moves `~/.hotfire`, else `~/.mst`, with the existing safety rules); env `MXC_*` → `HOTFIRE_*` → `MST_*`
 - [x] every user-facing string says MX Console / `mxc …`; the web UI title is "MX Console"
 - [x] full suite passes; `mxc --help`, `hotfire --help`, `mst --help` all work
+
+## F-019 Pull with progress: CLI and the Pull page [todo]
+Brief: docs/brief.md · Design: DESIGN-SYSTEM.md "Signature pages" (Pull) + canvas P2 · Needs: F-018
+- [ ] the daemon runs pulls as background jobs with progress (bytes per file, overall %, speed, step: resolve → architecture → download → verify → register); one at a time per model
+- [ ] `mxc pull <ref>` shows a live progress bar in the terminal (and `--json` lines for agents); Ctrl-C cancels cleanly
+- [ ] console Pull page: search box (curated names + any HF repo id), the cloud-churn animation driven by real progress, the step list, per-file rows, cancel; finished pulls appear in Models
+- [ ] tested with a fake Hugging Face client; nothing big is downloaded
+
+## F-020 Benchmarks: `mxc bench` and the drag race [todo]
+Brief: docs/brief.md · Design: canvas P5 · Needs: F-018
+- [ ] `mxc bench [models…|--all]` runs the same streamed workload (prompt ~512 tokens, 128 out, batch 1, N runs) per model through the daemon and records decode tok/s, prefill tok/s, TTFT p50/p95 and duration in SQLite; `--json`
+- [ ] console Benchmarks page: the drag race from the latest run (cars placed by decode tok/s, finish line, speedometer, synthesized "vroom" only on click), results table, history of runs, Run benchmark button (runs in the background, progress shown)
+- [ ] honest labels: which models, workload, when; nothing shown before the first run
+- [ ] tested with the fake max (it streams at a fixed rate)
+
+## F-021 System pages: Ports, Logs, Gateway, Daemon [todo]
+Brief: docs/brief.md · Design: canvas P6 + DESIGN-SYSTEM.md · Needs: F-018
+- [ ] Ports: every model's loopback port, the daemon, LiteLLM and Caddy ports, with state
+- [ ] Logs: a table of the CLI commands people need (copy buttons), plus a log viewer for the daemon and each model (tail, follow, filter)
+- [ ] Gateway: "what's protecting you": the six safeguards with real counters where the daemon can know them (401s, unknown routes, admin refusals) and "on" otherwise
+- [ ] Daemon: "the crew": daemon, Caddy, LiteLLM and each `max serve`, with pid, port, uptime and a heartbeat; restart/stop actions where safe
+- [ ] `mxc ps` prints the crew (with `--json`)
