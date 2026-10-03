@@ -17,6 +17,7 @@ from typing import AsyncIterator, Callable
 
 import httpx
 
+from . import system
 from .store import Store, mxc_home
 
 HOST = "127.0.0.1"
@@ -151,7 +152,8 @@ class Supervisor:
             raise DaemonAlreadyRunning("another MX Console daemon is already running for this MXC_HOME") from None
         f.seek(0)
         f.truncate()
-        f.write(str(os.getpid()))  # so `mxc ps` can tell which process is the daemon
+        pid = os.getpid()  # "pid starttime", so `mxc ps` can tell this daemon from a reused pid without the lock
+        f.write(f"{pid} {system.start_time(pid)}")
         f.flush()
         self._lock_file = f
 

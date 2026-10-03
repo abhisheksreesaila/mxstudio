@@ -1,6 +1,6 @@
 // Gateway, "what's protecting you": six safeguards as solid illustrations, each with the one counter the
 // daemon can really know. What Caddy or the start-up code enforces says so instead of inventing a number.
-import { h, s, icon, api, fmt } from "./core.js";
+import { h, s, icon, api, fmt, HUE } from "./core.js";
 
 const W = "#ffffff";
 const rect = (x, y, width, height, rx, fill, extra) => s("rect", { x, y, width, height, rx, fill, ...extra });
@@ -23,17 +23,17 @@ export function illustration(kind, colour) {
 const plural = (n, one, many) => `${fmt(n)} ${n === 1 ? one : many}`;
 function safeguards(g) {
   return [
-    ["lock", "#30a46c", "Encrypted on your LAN", "HTTPS with MX Console's own certificate authority. Trust it once per device.",
+    ["lock", HUE.daemon, "Encrypted on your LAN", "HTTPS with MX Console's own certificate authority. Trust it once per device.",
       g.tls.on ? { text: `HTTPS on · ${g.tls.endpoint}`, on: true } : { text: "LAN exposure is off: nothing listens beyond this machine", on: true }],
-    ["key", "#e09d00", "One key per app", "Revoke one app without touching the others. Keys are stored only as hashes.",
+    ["key", HUE.keys, "One key per app", "Revoke one app without touching the others. Keys are stored only as hashes.",
       { text: `${g.keys.active} active · ${g.keys.revoked} revoked · ${plural(g.unauthorized_today, "request", "requests")} refused today (401)`, on: true }],
-    ["gate", "#3e63dd", "Only four doors open", "/v1/models, chat, completions and embeddings. Everything else is a 404.",
-      { text: `${plural(g.unknown_routes_today, "request", "requests")} to other /v1 paths today`, on: true }],
-    ["broom", "#e93d82", "Sneaky paths swept away", "Requests like /x/../v1/models are refused before routing.",
+    ["gate", HUE.api, "Only four doors open", "/v1/models, chat, completions and embeddings. Everything else is a 404.",
+      { text: `${plural(g.unknown_routes_today, "request", "requests")} to other /v1 paths from this machine today (Caddy answers unknown LAN paths itself)`, on: true }],
+    ["broom", HUE.metrics, "Sneaky paths swept away", "Requests like /x/../v1/models are refused before routing.",
       { text: "enforced by Caddy (it answers before the daemon sees them)", on: null }],
-    ["house", "#0090ff", "Admin stays home", "The console and admin routes answer this machine only, never the LAN.",
+    ["house", HUE.overview, "Admin stays home", "The console and admin routes answer this machine only, never the LAN.",
       { text: `${plural(g.admin_refused_today, "refusal", "refusals")} today`, on: true }],
-    ["safe", "#8e4ec6", "No secrets lying around", "LiteLLM gets a minimal environment. Your shell's provider keys never leak in.",
+    ["safe", HUE.models, "No secrets lying around", "LiteLLM gets a minimal environment. Your shell's provider keys never leak in.",
       { text: "enforced when LiteLLM starts", on: null }],
   ];
 }

@@ -43,8 +43,9 @@ def test_collect_with_supervisor_rows_lists_daemon_expose_and_children(tmp_path)
     assert crew[3]["port"] == 5555 and "gpu" not in " ".join(crew[3])  # no invented GPU memory
 
 
-def test_collect_without_the_daemon_reads_pid_files(tmp_path, mxc_home):
-    fake_proc(tmp_path, 21, cmd=("python", "fake_max.py", "serve", "--port", "6001"))
+def test_collect_without_the_daemon_reads_pid_files(tmp_path, mxc_home, monkeypatch):
+    monkeypatch.setenv("MXC_MAX_CMD", "python /x/fake_max.py")
+    fake_proc(tmp_path, 21, cmd=("python", "/x/fake_max.py", "serve", "--port", "6001"))
     run = mxc_home / "run"
     run.mkdir(parents=True)
     (run / "qwen2.5-0.5b.21.pid").write_text("21 21")  # a model name with dots
@@ -74,15 +75,62 @@ def test_listeners_cover_every_port_and_say_who_talks_to_it(tmp_path):
     assert all(r["talks_to"] for r in rows.values())
 
 
-def test_daemon_pid_needs_a_held_lock(mxc_home):
+def test_a_reused_pid_running_npm_serve_is_not_a_model(tmp_path, mxc_home):
+    fake_proc(tmp_path, 32, cmd=("node", "/usr/bin/npm", "run", "serve", "--port", "3000"))
+    (mxc_home / "run").mkdir(parents=True)
+    (mxc_home / "run" / "m.32.pid").write_text("32 32")
+    assert [c for c in system.collect(None, proc_root=tmp_path, daemon=None, expose_pids={}) if c["kind"] == "model"] == []
+
+
+def test_a_max_serve_found_through_its_interpreter_still_counts(tmp_path, mxc_home):
+    fake_proc(tmp_path, 33, cmd=("/env/bin/python", "/env/bin/max", "serve", "--port", "6002"))
+    (mxc_home / "run").mkdir(parents=True)
+    (mxc_home / "run" / "m.33.pid").write_text("33 33")
+    crew = system.collect(None, proc_root=tmp_path, daemon=None, expose_pids={})
+    assert [c["pid"] for c in crew if c["kind"] == "model"] == [33]
+
+
+def lock_file(mxc_home, text):
     run = mxc_home / "run"
-    run.mkdir(parents=True)
-    (run / "daemon.lock").write_text("1234")
-    assert system.daemon_pid() is None  # nobody holds the lock: the file is stale
+    run.mkdir(parents=True, exist_ok=True)
+    (run / "daemon.lock").write_text(text)
+
+
+def test_daemon_pid_compares_the_start_time_and_never_takes_the_lock(mxc_home, tmp_path):
     import fcntl
-    with open(run / "daemon.lock", "a+") as held:
+    fake_proc(tmp_path, 50, ticks=777)
+    lock_file(mxc_home, "50 777")
+    assert system.daemon_pid(proc_root=tmp_path) == 50
+    lock_file(mxc_home, "50 778")  # the pid was reused
+    assert system.daemon_pid(proc_root=tmp_path) is None
+    lock_file(mxc_home, "51 777")  # no such process
+    assert system.daemon_pid(proc_root=tmp_path) is None
+    lock_file(mxc_home, "50 777")
+    with open(mxc_home / "run" / "daemon.lock", "a+") as held:  # held by a starting daemon: still readable
         fcntl.flock(held, fcntl.LOCK_EX)
-        assert system.daemon_pid() == 1234
+        assert system.daemon_pid(proc_root=tmp_path) == 50
+
+
+def test_daemon_pid_from_an_older_daemon_checks_the_command_line(mxc_home, tmp_path):
+    fake_proc(tmp_path, 60, cmd=("python", "-m", "mxconsole", "daemon"))
+    fake_proc(tmp_path, 61, cmd=("sleep", "9"))
+    fake_proc(tmp_path, 62, cmd=("/env/bin/mxc", "daemon"))
+    lock_file(mxc_home, "60")
+    assert system.daemon_pid(proc_root=tmp_path) == 60
+    lock_file(mxc_home, "61")
+    assert system.daemon_pid(proc_root=tmp_path) is None
+    lock_file(mxc_home, "62")
+    assert system.daemon_pid(proc_root=tmp_path) == 62
+    lock_file(mxc_home, "")  # a daemon older than the pid: unknown
+    assert system.daemon_pid(proc_root=tmp_path) is None
+
+
+def test_collect_says_running_pid_unknown_when_a_pidless_daemon_answers_health(tmp_path):
+    crew = system.collect([], proc_root=tmp_path, daemon=None, expose_pids={}, health=lambda: True)
+    assert crew[0]["state"] == "running" and crew[0]["pid"] is None
+    assert "running" in system.ps_text(crew).splitlines()[1]
+    crew = system.collect([], proc_root=tmp_path, daemon=None, expose_pids={}, health=lambda: False)
+    assert crew[0]["state"] == "stopped"
 
 
 def test_read_tail_caps_the_size_and_tolerates_a_missing_file(tmp_path):
@@ -118,3 +166,12 @@ def test_ps_text_is_a_table_with_dashes_for_what_is_unknown(tmp_path):
     out = system.ps_text(crew)
     assert out.splitlines()[0].split() == ["NAME", "STATE", "PID", "PORT", "MEMORY", "UPTIME"]
     assert "50 MB" in out and "stopped" in out
+
+
+def test_counters_are_safe_across_threads():
+    import threading
+    c = system.Counters()
+    ts = [threading.Thread(target=lambda: [c.bump("x") for _ in range(2000)]) for _ in range(8)]
+    [x.start() for x in ts]
+    [x.join() for x in ts]
+    assert c.get("x") == 16000
