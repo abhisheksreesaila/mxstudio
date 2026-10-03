@@ -8,6 +8,7 @@ TTFT p50 and p95, run duration and errors, in SQLite. `mxc bench` and the consol
 from __future__ import annotations
 
 import json
+import logging
 import math
 import time
 from dataclasses import dataclass, field
@@ -20,6 +21,8 @@ from mxconsole.metrics import StreamMeter, _percentile
 from mxconsole.settings import daemon_url
 from mxconsole.store import Store
 from mxconsole.supervisor import StartFailed, Supervisor, UnknownModel
+
+log = logging.getLogger("mxconsole.bench")
 
 BENCH_APP = "_bench"  # the reserved key the benchmark calls the gateway with
 DEFAULT_RUNS = 5
@@ -55,7 +58,9 @@ CREATE TABLE IF NOT EXISTS bench_results (
     total_ms REAL,
     prompt_tokens INTEGER,
     completion_tokens INTEGER,
-    estimated INTEGER NOT NULL DEFAULT 0
+    estimated INTEGER NOT NULL DEFAULT 0,
+    prompt_estimated INTEGER NOT NULL DEFAULT 0,
+    completion_estimated INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS bench_results_run ON bench_results (run_id);
 CREATE TABLE IF NOT EXISTS bench_samples (
@@ -77,6 +82,10 @@ CREATE INDEX IF NOT EXISTS bench_samples_run ON bench_samples (run_id);
 
 def ensure_schema(store: Store) -> None:
     store.db.executescript(SCHEMA)
+    have = {r["name"] for r in store.db.execute("PRAGMA table_info(bench_results)")}
+    for col in ("prompt_estimated", "completion_estimated"):  # a database from before the two flags
+        if col not in have:
+            store.db.execute(f"ALTER TABLE bench_results ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0")
 
 
 # -- the workload ---------------------------------------------------------------------------------------
@@ -94,10 +103,14 @@ _SENTENCES = (
 )
 
 
-def build_prompt(target_tokens: int = PROMPT_TARGET) -> str:
-    """A deterministic passage of about `target_tokens` tokens (four characters each), then the task."""
+def build_prompt(target_tokens: int = PROMPT_TARGET, nonce: str = "") -> str:
+    """A deterministic passage of about `target_tokens` tokens (four characters each), then the task.
+
+    A `nonce` line goes first and is paid for out of the budget, so the size stays honest: it makes the
+    prompt unique per run, so a prefix cache can never serve a counted run."""
     task = "Continue this passage in the same style, for as long as you can."
-    budget = target_tokens * 4 - len(task) - 1
+    head = f"{nonce}\n" if nonce else ""
+    budget = target_tokens * 4 - len(task) - 1 - len(head)
     parts: list[str] = []
     size, i = 0, 0
     while True:
@@ -107,7 +120,13 @@ def build_prompt(target_tokens: int = PROMPT_TARGET) -> str:
         parts.append(sentence)
         size += len(sentence) + 1
         i += 1
-    return " ".join(parts) + " " + task
+    return head + " ".join(parts) + " " + task
+
+
+def run_prompt(bench_id: int, i: int, runs: int) -> str:
+    """The prompt for counted run `i` of `runs` (0 is the warm-up), unique across runs and across benchmarks."""
+    label = "Warm-up" if i == 0 else f"Run {i} of {runs}"
+    return build_prompt(nonce=f"Benchmark {bench_id} · {label} ·")
 
 
 PROMPT = build_prompt()
@@ -124,8 +143,13 @@ class Sample:
     duration_ms: float | None = None
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
-    estimated: bool = False
+    prompt_estimated: bool = False
+    completion_estimated: bool = False
     error: str | None = None
+
+    @property
+    def estimated(self) -> bool:
+        return self.prompt_estimated or self.completion_estimated
 
     @property
     def decode_tps(self) -> float | None:
@@ -159,6 +183,8 @@ def summarize(samples: list[Sample]) -> dict:
         "total_ms": round(sum(s.duration_ms for s in ok), 1) if ok else None,
         "prompt_tokens": ok[0].prompt_tokens if ok else None,
         "completion_tokens": ok[0].completion_tokens if ok else None,
+        "prompt_estimated": any(s.prompt_estimated for s in ok),
+        "completion_estimated": any(s.completion_estimated for s in ok),
         "estimated": any(s.estimated for s in ok),
     }
 
@@ -203,7 +229,8 @@ async def one_request(http: httpx.AsyncClient, model: str, key: str, *, prompt: 
     estimated_prompt = meter.prompt_tokens is None
     return Sample(ttft_ms=(first - started) * 1000, duration_ms=(ended - started) * 1000,
                   prompt_tokens=meter.prompt_tokens if not estimated_prompt else estimate_tokens(prompt),
-                  completion_tokens=meter.completion_tokens, estimated=meter.estimated or estimated_prompt)
+                  completion_tokens=meter.completion_tokens, prompt_estimated=estimated_prompt,
+                  completion_estimated=meter.estimated)
 
 
 # -- a whole benchmark ----------------------------------------------------------------------------------
@@ -244,11 +271,12 @@ def _save_result(store: Store, run_id: int, name: str, status: str, error: str |
                  samples: list[Sample], summary: dict) -> None:
     store.db.execute(
         """INSERT INTO bench_results (run_id, model, status, error, load_seconds, runs_ok, errors, decode_tps,
-             prefill_tps, ttft_p50_ms, ttft_p95_ms, duration_ms, total_ms, prompt_tokens, completion_tokens, estimated)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+             prefill_tps, ttft_p50_ms, ttft_p95_ms, duration_ms, total_ms, prompt_tokens, completion_tokens, estimated, prompt_estimated, completion_estimated)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (run_id, name, status, error, load_seconds, summary["runs_ok"], summary["errors"], summary["decode_tps"],
          summary["prefill_tps"], summary["ttft_p50_ms"], summary["ttft_p95_ms"], summary["duration_ms"],
-         summary["total_ms"], summary["prompt_tokens"], summary["completion_tokens"], int(summary["estimated"])))
+         summary["total_ms"], summary["prompt_tokens"], summary["completion_tokens"], int(summary["estimated"]),
+         int(summary["prompt_estimated"]), int(summary["completion_estimated"])))
     for i, s in enumerate(samples):
         store.db.execute(
             """INSERT INTO bench_samples (run_id, model, idx, ttft_ms, duration_ms, prompt_tokens, completion_tokens,
@@ -259,27 +287,43 @@ def _save_result(store: Store, run_id: int, name: str, status: str, error: str |
 
 async def run_model(store: Store, supervisor: Supervisor, http: httpx.AsyncClient, key: str,
                     progress: Progress, name: str) -> None:
-    """Load (if cold), warm up once, then time `progress.runs` runs, and store the result."""
+    """Load (if cold), warm up once, then time `progress.runs` runs, and store the result.
+
+    A model the benchmark loaded itself is stopped again afterwards; one that was already running stays."""
     states = {s["name"]: s["state"] for s in supervisor.status()}
     load_seconds = None
+    loaded_here = False
     if states.get(name) != "ready":
         progress.set(name, state="loading")
         t0 = time.monotonic()
+        loaded_here = True
         try:
             await supervisor.ensure_running(name)
         except (StartFailed, UnknownModel) as e:
             _fail_model(store, progress, name, f"could not load: {e}", None)
             return
         load_seconds = round(time.monotonic() - t0, 2)
+    try:
+        await _time_model(store, http, key, progress, name, load_seconds)
+    finally:
+        if loaded_here:
+            try:
+                await supervisor.stop(name)
+            except Exception:
+                log.exception("could not stop %s after its benchmark", name)
+
+
+async def _time_model(store: Store, http: httpx.AsyncClient, key: str, progress: Progress, name: str,
+                      load_seconds: float | None) -> None:
     progress.set(name, state="warming")
-    warm = await one_request(http, name, key)  # not counted: the first request pays for caches and kernels
+    warm = await one_request(http, name, key, prompt=run_prompt(progress.run_id, 0, progress.runs))  # not counted
     if warm.error:
         _fail_model(store, progress, name, warm.error, load_seconds)
         return
     samples: list[Sample] = []
     progress.set(name, state="running", done=0)
     for i in range(progress.runs):
-        samples.append(await one_request(http, name, key))
+        samples.append(await one_request(http, name, key, prompt=run_prompt(progress.run_id, i + 1, progress.runs)))
         progress.set(name, done=i + 1)
     summary = summarize(samples)
     failed = summary["runs_ok"] == 0
@@ -318,7 +362,7 @@ async def run_all(store: Store, supervisor: Supervisor, progress: Progress, *,
 
 # -- reading results back -------------------------------------------------------------------------------
 def _run_dict(store: Store, row) -> dict:
-    results = [dict(r) | {"estimated": bool(r["estimated"])} for r in store.db.execute(
+    results = [dict(r) | {k: bool(r[k]) for k in ("estimated", "prompt_estimated", "completion_estimated")} for r in store.db.execute(
         "SELECT * FROM bench_results WHERE run_id = ?", (row["id"],))]
     results.sort(key=lambda r: (r["decode_tps"] is None, -(r["decode_tps"] or 0), r["model"]))
     for place, r in enumerate((r for r in results if r["decode_tps"] is not None), 1):
@@ -328,14 +372,12 @@ def _run_dict(store: Store, row) -> dict:
 
 def latest(store: Store) -> dict | None:
     """The newest finished run, with every model's result fastest first."""
-    ensure_schema(store)
     row = store.db.execute(
         "SELECT * FROM bench_runs WHERE status IN ('done', 'failed') ORDER BY started_at DESC, id DESC LIMIT 1").fetchone()
     return _run_dict(store, row) if row else None
 
 
 def history(store: Store, limit: int = 20) -> list[dict]:
-    ensure_schema(store)
     rows = store.db.execute("SELECT * FROM bench_runs ORDER BY started_at DESC, id DESC LIMIT ?", (limit,)).fetchall()
     return [_run_dict(store, r) for r in rows]
 

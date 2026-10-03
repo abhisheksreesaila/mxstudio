@@ -34,6 +34,14 @@ def test_the_prompt_is_fixed_and_about_512_tokens():
     assert bench.MAX_TOKENS == 128 and bench.DEFAULT_RUNS == 5
 
 
+def test_every_runs_prompt_is_unique_and_still_about_512_tokens():
+    prompts = [bench.run_prompt(7, i, 5) for i in range(6)]
+    assert len(set(prompts)) == 6 and prompts[3].startswith("Benchmark 7 · Run 3 of 5 ·\n")
+    assert prompts[0].startswith("Benchmark 7 · Warm-up ·")
+    assert bench.run_prompt(8, 3, 5) != prompts[3]  # nor can an earlier benchmark's cache serve this one
+    assert all(480 <= bench.estimate_tokens(p) <= 530 for p in prompts)
+
+
 def test_decode_and_prefill_rates_from_fixed_timings():
     s = bench.Sample(ttft_ms=200, duration_ms=1450, prompt_tokens=500, completion_tokens=126)
     assert s.decode_tps == pytest.approx(100.0)  # (126-1) tokens over 1.25 s
@@ -83,6 +91,7 @@ async def test_one_request_times_a_stream_and_reads_the_usage_block(fake_max):
     c = fake_max(FAKE_MAX_TOKENS_OUT="40", FAKE_MAX_CHUNK_DELAY="0.01", FAKE_MAX_TTFT_DELAY="0.1", FAKE_MAX_USAGE="1")
     s = await bench.one_request(c, "m", "k")
     assert s.error is None and s.completion_tokens == 40 and not s.estimated
+    assert not s.prompt_estimated and not s.completion_estimated
     assert 90 <= s.ttft_ms < 300
     assert 40 <= s.decode_tps <= 105  # one chunk per 10 ms plus scheduling: never above 100
     assert s.prompt_tokens > 400  # from the usage block
@@ -92,6 +101,7 @@ async def test_without_a_usage_block_the_tokens_are_estimated(fake_max):
     c = fake_max(FAKE_MAX_TOKENS_OUT="10")
     s = await bench.one_request(c, "m", "k")
     assert s.completion_tokens == 10 and s.estimated
+    assert s.prompt_estimated and s.completion_estimated
     assert s.prompt_tokens == bench.estimate_tokens(bench.PROMPT)
 
 
@@ -183,6 +193,59 @@ def test_a_run_left_running_by_a_dead_daemon_is_marked_interrupted(store):
                          store, None, lambda r: True)
     assert [r["status"] for r in bench.history(store)] == ["interrupted"]
     assert bench.latest(store) is None  # nothing finished: nothing to show
+
+
+def test_the_bench_key_a_dead_daemon_left_active_is_revoked_on_start(store):
+    from mxconsole import admin_bench, keys
+    keys.create_key(store, bench.BENCH_APP, rotate=True, internal=True)
+    assert next(k for k in keys.list_keys(store) if k.app == "_bench").revoked_at is None
+    admin_bench.register(type("A", (), {"post": lambda *a, **k: (lambda f: f), "get": lambda *a, **k: (lambda f: f)})(),
+                         store, None, lambda r: True)
+    assert next(k for k in keys.list_keys(store) if k.app == "_bench").revoked_at is not None
+
+
+def test_results_keep_prompt_and_completion_estimates_apart(store):
+    p = bench.start_run(store, ["tiny"], 1)
+    s = [bench.Sample(ttft_ms=100, duration_ms=1100, prompt_tokens=500, completion_tokens=101, completion_estimated=True)]
+    bench._save_result(store, p.run_id, "tiny", "done", None, None, s, bench.summarize(s))
+    store.db.execute("UPDATE bench_runs SET status = 'done' WHERE id = ?", (p.run_id,))
+    r = bench.latest(store)["results"][0]
+    assert r["completion_estimated"] is True and r["prompt_estimated"] is False and r["estimated"] is True
+
+
+async def test_a_run_revokes_its_key_and_stops_only_the_models_it_loaded(store, sup):
+    from mxconsole import keys
+    from mxconsole.gateway import create_app
+    await sup.ensure_running("other")  # already running before the benchmark: it must stay
+    async with client(create_app(store, sup)) as c:
+        progress = bench.start_run(store, ["tiny", "other"], 1)
+        await bench.run_all(store, sup, progress, http_factory=lambda: c)
+    states = {s["name"]: s["state"] for s in sup.status()}
+    assert states["tiny"] != "ready" and states["other"] == "ready"
+    assert sorted(r["status"] for r in bench.latest(store)["results"]) == ["done", "done"]
+    assert next(k for k in keys.list_keys(store) if k.app == "_bench").revoked_at is not None
+
+
+async def test_shutdown_cancels_a_running_benchmark_and_its_cleanup_runs(store, sup, monkeypatch):
+    import asyncio
+    from mxconsole import keys
+    from mxconsole.gateway import create_app
+    started = asyncio.Event()
+
+    async def hang(*a, **k):
+        started.set()
+        await asyncio.sleep(60)
+
+    monkeypatch.setattr(bench, "run_model", hang)
+    app = create_app(store, sup)
+    async with client(app) as c:
+        async with app.router.lifespan_context(app):
+            assert (await c.post("/admin/bench", headers=ADMIN, content=b'{"models": ["tiny"]}')).status_code == 202
+            await asyncio.wait_for(started.wait(), 5)
+        # leaving the lifespan is the daemon's shutdown: the run must have been cancelled and cleaned up
+    run = bench.history(store)[0]
+    assert run["status"] == "interrupted" and run["finished_at"] is not None
+    assert next(k for k in keys.list_keys(store) if k.app == "_bench").revoked_at is not None
 
 
 # -- stored results ------------------------------------------------------------------------------------------

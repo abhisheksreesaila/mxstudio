@@ -135,12 +135,17 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         try:
             yield
         finally:
+            await stop_bench()  # before the models are stopped: its cleanup talks to the supervisor
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
             await supervisor.stop_all()
             await proxy.aclose()
 
+    async def stop_bench() -> None:
+        await bench_shutdown[0]()
+
+    bench_shutdown = [lambda: asyncio.sleep(0)]  # replaced once admin_bench registers its routes
     boot = time.monotonic()
     # a literal secret_key stops FastHTML writing a .sesskey file; the gateway uses no sessions
     app = FastHTML(lifespan=lifespan, secret_key="mst-gateway-unused", default_hdrs=False)
@@ -524,7 +529,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                              "max_version": mst_max_version(), "uptime_seconds": round(time.monotonic() - boot),
                              "active_keys": active, "blocked_today": metrics.count_status(store, 401, today)})
 
-    admin_bench.register(app, store, supervisor, admin_only)
+    bench_shutdown[0] = admin_bench.register(app, store, supervisor, admin_only)
 
     @app.get("/favicon.ico")
     def favicon():

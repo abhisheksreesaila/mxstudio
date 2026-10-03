@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from mxconsole import bench
+from mxconsole import bench, keys
 
 log = logging.getLogger("mxconsole.bench")
 
@@ -18,9 +19,12 @@ def _error(status: int, message: str, code: str) -> JSONResponse:
                         status_code=status)
 
 
-def register(app, store, supervisor, admin_only, *, http_factory=None) -> None:
+def register(app, store, supervisor, admin_only, *, http_factory=None):
+    """Add the bench routes. Returns `shutdown`, a coroutine function that cancels a running benchmark and
+    waits for it, so its cleanup (revoking the key, stopping the models it loaded) runs."""
     bench.ensure_schema(store)
     bench.mark_interrupted(store)
+    keys.revoke_key(store, bench.BENCH_APP)  # a daemon that died mid-run left the key active
     state: dict = {"task": None, "progress": None}
 
     def refused() -> Response:
@@ -88,3 +92,12 @@ def register(app, store, supervisor, admin_only, *, http_factory=None) -> None:
         except ValueError:
             limit = 20
         return JSONResponse(bench.history(store, limit))
+
+    async def shutdown() -> None:
+        task = state["task"]
+        if task is not None and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
+
+    return shutdown
