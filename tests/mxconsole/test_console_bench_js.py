@@ -78,3 +78,13 @@ def test_internal_apps_get_a_friendly_label_on_activity_and_overview():
     assert 'name === "_bench"' in core and "benchmark" in core and 'name === "console"' in core
     for page in ("page-activity.js", "page-overview.js"):
         assert "appLabel(r.app)" in (CONSOLE_DIR / page).read_text(), page
+
+
+def test_the_stylesheet_braces_balance_so_no_rule_is_swallowed_by_an_open_media_query():
+    css = (CONSOLE_DIR / "console.css").read_text()
+    assert css.count("{") == css.count("}")
+    depth = 0
+    for line in css.splitlines():
+        if line.startswith("/* ---- benchmarks"):
+            assert depth == 0, "the benchmarks block starts inside an unclosed rule, so it never applies on desktop"
+        depth += line.count("{") - line.count("}")

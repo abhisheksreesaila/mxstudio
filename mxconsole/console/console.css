@@ -636,6 +636,10 @@ dialog.dlg[open] { animation: palin 120ms ease-out both; }
   .crew-row .act { grid-column: 3; grid-row: 1; }
   .sys-viewer-bar .select, .sys-viewer-bar .search { width: 100%; max-width: none; flex: 1 1 100%; }
   .sys-follow { margin-left: 0; }
+}
+
+.app-internal { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.app-internal svg { flex: none; }
 
 /* ---- benchmarks page ------------------------------------------------------------------------- */
 /* The race track follows the theme: the chrome colours (dark in contrast and dark, white in light). */
