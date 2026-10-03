@@ -235,6 +235,22 @@ async def test_each_model_goes_on_the_gpu_with_most_free_memory_with_a_capped_sh
         await s.stop_all()
 
 
+async def test_models_started_together_spread_across_gpus(store, clock, monkeypatch, tmp_path):
+    """Live: three models started at once all read the same free memory, all went to GPU0 and the third ran out.
+    A GPU this daemon already put a model on counts as fuller, even before nvidia-smi shows it."""
+    gpus = lambda: [{"index": 0, "used_mb": 80, "total_mb": 24576}, {"index": 1, "used_mb": 1300, "total_mb": 24576}]
+    s = Supervisor(store, max_command=(sys.executable, FAKE), health_timeout=20, clock=clock, gpus=gpus)
+    f = tmp_path / "args.log"
+    monkeypatch.setenv("FAKE_MAX_ARGS_LOG", str(f))
+    monkeypatch.setenv("FAKE_MAX_DELAY", "0.3")
+    try:
+        await asyncio.gather(s.ensure_running("tiny"), s.ensure_running("other"))
+        devices = sorted(a[a.index("--devices") + 1] for a in map(json.loads, f.read_text().splitlines()))
+        assert devices == ["gpu:0", "gpu:1"]
+    finally:
+        await s.stop_all()
+
+
 async def test_memory_share_is_configurable_and_no_gpu_means_no_device_flags(store, clock, monkeypatch, tmp_path):
     monkeypatch.setenv("MXC_GPU_MEMORY_FRACTION", "0.5")
     s = Supervisor(store, max_command=(sys.executable, FAKE), health_timeout=20, clock=clock, gpus=lambda: [])

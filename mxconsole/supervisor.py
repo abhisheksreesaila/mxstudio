@@ -57,6 +57,7 @@ class _Child:
     crashed: bool = False
     in_flight: int = 0
     started_at: float = 0.0
+    gpu: int | None = None
 
 
 DEFAULT_GPU_MEMORY_FRACTION = "0.35"
@@ -289,7 +290,22 @@ class Supervisor:
     def _pidfile(self, name: str, pid: int) -> Path:
         return self._run_dir() / f"{name}.{pid}.pid"
 
-    def _command(self, model, port: int) -> list[str]:
+    def _pick_gpu(self) -> int | None:
+        # MAX's default takes ~90% of free GPU memory for one model (a 0.5B model took 20 GB live), which
+        # leaves no room for a second, so each model gets a capped share. Models started together all read
+        # the same free memory before any has claimed it, so the GPU with the fewest of our models wins
+        # first, and free memory breaks the tie.
+        try:
+            gpus = self.gpus()
+        except Exception:
+            return None
+        if not gpus:
+            return None
+        ours = [c.gpu for c in self._children.values()]
+        best = min(gpus, key=lambda g: (ours.count(g["index"]), g["used_mb"] - g["total_mb"]))
+        return best["index"]
+
+    def _command(self, model, port: int, gpu: int | None = None) -> list[str]:
         # A pulled model loads from its pinned local snapshot, so serving needs no network.
         cmd = [*self.max_command, "serve", "--port", str(port), "--served-model-name", model.name]
         # Device graph capture crashes MAX 26.5 at warm-up on this hardware (CUDA_ERROR_INVALID_DEVICE in
@@ -297,14 +313,8 @@ class Supervisor:
         # MXC_GRAPH_CAPTURE=1 lets MAX decide again where capture works.
         if env("GRAPH_CAPTURE") != "1":
             cmd.append("--no-device-graph-capture")
-        # MAX's default takes ~90% of free GPU memory for one model (a 0.5B model took 20 GB live), which
-        # leaves no room for a second. Put each model on the GPU with the most free memory and cap its share.
-        try:
-            free = sorted(self.gpus(), key=lambda g: g["total_mb"] - g["used_mb"], reverse=True)
-        except Exception:
-            free = []
-        if free:
-            cmd += ["--devices", f"gpu:{free[0]['index']}"]
+        if gpu is not None:
+            cmd += ["--devices", f"gpu:{gpu}"]
         cmd += ["--device-memory-utilization", env("GPU_MEMORY_FRACTION") or DEFAULT_GPU_MEMORY_FRACTION]
         if model.custom_arch_path:  # a ported architecture MAX doesn't ship
             cmd += ["--custom-architectures", model.custom_arch_path]
@@ -317,11 +327,12 @@ class Supervisor:
 
     def _spawn(self, model) -> _Child:
         port = _free_port()
+        gpu = self._pick_gpu()
         env = {**os.environ, "MAX_SERVE_HOST": HOST}
         log = open(self._log_path(model.name), "ab")
         try:
             proc = subprocess.Popen(
-                self._command(model, port), stdout=log, stderr=subprocess.STDOUT,
+                self._command(model, port, gpu), stdout=log, stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL, start_new_session=True, env=env,
                 preexec_fn=_die_with_parent if sys.platform.startswith("linux") else None,
             )
@@ -330,7 +341,7 @@ class Supervisor:
         finally:
             log.close()
         self._pidfile(model.name, proc.pid).write_text(f"{proc.pid} {proc.pid}")
-        return _Child(proc=proc, port=port, last_used=self.clock(), started_at=self.clock())
+        return _Child(proc=proc, port=port, last_used=self.clock(), started_at=self.clock(), gpu=gpu)
 
     def _log_tail(self, name: str, offset: int = 0) -> str:
         with open(self._log_path(name), "rb") as f:

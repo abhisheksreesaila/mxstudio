@@ -1,5 +1,5 @@
 """Stand-in for `max serve`. Env: FAKE_MAX_DELAY (s before healthy), FAKE_MAX_FAIL (exit 1),
-FAKE_MAX_ARGS_FILE (write argv there), FAKE_MAX_STARTS_FILE (append a line per start).
+FAKE_MAX_ARGS_FILE (write argv there), FAKE_MAX_ARGS_LOG (append argv as a JSON line), FAKE_MAX_STARTS_FILE (append a line per start).
 It also answers POST /v1/{chat/completions,completions,embeddings}, echoing the requested model:
 stream=true gives SSE chunks then `data: [DONE]`. FAKE_MAX_CHUNK_DELAY (s between chunks).
 FAKE_MAX_GZIP gzips JSON replies when the caller accepts gzip.
@@ -15,6 +15,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 args = sys.argv[1:]
 if os.environ.get("FAKE_MAX_ARGS_FILE"):
     open(os.environ["FAKE_MAX_ARGS_FILE"], "w").write(json.dumps(args))
+if os.environ.get("FAKE_MAX_ARGS_LOG"):
+    open(os.environ["FAKE_MAX_ARGS_LOG"], "a").write(json.dumps(args) + "\n")
 if os.environ.get("FAKE_MAX_STARTS_FILE"):
     open(os.environ["FAKE_MAX_STARTS_FILE"], "a").write("start\n")
 if os.environ.get("FAKE_MAX_FAIL"):
