@@ -636,6 +636,7 @@ dialog.dlg[open] { animation: palin 120ms ease-out both; }
   .crew-row .act { grid-column: 3; grid-row: 1; }
   .sys-viewer-bar .select, .sys-viewer-bar .search { width: 100%; max-width: none; flex: 1 1 100%; }
   .sys-follow { margin-left: 0; }
+}
 
 /* ---- benchmarks page ------------------------------------------------------------------------- */
 /* The race track is always dark artwork, whatever the theme. */

@@ -78,3 +78,9 @@ def test_the_pull_page_takes_its_colours_from_the_tokens():
     assert not re.findall(r"#[0-9a-fA-F]{6}\b", js), "page-pull.js uses SIGNAL/HUE from core.js, not hex"
     assert "--hue-pull" not in css and "#ff8a8a" not in css
     assert "test hub" in js and "fake_hub" in js
+
+
+def test_console_css_braces_balance():
+    """An unclosed @media once swallowed every rule after it (the bench and pull pages rendered unstyled)."""
+    css = (CONSOLE_DIR / "console.css").read_text()
+    assert css.count("{") == css.count("}")
