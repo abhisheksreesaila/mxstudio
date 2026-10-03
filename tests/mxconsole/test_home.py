@@ -128,3 +128,27 @@ def test_port_and_command_settings_fall_back_in_order(monkeypatch):
     assert env("PORT") == "2222"
     monkeypatch.setenv("MXC_PORT", "3333")
     assert env("PORT") == "3333"
+
+
+def test_a_race_with_both_old_folders_ends_up_in_mxc(fake_user, monkeypatch, capsys):
+    """Another first run moved ~/.hotfire into ~/.mxc while we picked ~/.mst: use ~/.mxc, don't fall back."""
+    import errno
+    from pathlib import Path
+    (fake_user / ".mst").mkdir()
+    (fake_user / ".hotfire").mkdir()
+
+    def raced(self, target):
+        Path(target).mkdir(exist_ok=True)
+        raise OSError(errno.ENOTEMPTY, "Directory not empty")
+    monkeypatch.setattr(Path, "rename", raced)
+    assert mxc_home() == fake_user / ".mxc"
+    assert "move it by hand" not in capsys.readouterr().err
+
+
+def test_no_move_while_an_old_daemon_holds_the_mst_lock(fake_user, capsys):
+    import fcntl
+    run = fake_user / ".mst" / "run"
+    run.mkdir(parents=True)
+    with open(run / "daemon.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        assert mxc_home() == fake_user / ".mst"

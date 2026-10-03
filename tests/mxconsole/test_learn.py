@@ -86,7 +86,8 @@ def test_missing_config_degrades_gracefully():
 def test_sample_code_uses_env_and_covers_three_styles():
     nb = build()
     code = "\n".join(c.source for c in nb.cells if c.cell_type == "code")
-    assert 'os.environ.get("MXC_BASE_URL", "http://127.0.0.1:11435/v1")' in code
+    assert 'os.environ.get("MXC_BASE_URL") or os.environ.get("HOTFIRE_BASE_URL")' in code
+    assert 'or os.environ.get("MST_BASE_URL") or "http://127.0.0.1:11435/v1"' in code
     assert 'os.environ.get("MXC_API_KEY") or os.environ.get("HOTFIRE_API_KEY") or os.environ["MST_API_KEY"]' in code  # old name still works this release
     assert "from openai import OpenAI" in code
     assert "stream=True" in code

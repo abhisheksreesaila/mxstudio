@@ -249,7 +249,8 @@ def _trim(text: str, limit: int = CARD_LIMIT) -> str:
 def _setup_code(model_id: str) -> str:
     return (
         "import os\n"
-        f'BASE_URL = os.environ.get("MXC_BASE_URL", "{daemon_url()}/v1")\n'
+        f'BASE_URL = (os.environ.get("MXC_BASE_URL") or os.environ.get("HOTFIRE_BASE_URL")\n'
+        f'            or os.environ.get("MST_BASE_URL") or "{daemon_url()}/v1")\n'
         'API_KEY = (os.environ.get("MXC_API_KEY") or os.environ.get("HOTFIRE_API_KEY") or os.environ["MST_API_KEY"])  # create one with: mxc keys new <app>\n'
         f'MODEL = "{model_id}"\n'
         "print(BASE_URL, MODEL)"

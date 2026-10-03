@@ -30,7 +30,7 @@ Architecture decision: [docs/adr/0001](docs/adr/0001-mst-core-architecture.md)
 |---|---|---|
 | **Resolver** | `qwen2.5-0.5b` → HF repo → architecture → is it in MAX's catalog (`max list --json`)? Downloads safetensors at a pinned commit. | `mxconsole/resolve.py` |
 | **Supervisor** (the "hypervisor") | One `max serve` child per model on a free loopback port. Starts it on demand (concurrent callers share one start), stops it after `keep_alive` idle (default 5m) unless pinned, never mid-request. Cleans up orphans after a crash. | `mxconsole/supervisor.py` |
-| **Gateway** (`mxc daemon`) | OpenAI-compatible `/v1/*` on `127.0.0.1:11435`. Checks the Bearer key, routes by `model`, streams through, and serves the console (Mission Control, with the API reference) at `/console`; `/docs` redirects to it. Admin routes are for the CLI and the console only. | `mxconsole/gateway.py` |
+| **Gateway** (`mxc daemon`) | OpenAI-compatible `/v1/*` on `127.0.0.1:11435`. Checks the Bearer key, routes by `model`, streams through, and serves the console (MX Console, with the API reference) at `/console`; `/docs` redirects to it. Admin routes are for the CLI and the console only. | `mxconsole/gateway.py` |
 | **Keys** | `mst-…` keys, one per app, stored only as SHA-256 hashes. Shown once. | `mxconsole/keys.py` |
 | **Expose** | Writes and runs Caddy (`tls internal`, forward_auth) and LiteLLM (its own pixi env, master key, no Postgres) as your user. | `mxconsole/expose.py` |
 | **Learn** | A Jupyter notebook built only from the Hugging Face API: model card, config table, parameter breakdown, sample code, and a pointer to MAX's source. | `mxconsole/learn.py` |
@@ -101,7 +101,7 @@ pixi run mxc serve qwen2.5-0.5b
 endpoint `http://127.0.0.1:11435/v1`, a key `mst-…` (**save it**: `export MXC_API_KEY=mst-…`), and
 a curl and a Python snippet. Paste the curl and expect a JSON reply.
 ✅ Open http://127.0.0.1:11435/docs and you should land on the console's API reference.
-✅ Open http://127.0.0.1:11435/console: Mission Control lists your models. Click one to open its
+✅ Open http://127.0.0.1:11435/console: the console lists your models. Click one to open its
 side sheet: Overview, Settings (keep loaded, unload after idle; Apply saves), Logs and Requests. ⌘K runs any action.
 ❌ If loading fails: the error includes the tail of `~/.mxc/logs/qwen2.5-0.5b.log`.
 

@@ -81,7 +81,10 @@ def _migrate_legacy_home(new: Path) -> Path:
         old.rename(new)
     except FileNotFoundError:  # another mxc command moved it a moment ago
         return new
-    except OSError as e:  # a mount point or another device: rename can't do it
+    except OSError as e:
+        if new.exists():  # another mxc command moved the other old folder there first: use it
+            return new
+        # a mount point or another device: rename can't do it
         print(f"mxc: could not move {old} to {new} ({e.strerror}); move it by hand. "
               f"Using {old} for now.", file=sys.stderr)
         return old
