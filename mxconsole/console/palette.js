@@ -16,6 +16,13 @@ const PAGES = [
   ["daemon", "Daemon", "server", "mxc daemon"],
 ];
 
+/** Open the Pull page; text typed after "pull" in the palette becomes the ref ("pull qwen2.5-3b"). */
+export function pullTarget(query) {
+  const ref = String(query || "").trim().replace(/^(pull|download)\s*/i, "").trim();
+  return ref && /^[\w.\-]+(\/[\w.\-]+)?$/.test(ref) ? `pull/${encodeURIComponent(ref)}` : "pull";
+}
+const openPull = (query) => { location.hash = pullTarget(query); };
+
 /** The rows for the current state. Each: {group, icon, label, cli, run, copyOnly?, note?} */
 export function buildActions() {
   const rows = [];
@@ -26,8 +33,7 @@ export function buildActions() {
   rows.push(exposed
     ? { group: "Suggested", icon: "globe", label: "Stop exposing on the LAN", cli: "mxc expose --stop", run: () => stopExpose() }
     : { group: "Suggested", icon: "globe", label: "Expose on the LAN…", cli: "mxc expose", run: () => { location.hash = "network"; exposeDialog(); } });
-  rows.push({ group: "Suggested", icon: "download", label: "Pull a model…", cli: "mxc pull <model>", copyOnly: true,
-    note: "The console can't pull models yet: paste the command in a terminal." });
+  rows.push({ group: "Suggested", icon: "download", label: "Pull a model…", cli: "mxc pull <model>", run: (query) => openPull(query) });
   for (const m of store.models || []) {
     const running = m.state !== "cold";
     rows.push(running
@@ -127,7 +133,7 @@ export function openPalette(prefill = "") {
       toast(ok ? `Copied “${r.cli}”. ${r.note}` : `Run this in a terminal: ${r.cli}`, 6500);
       return;
     }
-    try { await r.run(); } catch (e) { toast(`Failed: ${e.message}`, 7000); }
+    try { await r.run(input.value); } catch (e) { toast(`Failed: ${e.message}`, 7000); }
   }
   async function copy(i) {
     const r = rows[i];
