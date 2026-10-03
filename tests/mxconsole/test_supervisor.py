@@ -217,3 +217,33 @@ async def test_graph_capture_can_be_turned_back_on(sup, monkeypatch, tmp_path):
     monkeypatch.setenv("FAKE_MAX_ARGS_FILE", str(f))
     await sup.ensure_running("tiny")
     assert "--no-device-graph-capture" not in json.loads(f.read_text())
+
+
+async def test_each_model_goes_on_the_gpu_with_most_free_memory_with_a_capped_share(store, clock, monkeypatch, tmp_path):
+    """MAX takes ~90% of free GPU memory by default, so a 0.5B model ate 20 GB live. Cap and spread instead."""
+    monkeypatch.delenv("MXC_GPU_MEMORY_FRACTION", raising=False)
+    gpus = lambda: [{"index": 0, "used_mb": 20000, "total_mb": 24576}, {"index": 1, "used_mb": 1000, "total_mb": 24576}]
+    s = Supervisor(store, max_command=(sys.executable, FAKE), health_timeout=20, clock=clock, gpus=gpus)
+    f = tmp_path / "args.json"
+    monkeypatch.setenv("FAKE_MAX_ARGS_FILE", str(f))
+    try:
+        await s.ensure_running("tiny")
+        args = json.loads(f.read_text())
+        assert args[args.index("--devices") + 1] == "gpu:1"
+        assert args[args.index("--device-memory-utilization") + 1] == "0.35"
+    finally:
+        await s.stop_all()
+
+
+async def test_memory_share_is_configurable_and_no_gpu_means_no_device_flags(store, clock, monkeypatch, tmp_path):
+    monkeypatch.setenv("MXC_GPU_MEMORY_FRACTION", "0.5")
+    s = Supervisor(store, max_command=(sys.executable, FAKE), health_timeout=20, clock=clock, gpus=lambda: [])
+    f = tmp_path / "args.json"
+    monkeypatch.setenv("FAKE_MAX_ARGS_FILE", str(f))
+    try:
+        await s.ensure_running("tiny")
+        args = json.loads(f.read_text())
+        assert "--devices" not in args
+        assert args[args.index("--device-memory-utilization") + 1] == "0.5"
+    finally:
+        await s.stop_all()

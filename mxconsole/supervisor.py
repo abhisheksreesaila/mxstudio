@@ -59,10 +59,20 @@ class _Child:
     started_at: float = 0.0
 
 
+DEFAULT_GPU_MEMORY_FRACTION = "0.35"
+
+
+def _nvidia_gpus() -> list[dict]:
+    from .metrics import gpus
+    return gpus()
+
+
 class Supervisor:
     def __init__(self, store: Store, *, max_command: tuple[str, ...] = ("max",),
-                 health_timeout: float = 600, clock: Callable[[], float] = time.monotonic):
+                 health_timeout: float = 600, clock: Callable[[], float] = time.monotonic,
+                 gpus: Callable[[], list[dict]] | None = None):
         self.store = store
+        self.gpus = gpus if gpus is not None else _nvidia_gpus
         self.max_command = tuple(max_command)
         self.health_timeout = health_timeout
         self.clock = clock
@@ -287,6 +297,15 @@ class Supervisor:
         # MXC_GRAPH_CAPTURE=1 lets MAX decide again where capture works.
         if env("GRAPH_CAPTURE") != "1":
             cmd.append("--no-device-graph-capture")
+        # MAX's default takes ~90% of free GPU memory for one model (a 0.5B model took 20 GB live), which
+        # leaves no room for a second. Put each model on the GPU with the most free memory and cap its share.
+        try:
+            free = sorted(self.gpus(), key=lambda g: g["total_mb"] - g["used_mb"], reverse=True)
+        except Exception:
+            free = []
+        if free:
+            cmd += ["--devices", f"gpu:{free[0]['index']}"]
+        cmd += ["--device-memory-utilization", env("GPU_MEMORY_FRACTION") or DEFAULT_GPU_MEMORY_FRACTION]
         if model.custom_arch_path:  # a ported architecture MAX doesn't ship
             cmd += ["--custom-architectures", model.custom_arch_path]
         if model.weights_path and Path(model.weights_path).is_dir():
