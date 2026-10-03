@@ -108,7 +108,7 @@ function racePanel(run, onRace) {
   const track = h("div", { class: "track" }, zoneProbe, lanes);
   const btn = h("button", { class: "btn race-btn", type: "button", onClick: () => onRace(true) }, icon("zap", 14, "currentColor"), "Race again", h("span", { class: "snd" }, " · with sound"));
   const node = h("section", { class: "race" },
-    h("div", { class: "race-head" }, icon("flag", 18, "#ffffff", 1.8), h("span", { class: "t" }, "Decode drag race"), h("span", { class: "mono w" }, workload), btn),
+    h("div", { class: "race-head" }, icon("flag", 18, "#ffffff", 1.8), h("span", { class: "t" }, "Decode drag race"), h("span", { class: "mono w" }, workload), racers.length ? btn : null),
     racers.length ? track : h("div", { class: "race-none" }, "No model finished the run, so there is no race. The table below says why."),
     failed.length && racers.length ? h("div", { class: "dnf mono" }, "did not finish: ", failed.map((f) => `${f.model} (${f.error || "failed"})`).join(" · ")) : null);
   const top = racers.length ? racers[0].tps : 0;
@@ -174,11 +174,12 @@ function emptyState(onRun) {
 }
 
 export function benchPage(ctx) {
-  let state = null, hist = null, failed = null, shownId = null, starting = false;
-  let panel = null, raceKey = "", tableKey = "", histKey = "", racing = 0, observer = null, pollTimer = 0;
+  let state = null, hist = null, failed = null, shownId = null, picked = false, starting = false;
+  let panel = null, progressKey = "", subText = "", raceKey = "", tableKey = "", histKey = "", racing = 0, observer = null, pollTimer = 0;
   const progressHost = h("div", {}), raceHost = h("div", {}), tableHost = h("div", { class: "bench-block" }), histHost = h("div", { class: "bench-block" });
   const runBtn = h("button", { class: "btn primary", type: "button", onClick: () => run() }, icon("zap", 15, "currentColor"), h("span", {}, "Run benchmark"));
-  ctx.actions.append(h("a", { class: "btn", href: "#benchmarks", onClick: (e) => { e.preventDefault(); const el = document.getElementById("bench-history"); if (el) el.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" }); } }, icon("activity", 15), "History"), runBtn);
+  const histBtn = h("a", { class: "btn", href: "#benchmarks", hidden: true, onClick: (e) => { e.preventDefault(); const el = document.getElementById("bench-history"); if (el) el.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" }); } }, icon("activity", 15), "History");
+  ctx.actions.append(histBtn, runBtn);
   ctx.body.replaceChildren(progressHost, raceHost, tableHost, histHost);
   assignColours(store.models);
 
@@ -229,7 +230,7 @@ export function benchPage(ctx) {
     if (animate && !reducedMotion()) {
       panel.track.classList.add("racing");
       clearTimeout(racing);
-      racing = setTimeout(() => { if (panel) panel.track.classList.remove("racing"); }, RACE_MS + 100);
+      racing = setTimeout(() => { if (panel) { panel.track.classList.remove("racing"); place(false); } }, RACE_MS + 100); // settle, so a resize during the race still lands right
     }
   }
   function race(sound) {
@@ -259,19 +260,27 @@ export function benchPage(ctx) {
 
   function draw() {
     drawButton();
+    histBtn.hidden = !(hist && hist.some((r) => r.status === "done" || r.status === "failed"));
     if (failed) { progressHost.replaceChildren(); raceHost.replaceChildren(); raceKey = ""; tableHost.replaceChildren(h("div", { class: "panel empty" }, h("h2", {}, "Could not load benchmarks"), h("p", {}, failed))); return; }
     if (!state) { tableHost.replaceChildren(h("div", { class: "panel empty" }, h("p", {}, "Loading…"))); return; }
     const progress = running() ? state.progress : null;
-    progressHost.replaceChildren(...(progress ? [progressPanel(progress)] : []));
-    progressHost.classList.toggle("bench-block", !!progress);
+    const pk = progress ? JSON.stringify(progress) : "";
+    if (pk !== progressKey) { // redraw only on change: idle polls leave the DOM alone
+      progressKey = pk;
+      progressHost.replaceChildren(...(progress ? [progressPanel(progress)] : []));
+      progressHost.classList.toggle("bench-block", !!progress);
+    }
     const run = shownRun();
     if (!run) {
-      raceKey = ""; panel = null; raceHost.replaceChildren(); histHost.replaceChildren(); tableKey = ""; histKey = "";
-      ctx.setSub("same workload, every model, this machine · mxc bench --all");
-      tableHost.replaceChildren(progress ? h("div", {}) : emptyState(() => run0()));
+      setSub("same workload, every model, this machine · mxc bench --all");
+      const key = progress ? "progress" : "empty";
+      if (tableKey !== key) {
+        raceKey = ""; panel = null; raceHost.replaceChildren(); histHost.replaceChildren(); histKey = ""; tableKey = key;
+        tableHost.replaceChildren(progress ? h("div", {}) : emptyState(() => run0()));
+      }
       return;
     }
-    ctx.setSub(`${run.results.length} model${run.results.length === 1 ? "" : "s"} · ${run.id === (state.latest && state.latest.id) ? "latest run" : "an earlier run"} · ${dateTime(run.started_at)} · mxc bench --all`);
+    setSub(`${run.results.length} model${run.results.length === 1 ? "" : "s"} · ${run.id === (state.latest && state.latest.id) ? "latest run" : "an earlier run"} · ${dateTime(run.started_at)} · mxc bench --all`);
     assignColours(store.models);
     drawRace(run);
     const tk = JSON.stringify(run.results);
@@ -281,20 +290,21 @@ export function benchPage(ctx) {
     if (hk !== histKey) {
       histKey = hk;
       histHost.replaceChildren(h("h2", { class: "section-title" }, "History", h("span", { class: "sub" }, `${rows.length} run${rows.length === 1 ? "" : "s"} · click one to see its race`)),
-        historyTable(rows, run.id, (id) => { shownId = id; raceKey = ""; tableKey = ""; histKey = ""; draw(); window.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" }); }),
+        historyTable(rows, run.id, (id) => { shownId = id; picked = !(state.latest && state.latest.id === id); raceKey = ""; tableKey = ""; histKey = ""; draw(); window.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" }); }),
         h("div", { class: "cli-note mono" }, h("span", {}, "$ mxc bench --all"), h("span", {}, "$ mxc bench <model> --runs 5 --json")));
     }
   }
   const run0 = () => run();
+  function setSub(text) { if (text !== subText) { subText = text; ctx.setSub(text); } }
 
   async function load() {
     try {
       const [now, history] = await Promise.all([api("GET", "/admin/bench"), api("GET", "/admin/bench/history")]);
       const finished = state && state.running && !now.running; // a run just ended: show it
       state = now; hist = history; failed = null;
-      if (finished || shownId === null) shownId = state.latest ? state.latest.id : null;
+      if (!picked || shownId === null) shownId = state.latest ? state.latest.id : null; // follow the newest run until one is picked
       if (finished && state.latest) toast(state.latest.status === "done" ? "Benchmark finished." : "Benchmark finished: every model failed.", 4000);
-    } catch (e) { failed = e.message; }
+    } catch (e) { if (!state) failed = e.message; } // a missed poll keeps what is on screen
     draw();
     schedule();
   }

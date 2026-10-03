@@ -69,8 +69,10 @@ def register(app, store, supervisor, admin_only, *, http_factory=None) -> None:
         state["task"] = asyncio.create_task(go())
         return JSONResponse({"id": progress.run_id, "models": names, "runs": runs}, status_code=202)
 
+    # async on purpose: the benchmark task writes on the event loop thread, and the store shares one
+    # SQLite connection, so these reads must run there too rather than in the threadpool.
     @app.get("/admin/bench")
-    def admin_bench_latest(request: Request):
+    async def admin_bench_latest(request: Request):
         if not admin_only(request):
             return refused()
         live = running()
@@ -78,7 +80,7 @@ def register(app, store, supervisor, admin_only, *, http_factory=None) -> None:
                              "latest": bench.latest(store)})
 
     @app.get("/admin/bench/history")
-    def admin_bench_history(request: Request):
+    async def admin_bench_history(request: Request):
         if not admin_only(request):
             return refused()
         try:

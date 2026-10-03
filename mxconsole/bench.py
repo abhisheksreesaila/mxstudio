@@ -413,7 +413,7 @@ def results_text(run: dict) -> str:
 def progress_line(model: dict, runs: int) -> str:
     state = model["state"]
     detail = {"queued": "waiting", "loading": "loading (the first load compiles the model)…", "warming": "warm-up run…",
-              "running": f"run {model['done']}/{runs}",
+              "running": f"run {min(model['done'] + 1, runs)}/{runs}",
               "done": f"done, {_num(model.get('decode_tps'), 1)} tok/s decode",
               "failed": f"failed: {model.get('error')}"}[state]
     return f"{model['name']:<26} {detail}"

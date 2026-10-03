@@ -166,6 +166,16 @@ async def test_only_one_benchmark_runs_at_a_time(http, store, monkeypatch):
     assert (await http.post("/admin/bench", headers=ADMIN, content=b'{"models": ["tiny"]}')).status_code == 202
 
 
+async def test_polling_reads_never_trip_over_the_shared_connection(http, store):
+    import asyncio
+    p = bench.start_run(store, ["tiny"], 1)
+    s = [bench.Sample(ttft_ms=100, duration_ms=1100, prompt_tokens=500, completion_tokens=101)]
+    bench._save_result(store, p.run_id, "tiny", "done", None, None, s, bench.summarize(s))
+    store.db.execute("UPDATE bench_runs SET status = 'done' WHERE id = ?", (p.run_id,))
+    calls = [http.get(path, headers=ADMIN) for path in ("/admin/bench", "/admin/bench/history") * 40]
+    assert {r.status_code for r in await asyncio.gather(*calls)} == {200}
+
+
 def test_a_run_left_running_by_a_dead_daemon_is_marked_interrupted(store):
     bench.start_run(store, ["tiny"], 5)
     from mxconsole import admin_bench
