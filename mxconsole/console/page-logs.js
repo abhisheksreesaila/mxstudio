@@ -15,6 +15,7 @@ const COMMANDS = [
   ["mxc stop --all", "Unload every model and stop the daemon"],
 ];
 const MAX_LINES = 2000;
+// Model logs come from the gateway capped at its LOG_TAIL_BYTES (8000); the others at what logUrl asks for.
 const logUrl = (id) => (id.startsWith("model:") ? `/admin/models/${encodeURIComponent(id.slice(6))}/log` : `/admin/${id}/log?bytes=32000`);
 
 export function logsPage(ctx) {
@@ -43,7 +44,7 @@ export function logsPage(ctx) {
     const total = lines.length;
     if (needle) lines = lines.filter((l) => l.toLowerCase().includes(needle));
     pre.textContent = error ? error : lines.length ? lines.join("\n") : text ? "No line matches the filter." : "Nothing in this log yet.";
-    meta.textContent = error ? "" : `${needle ? `${lines.length} of ${total}` : total} lines · the last 32 KB at most${follow ? " · refreshing every 2 s" : ""}`;
+    meta.textContent = error ? "" : `${needle ? `${lines.length} of ${total}` : total} lines · the last ${current && current.startsWith("model:") ? "8 KB" : "32 KB"} at most${follow ? " · refreshing every 2 s" : ""}`;
     if (follow) pre.scrollTop = pre.scrollHeight;
   };
   const fetchLog = async () => {

@@ -4,7 +4,7 @@ import { h, s, icon, api, store, toast, openDialog, uptime, fmt, colorOf, HUE } 
 import { loadModel, stopModel } from "./actions.js";
 
 const EKG = "M 0 20 L 40 20 L 48 6 L 56 34 L 64 20 L 120 20 L 128 8 L 136 32 L 144 20 L 200 20";
-const COLOUR = { daemon: HUE.daemon, caddy: HUE.gateway, litellm: "#f76b15" };
+const COLOUR = { daemon: HUE.daemon, caddy: HUE.network, litellm: HUE.gateway };
 
 export function daemonPage(ctx) {
   const host = h("div", {});
@@ -13,9 +13,9 @@ export function daemonPage(ctx) {
 
   async function restartLitellm() {
     busy = true; draw();
-    toast("Restarting LiteLLM… it can take up to a minute to boot.", 6000);
-    try { await api("POST", "/admin/litellm/restart"); toast("LiteLLM restarted."); }
-    catch (e) { toast(`Could not restart LiteLLM: ${e.message}`, 7000); }
+    toast("Restarting the gateway (Caddy + LiteLLM)… it can take up to a minute.", 6000);
+    try { await api("POST", "/admin/litellm/restart"); toast("Gateway restarted."); }
+    catch (e) { toast(`Could not restart the gateway: ${e.message}`, 7000); }
     busy = false; await load();
   }
   function stopExposing() {
@@ -39,10 +39,10 @@ export function daemonPage(ctx) {
     const alive = c.state === "running" || c.state === "ready";
     const colour = c.kind === "model" ? colorOf(c.name) : COLOUR[c.kind];
     const title = c.kind === "model" ? `max serve · ${c.name}` : c.name;
-    const where = [c.pid ? `pid ${c.pid}` : "not running", c.port ? `:${c.port}` : null].filter(Boolean).join(" · ");
+    const where = [c.pid ? `pid ${c.pid}` : alive ? "pid unknown" : "not running", c.port ? `:${c.port}` : null].filter(Boolean).join(" · ");
     let action = null;
     if (c.kind === "model" && alive) action = act("Stop", "square", () => stopModel(c.name).then(load));
-    if (c.kind === "litellm" && alive) action = act("Restart", "refresh-cw", restartLitellm);
+    if (c.kind === "litellm" && alive) action = act("Restart gateway (Caddy + LiteLLM, rotates the internal key)", "refresh-cw", restartLitellm);
     return h("div", { class: alive ? "crew-row" : "crew-row off" },
       beat(colour, alive, i),
       h("div", { class: "who" }, h("div", { class: "mono n" }, title), h("div", { class: "mono w" }, where)),
@@ -62,6 +62,7 @@ export function daemonPage(ctx) {
     const idle = (store.models || []).filter((m) => !running.has(m.name));
     const d = data.crew.find((c) => c.kind === "daemon");
     host.replaceChildren(
+      ...[
       h("div", { class: "section-title" }, "The crew", h("span", { class: "sub" }, `MXC_HOME ${data.home}`)),
       h("section", { class: "panel crew" }, data.crew.map(row)),
       h("p", { class: "hint sys-note" }, "Memory is each process's resident memory. GPU memory isn't shown: it can't be read per process."),
@@ -69,7 +70,7 @@ export function daemonPage(ctx) {
       idle.length ? h("section", { class: "panel crew" }, idle.map((m) => h("div", { class: "crew-row off" },
         h("span", { class: "beat" }), h("div", { class: "who" }, h("div", { class: "mono n" }, `max serve · ${m.name}`), h("div", { class: "mono w" }, "idle")),
         h("span"), h("span"), h("span"), h("span", { class: "act" }, act("Load", "play", () => loadModel(m.name).then(load)))))) : null,
-      h("div", { class: "cli-note mono" }, h("span", {}, "$ mxc ps"), h("span", {}, "$ mxc stop --all"), d && d.pid ? h("span", {}, `daemon pid ${d.pid}`) : null));
+      h("div", { class: "cli-note mono" }, h("span", {}, "$ mxc ps"), h("span", {}, "$ mxc stop --all"), d && d.pid ? h("span", {}, `daemon pid ${d.pid}`) : null)].filter(Boolean));
   }
   async function load() {
     try { data = await api("GET", "/admin/system"); failed = null; } catch (e) { failed = e.message; }
