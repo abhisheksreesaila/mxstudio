@@ -215,8 +215,11 @@ def keys_revoke(app_name: str = typer.Argument(..., metavar="APP")) -> None:
 def pull(ref: str = typer.Argument(..., help="Short name (qwen2.5-0.5b) or Hugging Face repo id"),
          dry_run: bool = typer.Option(False, "--dry-run", help="Only resolve; download nothing"),
          name: str = typer.Option(None, "--name", help="Register under this name"),
-         port_dir: Path = typer.Option(None, "--port", help="Register a finished port (from `mxc port`) instead")) -> None:
-    """Resolve a model, download it at a pinned revision and register it."""
+         port_dir: Path = typer.Option(None, "--port", help="Register a finished port (from `mxc port`) instead"),
+         as_json: bool = typer.Option(False, "--json", help="One JSON object per progress event, for scripts and agents.")) -> None:
+    """Resolve a model, download it at a pinned revision (with live progress) and register it.
+
+    Runs in the daemon when it is up, so the console's Pull page shows it too; Ctrl-C cancels (exit 130)."""
     if port_dir is not None:
         from mxconsole import port
         try:
@@ -234,12 +237,16 @@ def pull(ref: str = typer.Argument(..., help="Short name (qwen2.5-0.5b) or Huggi
                 _fail(f"{res.kind}: {res.message}")
             typer.echo(f"{res.kind}: {res.message}")
             return
-        model = resolve.pull(ref, name=name)
     except resolve.PullError as e:
         _fail(e.resolution.message)
     except resolve.ResolveError as e:
         _fail(str(e))
-    typer.echo(f"pulled {model.name} ({model.repo_id}@{model.revision[:8]}, {model.source})")
+    from mxconsole import pull_cli
+    code, text = pull_cli.run(ref, name, as_json)
+    if text:
+        typer.echo(text, err=code != 0)
+    if code:
+        raise typer.Exit(code)
 
 
 @app.command("port")
