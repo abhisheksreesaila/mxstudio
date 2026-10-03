@@ -83,7 +83,10 @@ function buildTopbar() {
     e.preventDefault();
     toggleMenu();
   });
-  window.matchMedia("(max-width: 900px)").addEventListener("change", drawMenuToggle);
+  window.matchMedia("(max-width: 900px)").addEventListener("change", (e) => {
+    if (!e.matches) { $("menu").classList.remove("open"); $("menu-scrim").hidden = true; } // widened: no slide-over left behind
+    drawMenuToggle();
+  });
   $("topbar").replaceChildren(
     menuBtn,
     h("a", { class: "brand", href: "#overview", "aria-label": "mxconsole, home" }, brandMark(26),
