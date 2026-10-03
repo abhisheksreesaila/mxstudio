@@ -92,10 +92,10 @@ Brief: docs/brief.md · Design: docs/design/console.md (gauges from option B) ·
 - [x] Overview shows essentials (endpoints, MAX version, GPUs, daemon uptime, active keys) and gauges for decode tok/s, TTFT p50, GPU memory, requests/min
 - [x] Recent requests: the last 10 on Overview, the last 200 on Activity log
 
-## F-014 API keys and Network pages [todo] (folded into F-016)
+## F-014 API keys and Network pages [done] (folded into F-016)
 Brief: docs/brief.md · Design: docs/design/console.md · Needs: F-012
-- [ ] API keys grid (app, prefix, created, last used, status); New key shows the key once in the blade; Revoke with confirmation
-- [ ] Network page shows expose status, LAN URL, the CA path, and Expose/Stop buttons
+- [x] API keys grid (app, prefix, created, last used, status); New key shows the key once in the blade; Revoke with confirmation
+- [x] Network page shows expose status, LAN URL, the CA path, and Expose/Stop buttons
 
 ## F-015 Command-line parity for agents [done]
 Brief: docs/brief.md · Needs: F-013
@@ -105,17 +105,17 @@ Brief: docs/brief.md · Needs: F-013
 - [x] `mst console [page]` opens the console; `mst serve`, `mst ls` and `mst status` print the matching console link
 - [x] `mst status`: daemon, endpoints, models, keys, expose, in one screen
 
-## F-016 Hotfire Mission Control in Graphite [todo]
+## F-016 Hotfire Mission Control in Graphite [done]
 Brief: docs/brief.md · Design: design-system/DESIGN-SYSTEM.md (Graphite) + canvas pages "Graphite · base" and "Graphite · personality" · Needs: F-017
-- [ ] shell: top bar, coloured menu (section hues), status bar, ⌘K palette whose rows run the same actions as the CLI and show the command; themes contrast (default) / light / dark, remembered per browser
-- [ ] Geist + Geist Mono and Lucide icons ship with Hotfire (no CDN); CSP stays `default-src 'self'`
-- [ ] Overview: live strip (a trace per running model), number strip, live tiles (models cycling, activity ticker, network packets, fastest model, gateway, pulling)
-- [ ] Models: table with mini traces + side sheet (trace, keep-loaded, idle timeout, logs, CLI twin); replaces the F-012 grid and blade
-- [ ] Metrics: number blocks, "what you should care about" (rules over the request metrics, no model needed), charts per model
-- [ ] API reference page in the console skin replaces /docs (Scalar)
-- [ ] API keys and Network pages: keys table with new/revoke; the patch-bay diagram from real expose and port data
-- [ ] motion per the design system, all off under prefers-reduced-motion; page transitions between menu pages
-- [ ] later tickets, not this one: Pull page (needs pull progress from the daemon), Benchmarks race (needs `hotfire bench`), Gateway safeguards counters, Ask Hotfire chat
+- [x] shell: top bar, coloured menu (section hues), status bar, ⌘K palette whose rows run the same actions as the CLI and show the command; themes contrast (default) / light / dark, remembered per browser
+- [x] Geist + Geist Mono and Lucide icons ship with Hotfire (no CDN); CSP stays `default-src 'self'`
+- [x] Overview: live strip (a trace per running model), number strip, live tiles (models cycling, activity ticker, network packets, fastest model, gateway, pulling)
+- [x] Models: table with mini traces + side sheet (trace, keep-loaded, idle timeout, logs, CLI twin); replaces the F-012 grid and blade
+- [x] Metrics: number blocks, "what you should care about" (rules over the request metrics, no model needed), charts per model
+- [x] API reference page in the console skin replaces /docs (Scalar)
+- [x] API keys and Network pages: keys table with new/revoke; the patch-bay diagram from real expose and port data
+- [x] motion per the design system, all off under prefers-reduced-motion; page transitions between menu pages
+- later tickets, not this one: Pull page (needs pull progress from the daemon), Benchmarks race (needs `hotfire bench`), Gateway safeguards counters, Ask Hotfire chat
 ## F-017 Rename to Hotfire [done]
 Brief: docs/brief.md · ADR: docs/adr/0002-name-hotfire.md · Needs: none
 - [x] Python package `mst/` becomes `hotfire/`; PyPI/project name `hotfire`; commands `hotfire` and `mst` (alias, one release)

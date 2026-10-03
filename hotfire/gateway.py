@@ -437,6 +437,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             if ok:  # the cap is always enforced: missing is filled in, too large is clamped, the newer alias is dropped
                 body["max_tokens"] = min(body.get("max_tokens", TRY_MAX_TOKENS), TRY_MAX_TOKENS)
                 body.pop("max_completion_tokens", None)
+                body["n"] = 1  # one completion per try, so the cap really bounds the work
                 raw = json.dumps(body).encode()
         except ValueError:
             ok = False
