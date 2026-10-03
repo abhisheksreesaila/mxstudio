@@ -52,7 +52,7 @@ pixi run mxc ls                              # registered models + live state (c
 pixi run mxc stop qwen2.5-0.5b               # unload one now
 pixi run mxc stop --all                      # unload everything, stop the daemon
 
-pixi run mxc pull <name-or-hf-repo> [--dry-run] [--name N]   # resolve + download only
+pixi run mxc pull <name-or-hf-repo> [--dry-run] [--name N] [--json]   # resolve + download, live progress bar (Ctrl-C cancels, exit 130); --json = one event per line
 pixi run mxc keys new my-app | ls | revoke my-app            # one key per app (printed once)
 pixi run mxc learn qwen2.5-0.5b [--no-open]                  # notebook → Jupyter Lab
 pixi run mxc expose [--host box.local] [--no-litellm] | --stop

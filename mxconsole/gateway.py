@@ -16,7 +16,7 @@ from fasthtml.common import FastHTML
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
-from mxconsole import admin_bench, admin_system, expose, insights, keys, metrics, system
+from mxconsole import admin_bench, admin_pull, admin_system, expose, insights, keys, metrics, system
 from mxconsole.settings import DAEMON_PORT
 from mxconsole.store import Store, mxc_home
 from mxconsole.supervisor import StartFailed, Supervisor, UnknownModel
@@ -32,7 +32,7 @@ CONSOLE_FONTS = {"geist-variable.woff2", "geist-mono-variable.woff2"}
 CONSOLE_SCRIPTS = {"page-bench.js", "theme.js", "main.js", "core.js", "icons.js", "charts.js", "shell.js", "palette.js", "actions.js",
                    "page-overview.js", "page-models.js", "page-metrics.js", "page-api.js", "page-keys.js",
                    "page-network.js", "page-activity.js", "page-ports.js", "page-logs.js", "page-gateway.js",
-                   "page-daemon.js"}
+                   "page-daemon.js", "page-pull.js"}
 CONSOLE_ASSETS = {"console.css"} | CONSOLE_SCRIPTS | CONSOLE_FONTS
 LOG_TAIL_BYTES = 8000
 TRY_MAX_TOKENS = 1024  # the API page's "Try it" is for a quick look, not for load
@@ -176,6 +176,8 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         origin = request.headers.get("origin")
         origin_ok = origin is None or origin.split("://", 1)[-1].rsplit(":", 1)[0].strip("[]") in LOOPBACK
         return loopback_only(request) and request.headers.get(ADMIN_HEADER) == "1" and origin_ok
+
+    admin_pull.register(app, store, supervisor, admin_only)  # /admin/pulls: background pulls with progress
 
     @app.get("/health")
     def health():

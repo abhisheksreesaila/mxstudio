@@ -1,3 +1,4 @@
+import pytest
 from fakes import CATALOG, make_hf
 from typer.testing import CliRunner
 
@@ -5,6 +6,11 @@ from mxconsole import cli
 from mxconsole.store import Store
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def no_daemon(monkeypatch):
+    monkeypatch.setenv("MXC_PORT", "1")  # nothing listens: pulls run in this process
 
 
 def _patch(monkeypatch, hf):
