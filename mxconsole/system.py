@@ -5,9 +5,11 @@ One data source for `mxc ps` and the console's System pages. Everything is read 
 not readable from /proc, so it is never reported."""
 from __future__ import annotations
 
-import fcntl
 import os
+import shlex
+import threading
 import time
+import urllib.request
 from datetime import date
 from pathlib import Path
 
@@ -30,15 +32,18 @@ class Counters:
 
     def __init__(self, today=date.today):
         self._today, self._day, self._n = today, None, {}
+        self._lock = threading.Lock()  # bump() runs on request threads as well as the event loop
         self.since = time.time()
 
     def bump(self, name: str) -> None:
-        self._roll()
-        self._n[name] = self._n.get(name, 0) + 1
+        with self._lock:
+            self._roll()
+            self._n[name] = self._n.get(name, 0) + 1
 
     def get(self, name: str) -> int:
-        self._roll()
-        return self._n.get(name, 0)
+        with self._lock:
+            self._roll()
+            return self._n.get(name, 0)
 
     def _roll(self) -> None:
         day = self._today()
@@ -86,20 +91,53 @@ def _port_from(cmd: list[str]) -> int | None:
 
 
 # -- pid files -----------------------------------------------------------------------------------
-def daemon_pid() -> int | None:
-    """The pid the daemon wrote into run/daemon.lock, only while a daemon really holds that lock."""
-    path = mxc_home() / "run" / "daemon.lock"
+def start_time(pid: int, proc_root: str | Path = "/proc") -> str | None:
+    """Kernel start time of a live (non-zombie) process; tells a process from a reused pid."""
     try:
-        pid = int(path.read_text().strip())
-        with open(path, "a+") as probe:
-            try:
-                fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                return pid  # held: the daemon is alive
-            fcntl.flock(probe, fcntl.LOCK_UN)
+        fields = (Path(proc_root) / str(pid) / "stat").read_text().rsplit(")", 1)[1].split()
+        return None if fields[0] == "Z" else fields[19]
+    except (OSError, IndexError):
+        return None
+
+
+def _is_daemon_cmd(cmd: list[str]) -> bool:
+    return any(cmd[i:i + 3] == ["-m", "mxconsole", "daemon"] for i in range(len(cmd))) or (
+        len(cmd) >= 2 and os.path.basename(cmd[0]) == "mxc" and cmd[1] == "daemon") or (
+        len(cmd) >= 3 and os.path.basename(cmd[1]) == "mxc" and cmd[2] == "daemon")
+
+
+def daemon_pid(proc_root: str | Path = "/proc") -> int | None:
+    """The daemon's pid from run/daemon.lock ("pid starttime"), only while that process is really it.
+    Never takes the lock: a daemon that is starting up must not fail because `mxc ps` looked."""
+    try:
+        parts = (mxc_home() / "run" / "daemon.lock").read_text().split()
+        pid = int(parts[0])
+    except (OSError, ValueError, IndexError):
+        return None
+    if len(parts) > 1:
+        return pid if start_time(pid, proc_root) == parts[1] else None
+    # Written by a daemon older than start times: the command line has to say it is a daemon.
+    return pid if proc_stats(pid, proc_root) and _is_daemon_cmd(_cmdline(pid, proc_root)) else None
+
+
+def daemon_answers() -> bool:
+    """Does something answer /health on the daemon's port? Used when the lock file has no pid."""
+    try:
+        with urllib.request.urlopen(f"http://{DAEMON_HOST}:{daemon_port()}/health", timeout=0.5) as r:
+            return r.status == 200
     except (OSError, ValueError):
-        pass
-    return None
+        return False
+
+
+def _is_max_serve(cmd: list[str]) -> bool:
+    """The configured max command followed by `serve`, as the supervisor spawns it (also when an
+    interpreter comes first, as in `python /env/bin/max serve`)."""
+    want = shlex.split(env("MAX_CMD", "max")) + ["serve"]
+    for i in range(len(cmd) - len(want) + 1):
+        head = cmd[i:i + len(want)]
+        if os.path.basename(head[0]) == os.path.basename(want[0]) and head[1:] == want[1:]:
+            return True
+    return False
 
 
 def _model_children(proc_root) -> list[dict]:
@@ -112,24 +150,26 @@ def _model_children(proc_root) -> list[dict]:
         except ValueError:
             continue
         cmd = _cmdline(pid, proc_root)
-        if "serve" in cmd and proc_stats(pid, proc_root) is not None:
+        if _is_max_serve(cmd) and proc_stats(pid, proc_root) is not None:
             out.append({"name": name, "pid": pid, "port": _port_from(cmd), "state": "running"})
     return out
 
 
 # -- the crew ------------------------------------------------------------------------------------
 def collect(rows: list[dict] | None = None, *, proc_root: str | Path = "/proc", daemon: int | None = None,
-            expose_pids: dict[str, int | None] | None = None) -> list[dict]:
+            expose_pids: dict[str, int | None] | None = None, health=None) -> list[dict]:
     """Every background process MX Console owns. `rows` is the supervisor's status (inside the daemon);
-    without it the models come from pid files and /proc, so `mxc ps` works with the daemon down."""
-    daemon = daemon if daemon is not None else daemon_pid()
+    without it the models come from pid files and /proc, so `mxc ps` works with the daemon down.
+    `health()` says whether a daemon with no readable pid (started before pids were recorded) answers."""
+    daemon = daemon if daemon is not None else daemon_pid(proc_root)
     pids = expose_pids if expose_pids is not None else {n: expose._running_pid(n) for n in expose.PROCESSES}
     ports = {"daemon": daemon_port(), "caddy": EXPOSE_PORT, "litellm": LITELLM_PORT}
     crew = []
     for kind, label, pid in (("daemon", "MX Console daemon", daemon), ("caddy", "Caddy", pids.get("caddy")),
                              ("litellm", "LiteLLM", pids.get("litellm"))):
         stats = proc_stats(pid, proc_root) if pid else None
-        crew.append({"id": kind, "kind": kind, "name": label, "state": "running" if stats else "stopped",
+        unknown = kind == "daemon" and not stats and health is not None and health()
+        crew.append({"id": kind, "kind": kind, "name": label, "state": "running" if stats or unknown else "stopped",
                      "pid": pid if stats else None, "port": ports[kind],
                      "rss_mb": stats and stats["rss_mb"], "uptime_seconds": stats and stats["uptime_seconds"]})
     if rows is None:

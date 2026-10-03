@@ -183,8 +183,10 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
 
     @app.get("/auth/check")
     def auth_check(request: Request):
+        started = time.monotonic()
         name = authenticate(request)
         if name is None:
+            note(None, None, "auth_check", 401, started)  # a LAN client Caddy turned away, counted with the rest
             return Response(status_code=401)
         return Response(status_code=200, headers={"X-Mst-App": name})
 

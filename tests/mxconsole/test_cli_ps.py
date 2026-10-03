@@ -13,6 +13,7 @@ runner = CliRunner()
 
 def test_ps_without_the_daemon_shows_what_pid_files_know(mxc_home, monkeypatch):
     monkeypatch.setenv("MXC_PORT", "1")
+    monkeypatch.setenv("MXC_MAX_CMD", f"{sys.executable} -c 'import time; time.sleep(30)'")
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)", "serve", "--port", "6001"])
     try:
         (mxc_home / "run").mkdir(parents=True)
@@ -42,3 +43,13 @@ def test_ps_json_is_only_json(mxc_home, monkeypatch):
     monkeypatch.setenv("MXC_PORT", "1")
     out = runner.invoke(app, ["ps", "--json"]).output
     assert [c["id"] for c in json.loads(out)] == ["daemon", "caddy", "litellm"]
+
+
+def test_ps_never_takes_the_daemon_lock(mxc_home, monkeypatch):
+    import fcntl
+    monkeypatch.setenv("MXC_PORT", "1")
+    (mxc_home / "run").mkdir(parents=True)
+    with open(mxc_home / "run" / "daemon.lock", "a+") as starting:  # a daemon taking the lock right now
+        fcntl.flock(starting, fcntl.LOCK_EX)
+        assert runner.invoke(app, ["ps", "--json"]).exit_code == 0
+        fcntl.flock(starting, fcntl.LOCK_EX | fcntl.LOCK_NB)  # still ours: ps neither released nor stole it

@@ -41,12 +41,14 @@ async def test_gateway_counts_what_the_daemon_can_know(http, store, key):
     keys.revoke_key(store, "second")
     await http.get("/v1/models")  # 401
     await http.get("/v1/models", headers=auth("mst-nope"))  # 401
+    await http.get("/auth/check", headers=auth("mst-nope"))  # 401: what Caddy's forward_auth sends
+    assert (await http.get("/auth/check", headers=auth(key))).status_code == 200  # a good key is not counted
     rec(store, ts=time.time() - 3 * 86400, status=401)  # not today
     await http.get("/v1/nothing", headers=auth(key))
     await http.post("/v1/images", headers=auth(key))
     await http.get("/admin/keys")  # refused: no admin header
     g = (await http.get("/admin/gateway", headers=ADMIN)).json()
-    assert g["unauthorized_today"] == 2 and g["unknown_routes_today"] == 2
+    assert g["unauthorized_today"] == 3 and g["unknown_routes_today"] == 2
     assert g["admin_refused_today"] == 1
     assert g["keys"] == {"active": 1, "revoked": 1}
     assert g["tls"] == {"on": False, "endpoint": None}
@@ -92,3 +94,25 @@ async def test_litellm_restart_refreshes_only_when_it_runs(http, monkeypatch):
     monkeypatch.setattr(expose, "refresh_if_running", boom)
     r = await http.post("/admin/litellm/restart", headers=ADMIN)
     assert r.status_code == 500 and "litellm exited" in r.json()["error"]["message"]
+
+
+async def test_litellm_restart_refuses_a_second_one_while_one_runs(http, monkeypatch):
+    import asyncio
+    import threading
+    started, release = threading.Event(), threading.Event()
+
+    def slow(store=None):
+        started.set()
+        release.wait(5)
+        return True
+    monkeypatch.setattr(expose, "refresh_if_running", slow)
+    first = asyncio.create_task(http.post("/admin/litellm/restart", headers=ADMIN))
+    for _ in range(100):
+        if started.is_set():
+            break
+        await asyncio.sleep(0.02)
+    second = await http.post("/admin/litellm/restart", headers=ADMIN)
+    assert second.status_code == 409 and "a restart is already running" in second.json()["error"]["message"]
+    release.set()
+    assert (await first).json() == {"restarted": True}
+    assert (await http.post("/admin/litellm/restart", headers=ADMIN)).status_code == 200  # lock released

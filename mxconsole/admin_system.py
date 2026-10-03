@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import threading
 import time
 
 from starlette.requests import Request
@@ -62,14 +63,20 @@ def register(app, store: Store, supervisor: Supervisor, admin_only, *, counters:
     for source in ("daemon", "caddy", "litellm"):
         app.get(f"/admin/{source}/log")(log_route(source))
 
+    restart_lock = threading.Lock()
+
     @app.post("/admin/litellm/restart")
     async def admin_litellm_restart(request: Request):
         if not admin_only(request):
             return refused()
+        if not restart_lock.acquire(blocking=False):
+            return error(409, "a restart is already running", "restart_in_progress")
         try:
             restarted = await asyncio.to_thread(expose.refresh_if_running, store)
         except expose.ExposeError as e:
             return error(500, str(e), "expose_failed", "server_error")
+        finally:
+            restart_lock.release()
         if not restarted:
             return error(409, "LiteLLM isn't running. Start it with `mxc expose`.", "litellm_not_running")
         return JSONResponse({"restarted": True})
