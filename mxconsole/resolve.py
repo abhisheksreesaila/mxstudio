@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +17,8 @@ from typing import Callable
 import httpx
 
 from mxconsole.store import Model, Store, mxc_home
+
+DOWNLOAD_WORKERS = 4  # files fetched at once, like snapshot_download
 
 # Short names -> HF repo ids. Each architecture here is in MAX's catalog.
 CURATED = {
@@ -173,6 +176,9 @@ class HubClient:
             raise ResolveError(f"download of {repo_id} failed ({type(e).__name__}); retry to resume") from e
 
     def _download_files(self, repo_id, revision, patterns, progress, cancel) -> str:
+        """Files download in parallel (a small pool, like snapshot_download); every file keeps its own
+        progress, and a cancel or a failure in one stops the rest at their next chunk."""
+        from concurrent.futures import ThreadPoolExecutor
         from huggingface_hub import hf_hub_download
         if progress is not None:
             try:  # sizes first, so the bar knows the total before the first byte arrives
@@ -181,17 +187,46 @@ class HubClient:
                         progress(info.path, 0, info.size)
             except Exception:  # sizes are a nicety; the download itself reports totals as it goes
                 pass
-        snapshot = None
-        for filename in patterns:
-            if cancel is not None and cancel.is_set():
+        stop = threading.Event()  # set when any file fails, so its siblings stop too
+        halt = _AnyOf(stop, cancel)
+
+        def fetch(filename: str) -> Path:
+            if halt.is_set():
                 raise PullCancelled()
             path = hf_hub_download(repo_id, filename, revision=revision, token=self.token,
-                                   tqdm_class=progress_bar(filename, progress, cancel))
-            snapshot = Path(path).parents[len(Path(filename).parts) - 1]
+                                   tqdm_class=progress_bar(filename, progress, halt))
             if progress is not None:
                 size = Path(path).stat().st_size
                 progress(filename, size, size)
-        return str(snapshot)
+            return Path(path)
+
+        paths: list[Path] = []
+        error: BaseException | None = None
+        with ThreadPoolExecutor(max_workers=min(DOWNLOAD_WORKERS, max(1, len(patterns))), thread_name_prefix="hf-dl") as pool:
+            futures = [pool.submit(fetch, f) for f in patterns]
+            for fut in futures:
+                try:
+                    paths.append(fut.result())
+                except BaseException as e:  # keep the first real error; siblings that only stopped are noise
+                    if error is None or (isinstance(error, PullCancelled) and not isinstance(e, PullCancelled)):
+                        error = e
+                    stop.set()
+        if error is not None:
+            if cancel is not None and cancel.is_set():
+                raise PullCancelled()
+            raise error
+        first = paths[0]
+        return str(first.parents[len(Path(patterns[0]).parts) - 1])
+
+
+class _AnyOf:
+    """is_set() is true when any of the events is set."""
+
+    def __init__(self, *events):
+        self.events = [e for e in events if e is not None]
+
+    def is_set(self) -> bool:
+        return any(e.is_set() for e in self.events)
 
 
 def progress_bar(filename: str, progress, cancel):
@@ -200,9 +235,16 @@ def progress_bar(filename: str, progress, cancel):
 
     class Bar(hf_tqdm):
         def __init__(self, *args, **kwargs):
-            kwargs["file"] = open(os.devnull, "w")
+            self._sink = open(os.devnull, "w")  # tqdm must print nothing; closed with the bar
+            kwargs["file"] = self._sink
             super().__init__(*args, **kwargs)
             self._report()
+
+        def close(self):
+            try:
+                super().close()
+            finally:
+                self._sink.close()
 
         def _report(self):
             if progress is not None and self.total:

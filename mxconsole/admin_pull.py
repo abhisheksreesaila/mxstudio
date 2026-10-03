@@ -20,25 +20,34 @@ from mxconsole.pulls import BadPull, PullBusy, PullManager
 log = logging.getLogger("mxconsole.admin_pull")
 
 # TEST-ONLY hook, so a scratch daemon can pull from a fake Hugging Face (no network, no real model).
-# It is off unless MXC_FAKE_HUB is the absolute path of an existing file called exactly `fake_hub.py`
-# (tests/mxconsole/fake_hub.py), which must define `make_hub()` and `CATALOG`. Any other value is
-# ignored, and a log warning says so, so it cannot be switched on by a stray or misspelled variable.
+# It is off unless MXC_FAKE_HUB is exactly the `tests/mxconsole/fake_hub.py` of this source checkout
+# (an installed package has no tests directory, so the hook cannot exist there). Any other value is
+# ignored with a warning, so a stray or misspelled variable cannot switch it on.
 FAKE_HUB_ENV = "MXC_FAKE_HUB"
-FAKE_HUB_FILE = "fake_hub.py"
+MAX_BODY = 4096  # bytes accepted by POST /admin/pulls
+
+
+def fake_hub_path() -> Path:
+    import mxconsole
+    return Path(mxconsole.__file__).resolve().parents[1] / "tests" / "mxconsole" / "fake_hub.py"
 
 
 def _fake_hub():
     value = os.environ.get(FAKE_HUB_ENV)
     if not value:
         return None
-    path = Path(value)
-    if not (path.is_absolute() and path.name == FAKE_HUB_FILE and path.is_file()):
-        log.warning("%s is set but is not the absolute path of a %s: ignoring it", FAKE_HUB_ENV, FAKE_HUB_FILE)
+    pinned = fake_hub_path()
+    try:
+        same = Path(value).is_absolute() and Path(value).resolve() == pinned
+    except (OSError, ValueError):
+        same = False
+    if not (same and pinned.is_file()):
+        log.warning("%s is set but is not %s: ignoring it", FAKE_HUB_ENV, pinned)
         return None
-    spec = importlib.util.spec_from_file_location("mxc_fake_hub", path)
+    spec = importlib.util.spec_from_file_location("mxc_fake_hub", pinned)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    log.warning("PULLS USE A FAKE HUGGING FACE (%s=%s): test mode, nothing real is downloaded", FAKE_HUB_ENV, path)
+    log.warning("PULLS USE A FAKE HUGGING FACE (%s=%s): test mode, nothing real is downloaded", FAKE_HUB_ENV, pinned)
     return module
 
 
@@ -60,14 +69,22 @@ def register(app, store, supervisor, admin_only, *, manager: PullManager | None 
     def pulls_list(request: Request):
         if not admin_only(request):
             return refused()
-        return JSONResponse({"pulls": manager.list(), "curated": resolve.CURATED})
+        return JSONResponse({"pulls": manager.list(), "curated": resolve.CURATED, **({"fake_hub": True} if fake else {})})
 
     @app.post("/admin/pulls")
     async def pulls_start(request: Request):
         if not admin_only(request):
             return refused()
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > MAX_BODY:
+            return _error(413, "That request is too large for a pull.", "request_too_large")
+        raw = b""
+        async for chunk in request.stream():  # never buffer more than the limit, whatever the header says
+            raw += chunk
+            if len(raw) > MAX_BODY:
+                return _error(413, "That request is too large for a pull.", "request_too_large")
         try:
-            body = json.loads(await request.body())
+            body = json.loads(raw)
         except ValueError:
             body = None
         name = body.get("name") if isinstance(body, dict) else None

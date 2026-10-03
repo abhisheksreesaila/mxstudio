@@ -1,5 +1,6 @@
 """The pull job lifecycle, against a fake Hugging Face that downloads small files slowly."""
 import threading
+from pathlib import Path
 import time
 
 import pytest
@@ -204,3 +205,103 @@ def test_progress_bar_class_reports_bytes_and_cancels():
     with pytest.raises(resolve.PullCancelled):
         bar.update(1)
     bar.close()
+
+
+# -- the real download path, with huggingface_hub's hf_hub_download stubbed ------------------------------------
+
+def _client():
+    """A HubClient with no network: file sizes unknown, hf_hub_download replaced by the caller."""
+    client = resolve.HubClient(token="x")
+    client.api = type("Api", (), {"get_paths_info": staticmethod(lambda *a, **kw: [])})()
+    return client
+
+
+def test_a_cancel_mid_file_propagates_and_the_retry_finishes_the_file(monkeypatch, tmp_path):
+    """Partial bytes stay on disk; the retry resumes from them (as hf_hub_download does with .incomplete files)."""
+    cache = tmp_path / "snap"
+    cache.mkdir()
+    calls = []
+
+    def fake_download(repo_id, filename, revision=None, token=None, tqdm_class=None):
+        part = cache / (filename + ".incomplete")
+        have = part.stat().st_size if part.exists() else 0
+        calls.append((filename, have))
+        bar = tqdm_class(total=100, initial=have, unit="B", name="huggingface_hub.http_get")
+        with bar, open(part, "ab") as out:
+            while have < 100:
+                out.write(b"x" * 20)
+                have += 20
+                bar.update(20)  # raises PullCancelled when the cancel event is set
+        part.rename(cache / filename)
+        return str(cache / filename)
+
+    monkeypatch.setattr("huggingface_hub.hf_hub_download", fake_download)
+    client, cancel = _client(), threading.Event()
+
+    def progress(f, d, t):
+        if d >= 40:
+            cancel.set()
+
+    with pytest.raises(resolve.PullCancelled):
+        client.download("o/r", "abc", ["model.safetensors"], progress=progress, cancel=cancel)
+    part = cache / "model.safetensors.incomplete"
+    assert 40 <= part.stat().st_size < 100 and not (cache / "model.safetensors").exists()
+
+    path = client.download("o/r", "abc", ["model.safetensors"], progress=lambda *a: None, cancel=threading.Event())
+    assert (cache / "model.safetensors").stat().st_size == 100 and Path(path) == cache
+    assert calls[1][1] >= 40  # the retry started from the partial file, not from zero
+
+
+def test_files_download_in_parallel_with_per_file_progress(monkeypatch, tmp_path):
+    inflight, peak, lock, release = [0], [0], threading.Lock(), threading.Event()
+
+    def fake_download(repo_id, filename, revision=None, token=None, tqdm_class=None):
+        with lock:
+            inflight[0] += 1
+            peak[0] = max(peak[0], inflight[0])
+            if inflight[0] >= 4:
+                release.set()
+        release.wait(5)  # all four must be in flight together for the test to pass
+        bar = tqdm_class(total=10, initial=0, unit="B", name="huggingface_hub.http_get")
+        bar.update(10)
+        bar.close()
+        with lock:
+            inflight[0] -= 1
+        p = tmp_path / filename
+        p.write_bytes(b"x" * 10)
+        return str(p)
+
+    monkeypatch.setattr("huggingface_hub.hf_hub_download", fake_download)
+    seen = {}
+    _client().download("o/r", "abc", [f"f{i}.bin" for i in range(6)],
+                       progress=lambda f, d, t: seen.__setitem__(f, (d, t)), cancel=threading.Event())
+    assert peak[0] == resolve.DOWNLOAD_WORKERS == 4
+    assert seen == {f"f{i}.bin": (10, 10) for i in range(6)}
+
+
+def test_a_cancel_stops_the_other_files_too(monkeypatch, tmp_path):
+    started = []
+
+    def fake_download(repo_id, filename, revision=None, token=None, tqdm_class=None):
+        started.append(filename)
+        bar = tqdm_class(total=100, initial=0, unit="B", name="huggingface_hub.http_get")
+        for _ in range(100):
+            bar.update(1)
+            time.sleep(0.005)
+        return str(tmp_path / filename)
+
+    monkeypatch.setattr("huggingface_hub.hf_hub_download", fake_download)
+    cancel = threading.Event()
+    threading.Timer(0.05, cancel.set).start()
+    with pytest.raises(resolve.PullCancelled):
+        _client().download("o/r", "abc", [f"f{i}" for i in range(12)], progress=lambda *a: None, cancel=cancel)
+    assert len(started) < 12  # queued files never started
+
+
+def test_the_progress_bar_closes_its_devnull_sink():
+    Bar = resolve.progress_bar("f", lambda *a: None, None)
+    bar = Bar(total=10, unit="B", name="huggingface_hub.http_get")
+    sink = bar._sink
+    assert not sink.closed
+    bar.close()
+    assert sink.closed

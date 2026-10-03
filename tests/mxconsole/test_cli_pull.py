@@ -9,8 +9,8 @@ runner = CliRunner()
 
 
 @pytest.fixture(autouse=True)
-def no_daemon(monkeypatch):
-    monkeypatch.setenv("MXC_PORT", "1")  # nothing listens: pulls run in this process
+def daemon(inproc_daemon):
+    return inproc_daemon  # pulls go through the daemon
 
 
 def _patch(monkeypatch, hf):
