@@ -144,13 +144,13 @@ Brief: docs/brief.md · Design: canvas P5 · Needs: F-018
 - [ ] honest labels: which models, workload, when; nothing shown before the first run
 - [ ] tested with the fake max (it streams at a fixed rate)
 
-## F-021 System pages: Ports, Logs, Gateway, Daemon [todo]
+## F-021 System pages: Ports, Logs, Gateway, Daemon [done]
 Brief: docs/brief.md · Design: canvas P6 + DESIGN-SYSTEM.md · Needs: F-018
-- [ ] Ports: every model's loopback port, the daemon, LiteLLM and Caddy ports, with state
-- [ ] Logs: a table of the CLI commands people need (copy buttons), plus a log viewer for the daemon and each model (tail, follow, filter)
-- [ ] Gateway: "what's protecting you": the six safeguards with real counters where the daemon can know them (401s, unknown routes, admin refusals) and "on" otherwise
-- [ ] Daemon: "the crew": daemon, Caddy, LiteLLM and each `max serve`, with pid, port, uptime and a heartbeat; restart/stop actions where safe
-- [ ] `mxc ps` prints the crew (with `--json`)
+- [x] Ports: every model's loopback port, the daemon, LiteLLM and Caddy ports, with state
+- [x] Logs: a table of the CLI commands people need (copy buttons), plus a log viewer for the daemon and each model (tail, follow, filter)
+- [x] Gateway: "what's protecting you": the six safeguards with real counters where the daemon can know them (401s, unknown routes, admin refusals) and "on" otherwise
+- [x] Daemon: "the crew": daemon, Caddy, LiteLLM and each `max serve`, with pid, port, uptime and a heartbeat; restart/stop actions where safe
+- [x] `mxc ps` prints the crew (with `--json`)
 
 ## F-022 SQLite safe under concurrent requests [done]
 Brief: docs/brief.md · Needs: F-019, F-020, F-021 merged
