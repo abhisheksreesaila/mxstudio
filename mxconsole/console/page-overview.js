@@ -1,5 +1,5 @@
 // Overview: the live strip (one trace per running model), the number strip and the live tiles.
-import { h, s, icon, api, store, fmt, tick, colorOf, HUE, reducedMotion, STATE_LABEL, lifecycle, copyButton } from "./core.js";
+import { h, s, icon, api, store, fmt, tick, colorOf, HUE, reducedMotion, STATE_LABEL, lifecycle, copyButton, appLabel } from "./core.js";
 import { traceSvg } from "./charts.js";
 import { openPalette } from "./palette.js";
 
@@ -198,7 +198,7 @@ export function overviewPage(ctx) {
       return;
     }
     const row = (r) => h("div", { class: "tick-row mono" },
-      h("span", { class: `code ${r.status < 400 ? "ok-text" : "bad-text"}` }, String(r.status)), h("span", {}, r.app || "no key"),
+      h("span", { class: `code ${r.status < 400 ? "ok-text" : "bad-text"}` }, String(r.status)), h("span", {}, appLabel(r.app)),
       h("span", { class: "to" }, `→ ${r.model || "—"}`), h("span", { class: "ms" }, `${fmt(r.duration_ms)} ms`));
     t.ticker.style.animation = "";
     t.ticker.style.setProperty("--dur", `${Math.max(10, rows.length * 1.6)}s`);

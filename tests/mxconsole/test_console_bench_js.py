@@ -41,8 +41,40 @@ def test_the_page_script_is_served_and_the_palette_offers_the_run():
     assert "benchPage" in (CONSOLE_DIR / "main.js").read_text()
 
 
-def test_sound_is_only_started_from_a_click():
+def run_node(body: str):
+    script = f"""
+      let made = 0;
+      globalThis.window = {{ AudioContext: class {{ constructor() {{ made++; }} get currentTime() {{ return 0; }}
+        createOscillator() {{ return {{ frequency: {{ setValueAtTime() {{}}, exponentialRampToValueAtTime() {{}}, value: 0 }}, connect() {{}}, start() {{}}, stop() {{}} }}; }}
+        createBiquadFilter() {{ return {{ frequency: {{}}, Q: {{}}, connect() {{}} }}; }}
+        createGain() {{ return {{ gain: {{ setValueAtTime() {{}}, exponentialRampToValueAtTime() {{}} }}, connect() {{}} }}; }}
+        get destination() {{ return {{}}; }} close() {{}} }} }};
+      const b = await import({json.dumps((CONSOLE_DIR / "page-bench.js").as_uri())});
+      {body}
+      console.log(JSON.stringify(made));
+    """
+    out = subprocess.run(["node", "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    return json.loads(out.stdout)
+
+
+def test_sound_only_makes_an_audio_context_for_the_click():
+    assert run_node("") == 0  # loading the page script builds no AudioContext
+    assert run_node("b.playIfClicked(false); b.playIfClicked(undefined); b.playIfClicked(null);") == 0  # the silent first view
+    assert run_node("b.playIfClicked(true);") == 1  # the click on "Race again"
     src = (CONSOLE_DIR / "page-bench.js").read_text()
-    assert src.count("vroom()") == 2  # its definition, and the one call inside race(), reached only from the button
-    assert "onRace(true)" in src and "race(false)" in src
-    assert "if (sound) vroom()" in src
+    assert "onRace(true)" in src and "race(false)" in src  # only the button passes true; the first view passes false
+
+
+def test_failed_models_and_estimates_are_labelled():
+    run = {"results": [{"status": "done"}, {"status": "failed"}, {"status": "failed"}], "status": "done"}
+    src = (CONSOLE_DIR / "page-bench.js").read_text()
+    assert "failed` : \"done\"" in src or "· ${failures(run)} failed" in src
+    assert "r.completion_estimated" in src and "r.prompt_estimated" in src and "no prefix cache" in src
+
+
+def test_internal_apps_get_a_friendly_label_on_activity_and_overview():
+    core = (CONSOLE_DIR / "core.js").read_text()
+    assert 'name === "_bench"' in core and "benchmark" in core and 'name === "console"' in core
+    for page in ("page-activity.js", "page-overview.js"):
+        assert "appLabel(r.app)" in (CONSOLE_DIR / page).read_text(), page

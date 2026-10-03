@@ -47,6 +47,15 @@ export const $ = (id) => document.getElementById(id);
 export const clear = (el) => el.replaceChildren();
 export { icon };
 
+/** An app name as shown in lists. Names starting with "_" or "console" are MX Console's own traffic: the
+ *  benchmark gets the gauge icon, muted. Both still count in the gauges, because the GPU really was busy. */
+export function appLabel(name) {
+  if (!name) return h("span", { class: "muted" }, "no key");
+  if (name === "_bench") return h("span", { class: "muted app-internal" }, icon("gauge", 13, "currentColor", 1.8), " benchmark");
+  if (name === "console") return h("span", { class: "muted app-internal" }, "console");
+  return name;
+}
+
 /** A hue chip: tinted square with a Lucide icon in the section's colour. */
 export function chip(name, hue, size = 24, iconSize = 15) {
   return h("span", { class: "hue-chip", style: { "--hue": hue, width: `${size}px`, height: `${size}px` } }, icon(name, iconSize, "currentColor", 1.8));

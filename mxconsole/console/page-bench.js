@@ -50,6 +50,11 @@ export function vroom() {
   setTimeout(() => ac.close(), 3600);
 }
 
+/** The sound gate: `sound` is true only for the click on "Race again"; the silent first view passes false. */
+export function playIfClicked(sound, play = vroom) {
+  if (sound === true) play();
+}
+
 // -- starting a run (the page button and the ⌘K palette both call this) -----------------------------
 export async function startBench() {
   try {
@@ -67,9 +72,9 @@ export async function startBench() {
 function car(color) {
   return s("svg", { viewBox: "0 0 120 50", width: CAR_W, height: 46, "aria-hidden": "true", class: "car-svg" },
     s("path", { d: "M 8 34 L 14 22 Q 18 16 30 15 L 58 13 Q 70 12 80 18 L 96 24 Q 110 26 112 32 L 112 36 L 8 36 Z", fill: color }),
-    s("path", { d: "M 36 17 L 56 15 Q 66 15 74 20 L 36 21 Z", fill: "#ffffff", opacity: "0.7" }),
-    s("circle", { cx: 30, cy: 37, r: 8, fill: "#18181b" }), s("circle", { cx: 30, cy: 37, r: 3, fill: "#a1a1aa" }),
-    s("circle", { cx: 92, cy: 37, r: 8, fill: "#18181b" }), s("circle", { cx: 92, cy: 37, r: 3, fill: "#a1a1aa" }));
+    s("path", { d: "M 36 17 L 56 15 Q 66 15 74 20 L 36 21 Z", class: "win" }),
+    s("circle", { cx: 30, cy: 37, r: 8, class: "tyre" }), s("circle", { cx: 30, cy: 37, r: 3, class: "hub" }),
+    s("circle", { cx: 92, cy: 37, r: 8, class: "tyre" }), s("circle", { cx: 92, cy: 37, r: 3, class: "hub" }));
 }
 
 function gauge(top, max, model) {
@@ -92,7 +97,7 @@ function racePanel(run, onRace) {
   const racers = placements(run.results);
   const failed = run.results.filter((r) => r.status === "failed");
   const done = run.results.find((r) => r.status === "done");
-  const tokens = done ? `${done.estimated ? "~" : ""}${fmt(done.prompt_tokens)}` : `~${fmt(run.prompt_tokens)}`;
+  const tokens = done ? `${done.prompt_estimated ? "~" : ""}${fmt(done.prompt_tokens)}` : `~${fmt(run.prompt_tokens)}`;
   const workload = `${tokens} in · ${run.max_tokens} out · batch 1 · ${run.runs} runs · ${dateTime(run.started_at)}`;
   const cars = [];
   const lanes = racers.map((r, i) => {
@@ -108,7 +113,7 @@ function racePanel(run, onRace) {
   const track = h("div", { class: "track" }, zoneProbe, lanes);
   const btn = h("button", { class: "btn race-btn", type: "button", onClick: () => onRace(true) }, icon("zap", 14, "currentColor"), "Race again", h("span", { class: "snd" }, " · with sound"));
   const node = h("section", { class: "race" },
-    h("div", { class: "race-head" }, icon("flag", 18, "#ffffff", 1.8), h("span", { class: "t" }, "Decode drag race"), h("span", { class: "mono w" }, workload), racers.length ? btn : null),
+    h("div", { class: "race-head" }, icon("flag", 18, "currentColor", 1.8), h("span", { class: "t" }, "Decode drag race"), h("span", { class: "mono w" }, workload), racers.length ? btn : null),
     racers.length ? track : h("div", { class: "race-none" }, "No model finished the run, so there is no race. The table below says why."),
     failed.length && racers.length ? h("div", { class: "dnf mono" }, "did not finish: ", failed.map((f) => `${f.model} (${f.error || "failed"})`).join(" · ")) : null);
   const top = racers.length ? racers[0].tps : 0;
@@ -118,27 +123,28 @@ function racePanel(run, onRace) {
 
 function resultsTable(run) {
   const dot = (n) => h("span", { class: "stat-dot", style: { "--c": colorOf(n), background: colorOf(n) } });
-  const est = run.results.some((r) => r.estimated);
+  const estPrompt = run.results.some((r) => r.prompt_estimated), estOut = run.results.some((r) => r.completion_estimated);
   const head = ["Model", "Decode", "Prefill", "TTFT p50", "TTFT p95", "Load", "Runs"];
-  const num = (v, d = 0, unit = "") => (v === null || v === undefined ? "—" : `${fmt(v, d)}${unit}`);
+  const num = (v, d = 0, unit = "", approx = false) => (v === null || v === undefined ? "—" : `${approx ? "~" : ""}${fmt(v, d)}${unit}`);
   const rows = run.results.map((r, i) => {
     const model = h("td", {}, h("span", { class: "who-cell" }, dot(r.model), h("span", { class: "mono" }, r.model), r.place ? h("span", { class: "place mono" }, ordinal(r.place)) : null));
     if (r.status === "failed") return h("tr", {}, model, h("td", { colspan: 6, class: "bad-text" }, r.error || "failed"));
     const strong = r.place === 1 ? "lead" : "";
     return h("tr", {}, model,
-      h("td", { class: `r num ${strong}` }, num(r.decode_tps, r.decode_tps < 100 ? 1 : 0)), h("td", { class: "r num" }, num(r.prefill_tps)),
+      h("td", { class: `r num ${strong}` }, num(r.decode_tps, r.decode_tps < 100 ? 1 : 0, "", r.completion_estimated)), h("td", { class: "r num" }, num(r.prefill_tps, 0, "", r.prompt_estimated)),
       h("td", { class: "r num" }, num(r.ttft_p50_ms, 0, " ms")), h("td", { class: "r num" }, num(r.ttft_p95_ms, 0, " ms")),
       h("td", { class: "r num" }, r.load_seconds === null ? h("span", { class: "muted" }, "warm") : `${fmt(r.load_seconds, 1)} s`),
       h("td", { class: "r num" }, `${r.runs_ok}/${r.runs_ok + r.errors}`));
   });
   return h("section", { class: "panel scroll-x bench-table" },
     h("table", { class: "grid" }, h("thead", {}, h("tr", {}, head.map((c, i) => h("th", { class: i ? "r" : "" }, i === 1 ? "Decode tok/s" : i === 2 ? "Prefill tok/s" : c)))), h("tbody", {}, rows)),
-    h("div", { class: "foot mono" }, `decode = (tokens − 1) ÷ (duration − first token), median of ${run.runs} runs · prefill = prompt tokens ÷ first token · load is the cold start, not in TTFT${est ? " · tokens counted from streamed chunks (~)" : ""}`));
+    h("div", { class: "foot mono" }, `decode = (tokens − 1) ÷ (duration − first token), median of ${run.runs} runs · prefill = prompt tokens ÷ first token · load is the cold start, not in TTFT · each run's prompt is unique, so no prefix cache${estOut ? " · ~ decode: tokens counted from streamed chunks" : ""}${estPrompt ? " · ~ prefill: prompt tokens estimated at 4 characters each" : ""}`));
 }
 
 function historyTable(rows, shownId, onPick) {
   const fastest = (run) => { const r = run.results.find((x) => x.status === "done"); return r ? `${r.model} · ${fmt(r.decode_tps, r.decode_tps < 100 ? 1 : 0)} tok/s` : "—"; };
-  const status = (run) => (run.status === "done" ? h("span", { class: "pill ok" }, "done") : run.status === "failed" ? h("span", { class: "pill bad" }, "all failed") : h("span", { class: "pill warn" }, run.status));
+  const failures = (run) => run.results.filter((x) => x.status === "failed").length;
+  const status = (run) => (run.status === "done" ? h("span", { class: "pill ok" }, failures(run) ? `done · ${failures(run)} failed` : "done") : run.status === "failed" ? h("span", { class: "pill bad" }, "all failed") : h("span", { class: "pill warn" }, run.status));
   return h("section", { class: "panel scroll-x", id: "bench-history" },
     h("table", { class: "grid" },
       h("thead", {}, h("tr", {}, ["When", "Models", "Workload", "Fastest", ""].map((c) => h("th", {}, c)))),
@@ -234,7 +240,7 @@ export function benchPage(ctx) {
     }
   }
   function race(sound) {
-    if (sound) vroom(); // sound only ever follows a click on "Race again"
+    playIfClicked(sound, vroom); // sound only ever follows a click on "Race again"
     place(true);
   }
 

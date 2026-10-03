@@ -1,5 +1,5 @@
 // Activity: the last 200 requests to /v1, and the "coming soon" panels for pages that don't have data yet.
-import { h, icon, api, store, fmt, clock, HUE, terminalBox } from "./core.js";
+import { h, icon, api, store, fmt, clock, HUE, terminalBox, appLabel } from "./core.js";
 
 export function activityPage(ctx) {
   const host = h("div", {});
@@ -19,7 +19,7 @@ export function activityPage(ctx) {
     const tokens = (r) => (r.completion_tokens === null ? "—" : `${fmt(r.prompt_tokens)} → ${r.estimated ? "~" : ""}${fmt(r.completion_tokens)}`);
     host.replaceChildren(h("section", { class: "panel scroll-x" }, h("table", { class: "grid" },
       h("thead", {}, h("tr", {}, ["Time", "App", "Model", "Route", "Status", "Tokens in → out", "TTFT", "Duration"].map((c) => h("th", {}, c)))),
-      h("tbody", {}, rows.map((r) => h("tr", {}, h("td", { class: "mono" }, clock(r.ts)), h("td", {}, r.app || h("span", { class: "muted" }, "no key")),
+      h("tbody", {}, rows.map((r) => h("tr", {}, h("td", { class: "mono" }, clock(r.ts)), h("td", {}, appLabel(r.app)),
         h("td", { class: "mono" }, r.model || "—"), h("td", { class: "mono" }, r.route),
         h("td", { class: `mono ${r.status < 400 ? "ok-text" : "bad-text"}` }, String(r.status)),
         h("td", { class: "mono" }, tokens(r)), h("td", { class: "mono" }, r.ttft_ms === null ? "—" : `${fmt(r.ttft_ms)} ms`), h("td", { class: "mono" }, `${fmt(r.duration_ms)} ms`)))))),
