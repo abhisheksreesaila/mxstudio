@@ -61,6 +61,7 @@ class _Child:
 
 
 DEFAULT_GPU_MEMORY_FRACTION = "0.35"
+MIN_FREE_GPU_MB = 4096
 
 
 def _nvidia_gpus() -> list[dict]:
@@ -301,8 +302,11 @@ class Supervisor:
             return None
         if not gpus:
             return None
+        free = lambda g: g["total_mb"] - g["used_mb"]
+        # A GPU another program has nearly filled would OOM whatever our count says.
+        roomy = [g for g in gpus if free(g) >= MIN_FREE_GPU_MB] or gpus
         ours = [c.gpu for c in self._children.values()]
-        best = min(gpus, key=lambda g: (ours.count(g["index"]), g["used_mb"] - g["total_mb"]))
+        best = min(roomy, key=lambda g: (ours.count(g["index"]), -free(g)))
         return best["index"]
 
     def _command(self, model, port: int, gpu: int | None = None) -> list[str]:

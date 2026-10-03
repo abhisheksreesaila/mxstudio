@@ -72,9 +72,9 @@ Brief: docs/brief.md · Design: docs/design/console.md
 - [x] visual direction chosen: Azure Blade (option C), tokens in design-system/DESIGN-SYSTEM.md
 
 ## F-011 Live acceptance on this machine [blocked]
-Blocked: stop the other agents to free RAM, then run `pixi run python scripts/mxc_acceptance.py` (downloads ~6 GB the first time). For the second-device check, copy ~/.local/share/caddy/pki/authorities/local/root.crt to that device and run the curl line the script prints.
-- [ ] 3 small models (qwen2.5-0.5b, smollm2-1.7b, qwen2.5-1.5b) answer through one keyed HTTPS endpoint
-- [ ] an idle model unloads and comes back on the next request
+Blocked: only the second-device check is left. Copy ~/.local/share/caddy/pki/authorities/local/root.crt to a phone or laptop on the LAN and run the curl line `scripts/mxc_acceptance.py` prints (11/11 passed on 2026-10-03).
+- [x] 3 small models (qwen2.5-0.5b, smollm2-1.7b, qwen2.5-1.5b) answer through one keyed HTTPS endpoint
+- [x] an idle model unloads and comes back on the next request
 - [ ] the same call works from a second device on the LAN
 
 ## F-012 Console shell and Models blade [done]

@@ -236,7 +236,7 @@ async def test_each_model_goes_on_the_gpu_with_most_free_memory_with_a_capped_sh
 
 
 async def test_models_started_together_spread_across_gpus(store, clock, monkeypatch, tmp_path):
-    """Live: three models started at once all read the same free memory, all went to GPU0 and the third ran out.
+    """Live: models started at once all read the same free memory, all went to GPU0 and the third ran out.
     A GPU this daemon already put a model on counts as fuller, even before nvidia-smi shows it."""
     gpus = lambda: [{"index": 0, "used_mb": 80, "total_mb": 24576}, {"index": 1, "used_mb": 1300, "total_mb": 24576}]
     s = Supervisor(store, max_command=(sys.executable, FAKE), health_timeout=20, clock=clock, gpus=gpus)
@@ -247,6 +247,38 @@ async def test_models_started_together_spread_across_gpus(store, clock, monkeypa
         await asyncio.gather(s.ensure_running("tiny"), s.ensure_running("other"))
         devices = sorted(a[a.index("--devices") + 1] for a in map(json.loads, f.read_text().splitlines()))
         assert devices == ["gpu:0", "gpu:1"]
+    finally:
+        await s.stop_all()
+
+
+async def test_stopping_a_model_frees_its_gpu_slot(store, clock, monkeypatch, tmp_path):
+    store.add_model(name="third", repo_id="org/third", revision="main", source="hf", architecture="X")
+    gpus = lambda: [{"index": 0, "used_mb": 80, "total_mb": 24576}, {"index": 1, "used_mb": 1300, "total_mb": 24576}]
+    s = Supervisor(store, max_command=(sys.executable, FAKE), health_timeout=20, clock=clock, gpus=gpus)
+    f = tmp_path / "args.log"
+    monkeypatch.setenv("FAKE_MAX_ARGS_LOG", str(f))
+    try:
+        await s.ensure_running("tiny")   # gpu:0, the freer one
+        await s.ensure_running("other")  # gpu:1
+        await s.stop("tiny")
+        await s.ensure_running("third")  # gpu:0 again: tiny's slot is free
+        devices = [a[a.index("--devices") + 1] for a in map(json.loads, f.read_text().splitlines())]
+        assert devices == ["gpu:0", "gpu:1", "gpu:0"]
+    finally:
+        await s.stop_all()
+
+
+async def test_a_nearly_full_gpu_is_skipped_even_if_it_has_fewer_of_our_models(store, clock, monkeypatch, tmp_path):
+    """Another program has GPU1 almost full: the second model shares GPU0 rather than run out of memory on GPU1."""
+    gpus = lambda: [{"index": 0, "used_mb": 80, "total_mb": 24576}, {"index": 1, "used_mb": 23000, "total_mb": 24576}]
+    s = Supervisor(store, max_command=(sys.executable, FAKE), health_timeout=20, clock=clock, gpus=gpus)
+    f = tmp_path / "args.log"
+    monkeypatch.setenv("FAKE_MAX_ARGS_LOG", str(f))
+    try:
+        await s.ensure_running("tiny")
+        await s.ensure_running("other")
+        devices = [a[a.index("--devices") + 1] for a in map(json.loads, f.read_text().splitlines())]
+        assert devices == ["gpu:0", "gpu:0"]
     finally:
         await s.stop_all()
 
