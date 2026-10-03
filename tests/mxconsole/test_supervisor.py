@@ -200,3 +200,20 @@ async def test_a_starting_model_reports_how_long_it_has_been_starting(sup, monke
     assert row["state"] == "starting" and row["starting_seconds"] is not None and row["starting_seconds"] >= 0
     await task
     assert st(sup, "tiny")["starting_seconds"] is None
+
+
+async def test_graph_capture_is_off_by_default(sup, monkeypatch, tmp_path):
+    """Real MAX 26.5 on this machine crashes in warmup_graph_capture (CUDA_ERROR_INVALID_DEVICE); serving works without it."""
+    monkeypatch.delenv("MXC_GRAPH_CAPTURE", raising=False)
+    f = tmp_path / "args.json"
+    monkeypatch.setenv("FAKE_MAX_ARGS_FILE", str(f))
+    await sup.ensure_running("tiny")
+    assert "--no-device-graph-capture" in json.loads(f.read_text())
+
+
+async def test_graph_capture_can_be_turned_back_on(sup, monkeypatch, tmp_path):
+    monkeypatch.setenv("MXC_GRAPH_CAPTURE", "1")
+    f = tmp_path / "args.json"
+    monkeypatch.setenv("FAKE_MAX_ARGS_FILE", str(f))
+    await sup.ensure_running("tiny")
+    assert "--no-device-graph-capture" not in json.loads(f.read_text())

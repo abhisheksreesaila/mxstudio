@@ -18,6 +18,7 @@ from typing import AsyncIterator, Callable
 import httpx
 
 from . import system
+from .settings import env
 from .store import Store, mxc_home
 
 HOST = "127.0.0.1"
@@ -281,6 +282,11 @@ class Supervisor:
     def _command(self, model, port: int) -> list[str]:
         # A pulled model loads from its pinned local snapshot, so serving needs no network.
         cmd = [*self.max_command, "serve", "--port", str(port), "--served-model-name", model.name]
+        # Device graph capture crashes MAX 26.5 at warm-up on this hardware (CUDA_ERROR_INVALID_DEVICE in
+        # warmup_graph_capture, native Linux, RTX 3090) while serving works fine without it.
+        # MXC_GRAPH_CAPTURE=1 lets MAX decide again where capture works.
+        if env("GRAPH_CAPTURE") != "1":
+            cmd.append("--no-device-graph-capture")
         if model.custom_arch_path:  # a ported architecture MAX doesn't ship
             cmd += ["--custom-architectures", model.custom_arch_path]
         if model.weights_path and Path(model.weights_path).is_dir():
