@@ -6,6 +6,7 @@ import fcntl
 import os
 import sqlite3
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -117,15 +118,34 @@ class Model:
 
 
 class Store:
+    """One SQLite file, one connection per thread.
+
+    The daemon uses a Store from the event loop and from the threadpool (sync routes, pull and bench
+    workers) at the same time. A single sqlite3 connection shared across threads fails with
+    InterfaceError, so each thread gets its own; WAL lets readers and one writer work together, and
+    busy_timeout makes a writer wait for another instead of failing.
+    """
+
+    BUSY_TIMEOUT_MS = 10_000
+
     def __init__(self, path: Path):
         self.path = path
         path.touch(mode=0o600, exist_ok=True)
         path.chmod(0o600)
-        self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
-        self.db.row_factory = sqlite3.Row
+        self._local = threading.local()
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.executescript(SCHEMA)
         self._migrate()
+
+    @property
+    def db(self) -> sqlite3.Connection:
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(self.path, isolation_level=None, timeout=self.BUSY_TIMEOUT_MS / 1000)
+            conn.row_factory = sqlite3.Row
+            conn.execute(f"PRAGMA busy_timeout = {self.BUSY_TIMEOUT_MS}")
+            self._local.conn = conn
+        return conn
 
     def _migrate(self) -> None:
         cols = {r["name"] for r in self.db.execute("PRAGMA table_info(models)")}

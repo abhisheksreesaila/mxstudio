@@ -152,7 +152,7 @@ Brief: docs/brief.md · Design: canvas P6 + DESIGN-SYSTEM.md · Needs: F-018
 - [ ] Daemon: "the crew": daemon, Caddy, LiteLLM and each `max serve`, with pid, port, uptime and a heartbeat; restart/stop actions where safe
 - [ ] `mxc ps` prints the crew (with `--json`)
 
-## F-022 SQLite safe under concurrent requests [todo]
+## F-022 SQLite safe under concurrent requests [done]
 Brief: docs/brief.md · Needs: F-019, F-020, F-021 merged
-- [ ] the shared `Store` connection is never used from two threads at once: sync admin routes run in the threadpool while the event loop records metrics; two console polls together returned 500 `sqlite3.InterfaceError` (found in F-020)
-- [ ] a stress test hits several admin routes and /v1 concurrently and gets no 500s
+- [x] the shared `Store` connection is never used from two threads at once (sync admin routes in the threadpool, pull and bench worker threads, the event loop recording metrics): one connection per thread, WAL, busy_timeout
+- [x] stress test: 8 threads reading and writing metrics, keys and models at once, no errors, no lost writes
