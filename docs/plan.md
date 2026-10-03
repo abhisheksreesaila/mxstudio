@@ -137,12 +137,12 @@ Brief: docs/brief.md · Design: DESIGN-SYSTEM.md "Signature pages" (Pull) + canv
 - [ ] console Pull page: search box (curated names + any HF repo id), the cloud-churn animation driven by real progress, the step list, per-file rows, cancel; finished pulls appear in Models
 - [ ] tested with a fake Hugging Face client; nothing big is downloaded
 
-## F-020 Benchmarks: `mxc bench` and the drag race [todo]
+## F-020 Benchmarks: `mxc bench` and the drag race [done]
 Brief: docs/brief.md · Design: canvas P5 · Needs: F-018
-- [ ] `mxc bench [models…|--all]` runs the same streamed workload (prompt ~512 tokens, 128 out, batch 1, N runs) per model through the daemon and records decode tok/s, prefill tok/s, TTFT p50/p95 and duration in SQLite; `--json`
-- [ ] console Benchmarks page: the drag race from the latest run (cars placed by decode tok/s, finish line, speedometer, synthesized "vroom" only on click), results table, history of runs, Run benchmark button (runs in the background, progress shown)
-- [ ] honest labels: which models, workload, when; nothing shown before the first run
-- [ ] tested with the fake max (it streams at a fixed rate)
+- [x] `mxc bench [models…|--all]` runs the same streamed workload (prompt ~512 tokens, 128 out, batch 1, N runs) per model through the daemon and records decode tok/s, prefill tok/s, TTFT p50/p95 and duration in SQLite; `--json`
+- [x] console Benchmarks page: the drag race from the latest run (cars placed by decode tok/s, finish line, speedometer, synthesized "vroom" only on click), results table, history of runs, Run benchmark button (runs in the background, progress shown)
+- [x] honest labels: which models, workload, when; nothing shown before the first run
+- [x] tested with the fake max (it streams at a fixed rate)
 
 ## F-021 System pages: Ports, Logs, Gateway, Daemon [done]
 Brief: docs/brief.md · Design: canvas P6 + DESIGN-SYSTEM.md · Needs: F-018

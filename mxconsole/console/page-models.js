@@ -1,5 +1,5 @@
 // Models: a table with a mini trace per model, and a side sheet (Overview, Settings, Logs, Requests).
-import { $, h, icon, api, store, fmt, dur, colorOf, lifecycle, STATE_LABEL, clock, terminalBox, reducedMotion } from "./core.js";
+import { $, h, icon, api, store, fmt, dur, colorOf, lifecycle, STATE_LABEL, clock, terminalBox, reducedMotion, appLabel } from "./core.js";
 import { sparkline, traceSvg } from "./charts.js";
 import { loadModel, stopModel, setPinned, saveSettings, cli } from "./actions.js";
 import { openPalette } from "./palette.js";
@@ -232,7 +232,7 @@ export function modelsPage(ctx) {
         const rows = await api("GET", `/admin/requests?model=${encodeURIComponent(name)}&limit=30`);
         host.replaceChildren(rows.length ? h("table", { class: "grid mini-table" },
           h("thead", {}, h("tr", {}, ["Time", "App", "Status", "Tokens", "TTFT"].map((c) => h("th", {}, c)))),
-          h("tbody", {}, rows.map((r) => h("tr", {}, h("td", { class: "mono" }, clock(r.ts)), h("td", {}, r.app || h("span", { class: "muted" }, "no key")),
+          h("tbody", {}, rows.map((r) => h("tr", {}, h("td", { class: "mono" }, clock(r.ts)), h("td", {}, appLabel(r.app)),
             h("td", { class: `mono ${r.status < 400 ? "ok-text" : "bad-text"}` }, String(r.status)),
             h("td", { class: "mono" }, r.completion_tokens === null ? "—" : `${fmt(r.prompt_tokens)} → ${r.estimated ? "~" : ""}${fmt(r.completion_tokens)}`),
             h("td", { class: "mono" }, r.ttft_ms === null ? "—" : `${fmt(r.ttft_ms)} ms`)))))
