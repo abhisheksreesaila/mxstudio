@@ -40,6 +40,10 @@ class ResolveError(Exception):
     """A failure outside the model itself (no `max`, network down); the message is one line."""
 
 
+class PullCancelled(Exception):
+    """Raised inside a download when the person cancels it; partial files stay on disk and resume."""
+
+
 class RepoNotFound(Exception):
     pass
 
@@ -149,12 +153,69 @@ class HubClient:
             raise ResolveError(f"could not read {filename} from {repo_id}: {type(e).__name__}") from e
         return json.loads(Path(path).read_text())
 
-    def download(self, repo_id: str, revision: str, patterns: list[str]) -> str:
+    def download(self, repo_id: str, revision: str, patterns: list[str], progress=None, cancel=None) -> str:
+        """Download the named files. With `progress(filename, done_bytes, total_bytes)` or a `cancel`
+        threading.Event, files come one by one so every byte is reported and cancel takes effect
+        within a chunk. Partial files stay in the cache, so a retry resumes."""
         from huggingface_hub import snapshot_download
+        from huggingface_hub.errors import GatedRepoError, HfHubHTTPError, RepositoryNotFoundError
         try:
-            return snapshot_download(repo_id, revision=revision, allow_patterns=patterns, token=self.token)
+            if progress is None and cancel is None:
+                return snapshot_download(repo_id, revision=revision, allow_patterns=patterns, token=self.token)
+            return self._download_files(repo_id, revision, patterns, progress, cancel)
+        except GatedRepoError as e:
+            raise ResolveError(f"{repo_id} is gated: accept its license on huggingface.co, set HF_TOKEN and retry.") from e
+        except RepositoryNotFoundError as e:
+            raise ResolveError(f"{repo_id} was not found on Hugging Face.") from e
+        except HfHubHTTPError as e:
+            raise ResolveError(f"Hugging Face returned an error during the download: {str(e)[:120]}") from e
         except (httpx.HTTPError, OSError) as e:
             raise ResolveError(f"download of {repo_id} failed ({type(e).__name__}); retry to resume") from e
+
+    def _download_files(self, repo_id, revision, patterns, progress, cancel) -> str:
+        from huggingface_hub import hf_hub_download
+        if progress is not None:
+            try:  # sizes first, so the bar knows the total before the first byte arrives
+                for info in self.api.get_paths_info(repo_id, patterns, revision=revision):
+                    if getattr(info, "size", None):
+                        progress(info.path, 0, info.size)
+            except Exception:  # sizes are a nicety; the download itself reports totals as it goes
+                pass
+        snapshot = None
+        for filename in patterns:
+            if cancel is not None and cancel.is_set():
+                raise PullCancelled()
+            path = hf_hub_download(repo_id, filename, revision=revision, token=self.token,
+                                   tqdm_class=progress_bar(filename, progress, cancel))
+            snapshot = Path(path).parents[len(Path(filename).parts) - 1]
+            if progress is not None:
+                size = Path(path).stat().st_size
+                progress(filename, size, size)
+        return str(snapshot)
+
+
+def progress_bar(filename: str, progress, cancel):
+    """A tqdm class for hf_hub_download that reports to `progress` and stops on `cancel`; prints nothing."""
+    from huggingface_hub.utils import tqdm as hf_tqdm
+
+    class Bar(hf_tqdm):
+        def __init__(self, *args, **kwargs):
+            kwargs["file"] = open(os.devnull, "w")
+            super().__init__(*args, **kwargs)
+            self._report()
+
+        def _report(self):
+            if progress is not None and self.total:
+                progress(filename, int(self.n), int(self.total))
+
+        def update(self, n=1):
+            result = super().update(n)
+            self._report()
+            if cancel is not None and cancel.is_set():
+                raise PullCancelled()
+            return result
+
+    return Bar
 
 
 # ---- resolve -------------------------------------------------------------
@@ -222,13 +283,18 @@ def check_name_free(store: Store, name: str, ref: str, res: Resolution) -> None:
             f"pick another with: mxc pull {ref} --name <name>")))
 
 
-def download_snapshot(res: Resolution, hf) -> str:
-    """Download the pinned safetensors snapshot (only the shards the index names)."""
+def download_snapshot(res: Resolution, hf, progress=None, cancel=None) -> str:
+    """Download the pinned safetensors snapshot (only the shards the index names).
+
+    `progress(filename, done_bytes, total_bytes)` and `cancel` (a threading.Event) are optional."""
     shards = None
     index = next((f for f in res.files if f.endswith(".safetensors.index.json")), None)
     if index:
         shards = set(hf.read_json(res.repo_id, res.revision, index)["weight_map"].values())
-    return hf.download(res.repo_id, res.revision, snapshot_patterns(res.files, shards))
+    patterns = snapshot_patterns(res.files, shards)
+    if progress is None and cancel is None:
+        return hf.download(res.repo_id, res.revision, patterns)
+    return hf.download(res.repo_id, res.revision, patterns, progress=progress, cancel=cancel)
 
 
 def pull(ref: str, *, store: Store | None = None, catalog: dict | None = None, hf=None,

@@ -26,7 +26,7 @@ class FakeHF:
     def read_json(self, repo_id, revision, filename):
         return {"weight_map": {"a": "model-00001.safetensors", "b": "model-00002.safetensors"}}
 
-    def download(self, repo_id, revision, patterns):
+    def download(self, repo_id, revision, patterns, progress=None, cancel=None):
         self.downloads.append((repo_id, revision, patterns))
         return "/cache/snap"
 
