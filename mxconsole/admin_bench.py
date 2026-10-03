@@ -73,8 +73,8 @@ def register(app, store, supervisor, admin_only, *, http_factory=None):
         state["task"] = asyncio.create_task(go())
         return JSONResponse({"id": progress.run_id, "models": names, "runs": runs}, status_code=202)
 
-    # async on purpose: the benchmark task writes on the event loop thread, and the store shares one
-    # SQLite connection, so these reads must run there too rather than in the threadpool.
+    # async: cheap reads on the loop thread. Since F-022 every thread has its own SQLite connection,
+    # so sync would be safe too.
     @app.get("/admin/bench")
     async def admin_bench_latest(request: Request):
         if not admin_only(request):
