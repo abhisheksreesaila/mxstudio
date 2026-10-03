@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" data-theme="contrast">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MX Console</title>
+<meta name="color-scheme" content="dark light">
+<link rel="stylesheet" href="/console/console.css">
+<script src="/console/theme.js"></script>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topbar" id="topbar"></header>
+  <div class="shell">
+    <nav class="menu" id="menu" aria-label="Console"></nav>
+    <div class="scrim-menu" id="menu-scrim" hidden></div>
+    <main class="main" id="main">
+      <div class="banner" id="banner" role="alert" hidden></div>
+      <div class="page" id="view"></div>
+    </main>
+  </div>
+  <footer class="statusbar mono" id="statusbar"></footer>
+</div>
+<div id="layer"></div>
+<div class="toast mono" id="toast" role="status" aria-live="polite" hidden></div>
+<script type="module" src="/console/main.js"></script>
+</body>
+</html>
