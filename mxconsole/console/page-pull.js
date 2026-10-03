@@ -3,7 +3,7 @@
 // the shard rate follows the download speed, the cartridge fill follows the percentage, and the
 // motion stops when the pull is done, failed or cancelled. prefers-reduced-motion turns the motion
 // off in CSS; the numbers and the fill still update.
-import { h, s, icon, api, store, toast, copyButton, terminalBox, ago, HUE } from "./core.js";
+import { h, s, icon, api, ADMIN, store, toast, copyButton, terminalBox, ago, HUE } from "./core.js";
 
 const POLL_MS = 1000;
 const SHARDS = 14;
@@ -45,7 +45,7 @@ export function pickFocus(pulls, selectedId) {
 }
 export function stage(job) {
   if (!job) return "idle";
-  return job.status === "running" ? "running" : job.status === "done" ? "done" : "failed";
+  return { running: "running", done: "done", cancelled: "cancelled" }[job.status] || "failed";
 }
 export function headline(job) {
   if (!job) return "Pick a model to pull";
@@ -103,9 +103,8 @@ function buildStage() {
       root.querySelector(".bar").setAttribute("aria-valuenow", String(Math.round(p)));
       caption.textContent = job ? (job.name || job.ref) : "no pull running";
       pct.textContent = job && job.percent !== null && job.percent !== undefined ? `${Math.round(p)}%` : job && job.status === "done" ? "100%" : "—";
-      bigNums.replaceChildren(
-        h("span", {}, st === "running" ? speedText(job.speed) : job ? "" : ""),
-        h("span", { class: "muted" }, st === "running" && job.total_bytes ? ` · ${bytes(job.done_bytes)} of ${bytes(job.total_bytes)}` : ""));
+      const eta = st === "running" && job.eta_seconds !== null && job.eta_seconds !== undefined ? ` · ${etaText(job.eta_seconds)} left` : "";
+      bigNums.textContent = st === "running" && job.speed ? `${speedText(job.speed)}${eta}` : "";
     },
   };
 }
@@ -141,14 +140,24 @@ export function pullPage(ctx) {
     h("h2", { class: "section-title pull-recent-title" }, "Recent pulls", h("span", { class: "sub" }, "kept after a restart")), recent);
 
   function current() { return pickFocus(ui.pulls, ui.selected); }
+  // Redraw a block only when what it shows changed: the page polls every second, and rebuilding an
+  // unchanged button under the pointer would eat the click.
+  const seen = new Map();
+  const changed = (id, key) => { const k = JSON.stringify(key); if (seen.get(id) === k) return false; seen.set(id, k); return true; };
 
   async function start(ref) {
     ui.formError = "";
     if (!ref) { ui.formError = "Type a short name (qwen2.5-0.5b) or a Hugging Face id like owner/repo."; draw(); return; }
     go.disabled = true;
     try {
-      const job = await api("POST", "/admin/pulls", { ref });
-      ui.selected = job.id;
+      const res = await fetch("/admin/pulls", { method: "POST", headers: { ...ADMIN, "Content-Type": "application/json" }, body: JSON.stringify({ ref }) });
+      let body = {};
+      try { body = await res.json(); } catch (_) { /* no JSON: report the status below */ }
+      if (res.status === 409 && body.pull) { // already being pulled: watch that one instead of showing an error
+        ui.selected = body.pull.id;
+      } else if (!res.ok) {
+        throw new Error((body.error && body.error.message) || `HTTP ${res.status}`);
+      } else ui.selected = body.id;
       await load();
     } catch (e) {
       ui.formError = e.message;
@@ -166,6 +175,7 @@ export function pullPage(ctx) {
 
   function drawChips() {
     const installed = new Set((store.models || []).map((m) => m.name));
+    if (!changed("chips", [ui.curated, [...installed]])) return;
     chips.replaceChildren(h("span", { class: "muted mono" }, "curated"), ...Object.entries(ui.curated).map(([name, repo]) =>
       h("button", { class: "chip-btn mono", type: "button", title: repo, onClick: () => { input.value = name; input.focus(); } },
         installed.has(name) ? icon("check", 12, "currentColor", 2.4) : null, name)));
@@ -173,6 +183,7 @@ export function pullPage(ctx) {
   }
 
   function drawSteps(job) {
+    if (!changed("steps", job && [job.id, job.steps])) return;
     if (!job) {
       steps.replaceChildren(h("p", { class: "pull-hint" }, "Nothing is downloading. Pick a name above, or paste any Hugging Face repo id. MAX needs safetensors weights; the pull is pinned to one revision and resumes if it stops."));
       return;
@@ -185,6 +196,7 @@ export function pullPage(ctx) {
 
   function drawFiles(job) {
     const rows = job ? job.files : [];
+    if (!changed("files", [job && job.id, rows])) return;
     files.replaceChildren(...rows.map((f) => {
       const done = f.state === "done";
       const p = f.size ? Math.min(100, Math.round((f.done * 100) / f.size)) : null;
@@ -195,6 +207,7 @@ export function pullPage(ctx) {
   }
 
   function drawNote(job) {
+    if (!changed("note", job && [job.id, job.status, job.message, job.hint, job.model])) return;
     if (!job || job.status === "running" || job.status === "done") {
       if (job && job.status === "done") {
         note.replaceChildren(h("div", { class: "pull-done" }, icon("circle-check", 16), h("div", {}, h("strong", {}, `${job.model} is ready. `), "It is registered and loads on its first request. ",
@@ -211,6 +224,7 @@ export function pullPage(ctx) {
   }
 
   function drawRecent() {
+    if (!changed("recent", [ui.pulls && ui.pulls.map((p) => [p.id, p.status, p.name, p.ref, p.repo_id, p.total_bytes, Math.round(p.percent || 0), p.finished_at, p.model]), ui.selected, (current() || {}).id, Math.floor(Date.now() / 30000)])) return;
     if (ui.pulls === null) { recent.replaceChildren(h("div", { class: "empty" }, h("p", {}, "Loading…"))); return; }
     if (!ui.pulls.length) { recent.replaceChildren(h("div", { class: "empty" }, h("p", {}, "No pulls yet. They are listed here, with how each one ended."))); return; }
     const focus = current();
@@ -233,7 +247,7 @@ export function pullPage(ctx) {
     formErr.textContent = ui.formError || (ui.error ? `Could not reach the daemon: ${ui.error}` : "");
     document.getElementById("pull-title").textContent = job ? `mxc pull ${job.ref}` : "";
     drawChips(); drawSteps(job); drawFiles(job); drawNote(job);
-    twin.replaceChildren(terminalBox([job ? `mxc pull ${job.ref}` : "mxc pull qwen2.5-0.5b", "mxc pull <repo> --json   # one event per line, for agents"], "same from the terminal"));
+    if (changed("twin", job && job.ref)) twin.replaceChildren(terminalBox([job ? `mxc pull ${job.ref}` : "mxc pull qwen2.5-0.5b", "mxc pull <repo> --json"], "same from the terminal"));
     drawRecent();
   }
 

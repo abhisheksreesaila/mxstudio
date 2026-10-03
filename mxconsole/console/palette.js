@@ -22,6 +22,13 @@ export function pullTarget(query) {
   return ref && /^[\w.\-]+(\/[\w.\-]+)?$/.test(ref) ? `pull/${encodeURIComponent(ref)}` : "pull";
 }
 const openPull = (query) => { location.hash = pullTarget(query); };
+/** "pull acme/weird" names a ref the fuzzy filter can't match to any row: offer it as its own row. */
+export function pullRowFor(query) {
+  const target = pullTarget(query);
+  if (target === "pull" || !/^\s*(pull|download)\s+\S/i.test(String(query))) return [];
+  const ref = decodeURIComponent(target.slice(5));
+  return [{ group: "Suggested", icon: "download", label: `Pull ${ref}`, cli: `mxc pull ${ref}`, run: () => { location.hash = target; } }];
+}
 
 /** The rows for the current state. Each: {group, icon, label, cli, run, copyOnly?, note?} */
 export function buildActions() {
@@ -90,7 +97,7 @@ export function openPalette(prefill = "") {
   let rows = [], sel = 0;
 
   const render = () => {
-    rows = filterActions(buildActions(), input.value);
+    rows = [...pullRowFor(input.value), ...filterActions(buildActions(), input.value)];
     sel = Math.min(sel, Math.max(0, rows.length - 1));
     const nodes = [];
     let group = null;

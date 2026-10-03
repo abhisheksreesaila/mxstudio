@@ -35,7 +35,7 @@ def test_shard_rate_follows_the_download_speed():
 def test_the_rain_stops_when_the_pull_is_not_running():
     assert node("m.rain(50_000_000, false)")["count"] == 0
     assert node("[m.stage(null), m.stage({status:'running'}), m.stage({status:'done'}), m.stage({status:'failed'}), m.stage({status:'cancelled'}), m.stage({status:'unsupported'})]") == [
-        "idle", "running", "done", "failed", "failed", "failed"]
+        "idle", "running", "done", "failed", "cancelled", "failed"]
 
 
 def test_intensity_is_zero_without_speed_and_never_above_one():
@@ -62,3 +62,10 @@ def test_the_palette_pull_row_opens_the_page_with_the_ref_filled_in():
     for query, target in [("pull qwen2.5-3b", "pull/qwen2.5-3b"), ("pull Qwen/Qwen2.5-3B-Instruct", "pull/Qwen%2FQwen2.5-3B-Instruct"),
                           ("pull", "pull"), ("", "pull"), ("pull a model please", "pull"), ("download smollm2-1.7b", "pull/smollm2-1.7b")]:
         assert node(f"m.pullTarget({json.dumps(query)})", "palette.js") == target, query
+
+
+def test_a_typed_ref_gets_its_own_palette_row():
+    rows = node('m.pullRowFor("pull acme/weird")', "palette.js")
+    assert [(r["label"], r["cli"]) for r in rows] == [("Pull acme/weird", "mxc pull acme/weird")]
+    assert node('m.pullRowFor("pull")', "palette.js") == [] and node('m.pullRowFor("serve acme/x")', "palette.js") == []
+    assert node('m.pullRowFor("pull a model please")', "palette.js") == []
