@@ -105,12 +105,15 @@ async def test_bad_requests_are_400_and_unknown_pull_is_404(http):
     assert (await http.get("/admin/pulls/999", headers=ADMIN)).status_code == 404
 
 
-def test_the_fake_hub_hook_needs_the_exact_file_and_ignores_anything_else(monkeypatch, tmp_path, caplog):
+def test_the_fake_hub_hook_is_pinned_to_this_checkouts_fake_hub_and_ignores_anything_else(monkeypatch, tmp_path, caplog):
     from mxconsole import admin_pull
+    assert admin_pull.fake_hub_path() == FAKE_HUB_FILE.resolve()
     monkeypatch.delenv("MXC_FAKE_HUB", raising=False)
     assert admin_pull._fake_hub() is None
     caplog.set_level(logging.WARNING)
-    for bad in ("1", "true", "tests/mxconsole/fake_hub.py", str(tmp_path / "fake_hub.py"), str(Path(__file__))):
+    copy = tmp_path / "fake_hub.py"  # a file with the right name somewhere else is not enough
+    copy.write_text(FAKE_HUB_FILE.read_text())
+    for bad in ("1", "true", "tests/mxconsole/fake_hub.py", str(copy), str(Path(__file__)), "x" * 300):
         monkeypatch.setenv("MXC_FAKE_HUB", bad)
         assert admin_pull._fake_hub() is None, bad
     assert "ignoring it" in caplog.text
@@ -118,3 +121,23 @@ def test_the_fake_hub_hook_needs_the_exact_file_and_ignores_anything_else(monkey
     module = admin_pull._fake_hub()
     assert module is not None and callable(module.make_hub) and "Qwen2ForCausalLM" in str(module.CATALOG)
     assert "FAKE HUGGING FACE" in caplog.text
+
+
+async def test_the_list_says_when_the_fake_hub_is_active(http, monkeypatch):
+    assert "fake_hub" not in (await http.get("/admin/pulls", headers=ADMIN)).json()
+    monkeypatch.setenv("MXC_FAKE_HUB", str(FAKE_HUB_FILE))
+    store = http.store
+    app = create_app(store, Supervisor(store, max_command=(sys.executable, "-c", "pass")))
+    transport = httpx.ASGITransport(app=app, client=("127.0.0.1", 5000))
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:11435") as c:
+        assert (await c.get("/admin/pulls", headers=ADMIN)).json()["fake_hub"] is True
+
+
+async def test_a_pull_request_body_over_4_kb_is_refused(http):
+    big = {"ref": "qwen2.5-0.5b", "name": "a" * 5000}
+    r = await http.post("/admin/pulls", json=big, headers=ADMIN)
+    assert r.status_code == 413 and r.json()["error"]["code"] == "request_too_large"
+    r = await http.post("/admin/pulls", content=b"{" + b" " * 5000 + b"}", headers=ADMIN)
+    assert r.status_code == 413
+    ok = await http.post("/admin/pulls", json={"ref": "qwen2.5-0.5b"}, headers=ADMIN)
+    assert ok.status_code == 202

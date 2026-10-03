@@ -38,7 +38,7 @@ def _fake_hub():
         return None
     pinned = fake_hub_path()
     try:
-        same = Path(value).resolve() == pinned
+        same = Path(value).is_absolute() and Path(value).resolve() == pinned
     except (OSError, ValueError):
         same = False
     if not (same and pinned.is_file()):
