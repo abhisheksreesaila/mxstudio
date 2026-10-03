@@ -128,6 +128,7 @@ export function modelsPage(ctx) {
             : h("button", { class: "btn", type: "button", disabled: busy, onClick: run(() => stopModel(name)) }, icon("square", 14), "Stop"),
           h("button", { class: "btn", type: "button", disabled: busy, onClick: run(() => setPinned(name, !m.pinned)) }, icon("pin", 14), m.pinned ? "Unpin" : "Pin"));
       }
+      foot.hidden = tab !== "settings" && !sheetState.note;
       const fsig = `${tab}|${!!sheetState.draft}|${sheetState.busy}|${sheetState.note}`;
       if (fsig !== footSig) {
         footSig = fsig;
@@ -216,7 +217,7 @@ export function modelsPage(ctx) {
       try {
         const text = await api("GET", LOG_ENDPOINT(name));
         const atEnd = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 24;
-        if (pre.dataset.text !== text) { pre.dataset.text = text; pre.textContent = text || "No log yet. It appears once the model has been started."; if (atEnd || !pre.dataset.seen) pre.scrollTop = pre.scrollHeight; pre.dataset.seen = "1"; }
+        if (pre.dataset.text !== text) { pre.dataset.text = text; pre.textContent = text || "The log is empty so far. Lines appear here as the model writes them."; if (atEnd || !pre.dataset.seen) pre.scrollTop = pre.scrollHeight; pre.dataset.seen = "1"; }
       } catch (e) { pre.textContent = `Could not read the log: ${e.message}`; }
     };
     load();

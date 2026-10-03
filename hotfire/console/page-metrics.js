@@ -13,9 +13,10 @@ export function metricsPage(ctx) {
 
   const seg = h("div", { class: "seg", role: "group", "aria-label": "Range" }, RANGES.map(([r, label]) => h("button", { type: "button", "aria-pressed": r === range ? "true" : "false", "data-r": r,
     onClick: () => { range = r; try { localStorage.setItem("hotfire-range", r); } catch (_) { /* fine */ } seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.r === r ? "true" : "false")); load(); } }, label)));
-  const modelCount = h("span", { class: "hint mono" });
+  let only = "";
+  const modelSel = h("select", { class: "select", "aria-label": "Model", style: "width:auto", onChange: (e) => { only = e.target.value; draw(); } }, h("option", { value: "" }, "All models"));
   const host = h("div", {});
-  ctx.body.replaceChildren(h("div", { class: "range-row" }, seg, modelCount), host);
+  ctx.body.replaceChildren(h("div", { class: "range-row" }, seg, modelSel), host);
 
   const block = (k, n, u, hue) => h("div", { class: "block", style: { "--hue": hue } }, h("div", { class: "k" }, k), h("div", { class: "n num" }, n), h("div", { class: "u mono" }, u));
   const pillSev = (sev) => (sev === "bad" ? HUE.bench : "#e09d00");
@@ -30,11 +31,16 @@ export function metricsPage(ctx) {
   function draw() {
     if (failed) { host.replaceChildren(h("div", { class: "panel empty" }, h("h2", {}, "Could not load metrics"), h("p", {}, failed))); return; }
     if (!data) { host.replaceChildren(h("div", { class: "panel empty" }, h("p", {}, "Loading…"))); return; }
-    const { summary: m, series } = data;
-    const names = Object.keys(series.models);
+    const { summary: base, series } = data;
+    const sel = only ? base.by_model[only] : null; // one model chosen: the blocks follow it
+    const m = sel ? { ...base, ...sel, per_minute: sel.requests / (base.window_seconds / 60), error_rate: sel.requests ? sel.errors / sel.requests : 0 } : base;
+    const all = Object.keys(series.models);
+    if (only && !all.includes(only)) only = "";
+    const names = all.filter((n) => !only || n === only);
     assignColours(store.models);
+    if (modelSel.options.length !== all.length + 1) modelSel.replaceChildren(h("option", { value: "" }, "All models"), ...all.map((n) => h("option", { value: n }, n)));
+    modelSel.value = only;
     ctx.setSub(`last ${RANGE_WORDS[range]} · p50 per ${series.bucket_seconds >= 3600 ? `${series.bucket_seconds / 3600} h` : series.bucket_seconds >= 60 ? `${series.bucket_seconds / 60} min` : `${series.bucket_seconds} s`} · streamed requests`);
-    modelCount.textContent = `${names.length} model${names.length === 1 ? "" : "s"} with traffic`;
     const failedPct = m.requests ? (m.error_rate * 100).toFixed(1) : "0.0";
     const blocks = h("section", { class: "blocks" },
       block("Decode", m.decode_tps_p50 === null ? "—" : fmt(m.decode_tps_p50), "tok/s p50", HUE.models),
@@ -59,7 +65,7 @@ export function metricsPage(ctx) {
       card("Requests", "per bucket", h("div", { class: "legend mono" }, h("span", {}, h("i", { class: "sq", style: { "--c": "#0090ff" } }), "ok"), h("span", {}, h("i", { class: "sq", style: { "--c": "#e5484d" } }), "failed")),
         stackedBars({ rows: totals, range }), "wide"));
 
-    const per = Object.entries(m.by_model || {});
+    const per = Object.entries(m.by_model || {}).filter(([n]) => !only || n === only);
     const table = per.length ? h("section", { class: "panel scroll-x", style: "margin-top:16px" }, h("table", { class: "grid" },
       h("thead", {}, h("tr", {}, ["Model", "Requests", "Failed", "TTFT p50", "TTFT p95", "Decode p50"].map((c, i) => h("th", { class: i ? "r" : "" }, c)))),
       h("tbody", {}, per.map(([n, v]) => h("tr", {}, h("td", {}, h("span", { style: "display:inline-flex;align-items:center;gap:8px" }, h("span", { class: "stat-dot", style: { "--c": colorOf(n), background: colorOf(n) } }), h("span", { class: "mono" }, n))),
