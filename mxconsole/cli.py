@@ -284,7 +284,7 @@ def pull(ref: str = typer.Argument(..., help="Short name (qwen2.5-0.5b) or Huggi
          as_json: bool = typer.Option(False, "--json", help="One JSON object per progress event, for scripts and agents.")) -> None:
     """Resolve a model, download it at a pinned revision (with live progress) and register it.
 
-    Runs in the daemon when it is up, so the console's Pull page shows it too; Ctrl-C cancels (exit 130)."""
+    Runs in the daemon (started if needed), so the console's Pull page shows it too; Ctrl-C cancels (exit 130)."""
     if port_dir is not None:
         from mxconsole import port
         try:
