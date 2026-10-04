@@ -156,3 +156,6 @@ Brief: docs/brief.md · Design: canvas P6 + DESIGN-SYSTEM.md · Needs: F-018
 Brief: docs/brief.md · Needs: F-019, F-020, F-021 merged
 - [x] the shared `Store` connection is never used from two threads at once (sync admin routes in the threadpool, pull and bench worker threads, the event loop recording metrics): one connection per thread, WAL, busy_timeout
 - [x] stress test: 8 threads reading and writing metrics, keys and models at once, no errors, no lost writes
+
+## Parked: console layout redesign
+Decided 2026-10-03: keep the current layout while the person uses mxconsole day to day; revisit once it's clear which views matter. Candidates on the canvas (Round 4): Resource blades (Azure), Agent deck (journal + reading pane), or both combined. Mockup-only ideas, not built: `mxc set --gpu`, `mxc expose --deny`, the ask box.
