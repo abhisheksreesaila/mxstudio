@@ -71,8 +71,8 @@ Brief: docs/brief.md · Needs: F-002
 Brief: docs/brief.md · Design: docs/design/console.md
 - [x] visual direction chosen: Azure Blade (option C), tokens in design-system/DESIGN-SYSTEM.md
 
-## F-011 Live acceptance on this machine [blocked]
-Blocked: only the second-device check is left. Copy ~/.local/share/caddy/pki/authorities/local/root.crt to a phone or laptop on the LAN and run the curl line `scripts/mxc_acceptance.py` prints (11/11 passed on 2026-10-03).
+## F-011 Live acceptance on this machine [deferred]
+Deferred 2026-10-03 (the person's call: one machine for now). Only the second-device check is left. Copy ~/.local/share/caddy/pki/authorities/local/root.crt to a phone or laptop on the LAN and run the curl line `scripts/mxc_acceptance.py` prints (11/11 passed on 2026-10-03).
 - [x] 3 small models (qwen2.5-0.5b, smollm2-1.7b, qwen2.5-1.5b) answer through one keyed HTTPS endpoint
 - [x] an idle model unloads and comes back on the next request
 - [ ] the same call works from a second device on the LAN
