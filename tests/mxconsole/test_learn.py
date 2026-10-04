@@ -49,6 +49,7 @@ def test_notebook_is_valid_and_describes_the_model():
     text = text_of(nb)
     for needle in ("apache-2.0", "text-generation", "1,234,567", "987", "494.03M", "A small instruct model"):
         assert needle in text
+    assert "repo_id" in nb.metadata["mxconsole"] and "mst" not in nb.metadata
 
 
 def test_model_card_is_trimmed():

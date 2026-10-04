@@ -23,7 +23,7 @@ export function highlight(code, lang) {
 }
 
 const ENDPOINTS = [
-  { group: "Models", method: "GET", path: "/v1/models", desc: "Lists every registered model with its live state (ready, starting, cold) in an `mst` field. A cold model costs nothing until its first request.", fields: [], statuses: [200, 401] },
+  { group: "Models", method: "GET", path: "/v1/models", desc: "Lists every registered model with its live state (ready, starting, cold) in an `mxconsole` field. A cold model costs nothing until its first request.", fields: [], statuses: [200, 401] },
   { group: "Inference", method: "POST", path: "/v1/chat/completions", desc: "Chat with a model. A cold model loads on this request (the response waits for it); set stream to true for server-sent events.",
     fields: [["model", "string", true, "A registered mxconsole name, for example qwen2.5-0.5b."], ["messages", "array", true, "Objects with role (system, user, assistant) and content."],
       ["stream", "boolean", false, "Send tokens as server-sent events. Default false."], ["max_tokens", "integer", false, "Upper bound on generated tokens."], ["temperature", "number", false, "0 to 2. Default 1."]], statuses: [200, 401, 404, 503] },

@@ -78,7 +78,7 @@ def openapi_spec(model_names: list[str]) -> dict:
         "servers": [{"url": "/"}],
         "paths": {
             "/v1/models": {"get": {"summary": "List models", "security": secured, "responses": {
-                "200": {"description": "Registered models, with load state in the `mst` field",
+                "200": {"description": "Registered models, with load state in the `mxconsole` field",
                         "content": {"application/json": {"schema": {"type": "object"}}}},
                 "401": {"description": "Missing or invalid key"}}}},
             "/v1/chat/completions": {"post": {"summary": "Create a chat completion", "security": secured,
