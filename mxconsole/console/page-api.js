@@ -39,7 +39,7 @@ const isEmbed = (n) => /embed|minilm|bge|e5-/i.test(n);
 function responses(ep, model) {
   const err = (message, type, code) => `{\n  "error": {\n    "message": "${message}",\n    "type": "${type}",\n    "code": "${code}"\n  }\n}`;
   const ok = {
-    "/v1/models": `{\n  "object": "list",\n  "data": [{\n    "id": "${model}",\n    "object": "model",\n    "owned_by": "mst",\n    "mst": {"state": "cold", "pinned": false, "keep_alive": 300}\n  }]\n}`,
+    "/v1/models": `{\n  "object": "list",\n  "data": [{\n    "id": "${model}",\n    "object": "model",\n    "owned_by": "mxconsole",\n    "mxconsole": {"state": "cold", "pinned": false, "keep_alive": 300}\n  }]\n}`,
     "/v1/chat/completions": `{\n  "id": "chatcmpl-7f3a",\n  "model": "${model}",\n  "choices": [{\n    "index": 0,\n    "message": {"role": "assistant", "content": "Hello there!"},\n    "finish_reason": "stop"\n  }],\n  "usage": {"prompt_tokens": 9, "completion_tokens": 3}\n}`,
     "/v1/completions": `{\n  "model": "${model}",\n  "choices": [{"index": 0, "text": " the quick brown fox", "finish_reason": "length"}],\n  "usage": {"prompt_tokens": 4, "completion_tokens": 16}\n}`,
     "/v1/embeddings": `{\n  "model": "${model}",\n  "data": [{"index": 0, "embedding": [0.0123, -0.0456, 0.0789]}],\n  "usage": {"prompt_tokens": 5}\n}`,

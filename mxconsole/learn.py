@@ -339,7 +339,7 @@ def build_notebook(*, model_id: str, repo_id: str, source: HFSource, revision: s
     ]
     nb = new_notebook(cells=cells, metadata={
         "kernelspec": {"name": "python3", "display_name": "Python 3", "language": "python"},
-        "mst": {"model": model_id, "repo_id": repo_id}})
+        "mxconsole": {"model": model_id, "repo_id": repo_id}})
     nbformat.validate(nb)
     return nb
 

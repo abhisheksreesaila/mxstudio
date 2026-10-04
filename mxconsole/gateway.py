@@ -207,9 +207,9 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             return unauthorized()
         note(app_name, None, "models", 200, started)
         states = {s["name"]: s for s in supervisor.status()}
-        data = [{"id": m.name, "object": "model", "created": 0, "owned_by": "mst",
-                 "mst": {"state": states.get(m.name, {}).get("state", "cold"), "repo_id": m.repo_id,
-                         "pinned": m.pinned, "keep_alive": m.keep_alive}}
+        data = [{"id": m.name, "object": "model", "created": 0, "owned_by": "mxconsole",
+                 "mxconsole": {"state": states.get(m.name, {}).get("state", "cold"), "repo_id": m.repo_id,
+                               "pinned": m.pinned, "keep_alive": m.keep_alive}}
                 for m in store.models()]
         return JSONResponse({"object": "list", "data": data})
 
