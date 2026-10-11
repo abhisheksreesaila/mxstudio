@@ -32,7 +32,7 @@ def register(app, store: Store, supervisor: Supervisor, admin_only, *, refused, 
         if not admin_only(request):
             return refused()
         q = request.query_params.get("q", "")
-        if len(q) > 200:
+        if len(q) > search.MAX_QUERY:
             return error(400, "The search text is too long.", "invalid_query")
         try:  # the catalog and Hugging Face are slow and blocking: keep the event loop free
             return JSONResponse(await asyncio.to_thread(search.search, q, search_sources))
@@ -77,10 +77,10 @@ def register(app, store: Store, supervisor: Supervisor, admin_only, *, refused, 
         if not admin_only(request):
             return refused()
         try:
-            plaintext = keys.rotate_key(store, app_name)
+            plaintext, revived = keys.rotate_key(store, app_name)
         except keys.KeyNotFound as e:
             return error(404, str(e), "key_not_found")
-        return JSONResponse({"app": app_name, "key": plaintext})  # the only time it is shown
+        return JSONResponse({"app": app_name, "key": plaintext, "revived": revived})  # the only time it is shown
 
     @app.delete("/admin/models/{name}")
     async def admin_model_remove(request: Request, name: str):

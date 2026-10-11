@@ -59,6 +59,8 @@ def search_models(query: str = typer.Argument("", help="Part of a name, an archi
                   as_json: bool = JSON) -> None:
     """Find a model (curated names, the MAX catalog, a Hugging Face repo) and see whether it fits this machine."""
     from mxconsole import search
+    if len(query) > search.MAX_QUERY:
+        _fail("the search text is too long")
     try:
         out = search.search(query)
     except resolve.ResolveError as e:
@@ -317,14 +319,16 @@ def keys_new(app_name: str = typer.Argument(..., metavar="APP"),
 def keys_rotate(app_name: str = typer.Argument(..., metavar="APP"), as_json: bool = JSON) -> None:
     """Issue a new key for an app and revoke the old one. The new key is printed once."""
     try:
-        key = keys.rotate_key(Store.open(), app_name)
+        key, revived = keys.rotate_key(Store.open(), app_name)
     except keys.KeyNotFound as e:
         _fail(str(e))
     if as_json:
-        typer.echo(report.dump({"app": app_name, "key": key}))
+        typer.echo(report.dump({"app": app_name, "key": key, "revived": revived}))
         return
     typer.echo(key)
     typer.echo("This key will not be shown again. Copy it now. The old key no longer works.")
+    if revived:
+        typer.echo(f"note: the old key had been revoked, so {app_name} is active again with this new key.")
 
 
 @keys_app.command("ls")

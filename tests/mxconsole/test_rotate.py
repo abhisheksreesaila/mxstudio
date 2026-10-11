@@ -47,3 +47,19 @@ def test_cli_keys_rotate():
     assert "not be shown again" in text.output and "mst-" in text.output
     missing = runner.invoke(cli.app, ["keys", "rotate", "nope"])
     assert missing.exit_code == 1 and "no key for nope" in missing.output
+
+
+async def test_rotating_a_revoked_key_says_it_revived_the_app(http, store, key):
+    assert (await http.post("/admin/keys/myapp/rotate", headers=ADMIN)).json()["revived"] is False
+    keys.revoke_key(store, "myapp")
+    body = (await http.post("/admin/keys/myapp/rotate", headers=ADMIN)).json()
+    assert body["revived"] is True and keys.verify_key(store, body["key"]) == "myapp"
+
+
+def test_cli_rotate_of_a_revoked_key_says_so():
+    store = Store.open()
+    keys.create_key(store, "notes")
+    keys.revoke_key(store, "notes")
+    r = runner.invoke(cli.app, ["keys", "rotate", "notes"])
+    assert r.exit_code == 0 and "active again" in r.output
+    assert json.loads(runner.invoke(cli.app, ["keys", "rotate", "notes", "--json"]).output)["revived"] is False

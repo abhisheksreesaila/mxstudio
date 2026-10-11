@@ -153,3 +153,18 @@ def test_cli_search_prints_a_table_and_json(inproc_daemon, monkeypatch):
     assert out["results"][0]["fit"] == "ok" and out["memory"]["basis"] == "gpu"
     none = runner.invoke(cli.app, ["search", "zzz-nothing"])
     assert none.exit_code == 0 and "no models match" in none.output
+
+
+@pytest.mark.parametrize("q", ["a/..", "../x", "a/-b", "a/b.", ".a/b", "a//b", "a/b/c", "a/" + "x" * 100, "a--b/c"])
+def test_things_that_are_not_repo_ids_never_reach_hugging_face(q):
+    hub = FakeHub()
+    assert search(q, sources(hub=hub))["results"] == [] and hub.asked == []
+
+
+def test_a_validation_error_from_the_hub_client_means_no_row():
+    assert search("acme/model", sources(hub=FakeHub(fail=ValueError("Repo id must use alphanumeric chars"))))["results"] == []
+
+
+def test_cli_search_refuses_an_overlong_query():
+    r = runner.invoke(cli.app, ["search", "q" * 300])
+    assert r.exit_code == 1 and "too long" in r.output

@@ -30,7 +30,14 @@ BYTES_PER_PARAM = 2
 OK_FRACTION = 0.8
 MAX_RESULTS = 20
 MAX_SUGGESTIONS = 3
-REPO_ID = re.compile(r"[A-Za-z0-9][\w.-]*/[\w.-]+")
+MAX_QUERY = 200
+_REPO_PART = r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?"
+_REPO_ID = re.compile(f"{_REPO_PART}/{_REPO_PART}")
+
+
+def looks_like_repo_id(q: str) -> bool:
+    """Hugging Face's own rules: owner/name, at most 96 characters, no leading or trailing '.' or '-', no '..' or '--'."""
+    return len(q) <= 96 and ".." not in q and "--" not in q and _REPO_ID.fullmatch(q) is not None
 _PARAMS = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)([bBmM])(?![A-Za-z0-9])")
 
 
@@ -146,7 +153,7 @@ def search(q: str, src: Sources | None = None) -> dict:
     results.sort(key=lambda r: (r["id"].lower() != q.lower(), r["id"] not in resolve.CURATED))  # exact name, then curated
     results = results[:MAX_RESULTS]
     warnings: list[str] = []
-    if REPO_ID.fullmatch(q) and not any(r["repo_id"].lower() == q.lower() for r in results):
+    if looks_like_repo_id(q) and not any(r["repo_id"].lower() == q.lower() for r in results):
         row = _hf_row(q, src, catalog, free, warnings)
         if row:
             results.insert(0, row)
@@ -164,6 +171,8 @@ def _hf_row(repo_id: str, src: Sources, catalog: dict, free_gb: float, warnings:
         return None  # nothing to offer: pulling it would fail the same way
     except resolve.ResolveError as e:
         warnings.append(str(e))
+        return None
+    except ValueError:  # the client's own repo-id validation said no
         return None
     params = None
     counter = getattr(hub, "param_count", None)
