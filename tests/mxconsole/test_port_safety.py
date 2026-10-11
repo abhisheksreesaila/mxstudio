@@ -413,3 +413,13 @@ def test_restart_removes_the_work_dir_of_interrupted_jobs_only(tmp_path):
     assert not (mxc_home() / "ports" / str(ids["a/one"]) / "work").exists()
     assert (mxc_home() / "ports" / str(ids["a/one"]) / "port.log").exists()   # the log stays
     assert (mxc_home() / "ports" / str(ids["b/two"]) / "work").exists()       # finished jobs are not touched
+
+
+def test_scrub_env_drops_the_daemons_own_pixi_activation():
+    """The daemon runs under `pixi run`: its PIXI_PROJECT_* / CONDA_* point at mxstudio's pixi.toml and env,
+    which the sandbox can't see, so a `pixi run` inside the sandbox failed with "failed to open pixi.toml"."""
+    from mxconsole import port_sandbox
+    env = {"PIXI_PROJECT_MANIFEST": "/x/pixi.toml", "PIXI_PROJECT_ROOT": "/x", "PIXI_PROJECT_NAME": "mxconsole",
+           "PIXI_ENVIRONMENT_NAME": "default", "PIXI_IN_SHELL": "1", "CONDA_PREFIX": "/x/.pixi/envs/default",
+           "CONDA_DEFAULT_ENV": "mxconsole", "PIXI_CACHE_DIR": "/c", "PATH": "/usr/bin", "LANG": "C.UTF-8"}
+    assert port_sandbox.scrub_env(env) == {"PIXI_CACHE_DIR": "/c", "PATH": "/usr/bin", "LANG": "C.UTF-8"}

@@ -22,6 +22,9 @@ ALWAYS_DROP = ("SSH_AUTH_SOCK", "SSH_AGENT_PID", "DBUS_SESSION_BUS_ADDRESS", "GP
                "HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_HUB_TOKEN")
 # What the claude process itself may keep to authenticate (the OAuth login is copied into its private
 # config dir instead; these cover API-key and cloud-provider setups).
+# The daemon itself runs under `pixi run`: its activation points at mxstudio's pixi.toml and env, which the
+# sandbox can't see, so a `pixi run` inside would fail to open that manifest. The caches stay (set per job).
+OUTER_ACTIVATION = re.compile(r"(PIXI_PROJECT_|PIXI_ENVIRONMENT_|PIXI_IN_SHELL$|PIXI_PROMPT$|CONDA_)")
 CLAUDE_AUTH = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_BASE_URL",
                "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE", "AWS_REGION",
                "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "GOOGLE_APPLICATION_CREDENTIALS")
@@ -31,7 +34,7 @@ def scrub_env(env: dict[str, str], keep: tuple[str, ...] = ()) -> dict[str, str]
     """A copy of env without secrets: anything named like a key/token/secret and the known agent sockets,
     except the names in `keep`."""
     return {k: v for k, v in env.items()
-            if k in keep or not (k in ALWAYS_DROP or SECRET_NAME.search(k))}
+            if k in keep or not (k in ALWAYS_DROP or SECRET_NAME.search(k) or OUTER_ACTIVATION.match(k))}
 
 
 def have_bwrap(path: str = "bwrap") -> str | None:
