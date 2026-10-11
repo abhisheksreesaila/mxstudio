@@ -1,2 +1,83 @@
 /* mxconsole, the Notebook blade (F-028). Styles for this blade only; shared pieces live in blades.css. */
-.b-notebook .bb { background: var(--canvas); }
+.b-notebook .bb { background: var(--canvas); overflow: hidden; display: flex; flex-direction: column; }
+.b-notebook .tools { min-width: 0; }
+
+/* kernel chip in the header */
+.kchip { font: 500 11.5px var(--mono); display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; color: var(--ok-fg); box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 40%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.kchip .sd { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+.kchip.off { color: var(--muted); }
+.kchip.off .sd { background: var(--faint); }
+
+.nb { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.nb-status { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 12.5px; background: var(--card); border-bottom: 1px solid var(--card-line); color: var(--text-2); flex-wrap: wrap; }
+.nb-status[hidden] { display: none; }
+.nb-status.bad { color: var(--bad-fg); background: color-mix(in srgb, var(--bad) 5%, var(--card)); }
+.nb-status a { color: var(--accent); }
+.nb-status code { background: var(--code); color: var(--code-text); border-radius: 5px; padding: 1px 7px; }
+.nb-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 210px minmax(0, 1fr) 300px; }
+
+.nb-toc { border-right: 1px solid var(--card-line); padding: 16px 10px; overflow-y: auto; background: var(--card); display: flex; flex-direction: column; gap: 2px; }
+.nb-toc .lbl { padding: 0 10px 8px; }
+.nb-toc button { display: flex; gap: 10px; align-items: baseline; text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 6px; color: var(--text-2); font-size: 13px; }
+.nb-toc button:hover { background: var(--sunk); color: var(--text); }
+.nb-toc button[aria-current="true"] { background: var(--sel); color: var(--text); }
+.nb-toc button.lv2 { padding-left: 24px; font-size: 12.5px; }
+.nb-toc .num { font-size: 11px; color: var(--muted); flex: none; }
+
+.nb-main { overflow-y: auto; padding: 24px clamp(16px, 3vw, 40px) 80px; }
+.nb-inner { max-width: 880px; margin: 0 auto; }
+.nb-cell { background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; margin-bottom: 14px; overflow: hidden; scroll-margin-top: 16px; }
+
+/* markdown cells */
+.nb-md { padding: 16px 18px 10px; font-size: 14px; line-height: 1.6; color: var(--text-2); overflow-wrap: anywhere; }
+.nb-md h1, .nb-md h2, .nb-md h3, .nb-md h4, .nb-md h5, .nb-md h6 { color: var(--text); font-weight: 600; letter-spacing: -.015em; margin: 0 0 8px; line-height: 1.3; }
+.nb-md h1 { font-size: 20px; }
+.nb-md h2 { font-size: 17px; }
+.nb-md h3 { font-size: 15px; }
+.nb-md h4, .nb-md h5, .nb-md h6 { font-size: 14px; }
+.nb-md p { margin: 0 0 10px; max-width: 72ch; }
+.nb-md ul, .nb-md ol { margin: 0 0 10px; padding-left: 22px; max-width: 72ch; }
+.nb-md li { margin-bottom: 3px; }
+.nb-md strong { color: var(--text); }
+.nb-md a { color: var(--accent); }
+.nb-md code { font: 12.5px var(--mono); background: var(--sunk); border-radius: 4px; padding: 1px 5px; color: var(--text); }
+.nb-md pre { background: var(--code); color: var(--code-text); border-radius: 8px; padding: 12px 14px; margin: 0 0 10px; overflow-x: auto; }
+.nb-md pre code { background: none; padding: 0; color: inherit; white-space: pre; }
+
+/* code cells */
+.nb-in { display: grid; grid-template-columns: 56px minmax(0, 1fr); border-top: 1px solid var(--card-line-2); }
+.nb-cell > .nb-in:first-child { border-top: 0; }
+.nb-n { padding-top: 14px; text-align: center; font-size: 11.5px; color: var(--muted); }
+.nb-code { margin: 0; background: var(--code); color: var(--code-text); padding: 14px 16px; font-size: 12.5px; line-height: 1.6; overflow-x: auto; white-space: pre; border-radius: 0; }
+.nb-code code { font: inherit; }
+.nb-outs { border-top: 1px solid var(--card-line-2); background: var(--hover); }
+.nb-out { margin: 0; font: 12.5px var(--mono); padding: 10px 16px 10px 72px; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.nb-out + .nb-out { border-top: 1px solid var(--card-line-2); }
+.nb-out.stderr { color: var(--warn-fg); }
+.nb-out.err { color: var(--bad-fg); }
+.nb-out.note { display: flex; align-items: center; gap: 7px; color: var(--muted); font-family: var(--sans); font-size: 12.5px; }
+
+/* architecture side panel */
+.nb-side { border-left: 1px solid var(--card-line); padding: 16px; overflow-y: auto; background: var(--card); min-width: 0; }
+.nb-arch { margin-top: 8px; font-size: 13px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+.nb-kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 12px; margin: 12px 0 0; font-size: 12.5px; }
+.nb-kv dt { color: var(--muted); }
+.nb-kv dd { margin: 0; color: var(--text); text-align: right; overflow-wrap: anywhere; }
+.nb-rows { width: 100%; margin-top: 14px; border-collapse: collapse; font-size: 11.5px; }
+.nb-rows th, .nb-rows td { text-align: left; padding: 4px 0; border-top: 1px solid var(--card-line-2); vertical-align: top; overflow-wrap: anywhere; }
+.nb-rows th { color: var(--muted); font-weight: 400; padding-right: 10px; width: 52%; }
+.nb-rows td { color: var(--text); }
+.nb-gap { margin-top: 18px; }
+.nb-none { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; }
+.nb-cmd { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.nb-cmd .cli { flex: 1; background: var(--code); color: var(--code-text); border-radius: 7px; padding: 6px 10px; }
+.nb-cmd .cli::before { color: var(--muted); }
+.nb-path { margin-top: 8px; font-size: 11.5px; color: var(--text-2); overflow-wrap: anywhere; }
+
+.nb-notice { margin: 28px 24px; max-width: 520px; }
+.nb-notice h4 { margin: 0 0 6px; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+.nb-notice p { margin: 0 0 12px; color: var(--text-2); font-size: 13px; }
+.nb-notice .cli { margin-top: 12px; }
+
+@container (max-width: 1100px) { .nb-grid { grid-template-columns: 190px minmax(0, 1fr); } .nb-side { display: none; } }
+@container (max-width: 720px) { .nb-grid { grid-template-columns: minmax(0, 1fr); } .nb-toc { display: none; } .nb-out { padding-left: 16px; } .nb-in { grid-template-columns: 44px minmax(0, 1fr); } }
