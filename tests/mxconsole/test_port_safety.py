@@ -423,3 +423,18 @@ def test_scrub_env_drops_the_daemons_own_pixi_activation():
            "PIXI_ENVIRONMENT_NAME": "default", "PIXI_IN_SHELL": "1", "CONDA_PREFIX": "/x/.pixi/envs/default",
            "CONDA_DEFAULT_ENV": "mxconsole", "PIXI_CACHE_DIR": "/c", "PATH": "/usr/bin", "LANG": "C.UTF-8"}
     assert port_sandbox.scrub_env(env) == {"PIXI_CACHE_DIR": "/c", "PATH": "/usr/bin", "LANG": "C.UTF-8"}
+
+
+def test_a_sandboxed_check_runs_in_the_directory_it_asked_for(tmp_path, fake_claude, fake_bwrap):
+    """The skill's checks run `pixi run` from the skill root; inside bwrap they ran from the workspace,
+    where pixi finds no pixi.toml (first real port, OLMoE)."""
+    py, script = sys.executable, str(HERE / "fake_port_check.py")
+    tools = check_tools()
+    tools.build = lambda c: ([py, script, "build", str(c.port_dir)], c.skills_root)
+    job = run(make_manager(tmp_path, fake_claude, sandbox=True, bwrap=fake_bwrap, tools=tools))
+    runs = [json.loads(line) for line in (tmp_path / "bwrap.log").read_text().splitlines()]
+    build = next(r for r in runs if r["cmd"][:3] == [py, script, "build"])
+    argv = build["bwrap"]
+    chdir = argv[argv.index("--chdir") + 1]
+    assert chdir.endswith("skills/modular") or "skills" in chdir, (chdir, job["status"])
+    assert chdir != str(mxc_home() / "ports" / "weird")  # not the workspace

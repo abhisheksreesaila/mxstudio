@@ -535,7 +535,8 @@ class PortManager:
     def _creds_src(self) -> Path:
         return (self.claude_home or Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")) / ".credentials.json"
 
-    def _confine(self, job: _Job, argv: list[str], role: str, ctx: Ctx | None) -> tuple[list[str], dict, str]:
+    def _confine(self, job: _Job, argv: list[str], role: str, ctx: Ctx | None,
+                 cwd: Path | None = None) -> tuple[list[str], dict, str]:
         """(argv, env, note) for running `argv` as role "agent", "check" (the skill's gates), "serve" (the
         smoke `max serve`) or "install" (trusted, pristine code, never confined). The environment is
         scrubbed of secrets (claude keeps only its own auth). Every cache a sandboxed process writes to
@@ -591,7 +592,7 @@ class PortManager:
             ro += self._weights_roots(ctx)
             rw = [work]
         gpu = role == "serve"
-        wrapped = port_sandbox.bwrap_argv(argv, bwrap=bw, cwd=Path(ws), home=home, mxc_home=mxc_home(),
+        wrapped = port_sandbox.bwrap_argv(argv, bwrap=bw, cwd=Path(cwd or ws), home=home, mxc_home=mxc_home(),
                                           rw=rw, ro=ro, ro_after=ro_after, binds=binds, gpu=gpu)
         return wrapped, env, "sandboxed with bubblewrap (read-only system and skills, empty $HOME and MXC_HOME, " \
             "private /tmp and caches, writable: " + ", ".join(str(x) for x in rw) + ")"
@@ -628,7 +629,7 @@ class PortManager:
         line to the log, and return (exit code, the last of its output). Cancel and the timeout kill the
         whole group."""
         self._check(job)
-        run_argv, env, note = self._confine(job, argv, role, ctx)
+        run_argv, env, note = self._confine(job, argv, role, ctx, cwd)  # inside the sandbox too (pixi needs it)
         job.say(f"[{role}] {note}")
         job.say("$ " + " ".join(argv if len(" ".join(argv)) < 600 else argv[:3] + ["..."]) + f"   (cwd {cwd})")
         try:
