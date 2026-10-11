@@ -414,9 +414,16 @@ def port_model(ref: str = typer.Argument(..., help="Short name or Hugging Face r
 def learn_model(
     model: str = typer.Argument(..., help="A registered model name or a Hugging Face repo id."),
     no_open: bool = typer.Option(False, "--no-open", help="Write the notebook but don't launch Jupyter Lab."),
+    as_json: bool = typer.Option(False, "--json", help="Print the notebook (path, cells, architecture) as JSON; never launches Jupyter."),
 ) -> None:
     """Build a notebook about a model from Hugging Face metadata and open it in Jupyter Lab."""
     from mxconsole import learn
+    if as_json:
+        try:
+            typer.echo(report.dump(learn.notebook_payload(model)))
+        except Exception as exc:
+            _fail(f"could not build a notebook for {model}: {exc}")
+        return
     try:
         path = learn.write_notebook(model)
     except Exception as exc:

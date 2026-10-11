@@ -287,6 +287,13 @@ r.raise_for_status()
 print(r.json()["choices"][0]["message"]["content"])'''
 
 
+def architecture_summary(cfg: dict[str, Any], actual: int | None = None) -> dict:
+    """The architecture panel as data (also stored in the notebook's metadata, so the console needn't re-fetch)."""
+    return {"architecture": next(iter(cfg.get("architectures") or []), None),
+            "rows": [{"field": k, "value": v, "meaning": EXPLAIN.get(k, "")} for k, v in architecture_rows(cfg)],
+            "parameters": parameter_breakdown(cfg), "safetensors_total": actual}
+
+
 def build_notebook(*, model_id: str, repo_id: str, source: HFSource, revision: str | None = None, registered: bool = True,
                    max_finder: Callable[[str | None], list[Path]] = find_max_implementation):
     info = source.info(repo_id, revision)
@@ -339,14 +346,15 @@ def build_notebook(*, model_id: str, repo_id: str, source: HFSource, revision: s
     ]
     nb = new_notebook(cells=cells, metadata={
         "kernelspec": {"name": "python3", "display_name": "Python 3", "language": "python"},
-        "mxconsole": {"model": model_id, "repo_id": repo_id}})
+        "mxconsole": {"model": model_id, "repo_id": repo_id,
+                      "architecture": architecture_summary(cfg, info.safetensors_total)}})
     nbformat.validate(nb)
     return nb
 
 
-def resolve(ref: str) -> tuple[str, str, str | None, bool]:
+def resolve(ref: str, store: Store | None = None) -> tuple[str, str, str | None, bool]:
     """(name the gateway serves, repo id, revision, registered) for a model name, repo id or curated alias."""
-    store = Store.open()
+    store = store or Store.open()
     m = store.get_model(ref) or next((x for x in store.models() if x.repo_id == ref), None)
     if m:
         return m.name, m.repo_id, m.revision, True
@@ -357,12 +365,37 @@ def resolve(ref: str) -> tuple[str, str, str | None, bool]:
     return model_name(ref, repo_id), repo_id, None, False
 
 
+def notebook_path(name: str) -> Path:
+    return mxc_home() / "notebooks" / f"{name}.ipynb"
+
+
 def write_notebook(ref: str, source: HFSource | None = None,
-                   max_finder: Callable[[str | None], list[Path]] = find_max_implementation) -> Path:
-    name, repo_id, revision, registered = resolve(ref)
+                   max_finder: Callable[[str | None], list[Path]] = find_max_implementation,
+                   store: Store | None = None) -> Path:
+    name, repo_id, revision, registered = resolve(ref, store)
     nb = build_notebook(model_id=name, repo_id=repo_id, source=source or default_source(),
                         revision=revision, registered=registered, max_finder=max_finder)
-    out = mxc_home() / "notebooks" / f"{name}.ipynb"
+    out = notebook_path(name)
     out.parent.mkdir(parents=True, exist_ok=True)
     nbformat.write(nb, out)
     return out
+
+
+def notebook_payload(ref: str, source: HFSource | None = None, store: Store | None = None) -> dict:
+    """The generated notebook as data for the console and `mxc learn --json`, generating it if missing.
+
+    An older notebook without the stored architecture summary is regenerated once."""
+    name = resolve(ref, store)[0]
+    path = notebook_path(name)
+    generated = False
+    nb = nbformat.read(path, as_version=4) if path.exists() else None
+    if nb is None or "architecture" not in nb.metadata.get("mxconsole", {}):
+        path = write_notebook(ref, source, store=store)
+        nb, generated = nbformat.read(path, as_version=4), True
+    spec = nb.metadata.get("kernelspec", {})
+    return {"name": name, "path": str(path), "generated": generated,
+            "kernelspec": {"name": spec.get("name"), "display_name": spec.get("display_name"),
+                           "language": spec.get("language")},
+            "architecture": nb.metadata.get("mxconsole", {}).get("architecture"),
+            "cells": [{"type": c.cell_type, "source": c.source,
+                       "outputs": json.loads(json.dumps(c.get("outputs", [])))} for c in nb.cells]}
