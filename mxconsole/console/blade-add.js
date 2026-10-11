@@ -344,12 +344,10 @@ function mountAdd(blade, body) {
   const logToggle = h("button", { type: "button", class: "ltoggle", "aria-expanded": "true" }, "Hide log");
   const stageList = h("ol", { class: "stages" });
   const rowEls = new Map();
-  const headTitle = h("h3", { class: "runtitle" });
-  const headTwin = h("div", { class: "cli mono" });
   const after = h("div", { class: "after" });
   const actions = h("div", { class: "runacts" });
   const setupEl = h("div", { class: "setup" },
-    h("div", { class: "sl" }, headTitle, headTwin, stageList, actions, after),
+    h("div", { class: "sl" }, stageList, actions, after),
     h("div", { class: "sr" }, h("div", { class: "lbl" }, icon("terminal", 13, "currentColor", 1.8), "LIVE LOG", h("span", { class: "grow" }), logToggle), logEl));
   logToggle.addEventListener("click", () => {
     ui.logOpen = !ui.logOpen;
@@ -391,7 +389,8 @@ function mountAdd(blade, body) {
       let el = rowEls.get(r.id);
       if (!el) {
         el = { status: null, ring: h("span", { class: "ring" }), n: h("span", { class: "n" }), el: h("span", { class: "el" }), d: h("span", { class: "d" }), tw: h("span", { class: "cli mono tw" }), bar: h("i") };
-        el.li = h("li", { class: "stg pending", "data-id": r.id }, el.ring, el.n, h("span", { class: "meta" }, el.el), el.d, h("div", { class: "bar" }, el.bar), el.tw);
+        el.barWrap = h("div", { class: "bar" }, el.bar);
+        el.li = h("li", { class: "stg pending", "data-id": r.id }, el.ring, el.n, h("span", { class: "meta" }, el.el), el.d, el.barWrap, el.tw);
         rowEls.set(r.id, el);
       }
       if (el.status !== r.status) {
@@ -403,7 +402,9 @@ function mountAdd(blade, body) {
       const t = elapsedText(r.elapsed);
       if (el.el.textContent !== t) el.el.textContent = t;
       if (el.d.textContent !== r.detail) { el.d.textContent = r.detail; el.d.title = r.detail; }
-      if (el.tw.textContent !== r.twin) { el.tw.textContent = r.twin; el.tw.hidden = !r.twin; }
+      if (el.tw.textContent !== r.twin) el.tw.textContent = r.twin;
+      el.tw.hidden = !r.twin;
+      el.barWrap.hidden = r.percent === null;
       el.bar.style.width = r.percent === null ? "0%" : `${Math.max(0, Math.min(100, r.percent))}%`;
       if (stageList.children[i] !== el.li) stageList.insertBefore(el.li, stageList.children[i] || null);
     });
@@ -421,8 +422,6 @@ function mountAdd(blade, body) {
     rowEls.clear();
     preEl.replaceChildren(); postEl.replaceChildren(); tailEl.replaceChildren(); tailKey = "";
     after.replaceChildren(); actions.replaceChildren();
-    headTitle.textContent = title;
-    headTwin.textContent = twinText;
     body.replaceChildren(setupEl);
     setHead(blade, { title, crumb: ref, sub: twinText });
     ui.tick = every(paint, TICK_MS);
@@ -528,9 +527,10 @@ function mountAdd(blade, body) {
       const onJob = (j) => {
         ui.run.fetch = j;
         for (const s of j.steps || []) {
-          const key = `${s.state}|${s.detail}`;
+          // download detail changes every second: log it at every tenth of the bytes, not every tick
+          const key = s.id === "download" && s.state === "now" ? `now|${Math.floor((j.percent || 0) / 10)}` : `${s.state}|${s.detail}`;
           if (seen.get(s.id) !== key && s.state !== "next" && (s.detail || s.state === "done")) {
-            if (s.state !== "now" || s.detail) logLine(`${s.label || s.id}: ${s.detail || s.state}`, s.state === "done" ? "okl" : "");
+            logLine(`${s.label || s.id}: ${s.detail || s.state}`, s.state === "done" ? "okl" : "");
             seen.set(s.id, key);
           }
         }
@@ -565,7 +565,7 @@ function mountAdd(blade, body) {
     showSetup(`Porting ${ref.split("/").pop()}`, `${twin("port", ref)} · Claude Code with Modular’s import-model skill`, ref);
     cancelButton(flow);
     logWith("check", `hardware: ${ui.run.hw}`);
-    logLine("Claude Code is running Modular’s import-model skill in a sandbox. This may take a while.");
+    logWith("check", "Claude Code is running Modular’s import-model skill in a sandbox. This may take a while.");
     const finished = (j) => ["done", "failed", "cancelled"].includes(j.status);
     try {
       const onJob = (j) => { ui.run.port = j; setTail(portLogLines(j)); paint(); };
