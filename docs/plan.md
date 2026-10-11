@@ -179,12 +179,12 @@ Brief: docs/briefs/console-1.0.md · Needs: none
 - [x] `GET /admin/system` also returns the GPU name, total and used VRAM, and VRAM per running model
 - [x] every new route is admin-only and loopback-only like the others; each has its CLI twin with `--json`
 
-## F-025 A model's resource blade, Security and API keys [todo]
+## F-025 A model's resource blade, Security and API keys [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
-- [ ] model blade: menu (Overview, Security, Benchmark, Logs, Notebook), command bar (Start/Stop/Restart, Make it secure, Run benchmark, Open notebook, Logs, Copy endpoint, Remove with a second click to confirm)
-- [ ] Overview: essentials, live tokens (tok/s, TTFT, requests, trace), call it (endpoint, key, curl that changes to the LAN URL once secure), hardware fit bar
-- [ ] Security blade: Make it secure runs `/admin/expose` with its steps shown, then the HTTPS URL, key and CA path
-- [ ] API keys blade: list, new (shown once), rotate, revoke; each shows its `mxc` command
+- [x] model blade: menu (Overview, Security, Benchmark, Logs, Notebook), command bar (Start/Stop/Restart, Make it secure, Run benchmark, Open notebook, Logs, Copy endpoint, Remove with a second click to confirm)
+- [x] Overview: essentials, live tokens (tok/s, TTFT, requests, trace), call it (endpoint, key, curl that changes to the LAN URL once secure), hardware fit bar
+- [x] Security blade: Make it secure runs `/admin/expose` with its steps shown, then the HTTPS URL, key and CA path
+- [x] API keys blade: list, new (shown once), rotate, revoke; each shows its `mxc` command
 
 ## F-026 Add a model [todo]
 Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024

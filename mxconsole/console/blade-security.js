@@ -95,7 +95,10 @@ register("security", (blade) => ({
         return;
       }
       clearTimeout(stopTimer); stopArmed = false; stopBusy = true; btn.disabled = true;
-      try { await api("POST", "/admin/expose/stop"); toast("LAN access is off · $ mxc expose --stop"); } catch (e) { toast(`Could not stop: ${e.message}`); }
+      try { await api("POST", "/admin/expose/stop"); toast("LAN access is off · $ mxc expose --stop"); } catch (e) {
+        toast(`Could not stop: ${e.message}`);
+        btn.disabled = false; btn.lastChild.textContent = "Stop exposing";  // nothing redraws it on failure
+      }
       phase = "idle"; stopBusy = false; await reloadInfo(); await loadNetwork();
     }
 
