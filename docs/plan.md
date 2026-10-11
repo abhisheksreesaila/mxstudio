@@ -157,5 +157,70 @@ Brief: docs/brief.md · Needs: F-019, F-020, F-021 merged
 - [x] the shared `Store` connection is never used from two threads at once (sync admin routes in the threadpool, pull and bench worker threads, the event loop recording metrics): one connection per thread, WAL, busy_timeout
 - [x] stress test: 8 threads reading and writing metrics, keys and models at once, no errors, no lost writes
 
+## Console 1.0 (brief: docs/briefs/console-1.0.md)
+Design: concept D, https://claude.ai/artifact/CSZMDSYDhyCzja8pjHpotw (local copy `.lavish/concepts/d-console.html`).
+Order: F-023 and F-024 first (in parallel); then F-025 to F-028 in parallel (each its own blade file); F-029 and F-030 any time; F-031 last.
+
+## F-023 Blades shell and My models [todo]
+Brief: docs/briefs/console-1.0.md · Needs: none
+- [ ] `/console` is the new layout: dark top bar (brand → home, breadcrumb, hardware chip with a VRAM bar per running model and a popover, API keys, Gateway, Settings, theme toggle, daemon dot); no left menu, no global Logs
+- [ ] blade engine: blades dock side by side, the newest on the right; older ones fold into clickable rails when space runs out; breadcrumb and Esc close back; a wide blade (notebook, add) folds everything left of it
+- [ ] My models blade from `/admin/models` + `/admin/metrics`: list (default) and cards toggle remembered per browser, state, access, live tok/s, a crashed model called out with "View logs"; compact list when a model is open beside it; "Add a model"
+- [ ] blade registry: each later blade is its own `blade-*.js` + CSS section, stubs registered now so F-025..F-028 touch only their own files
+- [ ] light and dark themes from tokens (dark follows the system until toggled, remembered); colour-coded outline icons (icon in the action's hue, label a quieter tint; Remove red); CSP unchanged, data as text nodes
+- [ ] the daemon-down state; narrow screens show only the newest blade
+
+## F-024 Admin API for the 1.0 console [todo]
+Brief: docs/briefs/console-1.0.md · Needs: none
+- [ ] `mxc rm <model>` and `DELETE /admin/models/{name}`: stops it, unregisters it, deletes its compiled-graph cache; weights stay in the HF cache unless `--purge`
+- [ ] `GET /admin/search?q=`: curated names, MAX catalog and Hugging Face repo ids, each with source, params, size, estimated VRAM, `fit` (ok / tight / no / port) against this machine's free GPU memory, and for `no` up to 3 suggestions that fit
+- [ ] `mxc keys rotate <app>` and `POST /admin/keys/{app}/rotate`: new secret shown once, old one revoked
+- [ ] `GET /admin/learn/{name}`: the generated notebook (cells, kernel spec, path), generating it if missing; `POST /admin/learn/{name}/open` starts Jupyter on it and returns the URL
+- [ ] `GET /admin/system` also returns the GPU name, total and used VRAM, and VRAM per running model
+- [ ] every new route is admin-only and loopback-only like the others; each has its CLI twin with `--json`
+
+## F-025 A model's resource blade, Security and API keys [todo]
+Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
+- [ ] model blade: menu (Overview, Security, Benchmark, Logs, Notebook), command bar (Start/Stop/Restart, Make it secure, Run benchmark, Open notebook, Logs, Copy endpoint, Remove with a second click to confirm)
+- [ ] Overview: essentials, live tokens (tok/s, TTFT, requests, trace), call it (endpoint, key, curl that changes to the LAN URL once secure), hardware fit bar
+- [ ] Security blade: Make it secure runs `/admin/expose` with its steps shown, then the HTTPS URL, key and CA path
+- [ ] API keys blade: list, new (shown once), rotate, revoke; each shows its `mxc` command
+
+## F-026 Add a model [todo]
+Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
+- [ ] wide blade: search (`/admin/search`), results marked fits / tight / too big / needs porting; too big shows why and the suggestions
+- [ ] picking one runs the stages (check hardware, fetch, compile graph, serve on localhost, smoke test) from `/admin/pulls`, the load call and a one-line chat; live log; cancel
+- [ ] ends on a Ready card (endpoint, curl, Make it secure, Open); the model appears in My models with a short flash
+- [ ] needs porting → "Port it" hands over to F-029's job (until F-029 lands: shows the `mxc port` command)
+
+## F-027 Benchmark and Logs blades [todo]
+Brief: docs/briefs/console-1.0.md · Needs: F-023
+- [ ] Benchmark: standard horizontal bar charts for decode tok/s and TTFT across your models (this one outlined), workload line, Run again (background, progress), history; data from `/admin/bench`
+- [ ] Logs: per model, follow/pause, filter, from `/admin/models/{name}/log`
+
+## F-028 Notebook, Gateway and Settings blades [todo]
+Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
+- [ ] Notebook (wide): chapters, the generated notebook's markdown and code cells read-only with saved outputs, architecture panel, kernel chip, "Open in Jupyter" (`/admin/learn/{name}/open`)
+- [ ] Gateway: LiteLLM routes (model → upstream), status, restart; Settings: theme, idle unload default, daemon info
+
+## F-029 Automatic port for unsupported architectures [todo]
+Brief: docs/briefs/console-1.0.md · Needs: none (UI hook in F-026)
+- [ ] `mxc port <ref> --auto` runs Modular's `import-model` skill unattended with Claude Code (`claude -p`) in the port workspace, as a background job with stages (workspace, skills, generate, build, parity check, register) and a full log
+- [ ] a failing stage is retried with the error fed back (auto-fix, bounded attempts); on success the model is registered and served like any other; on failure the log says what it tried
+- [ ] `POST /admin/ports`, `GET /admin/ports/{id}`, cancel; `--json` progress lines
+- [ ] tested with a fake `claude` binary; nothing real runs in tests
+
+## F-030 Desktop app for Linux and Mac [todo]
+Brief: docs/briefs/console-1.0.md · Needs: F-023
+- [ ] `mxc app` opens the console in a native window (pywebview), starting the daemon if it isn't running, and stops nothing on close
+- [ ] Linux: `mxc app --install` writes a `.desktop` launcher with the mxconsole icon
+- [ ] no Linux-only assumptions in the code path; Mac build verified later on a Mac
+
+## F-031 Retire the old console pages [todo]
+Brief: docs/briefs/console-1.0.md · Needs: F-025..F-028
+- [ ] old page files and their CSS are gone; every old capability is reachable from a blade or the CLI; `mxc console [page]` maps old page names to blades
+- [ ] full suite green; live check in the running app (`/verify`) in both themes
+
 ## Parked: console layout redesign
-Decided 2026-10-03: keep the current layout while the person uses mxconsole day to day; revisit once it's clear which views matter. Candidates on the canvas (Round 4): Resource blades (Azure), Agent deck (journal + reading pane), or both combined. Mockup-only ideas, not built: `mxc set --gpu`, `mxc expose --deny`, the ask box.
+Superseded 2026-10-11 by Console 1.0 above (concept D chosen).
+Still mockup-only ideas, not built: `mxc set --gpu`, `mxc expose --deny`, the ask box.

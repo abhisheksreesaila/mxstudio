@@ -15,3 +15,4 @@ Claude reads this at the start of each session. -->
 - 2026-10-03 · The product is written as one lowercase word, mxconsole (mx carries the weight), never "MX Console"; the command stays mxc.
 - 2026-10-03 · ↗ only on links that leave the console and open a new tab; a link to our own page (the API reference) gets no arrow.
 - 2026-10-03 · The menu must collapse to an icon rail (☰ in the top bar), with tooltips on hover.
+- 2026-10-10 · Show design concepts and mockups as Claude Artifacts, not Lavish Editor: that's where the person reviews them.
