@@ -68,10 +68,10 @@ function barBlock(title, hint, rows, unit, digits) {
   return h("section", { class: "bn-sec" },
     h("div", { class: "h3" }, title, h("span", { class: "r mono" }, hint)),
     h("div", { class: "bn-bars" }, rows.map((r) => h("div", { class: `bn-row${r.me ? " me" : ""}${r.best ? " best" : ""}` },
-      h("span", { class: "bn-nm" }, h("span", { class: "mdot", style: { "--mc": colorOf(r.model) } }), h("span", { class: "trunc" }, r.model)),
+      h("span", { class: "bn-nm" }, h("span", { class: "mdot", style: { "--mc": colorOf(r.model) } }), h("span", { class: "bn-who" }, h("span", { class: "trunc" }, r.model),
+        r.older ? h("span", { class: "bn-old trunc", title: "from an earlier run" }, dateTime(r.at)) : null)),
       h("span", { class: "bn-tr" }, h("span", { class: "bn-fill", "data-w": (r.fraction * 100).toFixed(1), style: { "--mc": colorOf(r.model) } })),
-      h("span", { class: "bn-v mono" }, `${r.estimated ? "~" : ""}${fmt(r.value, digits)} ${unit}`,
-        r.older ? h("span", { class: "bn-old", title: "from an earlier run" }, ` ${dateTime(r.at)}`) : null)))));
+      h("span", { class: "bn-v mono" }, `${r.estimated ? "~" : ""}${fmt(r.value, digits)} ${unit}`)))));
 }
 function setWidths(root, instant) {
   const fills = [...root.querySelectorAll(".bn-fill")];
@@ -146,7 +146,7 @@ register("bench", (blade) => {
     if (!state) { chartsHost.replaceChildren(h("div", { class: "bn-empty" }, "Loading…")); return; }
     const run = shownRun();
     const onLatest = !!run && !!state.latest && run.id === state.latest.id;
-    const results = !run ? [] : onLatest ? mergeLatest([state.latest, ...hist], (store.models || []).map((m) => m.name)) : run.results;
+    const results = !run ? [] : onLatest ? mergeLatest([state.latest, ...hist.filter((r) => r.status === "done" || r.status === "failed")], store.models ? store.models.map((m) => m.name) : null) : run.results;
     const key = JSON.stringify([run && run.id, id, running(), results.map((r) => [r.model, r.status, r.decode_tps, r.ttft_p50_ms, r.at])]);
     if (key === chartKey) return; // idle polls leave the DOM alone
     chartKey = key;

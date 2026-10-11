@@ -6,8 +6,9 @@
 .bn-charts:empty { display: none; }
 .bn-sec .h3 { margin-bottom: 12px; }
 .bn-bars { display: grid; gap: 8px; }
-.bn-row, .bn-prow { display: grid; grid-template-columns: minmax(80px, 150px) minmax(0, 1fr) auto; align-items: center; gap: 10px; font: 12.5px var(--mono); }
-.bn-row .bn-v { min-width: 84px; text-align: right; color: var(--text-2); white-space: nowrap; }
+.bn-row, .bn-prow { display: grid; grid-template-columns: minmax(80px, 150px) minmax(0, 1fr) var(--bn-val); align-items: center; gap: 10px; font: 12.5px var(--mono); }
+.bn { --bn-val: 92px; }
+.bn-row .bn-v { text-align: right; color: var(--text-2); white-space: nowrap; }
 .bn-nm { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .bn-tr, .bn-ptr { height: 16px; border-radius: 4px; background: var(--card-line-2); overflow: hidden; display: block; }
 .bn-fill, .bn-pfill { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--mc); transition: width .9s var(--ease); }
@@ -42,11 +43,12 @@
 .bn-hbest { color: var(--text-2); text-align: right; }
 @container (max-width: 420px) {
   .bn { padding: 14px 14px 32px; }
-  .bn-row { grid-template-columns: minmax(70px, 100px) minmax(0, 1fr) auto; }
+  .bn-row { grid-template-columns: minmax(70px, 100px) minmax(0, 1fr) var(--bn-val); }
   .bn-prow { grid-template-columns: minmax(70px, 100px) minmax(0, 1fr); }
   .bn-prow .bn-pword { grid-column: 1 / -1; }
-  .bn-hrow { grid-template-columns: minmax(0, 1fr) auto; }
+  .bn-hrow { grid-template-columns: minmax(0, 1fr) var(--bn-val); }
   .bn-hwho { display: none; }
 }
 .bn > div:empty { display: none; }
+.bn-who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .bn-old { color: var(--faint); font-size: 10.5px; }

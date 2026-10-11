@@ -152,3 +152,12 @@ async def test_log_route_says_whether_the_tail_was_cut(http):
     (logs / "tiny.log").write_text("short\n")
     assert (await http.get("/admin/models/tiny/log", headers=ADMIN)).headers["x-log-truncated"] == "0"
     assert (await http.get("/admin/models/other/log", headers=ADMIN)).headers["x-log-truncated"] == "0"  # no file yet
+
+
+def test_every_bar_row_has_the_same_fixed_value_column_so_equal_values_draw_equal_bars():
+    css = (CONSOLE_DIR / "blade-bench.css").read_text()
+    rules = [line for line in css.splitlines() if "grid-template-columns" in line and ".bn-row" in line]
+    assert rules and all("auto" not in r and "var(--bn-val)" in r for r in rules)
+    assert re.search(r"--bn-val:\s*\d+px", css)
+    js = (CONSOLE_DIR / "blade-bench.js").read_text()
+    assert "(store.models || [])" not in js and 'r.status === "done" || r.status === "failed"' in js  # cold open, running runs
