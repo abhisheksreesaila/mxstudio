@@ -179,12 +179,12 @@ Brief: docs/briefs/console-1.0.md · Needs: none
 - [x] `GET /admin/system` also returns the GPU name, total and used VRAM, and VRAM per running model
 - [x] every new route is admin-only and loopback-only like the others; each has its CLI twin with `--json`
 
-## F-025 A model's resource blade, Security and API keys [todo]
+## F-025 A model's resource blade, Security and API keys [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
-- [ ] model blade: menu (Overview, Security, Benchmark, Logs, Notebook), command bar (Start/Stop/Restart, Make it secure, Run benchmark, Open notebook, Logs, Copy endpoint, Remove with a second click to confirm)
-- [ ] Overview: essentials, live tokens (tok/s, TTFT, requests, trace), call it (endpoint, key, curl that changes to the LAN URL once secure), hardware fit bar
-- [ ] Security blade: Make it secure runs `/admin/expose` with its steps shown, then the HTTPS URL, key and CA path
-- [ ] API keys blade: list, new (shown once), rotate, revoke; each shows its `mxc` command
+- [x] model blade: menu (Overview, Security, Benchmark, Logs, Notebook), command bar (Start/Stop/Restart, Make it secure, Run benchmark, Open notebook, Logs, Copy endpoint, Remove with a second click to confirm)
+- [x] Overview: essentials, live tokens (tok/s, TTFT, requests, trace), call it (endpoint, key, curl that changes to the LAN URL once secure), hardware fit bar
+- [x] Security blade: Make it secure runs `/admin/expose` with its steps shown, then the HTTPS URL, key and CA path
+- [x] API keys blade: list, new (shown once), rotate, revoke; each shows its `mxc` command
 
 ## F-026 Add a model [todo]
 Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
@@ -193,10 +193,10 @@ Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
 - [ ] ends on a Ready card (endpoint, curl, Make it secure, Open); the model appears in My models with a short flash
 - [ ] needs porting → "Port it" hands over to F-029's job (until F-029 lands: shows the `mxc port` command)
 
-## F-027 Benchmark and Logs blades [todo]
+## F-027 Benchmark and Logs blades [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023
-- [ ] Benchmark: standard horizontal bar charts for decode tok/s and TTFT across your models (this one outlined), workload line, Run again (background, progress), history; data from `/admin/bench`
-- [ ] Logs: per model, follow/pause, filter, from `/admin/models/{name}/log`
+- [x] Benchmark: standard horizontal bar charts for decode tok/s and TTFT across your models (this one outlined), workload line, Run again (background, progress), history; data from `/admin/bench`
+- [x] Logs: per model, follow/pause, filter, from `/admin/models/{name}/log`
 
 ## F-028 Notebook, Gateway and Settings blades [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
