@@ -32,8 +32,8 @@ class DaemonSource:
         except httpx.HTTPError as e:
             raise PortFailed(f"could not reach the mxconsole daemon at {daemon_url()}: {e}")
 
-    def start(self, ref, name, max_attempts):
-        body = {"ref": ref, "max_attempts": max_attempts, **({"name": name} if name else {})}
+    def start(self, ref, name, max_attempts, unsandboxed=False):
+        body = {"ref": ref, "max_attempts": max_attempts, **({"name": name} if name else {}), **({"unsandboxed": True} if unsandboxed else {})}
         r = self._call("POST", "", json=body)
         data = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
         if r.status_code == 409 and "port" in data:
@@ -91,7 +91,7 @@ class Display:
             print(json.dumps({"event": job["status"], **job}), file=self.out, flush=True)
 
 
-def run(ref: str, name: str | None, as_json: bool, max_attempts: int = DEFAULT_ATTEMPTS, *, source=None,
+def run(ref: str, name: str | None, as_json: bool, max_attempts: int = DEFAULT_ATTEMPTS, *, unsandboxed: bool = False, source=None,
         display: Display | None = None, sleep=time.sleep) -> tuple[int, str]:
     """Start the port and watch it. Returns (exit code, the line to print; empty with --json)."""
     from mxconsole import serve
@@ -101,7 +101,7 @@ def run(ref: str, name: str | None, as_json: bool, max_attempts: int = DEFAULT_A
             if serve.ensure_daemon() and not as_json:
                 print("started the mxconsole daemon", file=sys.stderr)
             source = DaemonSource()
-        job = source.start(ref, name, max_attempts)
+        job = source.start(ref, name, max_attempts, unsandboxed)
     except (PortFailed, serve.DaemonError) as e:
         return _failed(as_json, str(e))
     port_id = job["id"]

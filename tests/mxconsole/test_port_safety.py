@@ -88,8 +88,10 @@ def test_environment_is_scrubbed_and_claude_gets_a_private_config(tmp_path, fake
     for k in ("MXC_API_KEY", "HF_TOKEN", "SOME_SECRET", "SSH_AUTH_SOCK"):
         assert k not in call["env"]
     assert "ANTHROPIC_API_KEY" in call["env"]
-    assert call["config_dir"] == str(mxc_home() / "ports" / str(job["id"]) / "claude-cfg")
-    assert call["creds"] == '{"login": "x"}'
+    assert call["config_dir"] == str(mxc_home() / "ports" / str(job["id"]) / "work" / "claude-cfg")
+    assert call["creds"] == '{"login": "x"}'  # reached through a link to the one real login, not a copy
+    assert not (mxc_home() / "ports" / str(job["id"]) / "work").exists()
+    assert (home / ".credentials.json").read_text() == '{"login": "x"}'
     checks = [json.loads(line) for line in (tmp_path / "check-env.log").read_text().splitlines()]
     assert {c["phase"] for c in checks} == {"build", "verify"}
     for c in checks:
@@ -105,42 +107,132 @@ def fake_bwrap(tmp_path, monkeypatch):
     return str(script)
 
 
-def test_agent_checks_and_server_run_inside_bwrap(tmp_path, fake_claude, fake_bwrap, monkeypatch):
+def bind_pairs(argv, flag):
+    return [(argv[i + 1], argv[i + 2]) for i, a in enumerate(argv) if a == flag]
+
+
+def test_agent_checks_and_server_run_inside_bwrap_with_nothing_shared_writable(tmp_path, fake_claude, fake_bwrap):
     if not sys.platform.startswith("linux"):
         pytest.skip("bubblewrap is Linux only")
+    home = tmp_path / "claude-home"
+    home.mkdir()
+    (home / ".credentials.json").write_text('{"login": "x"}')
     m = make_manager(tmp_path, fake_claude, sandbox=True, bwrap=fake_bwrap)
     job = run(m)
     assert job["status"] == "done", job["message"]
     runs = [json.loads(line) for line in (tmp_path / "bwrap.log").read_text().splitlines()]
     ws = mxc_home() / "ports" / "weird"
-    clone = mxc_home() / "skills" / "modular" / "import-model"
+    work = mxc_home() / "ports" / str(job["id"]) / "work"
+    clone = mxc_home() / "skills" / "modular"
     agent = next(r for r in runs if r["cmd"][0] == fake_claude)
+    checks = [r for r in runs if "fake_port_check.py" in " ".join(r["cmd"])]
+    server = next(r for r in runs if "serve" in r["cmd"])
+    assert len(checks) == 2
     assert agent["bwrap"][:9] == ["--die-with-parent", "--new-session", "--unshare-pid", "--unshare-ipc",
                                   "--unshare-uts", "--ro-bind", "/", "/", "--dev"]
-    assert str(ws) in agent["bwrap"] and str(mxc_home()) in agent["bwrap"]
-    assert str(clone) not in agent["bwrap"]                 # the agent cannot write the gates' skill dir
+    allowed_rw = {"agent": {str(ws), str(work)}, "check": {str(work)}, "serve": {str(work)}}
+    for role, r in (("agent", agent), ("check", checks[0]), ("check", checks[1]), ("serve", server)):
+        rw = {src for src, dst in bind_pairs(r["bwrap"], "--bind-try") if src == dst}
+        assert rw == allowed_rw[role], (role, rw)          # no shared cache or home path is ever writable
+        assert str(clone) in [src for src, _ in bind_pairs(r["bwrap"], "--ro-bind-try")], role  # pristine skills, read-only
+    assert str(ws) in [src for src, _ in bind_pairs(checks[0]["bwrap"], "--ro-bind-try")]
     ws_at = agent["bwrap"].index(str(ws))
     for name in ("settings.json", "settings.local.json"):  # it cannot widen its own permissions either
         f = str(ws / ".claude" / name)
         i = agent["bwrap"].index(f)
         assert i > ws_at and agent["bwrap"][i - 1] == "--ro-bind-try"
-    checks = [r for r in runs if "fake_port_check.py" in " ".join(r["cmd"])]
-    assert len(checks) == 2
-    assert all(str(clone) in c["bwrap"] for c in checks)    # pixi writes its env there, but only the gate runs there
-    server = next(r for r in runs if "serve" in r["cmd"])
-    assert "--dev-bind" in server["bwrap"]                  # the smoke server sees the GPU
+    assert "--dev-bind" in server["bwrap"] and "--dev-bind" not in agent["bwrap"]
     log = Path(job["log"]).read_text()
     assert "[agent] sandboxed with bubblewrap" in log and "[serve] sandboxed with bubblewrap" in log
+    assert not str(Path(job["log"])).startswith(str(work))   # port.log is outside everything the agent can write
+    assert not work.exists()                                 # private caches and the claude config are deleted at the end
+
+
+def test_credentials_are_bound_not_copied(tmp_path, fake_claude, fake_bwrap):
+    home = tmp_path / "claude-home"
+    home.mkdir()
+    real = home / ".credentials.json"
+    real.write_text('{"login": "x"}')
+    job = run(make_manager(tmp_path, fake_claude, sandbox=True, bwrap=fake_bwrap))
+    runs = [json.loads(line) for line in (tmp_path / "bwrap.log").read_text().splitlines()]
+    agent = next(r for r in runs if r["cmd"][0] == fake_claude)
+    work = mxc_home() / "ports" / str(job["id"]) / "work"
+    assert (str(real), str(work / "claude-cfg" / ".credentials.json")) in bind_pairs(agent["bwrap"], "--bind-try")
+    # nothing else of ~/.claude is exposed: only that one file
+    assert not any(str(home) in a for a in agent["bwrap"] if a != str(real))
+
+
+def test_private_caches_are_in_the_job_work_dir(tmp_path, fake_claude):
+    m = make_manager(tmp_path, fake_claude)
+    job = _Job(5, "acme/weird", "weird", 1)
+    job.dir = tmp_path / "j"
+    _, env, _ = m._confine(job, ["x"], "check", None)
+    for k in ("PIXI_CACHE_DIR", "RATTLER_CACHE_DIR", "UV_CACHE_DIR", "XDG_CACHE_HOME", "MODULAR_DERIVED_PATH", "HF_HOME", "HF_HUB_CACHE"):
+        assert env[k].startswith(str(job.dir / "work")), k
+
+
+def test_skill_env_is_installed_outside_the_sandbox_before_the_agent(tmp_path, fake_claude, fake_bwrap):
+    order = tmp_path / "order.log"
+    tools = check_tools()
+    tools.install = lambda c: ([sys.executable, "-c", f"open({str(order)!r}, 'a').write('install')"], c.skills_root)
+    job = run(make_manager(tmp_path, fake_claude, sandbox=True, bwrap=fake_bwrap, tools=tools))
+    assert job["status"] == "done", job["message"]
+    assert order.read_text() == "install"
+    runs = [json.loads(line) for line in (tmp_path / "bwrap.log").read_text().splitlines()]
+    assert not any(r["cmd"][:2] == [sys.executable, "-c"] for r in runs)      # never wrapped
+    assert "trusted install of the pristine skill env, not sandboxed" in Path(job["log"]).read_text()
+
+
+def test_failed_skill_install_fails_the_skills_stage(tmp_path, fake_claude):
+    tools = check_tools()
+    tools.install = lambda c: ([sys.executable, "-c", "import sys; print('no space left'); sys.exit(3)"], c.skills_root)
+    job = run(make_manager(tmp_path, fake_claude, tools=tools))
+    assert job["status"] == "failed" and "could not install the skill's pixi environment" in job["message"]
+    assert calls(tmp_path) == []
+
+
+def test_default_install_uses_the_lockfile_when_there_is_one(tmp_path):
+    clone = tmp_path / "c"
+    (clone / "import-model").mkdir(parents=True)
+    ctx = port_auto.Ctx("r", "o/r", "r", tmp_path, tmp_path / "p", clone)
+    assert port_auto._skill_install(ctx) is None                       # no manifest: nothing to install
+    (clone / "import-model" / "pixi.toml").write_text("")
+    assert port_auto._skill_install(ctx) == (["pixi", "install"], clone / "import-model")
+    (clone / "import-model" / "pixi.lock").write_text("")
+    assert port_auto._skill_install(ctx)[0] == ["pixi", "install", "--locked"]
+
+
+def test_without_bwrap_auto_is_refused_unless_unsandboxed_is_given(tmp_path, fake_claude):
+    m = make_manager(tmp_path, fake_claude, sandbox=True, bwrap="no-such-bwrap")
+    with pytest.raises(port_auto.PortUnsafe, match="--unsandboxed"):
+        m.start("acme/weird")
+    assert m.list() == [] and calls(tmp_path) == []
 
 
 def test_without_bwrap_it_says_so_and_asks_claude_for_its_own_sandbox(tmp_path, fake_claude):
     m = make_manager(tmp_path, fake_claude, sandbox=True, bwrap="no-such-bwrap")
-    job = run(m)
+    job = run(m, unsandboxed=True)
     assert job["status"] == "done", job["message"]
-    assert "[agent] NOT sandboxed (bubblewrap (bwrap) not found); using Claude Code's own sandbox setting" in Path(job["log"]).read_text()
+    assert "[agent] NOT sandboxed (bubblewrap (bwrap) not found; --unsandboxed was given); using Claude Code's own sandbox setting" in Path(job["log"]).read_text()
     (call,) = calls(tmp_path)
     i = call["argv"].index("--settings")
     assert json.loads(call["argv"][i + 1])["sandbox"]["enabled"] is True
+
+
+async def test_route_refuses_auto_without_a_sandbox_with_the_reason(tmp_path, monkeypatch):
+    import httpx
+    from mxconsole.gateway import create_app
+    from mxconsole.supervisor import Supervisor
+    monkeypatch.setattr("mxconsole.port_sandbox.have_bwrap", lambda path="bwrap": None)
+    store = Store(tmp_path / "mst.db")
+    app = create_app(store, Supervisor(store, max_command=(sys.executable, "-c", "pass")))
+    transport = httpx.ASGITransport(app=app, client=("127.0.0.1", 5000))
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:11435") as c:
+        r = await c.post("/admin/ports", json={"ref": "acme/weird"}, headers={"X-Mst-Admin": "1"})
+        assert r.status_code == 400 and r.json()["error"]["code"] == "no_sandbox"
+        assert "bubblewrap" in r.json()["error"]["message"] and "--unsandboxed" in r.json()["error"]["message"]
+        bad = await c.post("/admin/ports", json={"ref": "acme/weird", "unsandboxed": "yes"}, headers={"X-Mst-Admin": "1"})
+        assert bad.status_code == 400 and bad.json()["error"]["code"] == "invalid_request_body"
 
 
 # ---- the gates cannot be edited by the agent --------------------------------------------------

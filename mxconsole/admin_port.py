@@ -11,7 +11,7 @@ import json
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from mxconsole.port_auto import DEFAULT_ATTEMPTS, PortBusy, PortManager, cleanup_at_exit
+from mxconsole.port_auto import DEFAULT_ATTEMPTS, PortBusy, PortManager, PortUnsafe, cleanup_at_exit
 from mxconsole.pulls import BadPull
 
 MAX_BODY = 4096
@@ -63,12 +63,17 @@ def register(app, store, supervisor, admin_only, *, manager: PortManager | None 
             body = None
         name = body.get("name") if isinstance(body, dict) else None
         attempts = body.get("max_attempts", DEFAULT_ATTEMPTS) if isinstance(body, dict) else None
+        unsandboxed = body.get("unsandboxed", False) if isinstance(body, dict) else None
+        if unsandboxed is not False and not isinstance(unsandboxed, bool):
+            return _error(400, "`unsandboxed` must be true or false.", "invalid_request_body")
         if not isinstance(body, dict) or not isinstance(body.get("ref"), str) or not (name is None or isinstance(name, str)):
             return _error(400, 'Send JSON like {"ref": "owner/repo", "max_attempts": 3}.', "invalid_request_body")
         try:
-            job = manager.start(body["ref"], name or None, attempts)
+            job = manager.start(body["ref"], name or None, attempts, unsandboxed=unsandboxed)
         except BadPull as e:
             return _error(400, str(e), "invalid_request_body")
+        except PortUnsafe as e:
+            return _error(400, str(e), "no_sandbox")
         except PortBusy as e:
             return _error(409, f"{e.job['ref']} is already being ported.", "port_in_progress", port=e.job)
         return JSONResponse(job, status_code=202)

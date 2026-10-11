@@ -106,21 +106,18 @@ def test_claude_is_run_headless_in_the_workspace_with_exactly_these_flags(tmp_pa
         assert broad not in call["argv"]
     ws = mxc_home() / "ports" / "weird"
     assert call["cwd"] == str(ws)
-    agent_skill = ws / ".claude" / "skills" / "import-model"
+    clone_skill = mxc_home() / "skills" / "modular" / "import-model"
     for needle in ("acme/weird", "import-model", "Package folder: ", "PORT.md", "check_port.py", "Nobody is available",
-                   str(agent_skill)):
+                   str(clone_skill)):
         assert needle in prompt
-    assert str(mxc_home() / "skills" / "modular") not in prompt  # the agent never hears of the pristine clone
     assert "Fix this" not in prompt
 
 
-def test_the_agent_works_on_a_copy_of_the_skills_not_the_clone(tmp_path, fake_claude):
+def test_the_skills_are_links_to_the_read_only_clone(tmp_path, fake_claude):
     run(make_manager(tmp_path, fake_claude))
     ws = mxc_home() / "ports" / "weird"
-    skill = ws / ".claude" / "skills" / "import-model"
-    assert skill.is_dir() and not skill.is_symlink() and (skill / "SKILL.md").is_file()
-    assert not (skill / ".git").exists()
-    assert str(skill) in (ws / "PORT.md").read_text()
+    link = ws / ".claude" / "skills" / "import-model"
+    assert link.is_symlink() and link.resolve() == (mxc_home() / "skills" / "modular" / "import-model").resolve()
 
 
 def test_log_file_has_everything_and_tail_is_streamed(tmp_path, fake_claude):
@@ -303,7 +300,7 @@ async def test_every_port_route_refuses_non_admin_callers(http):
 
 
 async def test_start_poll_finish_list_and_the_model_is_served(http):
-    started = await http.post("/admin/ports", json={"ref": "acme/weird", "max_attempts": 2}, headers=ADMIN)
+    started = await http.post("/admin/ports", json={"ref": "acme/weird", "max_attempts": 2, "unsandboxed": True}, headers=ADMIN)
     assert started.status_code == 202
     job = started.json()
     assert job["ref"] == "acme/weird" and job["status"] == "running" and job["max_attempts"] == 2
@@ -325,8 +322,8 @@ async def test_bad_bodies_unknown_ids_and_double_start(http, monkeypatch):
     assert (await http.get("/admin/ports/99", headers=ADMIN)).status_code == 404
     assert (await http.post("/admin/ports/99/cancel", headers=ADMIN)).status_code == 404
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "hang")
-    first = (await http.post("/admin/ports", json={"ref": "acme/weird"}, headers=ADMIN)).json()
-    again = await http.post("/admin/ports", json={"ref": "acme/weird"}, headers=ADMIN)
+    first = (await http.post("/admin/ports", json={"ref": "acme/weird", "unsandboxed": True}, headers=ADMIN)).json()
+    again = await http.post("/admin/ports", json={"ref": "acme/weird", "unsandboxed": True}, headers=ADMIN)
     assert again.status_code == 409 and again.json()["port"]["id"] == first["id"]
     cancelled = await http.post(f"/admin/ports/{first['id']}/cancel", headers=ADMIN)
     assert cancelled.status_code == 200
@@ -344,7 +341,7 @@ def test_cli_auto_json_streams_progress_then_a_final_event(tmp_path, daemon_env,
     with TestClient(app, base_url="http://127.0.0.1:11435", client=("127.0.0.1", 5000)) as tc:
         monkeypatch.setattr("httpx.request", lambda method, url, **kw: tc.request(method, url, **kw))
         monkeypatch.setattr("mxconsole.serve.ensure_daemon", lambda *a, **k: False)
-        out = CliRunner().invoke(cli.app, ["port", "acme/weird", "--auto", "--json", "--max-attempts", "2"])
+        out = CliRunner().invoke(cli.app, ["port", "acme/weird", "--auto", "--json", "--unsandboxed", "--max-attempts", "2"])
     assert out.exit_code == 0, out.output
     events = [json.loads(line) for line in out.stdout.splitlines() if line.startswith("{")]
     assert events[0]["event"] == "progress" and events[-1]["event"] == "done"
@@ -361,7 +358,7 @@ def test_cli_auto_prints_stages_and_exits_1_on_failure(tmp_path, daemon_env, mon
     with TestClient(app, base_url="http://127.0.0.1:11435", client=("127.0.0.1", 5000)) as tc:
         monkeypatch.setattr("httpx.request", lambda method, url, **kw: tc.request(method, url, **kw))
         monkeypatch.setattr("mxconsole.serve.ensure_daemon", lambda *a, **k: False)
-        out = CliRunner().invoke(cli.app, ["port", "acme/weird", "--auto", "--max-attempts", "2"])
+        out = CliRunner().invoke(cli.app, ["port", "acme/weird", "--auto", "--unsandboxed", "--max-attempts", "2"])
     assert out.exit_code == 1
     assert "generate (attempt 1)" in out.output and "build (attempt 2)" in out.output and "FAILED" in out.output
     assert "after 2 attempts" in out.output

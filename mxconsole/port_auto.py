@@ -17,11 +17,22 @@ When build or parity fails, generate runs again with the error output appended (
 of every command goes to MXC_HOME/ports/<id>/port.log. Cancel kills the process tree of whatever runs.
 Everything outside this process (claude, the skill's checks, max) is injectable, so tests run fakes.
 
-Safety (config.json and the model card are untrusted, so assume prompt injection): the agent, the checks
-and the smoke server run under bubblewrap (port_sandbox.py) with a scrubbed environment and a job-private
-Claude config; the agent edits a COPY of the skills, and the gates run from the pristine clone, whose
-scripts are hash-checked (and restored from git) before every use; the allow list is only the skill's
-own scripts. Without bwrap it says "NOT sandboxed" in the log and asks Claude Code for its own sandbox.
+Safety (config.json and the model card are untrusted, so assume prompt injection):
+- The agent, the gate checks and the smoke server run under bubblewrap (port_sandbox.py) with a scrubbed
+  environment, a job-private Claude config, and `--permission-prompts none`. The allow list is only the
+  skill's own scripts plus file tools. Without bwrap `--auto` is refused unless `--unsandboxed` is given.
+- Nothing shared is writable from a sandbox. The skill's pixi env is installed beforehand from the pristine
+  clone, outside the sandbox; the clone, the model's Hugging Face repo dir and the toolchain are bound
+  read-only; every cache (pixi, rattler, uv, HF_HOME with its token and modules, MODULAR_DERIVED_PATH)
+  lives in MXC_HOME/ports/<id>/work, which is deleted when the job ends. port.log is outside it.
+  MAX also keeps a cache in its install prefix (`share/max/.max_cache`); the prefix is read-only here.
+- The gate scripts are hash-checked, and restored from git if touched, before every use.
+Accepted risks, documented rather than solved:
+- Code in the agent sandbox can read the Claude login (the real ~/.claude/.credentials.json is bound into
+  the private config dir, so a token refresh writes back to the one file instead of a stale copy) and it
+  has network access: a prompt-injected agent could send the login out. bwrap cannot prevent that.
+- check_port.py and `max serve` import and run the generated code, so a passing gate means "an agent that did
+  not cheat produced matching output". The sandbox limits damage; it does not vouch for the port.
 """
 from __future__ import annotations
 
@@ -59,6 +70,7 @@ DEFAULT_ATTEMPTS = 3
 MAX_ATTEMPTS = 10
 GENERATE_TIMEOUT = 3 * 3600   # seconds for one `claude -p` run
 CHECK_TIMEOUT = 45 * 60       # seconds for the skill's build/verify checks
+INSTALL_TIMEOUT = 60 * 60       # the skill env pulls MAX and PyTorch the first time
 SMOKE_TIMEOUT = 40 * 60       # a cold compile of a new architecture takes 5 to 25 minutes
 SERVE_TIMEOUT = 40 * 60
 TAIL_LINES = 40
@@ -66,6 +78,8 @@ FEEDBACK_CHARS = 6000         # how much error output is fed back to the agent
 KEEP_ROWS = 30
 SMOKE_PROMPT = "The capital of France is"
 
+NO_SANDBOX = ("Automatic port needs bubblewrap (`bwrap`) to confine the agent that reads the model's untrusted files, "
+              "and it was not found. Install bubblewrap, or pass --unsandboxed to run without confinement (not recommended).")
 NO_CLAUDE = ("Claude Code (`claude`) was not found. Install Claude Code, or run the guided `mxc port {ref}`. "
              "(Set MXC_CLAUDE to its full path if it is installed but not on the daemon's PATH.)")
 
@@ -105,6 +119,10 @@ class PortBusy(Exception):
         self.job = job
 
 
+class PortUnsafe(Exception):
+    """No sandbox is available and the caller did not accept running without one."""
+
+
 class _Cancelled(Exception):
     pass
 
@@ -127,7 +145,7 @@ class Ctx:
     workspace: Path
     port_dir: Path
     skills_root: Path             # the pristine clone: the build/parity gates run from here, never the agent
-    agent_skill: Path = None      # the agent's own writable copy of the import-model skill, in the workspace
+    weights: str = ""            # the downloaded snapshot, set before the sandboxed parity step
     gate_hash: str = ""           # hash of the gate scripts right after the clone was updated
     extra_allowed: tuple = ()     # per-model additions to the allow list (the donor copy commands)
 
@@ -135,8 +153,12 @@ class Ctx:
 @dataclass
 class PortTools:
     """The commands the job shells out to. Each returns (argv, cwd), or None to skip the check."""
+    install: Callable[[Ctx], "tuple[list[str], Path] | None"] | None = None
     build: Callable[[Ctx], "tuple[list[str], Path] | None"] | None = None
     verify: Callable[[Ctx, int], "tuple[list[str], Path] | None"] | None = None
+
+    def install_cmd(self, c: Ctx):
+        return (self.install or _skill_install)(c)
 
     def build_cmd(self, c: Ctx):
         return (self.build or _skill_build)(c)
@@ -149,6 +171,15 @@ def _pixi_run(c: Ctx, script: str, *args: str):
     if not (c.skills_root / port.ENTRY_SKILL / "scripts" / script).is_file():
         return None
     return (["pixi", "run", "python", f"scripts/{script}", *args], c.skills_root / port.ENTRY_SKILL)
+
+
+def _skill_install(c: Ctx):
+    """Install the pristine skill's pixi env, outside any sandbox (its lockfile when it has one), so the
+    sandboxed processes find it ready and need no network or shared cache to run it."""
+    d = c.skills_root / port.ENTRY_SKILL
+    if not (d / "pixi.toml").is_file():
+        return None
+    return (["pixi", "install", *(["--locked"] if (d / "pixi.lock").is_file() else [])], d)
 
 
 def _skill_build(c: Ctx):
@@ -190,13 +221,13 @@ def build_prompt(c: Ctx, attempt: int, feedback: str | None, donor_note: str) ->
 
 Model: {c.repo_id}
 Workspace (your working directory): {c.workspace}
-Read PORT.md and config.json here first. Follow the `import-model` skill (.claude/skills/import-model/SKILL.md; that folder, {c.agent_skill}, is your working copy and the skill root) for this model, phase by phase, and write the custom architecture package for it.
+Read PORT.md and config.json here first. Follow the `import-model` skill (.claude/skills/import-model/SKILL.md; the skill root is {c.skills_root / port.ENTRY_SKILL}, read-only, with its pixi environment already installed) for this model, phase by phase, and write the custom architecture package for it.
 
 {donor_note}
 Package folder: {c.port_dir}
 That exact folder must end up holding arch.py and an __init__.py that exposes ARCHITECTURES. Scaffold with `--output-dir {c.port_dir.parent} --slug {c.port_dir.name}` (or create it by hand). Do not write outside the workspace, except by running the skill's own commands.
 
-You are done when `pixi run python scripts/check_port.py {c.repo_id} --port-dir {c.port_dir}` (run from {c.agent_skill}) passes and the implementation-complete criteria in the skill are met. Do not start `max serve` yourself and do not install packages with pip; mxconsole serves and verifies the port afterwards, against the Hugging Face reference. Finish with a short summary of what you changed."""
+You are done when `pixi run python scripts/check_port.py {c.repo_id} --port-dir {c.port_dir}` (run from the skill root) passes and the implementation-complete criteria in the skill are met. Do not start `max serve` yourself and do not install packages with pip; mxconsole serves and verifies the port afterwards, against the Hugging Face reference. Finish with a short summary of what you changed."""
     if attempt <= 1 and not feedback:
         return base
     return (base + f"""
@@ -305,6 +336,7 @@ class _Job:
         self.tail: deque[str] = deque(maxlen=TAIL_LINES)
         self.cancel = threading.Event()
         self.proc: subprocess.Popen | None = None
+        self.unsandboxed = False
         self.procs: dict[int, tuple[subprocess.Popen, str]] = {}
         self.lock = threading.RLock()
         self.thread: threading.Thread | None = None
@@ -388,7 +420,8 @@ class PortManager:
                              "WHERE status='running'", (time.time(),))
 
     # -- public ----------------------------------------------------------------------------------
-    def start(self, ref: str, name: str | None = None, max_attempts: int = DEFAULT_ATTEMPTS) -> dict:
+    def start(self, ref: str, name: str | None = None, max_attempts: int = DEFAULT_ATTEMPTS, *,
+              unsandboxed: bool = False) -> dict:
         ref = (ref or "").strip()
         if not REF_RE.match(ref):
             raise BadPull("Send a short name or a Hugging Face id like owner/repo.")
@@ -396,6 +429,8 @@ class PortManager:
             raise BadPull("`name` may use letters, digits, '.', '_' and '-' (64 characters at most).")
         if not isinstance(max_attempts, int) or isinstance(max_attempts, bool) or not 1 <= max_attempts <= MAX_ATTEMPTS:
             raise BadPull(f"`max_attempts` must be a whole number from 1 to {MAX_ATTEMPTS}.")
+        if self.sandbox and not unsandboxed and port_sandbox.have_bwrap(self.bwrap) is None:
+            raise PortUnsafe(NO_SANDBOX)
         key = resolve.CURATED.get(ref.lower(), ref).lower()
         name = name or resolve.model_name(ref, resolve.CURATED.get(ref.lower(), ref))
         with self.live_lock:
@@ -407,6 +442,7 @@ class PortManager:
                                             "VALUES (?, ?, 'running', 'workspace', ?, ?)",
                                             (ref, name, time.time(), max_attempts))
             job = _Job(cur.lastrowid, ref, name, max_attempts)
+            job.unsandboxed = unsandboxed
             self.live[job.id] = job
         job.thread = threading.Thread(target=self._run, args=(job,), name=f"port-{job.id}", daemon=True)
         job.thread.start()
@@ -494,25 +530,50 @@ class PortManager:
                     r["status"] = "skipped"
 
     # -- running things --------------------------------------------------------------------------
+    def _creds_src(self) -> Path:
+        return (self.claude_home or Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")) / ".credentials.json"
+
     def _confine(self, job: _Job, argv: list[str], role: str, ctx: Ctx | None) -> tuple[list[str], dict, str]:
-        """(argv, env, note) for running `argv` as the agent, a gate check, or the smoke server: the
-        environment is scrubbed of secrets (claude keeps only its own auth), and when bubblewrap is
-        available the process runs confined to the workspace and job dir. The note says what happened."""
+        """(argv, env, note) for running `argv` as role "agent", "check" (the skill's gates), "serve" (the
+        smoke `max serve`) or "install" (trusted, pristine code, never confined). The environment is
+        scrubbed of secrets (claude keeps only its own auth). Every cache a sandboxed process writes to
+        (pixi, rattler, uv, Hugging Face, MAX) lives in the job's private `work/` dir, so nothing shared
+        and later used outside the sandbox is ever writable from inside it. The skill env is installed
+        beforehand, outside; the clone and the model weights are bound read-only."""
         keep = port_sandbox.CLAUDE_AUTH if role == "agent" else ()
         env = port_sandbox.scrub_env(dict(os.environ), keep)
-        home = Path.home()
+        if role == "install":
+            return argv, env, "trusted install of the pristine skill env, not sandboxed"
+        work = job.dir / "work"
+        cache = work / "cache"
+        for d in (cache / "pixi", cache / "rattler", cache / "uv", cache / "xdg", cache / "modular", work / "hf" / "hub"):
+            d.mkdir(parents=True, exist_ok=True)
+        env.update(PIXI_CACHE_DIR=str(cache / "pixi"), RATTLER_CACHE_DIR=str(cache / "rattler"),
+                   UV_CACHE_DIR=str(cache / "uv"), XDG_CACHE_HOME=str(cache / "xdg"),
+                   MODULAR_DERIVED_PATH=str(cache / "modular"), HF_HOME=str(work / "hf"),
+                   HF_HUB_CACHE=str(work / "hf" / "hub"))
+        binds: list[tuple[Path, Path]] = []
         if role == "agent":
-            cfg = self._claude_config(job)
+            cfg = work / "claude-cfg"
+            cfg.mkdir(parents=True, exist_ok=True)
             env["CLAUDE_CONFIG_DIR"] = str(cfg)
-        bw = port_sandbox.have_bwrap(self.bwrap) if self.sandbox else None
+            creds = self._creds_src()
+            if creds.is_file():  # the one real login file, not a copy: a token refresh writes back to it
+                binds.append((creds, cfg / ".credentials.json"))
+        bw = port_sandbox.have_bwrap(self.bwrap) if self.sandbox and not job.unsandboxed else None
         if bw is None:
-            why = "sandbox disabled" if not self.sandbox else "bubblewrap (bwrap) not found"
+            why = "sandbox disabled" if not self.sandbox else "bubblewrap (bwrap) not found; --unsandboxed was given"
+            for src, dst in binds:  # no mount namespace: link the login into the private config dir instead
+                with contextlib.suppress(OSError):
+                    dst.unlink(missing_ok=True)
+                    dst.symlink_to(src)
             return argv, env, f"NOT sandboxed ({why})" + ("; using Claude Code's own sandbox setting" if role == "agent" and self.sandbox else "")
-        hf = Path(os.environ.get("HF_HOME") or home / ".cache" / "huggingface")
-        rattler = home / ".cache" / "rattler"
+        home = Path.home()
         ws = ctx.workspace if ctx else job.dir
-        tools = port_sandbox.tool_roots(argv[0], "pixi", "git")
+        ro = [*port_sandbox.tool_roots(argv[0], "pixi", "git")]
         ro_after: list[Path] = []
+        if ctx:
+            ro.append(ctx.skills_root)  # the pristine clone, with its pre-installed env: read-only everywhere
         if role == "agent":
             # claude reads project settings from the workspace; the agent must not be able to widen its own
             # permissions there, so those files are bound read-only on top of the writable workspace
@@ -522,28 +583,26 @@ class PortManager:
                 if not f.exists():
                     f.write_text("{}\n")
                 ro_after.append(f)
-            rw, ro, gpu = [ws, job.dir, rattler], tools, False
+            rw = [ws, work]
         else:
-            skill = ctx.skills_root if ctx else ws
-            rw = [job.dir, skill / port.ENTRY_SKILL, rattler, hf, home / ".modular", home / ".cache" / "modular"]
-            ro = [*tools, ws]
-            gpu = role == "serve"
+            ro.append(ws)
+            ro += self._weights_roots(ctx)
+            rw = [work]
+        gpu = role == "serve"
         wrapped = port_sandbox.bwrap_argv(argv, bwrap=bw, cwd=Path(ws), home=home, mxc_home=mxc_home(),
-                                          rw=rw, ro=ro, ro_after=ro_after, gpu=gpu)
-        return wrapped, env, "sandboxed with bubblewrap (read-only system, empty $HOME and MXC_HOME, private /tmp, writable: " \
-            + ", ".join(str(x) for x in rw[:2]) + ")"
+                                          rw=rw, ro=ro, ro_after=ro_after, binds=binds, gpu=gpu)
+        return wrapped, env, "sandboxed with bubblewrap (read-only system and skills, empty $HOME and MXC_HOME, " \
+            "private /tmp and caches, writable: " + ", ".join(str(x) for x in rw) + ")"
 
-    def _claude_config(self, job: _Job) -> Path:
-        """A job-private Claude Code config dir holding only the login, so the user's settings, hooks,
-        CLAUDE.md and MCP servers cannot widen what the agent may do."""
-        cfg = job.dir / "claude-cfg"
-        cfg.mkdir(parents=True, exist_ok=True)
-        src = (self.claude_home or Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")) / ".credentials.json"
-        if src.is_file():
-            dst = cfg / ".credentials.json"
-            dst.write_bytes(src.read_bytes())
-            dst.chmod(0o600)
-        return cfg
+    def _weights_roots(self, ctx: Ctx | None) -> list[Path]:
+        """The downloaded model, read-only inside the sandbox: its whole Hugging Face repo dir (the snapshot
+        files are symlinks into the sibling blobs/ dir), not the cache around it."""
+        w = getattr(ctx, "weights", None) if ctx else None
+        if not w:
+            return []
+        w = Path(w)
+        repo = next((a for a in [w, *w.parents] if a.name.startswith("models--")), w)
+        return [repo]
 
     def _track(self, job: _Job, proc: subprocess.Popen, marker: str, add: bool = True) -> None:
         """Remember the process groups a job has running, in memory (for cancel) and in the database (so a
@@ -676,13 +735,17 @@ class PortManager:
         skills_root = port.ensure_skills(runner=self.git_runner)
         if port.ENTRY_SKILL not in port.list_skills(skills_root):
             raise _StageFailed(f"Modular's skills in {skills_root} have no {port.ENTRY_SKILL} skill")
-        # the agent gets its own writable COPY of the skills; the clone stays pristine for the gates
-        skills = port.finish_workspace(job.ref, res, workspace, config, donor, skills_root, copy=True)
-        self._end(job, row, detail=f"{len(skills)} skills, copied into the workspace; gates run from the pristine clone {skills_root}")
+        skills = port.finish_workspace(job.ref, res, workspace, config, donor, skills_root)
         allowed = tuple(f"Bash(cp -r {d}/:*)" for d in (donor.source_dir, donor.v3_dir) if d)
         ctx = Ctx(job.ref, res.repo_id, name, workspace, workspace / "port" / package_slug(name), skills_root,
-                  agent_skill=workspace / ".claude" / "skills" / port.ENTRY_SKILL, gate_hash=gate_hash(skills_root),
-                  extra_allowed=allowed)
+                  gate_hash=gate_hash(skills_root), extra_allowed=allowed)
+        cmd = self.tools.install_cmd(ctx)
+        if cmd is not None:
+            self._detail(job, row, "installing the skill's environment (outside the sandbox; the first time takes a while)…")
+            code, out = self._exec(job, cmd[0], cmd[1], timeout=INSTALL_TIMEOUT, role="install", ctx=ctx)
+            if code != 0:
+                raise _StageFailed(f"could not install the skill's pixi environment (exit {code}): {out[-300:]}")
+        self._end(job, row, detail=f"{len(skills)} skills in {skills_root}, read-only for the agent and the gates")
 
         feedback: str | None = None
         for attempt in range(1, job.max_attempts + 1):
@@ -781,6 +844,7 @@ class PortManager:
             weights = resolve.download_snapshot(res, hub, cancel=job.cancel)
         except resolve.PullCancelled:
             raise _Cancelled()
+        ctx.weights = str(weights)
         self._check(job)
         port_ = _free_port()
         self._detail(job, row, f"compiling and serving on :{port_} (a cold compile takes 5 to 25 minutes)…")
@@ -854,6 +918,7 @@ class PortManager:
 
     # -- finishing -------------------------------------------------------------------------------
     def _finish(self, job: _Job, status: str, message: str) -> None:
+        shutil.rmtree(job.dir / "work", ignore_errors=True)  # private caches and the Claude config dir (never the login itself)
         with job.lock:
             job.status, job.message, job.finished_at = status, message, time.time()
         job.say(f"== {status}: {message}")
