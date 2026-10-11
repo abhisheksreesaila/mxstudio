@@ -6,6 +6,12 @@ from html import escape as e
 STYLE = "/console/docs.css"
 
 
+def md(text: str) -> str:
+    """Escape, then turn `code` spans into <code>: the spec's descriptions use them."""
+    parts = e(text).split("`")
+    return "".join(f"<code>{p}</code>" if i % 2 else p for i, p in enumerate(parts))
+
+
 def _schema(spec: dict, name: str) -> dict:
     return spec["components"]["schemas"][name]
 
@@ -52,7 +58,7 @@ def render(spec: dict, base: str) -> str:
 <body><header><a class="brand" href="/console">mxconsole</a><span class="mono">API reference</span>
 <a class="back" href="/console">Back to the console</a></header><main>
 <h1>OpenAI-compatible API</h1>
-<p>{e(spec['info']['description'])}</p>
+<p>{md(spec['info']['description'])}</p>
 <h2>Base URL and key</h2>
 <dl><dt>Base URL</dt><dd class="mono">{e(base)}/v1</dd>
 <dt>Auth</dt><dd>Send <code>Authorization: Bearer $MXC_API_KEY</code>. Create a key with <code class="mono">mxc keys new &lt;app&gt;</code>
@@ -62,15 +68,15 @@ def render(spec: dict, base: str) -> str:
     for path, ops in spec["paths"].items():
         for method, op in ops.items():
             out.append(f'<section><h2><span class="m {e(method)}">{e(method.upper())}</span> <span class="mono">{e(path)}</span></h2>')
-            out.append(f"<p>{e(op['summary'])}</p>")
+            out.append(f"<p>{md(op['summary'])}</p>")
             fields = _fields(spec, op)
             if fields:
                 out.append("<table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th></th></tr></thead><tbody>")
-                out += [f'<tr><td class="mono">{e(f)}</td><td class="mono">{e(k)}</td><td>{"yes" if req else "no"}</td><td>{e(note)}</td></tr>'
+                out += [f'<tr><td class="mono">{e(f)}</td><td class="mono">{e(k)}</td><td>{"yes" if req else "no"}</td><td>{md(note)}</td></tr>'
                         for f, k, req, note in fields]
                 out.append("</tbody></table>")
             out.append(f'<pre class="mono">{e(_curl(path, method, base, model))}</pre>')
-            out.append("<p class=\"codes\">" + " ".join(f'<span class="mono">{e(code)}</span> {e(r["description"])}' for code, r in op["responses"].items()) + "</p>")
+            out.append("<p class=\"codes\">" + " ".join(f'<span class="mono">{e(code)}</span> {md(r["description"])}' for code, r in op["responses"].items()) + "</p>")
             out.append("</section>")
     out.append('<p class="foot">Try a request without a key from the console: add a model, then use its Ready card or <span class="mono">mxc console model &lt;name&gt;</span>.</p></main></body></html>')
     return "\n".join(out)
