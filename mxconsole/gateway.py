@@ -116,7 +116,8 @@ def openapi_spec(model_names: list[str]) -> dict:
     }
 
 
-def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 15.0):
+def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 15.0, api_deps: dict | None = None):
+    """`api_deps` are test doubles for admin_api.register (search sources, notebook source, Jupyter launcher)."""
     async def lifespan(app):
         async def reaper():
             while True:
@@ -601,5 +602,6 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
 
     admin_system.register(app, store, supervisor, admin_only, counters=counters,
                           refused=admin_refused, error=openai_error)
-    admin_api.register(app, store, supervisor, admin_only, refused=admin_refused, error=openai_error)
+    admin_api.register(app, store, supervisor, admin_only, refused=admin_refused, error=openai_error,
+                       **(api_deps or {}))
     return app

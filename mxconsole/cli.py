@@ -54,6 +54,40 @@ def list_models(as_json: bool = JSON) -> None:
     typer.echo(f"\nconsole  {report.console_link('models')}")
 
 
+@app.command("search")
+def search_models(query: str = typer.Argument("", help="Part of a name, an architecture, or a Hugging Face repo id (owner/name)"),
+                  as_json: bool = JSON) -> None:
+    """Find a model (curated names, the MAX catalog, a Hugging Face repo) and see whether it fits this machine."""
+    from mxconsole import search
+    try:
+        out = search.search(query)
+    except resolve.ResolveError as e:
+        _fail(str(e))
+    if as_json:
+        typer.echo(report.dump(out))
+        return
+    mem = out["memory"]
+    typer.echo(f"memory: {mem['free_gb']} GB free of {mem['total_gb']} GB on {mem['name']}")
+    for w in out["warnings"]:
+        typer.echo(f"warning: {w}", err=True)
+    if not out["results"]:
+        typer.echo("no models match. Try a Hugging Face repo id (owner/name), or a shorter search.")
+        return
+
+    def num(v, unit=""):
+        return "?" if v is None else f"{v:g}{unit}"
+    typer.echo(f"{'ID':<34} {'FIT':<6} {'PARAMS':<8} {'SIZE':<9} {'EST VRAM':<9} {'SOURCE':<7} ARCHITECTURE")
+    for r in out["results"]:
+        params = "?" if r["params"] is None else f"{r['params'] / 1e9:g}B"
+        typer.echo(f"{r['id'][:34]:<34} {r['fit'] or '?':<6} {params:<8} {num(r['size_gb'], ' GB'):<9} "
+                   f"{num(r['est_vram_gb'], ' GB'):<9} {r['source']:<7} {r['architecture'] or '?'}")
+        if r["fit"] == "port":
+            typer.echo(f"{'':<34} MAX does not support this architecture yet: mxc port {r['repo_id']}")
+        for s in r["suggestions"]:
+            typer.echo(f"{'':<34} too big here; smaller: {s['id']} (~{s['est_vram_gb']:g} GB)")
+    typer.echo("pull one with: mxc pull <id>")
+
+
 @app.command("rm")
 def remove_model(model: str = typer.Argument(..., help="A registered model name"),
                  purge: bool = typer.Option(False, "--purge", help="Also delete its weights from the Hugging Face cache."),

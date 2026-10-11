@@ -11,18 +11,31 @@ import logging
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from mxconsole import expose, keys, removal
+from mxconsole import expose, keys, removal, resolve, search
 from mxconsole.store import Store
 from mxconsole.supervisor import Supervisor
 
 log = logging.getLogger("mxconsole.admin_api")
 
 
-def register(app, store: Store, supervisor: Supervisor, admin_only, *, refused, error) -> None:
+def register(app, store: Store, supervisor: Supervisor, admin_only, *, refused, error,
+             search_sources: search.Sources | None = None) -> None:
     """`refused()` is the gateway's 403 answer, `error(status, message, code, type_)` its OpenAI-shaped error."""
 
     def not_registered(name: str) -> JSONResponse:
         return error(404, f"The model `{name}` is not registered.", "model_not_found")
+
+    @app.get("/admin/search")
+    async def admin_search(request: Request):
+        if not admin_only(request):
+            return refused()
+        q = request.query_params.get("q", "")
+        if len(q) > 200:
+            return error(400, "The search text is too long.", "invalid_query")
+        try:  # the catalog and Hugging Face are slow and blocking: keep the event loop free
+            return JSONResponse(await asyncio.to_thread(search.search, q, search_sources))
+        except resolve.ResolveError as e:
+            return error(503, str(e), "search_unavailable", "server_error")
 
     @app.post("/admin/keys/{app_name}/rotate")
     def admin_key_rotate(request: Request, app_name: str):
