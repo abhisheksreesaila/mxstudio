@@ -167,17 +167,20 @@ async def test_try_chat_validates_the_body(http):
     assert r.status_code == 404 and r.json()["error"]["code"] == "model_not_found"
 
 
-async def test_docs_redirects_to_the_console_api_page(http):
-    r = await http.get("/docs", follow_redirects=False)
-    assert r.status_code in (301, 302, 307, 308) and r.headers["location"] == "/console#api"
-    assert "scalar" not in (await http.get("/docs", follow_redirects=True)).text.lower()
+async def test_docs_is_the_api_reference_page(http):
+    r = await http.get("/docs")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
+    for want in ("/v1/chat/completions", "/v1/embeddings", "Authorization: Bearer", "tiny", "/console/docs.css"):
+        assert want in r.text, want
+    assert "<script" not in r.text and "Content-Security-Policy" in r.headers  # no scripts: the console's CSP holds
+    assert (await http.get("/console/docs.css")).status_code == 200
     assert (await http.get("/docs", headers={"X-Forwarded-For": "192.168.1.20"})).status_code == 403
     assert (await http.get("/openapi.json")).status_code == 200  # the spec stays
 
 
 async def test_only_listed_console_files_are_served(http):
     from mxconsole.gateway import CONSOLE_ASSETS, CONSOLE_DIR
-    assert "console.css" in CONSOLE_ASSETS and "geist-variable.woff2" in CONSOLE_ASSETS
+    assert "blades.css" in CONSOLE_ASSETS and "geist-variable.woff2" in CONSOLE_ASSETS
     assert not any("source-" in a for a in CONSOLE_ASSETS)
     for asset in sorted(CONSOLE_ASSETS):
         assert (CONSOLE_DIR / asset).is_file(), asset  # nothing listed is missing
@@ -198,7 +201,7 @@ def test_console_code_never_writes_html_or_loads_from_elsewhere():
         text = path.read_text()
         assert not banned.search(text), f"{path.name} writes HTML or an inline style"
         assert not re.search(r"(fetch|import)\(\s*['\"`]https?:", text), f"{path.name} loads from another origin"
-    for name in ("index.html", "console.css"):
+    for name in ("index.html", "blades.css", "docs.css"):
         text = (CONSOLE_DIR / name).read_text()
         assert "http://" not in text and "https://" not in text, f"{name} points outside the daemon"
         assert not re.search(r"<style|\sstyle=\"|<script(?![^>]*\ssrc=)", text), f"{name} has inline code the CSP blocks"

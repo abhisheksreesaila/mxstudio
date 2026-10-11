@@ -7,11 +7,34 @@ import time
 from mxconsole.settings import daemon_url
 from mxconsole.store import Model, format_duration
 
-PAGES = ("overview", "models", "activity", "metrics", "keys", "network", "api", "ports", "logs", "gateway", "daemon", "benchmarks", "pull")
+# Where each console page name lives in the blades console (the old pages are gone). The hash is what the console
+# opens; "" = My models. console/routes.js is the JS twin, and tests/mxconsole/test_console_routes.py keeps them equal.
+PAGES = ("home", "overview", "models", "activity", "metrics", "ports", "keys", "network", "gateway", "daemon", "settings",
+         "benchmarks", "bench", "logs", "pull", "add", "api", "model", "security", "notebook")
+_MODEL_PAGES = {"model", "security", "bench", "benchmarks", "logs", "notebook"}
+_HASH = {"home": "", "overview": "", "models": "", "activity": "", "metrics": "", "ports": "", "keys": "keys",
+         "network": "gateway", "gateway": "gateway", "daemon": "settings", "settings": "settings", "pull": "add", "add": "add",
+         "benchmarks": "bench", "bench": "bench"}
 
 
-def console_link(page: str | None = None) -> str:
-    return f"{daemon_url()}/console" + (f"#{page}" if page else "")
+def console_hash(page: str, model: str | None = None) -> str | None:
+    """The hash a page name opens in the console ("" = My models). None for the API reference, which is /docs."""
+    if page == "api":
+        return None
+    if page in _MODEL_PAGES:
+        name = _HASH.get(page, page)
+        if model:
+            return f"{name}/{model}"
+        return "" if page in ("model", "logs") else name  # no model named: the console picks the first one
+    return _HASH[page]
+
+
+def console_link(page: str | None = None, model: str | None = None) -> str:
+    """The console URL for a page name (old or new); the API reference is /docs."""
+    if page == "api":
+        return f"{daemon_url()}/docs"
+    frag = console_hash(page, model) if page else ""
+    return f"{daemon_url()}/console" + (f"#{frag}" if frag else "")
 
 
 def lifecycle(m: Model) -> str:

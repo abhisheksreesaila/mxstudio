@@ -20,7 +20,7 @@ def test_metrics_table_and_json_match_the_store(monkeypatch):
     monkeypatch.setattr(metrics, "gpus", lambda: [{"index": 0, "name": "RTX", "used_mb": 100, "total_mb": 1000, "util": 7}])
     rec(); rec(status=500, ttft=None); rec(ago=4000)  # the last is outside 5m
     out = runner.invoke(app, ["metrics"]).output
-    assert "requests" in out and "TTFT p50" in out and "tiny" in out and "RTX" in out and "/console#metrics" in out
+    assert "requests" in out and "TTFT p50" in out and "tiny" in out and "RTX" in out and "/console" in out
     data = json.loads(runner.invoke(app, ["metrics", "--json"]).output)
     assert data["requests"] == 2 and data["errors"] == 1 and data["range"] == "5m"
     assert data["by_model"]["tiny"]["requests"] == 2 and data["gpus"][0]["name"] == "RTX"
@@ -42,7 +42,7 @@ def test_requests_table_limit_and_json():
     for i in range(3):
         rec(ago=i + 1)
     out = runner.invoke(app, ["requests", "--limit", "2"]).output
-    assert out.count("/v1/chat/completions") == 2 and "/console#activity" in out
+    assert out.count("/v1/chat/completions") == 2 and "/console" in out
     rows = json.loads(runner.invoke(app, ["requests", "--limit", "2", "--json"]).output)
     assert len(rows) == 2 and rows[0]["model"] == "tiny"
 

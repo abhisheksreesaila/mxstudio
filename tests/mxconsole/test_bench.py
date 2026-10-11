@@ -305,7 +305,7 @@ def test_mxc_bench_runs_every_model_and_prints_a_table_fastest_first(daemon):
     assert any(l.startswith("fast") and "done" in l for l in lines)  # progress per model
     table = lines[next(i for i, l in enumerate(lines) if l.startswith("#")):]
     assert table[1].split()[1] == "fast" and table[2].split()[1] == "slow"  # sorted by decode speed
-    assert "2 runs after a warm-up" in r.output and "/console#benchmarks" in r.output
+    assert "2 runs after a warm-up" in r.output and "/console#bench" in r.output
     # the warm-up isn't counted, and the load time is kept apart
     run = bench.latest(Store.open())
     assert [x["runs_ok"] for x in run["results"]] == [2, 2]

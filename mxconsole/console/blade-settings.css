@@ -21,3 +21,11 @@
 .st-confirm p { margin: 0 0 10px; font-size: 13px; color: var(--text-2); }
 .st-confirm code { background: var(--code); color: var(--code-text); border-radius: 5px; padding: 1px 7px; }
 .st-row { display: flex; gap: 8px; }
+
+.st-table { overflow-x: auto; margin: 0 -16px; }
+.st-table table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.st-table th { text-align: left; font: 500 10.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 6px 16px; border-bottom: 1px solid var(--card-line); white-space: nowrap; }
+.st-table td { padding: 9px 16px; border-bottom: 1px solid var(--card-line-2); white-space: nowrap; }
+.st-table tr:last-child td { border-bottom: 0; }
+.st-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); margin-right: 7px; }
+.st-dot.on { background: var(--ok); }

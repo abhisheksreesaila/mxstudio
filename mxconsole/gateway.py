@@ -14,9 +14,9 @@ import httpx
 import logging
 from fasthtml.common import FastHTML
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 
-from mxconsole import admin_api, admin_bench, admin_port, admin_pull, admin_system, expose, insights, keys, metrics, system
+from mxconsole import admin_api, api_docs, admin_bench, admin_port, admin_pull, admin_system, expose, insights, keys, metrics, system
 from mxconsole.settings import DAEMON_PORT
 from mxconsole.store import Store, mxc_home
 from mxconsole.supervisor import StartFailed, Supervisor, UnknownModel
@@ -29,15 +29,12 @@ ADMIN_HEADER = "x-mst-admin"
 CONSOLE_DIR = Path(__file__).parent / "console"
 CONSOLE_FONTS = {"geist-variable.woff2", "geist-mono-variable.woff2"}
 # An explicit list: the console is never a directory server. Add a file here when you add one to console/.
-CONSOLE_SCRIPTS = {"page-bench.js", "theme.js", "main.js", "core.js", "icons.js", "charts.js", "shell.js", "palette.js", "actions.js",
-                   "page-overview.js", "page-models.js", "page-metrics.js", "page-api.js", "page-keys.js",
-                   "page-network.js", "page-activity.js", "page-ports.js", "page-logs.js", "page-gateway.js",
-                   "page-daemon.js", "page-pull.js",
-                   # the blades console (F-023): engine, shell and one file per blade, each with its own CSS
+CONSOLE_SCRIPTS = {"theme.js", "main.js", "core.js", "icons.js", "routes.js",
+                   # the blades console: engine, shell and one file per blade, each with its own CSS
                    "blades.js", "blade-layout.js", "blade-stack.js", "keyed.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "blade-home.js",
                    "blade-model.js", "blade-add.js", "blade-security.js", "blade-keys.js", "blade-bench.js", "blade-logs.js",
                    "blade-notebook.js", "blade-gateway.js", "blade-settings.js"}
-CONSOLE_STYLES = {"console.css", "blades.css", "topbar.css", "blade-home.css", "blade-model.css", "blade-add.css",
+CONSOLE_STYLES = {"blades.css", "topbar.css", "docs.css", "blade-home.css", "blade-model.css", "blade-add.css",
                   "blade-security.css", "blade-keys.css", "blade-bench.css", "blade-logs.css", "blade-notebook.css",
                   "blade-gateway.css", "blade-settings.css"}
 CONSOLE_IMAGES = {"favicon.svg"}
@@ -609,7 +606,8 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
     def docs(request: Request):
         if not loopback_only(request):
             return Response("docs are only served to this machine", status_code=403)
-        return RedirectResponse("/console#api", status_code=307)  # the API reference lives in the console
+        return HTMLResponse(api_docs.render(openapi_spec(sorted(m.name for m in store.models())), str(request.base_url).rstrip("/")),
+                            headers=CONSOLE_HEADERS)
 
     api_deps = dict(api_deps or {})
     admin_system.register(app, store, supervisor, admin_only, counters=counters,

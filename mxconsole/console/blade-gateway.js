@@ -1,6 +1,6 @@
 // mxconsole, the Gateway blade: LiteLLM's status, its routes (model name -> upstream), restart, the log tail and
 // the CLI twins. Data: GET /admin/network and /admin/gateway (polled), GET /admin/litellm/log, POST /admin/litellm/restart.
-import { h, icon, api, store, toast, fmt, copyText } from "./core.js";
+import { h, icon, api, store, onData, toast, fmt, clock, appLabel, copyText } from "./core.js";
 import { register } from "./blades.js";
 
 const POLL = 4000;
@@ -31,6 +31,14 @@ export function safeguardLines(gw) {
     ["Admin stays home", `${n(gw.admin_refused_today, "refusal", "refusals")} today`],
   ];
 }
+/** Recent requests to /v1 (GET /admin/requests, newest first) as table rows. `~` marks tokens counted from streamed chunks. */
+export function requestRows(requests, n = 12) {
+  return (requests || []).slice(0, n).map((r) => ({
+    at: r.ts, app: r.app, model: r.model || "—", route: r.route, status: r.status, ok: r.status < 400,
+    tokens: r.completion_tokens === null || r.completion_tokens === undefined ? "—" : `${fmt(r.prompt_tokens)} → ${r.estimated ? "~" : ""}${fmt(r.completion_tokens)}`,
+    ttft: r.ttft_ms === null || r.ttft_ms === undefined ? "—" : `${fmt(r.ttft_ms)} ms`, duration: `${fmt(r.duration_ms)} ms`,
+  }));
+}
 /** The last n lines of a log, without the trailing blank. */
 export function tailLines(text, n = LOG_LINES) {
   const lines = String(text || "").replace(/\s+$/, "").split("\n");
@@ -50,6 +58,7 @@ register("gateway", (blade) => {
   const status = h("section", { class: "gw-sec" });
   const routes = h("section", { class: "gw-sec" });
   const guards = h("section", { class: "gw-sec" });
+  const recent = h("section", { class: "gw-sec" });
   const logPre = h("pre", { class: "gw-log mono", tabindex: "0", "aria-label": "LiteLLM log" }, "Loading…");
   const logBox = h("section", { class: "gw-sec" }, h("div", { class: "h3" }, "LiteLLM log", h("span", { class: "r muted" }, "last lines, refreshed every few seconds")), logPre);
   let logText = null;
@@ -85,6 +94,17 @@ register("gateway", (blade) => {
     guards.replaceChildren(...(lines.length ? [h("div", { class: "h3" }, "Safeguards", h("span", { class: "r muted" }, "counted today")),
       h("dl", { class: "gw-kv wide" }, lines.map(([k, v]) => [h("dt", {}, k), h("dd", {}, v)]))] : []));
   }
+  function drawRecent() {
+    const rows = requestRows(store.requests);
+    recent.replaceChildren(
+      h("div", { class: "h3" }, "Recent requests", h("span", { class: "r muted" }, "newest first · kept for 7 days")),
+      rows.length ? h("div", { class: "gw-table" }, h("table", {},
+        h("thead", {}, h("tr", {}, ["Time", "App", "Model", "Route", "Status", "Tokens in → out", "TTFT", "Duration"].map((c) => h("th", {}, c)))),
+        h("tbody", {}, rows.map((r) => h("tr", {}, h("td", { class: "mono" }, clock(r.at)), h("td", {}, appLabel(r.app)), h("td", { class: "mono" }, r.model), h("td", { class: "mono" }, r.route),
+          h("td", { class: `mono ${r.ok ? "ok-text" : "bad-text"}` }, String(r.status)), h("td", { class: "mono" }, r.tokens), h("td", { class: "mono" }, r.ttft), h("td", { class: "mono" }, r.duration))))))
+        : h("div", { class: "muted gw-pad" }, store.requests ? "No requests yet: they show up here once an app calls /v1." : "Loading…"),
+      twin("mxc requests --limit 200"));
+  }
   function drawLog(text, failedWith) {
     const key = failedWith ? `!${failedWith}` : text;
     if (key === logText) return;
@@ -119,14 +139,18 @@ register("gateway", (blade) => {
     icon: "route", hue: "var(--hue-gateway)", side: 640, min: 520,
     tools: restartBtn,
     mount(body) {
-      body.replaceChildren(h("div", { class: "gw" }, status, routes, guards, logBox,
+      body.replaceChildren(h("div", { class: "gw" }, status, routes, recent, guards, logBox,
+        h("div", { class: "gw-sec" }, h("div", { class: "h3" }, "API reference"),
+          h("p", { class: "muted gw-pad" }, "Base URL, auth, every endpoint and a request you can copy."),
+          h("a", { class: "btn sm", href: "/docs" }, icon("book-open", 13), "Open the API reference"), twin("mxc console api")),
         h("div", { class: "gw-sec" }, h("div", { class: "h3" }, "From the terminal"), twin("mxc status"), twin("mxc expose"), twin("mxc expose --stop"))));
-      drawStatus(); drawRoutes(); drawGuards();
+      drawStatus(); drawRoutes(); drawRecent(); drawGuards();
+      timers.push(onData(drawRecent));
       load();
       // a timeout chain, not an interval: the next poll starts only after the last one finished (no pile-up)
       const next = () => { if (blade.alive) timers.push(setTimeout(async () => { await load(); next(); }, POLL)); };
       next();
-      blade.onClose = () => timers.forEach(clearTimeout);
+      blade.onClose = () => timers.forEach((t) => (typeof t === "function" ? t() : clearTimeout(t)));
     },
   };
 });

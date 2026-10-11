@@ -24,7 +24,7 @@ def test_ps_without_the_daemon_shows_what_pid_files_know(mxc_home, monkeypatch):
         assert by["model:tiny"]["pid"] == child.pid and by["model:tiny"]["port"] == 6001
         assert by["model:tiny"]["rss_mb"] > 0
         out = runner.invoke(app, ["ps"]).output
-        assert "max serve · tiny" in out and "stopped" in out and "#daemon" in out
+        assert "max serve · tiny" in out and "stopped" in out and "#settings" in out
     finally:
         child.kill()
         child.wait()

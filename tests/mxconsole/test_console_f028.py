@@ -170,7 +170,12 @@ def test_settings_idle_rows_daemon_rows_and_theme():
     rows = dict(node("blade-settings", f"m.daemonRows({json.dumps(info)}, '/h/.mxc', 60)"))
     assert rows["Uptime"] == "1h 2m" and rows["MXC_HOME"] == "/h/.mxc" and rows["LAN endpoint"].startswith("off") and rows["MAX version"] == "26.5"
     assert node("blade-settings", "m.daemonRows(null)") == []
-    assert node("blade-settings", "[m.effectiveTheme(null, true), m.effectiveTheme(null, false), m.effectiveTheme('light', true)]") == ["dark", "light", "light"]
+    listeners = [{"name": "daemon", "host": "127.0.0.1", "port": 8080, "state": "listening", "exposed": False, "talks_to": "your apps"},
+                 {"name": "Caddy", "host": "0.0.0.0", "port": None, "state": "off", "exposed": True, "talks_to": ""}]
+    rows = node("blade-settings", f"m.portRows({json.dumps(listeners)})")
+    assert rows[0] == {"name": "daemon", "address": "127.0.0.1:8080", "reach": "this machine", "state": "Listening", "on": True, "talksTo": "your apps"}
+    assert rows[1]["address"] == "0.0.0.0:—" and rows[1]["reach"] == "your LAN" and rows[1]["on"] is False
+    assert node("blade-settings", "m.portRows(null)") == []
     assert node("blade-settings", "m.DEFAULT_KEEP_ALIVE") == 300
 
 

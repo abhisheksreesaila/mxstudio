@@ -1,4 +1,4 @@
-// mxconsole, shared pieces: DOM helpers, admin API calls, polling, formatting, theme.
+// mxconsole, shared pieces: DOM helpers, admin API calls, polling, formatting. (The theme lives in prefs.js.)
 // Every piece of data (model names, logs, request fields) goes in as a text node, never as HTML.
 import { icon } from "./icons.js";
 
@@ -128,11 +128,6 @@ export function colorOf(name) {
   }
   return SIGNAL[colours.get(name)];
 }
-export function assignColours(models) {
-  for (const m of models || []) if (m.state === "ready" || m.state === "starting") colorOf(m.name);
-  for (const m of models || []) colorOf(m.name);
-}
-
 // -- formatting --------------------------------------------------------------------------------
 export const fmt = (v, digits = 0) => (v === null || v === undefined ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: digits }));
 export function dur(sec) {
@@ -158,15 +153,6 @@ export function ago(ts) {
 }
 export const clock = (ts) => new Date(ts * 1000).toLocaleTimeString([], { hour12: false });
 export const dateTime = (ts) => new Date(ts * 1000).toLocaleString([], { hour12: false, month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-export const lifecycle = (m) => {
-  if (m.state === "starting" && m.starting_seconds !== null) return `compiling · ${dur(m.starting_seconds)}`;
-  if (m.pinned) return "pinned";
-  if (m.state === "ready" && m.idle_seconds !== null) return `idle ${dur(m.idle_seconds)} of ${dur(m.keep_alive)}`;
-  return `unload after ${dur(m.keep_alive)}`;
-};
-export const STATE_LABEL = { ready: "Running", starting: "Starting", cold: "Idle", crashed: "Crashed" };
-
-export const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform || "");
 export const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** Count a number up (or down) to a new value; instant under reduced motion. */
@@ -216,31 +202,4 @@ export function copyButton(getText, label = "Copy", cls = "btn") {
     if (ok) { btn.lastChild.textContent = "Copied"; setTimeout(() => { btn.lastChild.textContent = label; }, 1400); }
   });
   return btn;
-}
-
-// -- theme -------------------------------------------------------------------------------------
-export const THEMES = ["contrast", "light", "dark"];
-export const getTheme = () => document.documentElement.dataset.theme || "contrast";
-export function setTheme(name) {
-  document.documentElement.dataset.theme = name;
-  try { localStorage.setItem("mxc-theme", name); } catch (_) { /* storage blocked: the theme just won't be remembered */ }
-  emitData();
-}
-export const cycleTheme = () => setTheme(THEMES[(THEMES.indexOf(getTheme()) + 1) % THEMES.length]);
-
-// -- dialogs -----------------------------------------------------------------------------------
-/** A native <dialog>: focus trap and Esc for free. Returns {close}. */
-export function openDialog(...content) {
-  const dlg = h("dialog", { class: "dlg" }, h("div", { class: "dlg-in" }, content));
-  document.body.append(dlg);
-  dlg.addEventListener("close", () => dlg.remove());
-  dlg.showModal();
-  return { dlg, close: () => dlg.close() };
-}
-
-// -- CLI twin box -------------------------------------------------------------------------------
-export function terminalBox(lines, caption = "same from the terminal") {
-  return h("div", { class: "code-box" },
-    h("div", { class: "cap mono" }, caption),
-    h("div", { class: "ln mono" }, lines.map((l, i) => h("div", { key: i }, h("span", { class: "p" }, "$ "), l))));
 }
