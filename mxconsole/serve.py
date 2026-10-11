@@ -65,6 +65,25 @@ def _admin(path: str, timeout: float | None) -> httpx.Response:
     return r
 
 
+def admin_call(method: str, path: str, *, timeout: float | None = 30.0, **kw) -> tuple[int, dict | list | str]:
+    """One admin request to the running daemon: (status, parsed JSON or text). DaemonError if it can't be reached."""
+    try:
+        r = httpx.request(method, f"{daemon_url()}/admin/{path}", headers=ADMIN, timeout=timeout, **kw)
+    except httpx.HTTPError as e:
+        raise DaemonError(f"could not reach the mxconsole daemon at {daemon_url()}: {e}")
+    try:
+        return r.status_code, r.json()
+    except ValueError:
+        return r.status_code, r.text
+
+
+def error_message(status: int, body) -> str:
+    """The one line to show for a failed admin call."""
+    if isinstance(body, dict) and isinstance(body.get("error"), dict) and body["error"].get("message"):
+        return body["error"]["message"]
+    return body if isinstance(body, str) and body else f"the daemon answered HTTP {status}"
+
+
 def load(name: str) -> None:
     _admin(f"models/{name}/load", timeout=None)
 

@@ -54,6 +54,35 @@ def list_models(as_json: bool = JSON) -> None:
     typer.echo(f"\nconsole  {report.console_link('models')}")
 
 
+@app.command("rm")
+def remove_model(model: str = typer.Argument(..., help="A registered model name"),
+                 purge: bool = typer.Option(False, "--purge", help="Also delete its weights from the Hugging Face cache."),
+                 as_json: bool = JSON) -> None:
+    """Stop a model, unregister it and delete its compiled-graph cache. Weights stay unless --purge."""
+    from mxconsole import removal, serve
+    store = Store.open()
+    if store.get_model(model) is None:
+        _fail(f"the model `{model}` is not registered. See: mxc ls")
+    if serve.daemon_running():  # the daemon owns the running process: let it stop the model first
+        try:
+            status, body = serve.admin_call("DELETE", f"models/{model}", params={"purge": "1"} if purge else None, timeout=None)
+        except serve.DaemonError as e:
+            _fail(str(e))
+        if status != 200:
+            _fail(serve.error_message(status, body))
+        result = body
+    else:
+        result = removal.remove(store, model, purge=purge)
+    if as_json:
+        typer.echo(report.dump(result))
+        return
+    typer.echo(f"removed {model}" + (" and deleted its weights" if result["purged"] else ""))
+    if result.get("purge_note"):
+        typer.echo(f"note: {result['purge_note']}")
+    if not purge:
+        typer.echo("its weights are still in the Hugging Face cache (mxc rm --purge deletes them too)")
+
+
 @app.command("set")
 def set_model(model: str = typer.Argument(..., help="A registered model name"),
               pin: bool = typer.Option(False, "--pin", help="Keep it loaded; never unload when idle."),

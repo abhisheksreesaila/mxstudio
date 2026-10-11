@@ -16,7 +16,7 @@ from fasthtml.common import FastHTML
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
-from mxconsole import admin_bench, admin_pull, admin_system, expose, insights, keys, metrics, system
+from mxconsole import admin_api, admin_bench, admin_pull, admin_system, expose, insights, keys, metrics, system
 from mxconsole.settings import DAEMON_PORT
 from mxconsole.store import Store, mxc_home
 from mxconsole.supervisor import StartFailed, Supervisor, UnknownModel
@@ -601,4 +601,5 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
 
     admin_system.register(app, store, supervisor, admin_only, counters=counters,
                           refused=admin_refused, error=openai_error)
+    admin_api.register(app, store, supervisor, admin_only, refused=admin_refused, error=openai_error)
     return app
