@@ -193,10 +193,10 @@ Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
 - [ ] ends on a Ready card (endpoint, curl, Make it secure, Open); the model appears in My models with a short flash
 - [ ] needs porting → "Port it" hands over to F-029's job (until F-029 lands: shows the `mxc port` command)
 
-## F-027 Benchmark and Logs blades [todo]
+## F-027 Benchmark and Logs blades [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023
-- [ ] Benchmark: standard horizontal bar charts for decode tok/s and TTFT across your models (this one outlined), workload line, Run again (background, progress), history; data from `/admin/bench`
-- [ ] Logs: per model, follow/pause, filter, from `/admin/models/{name}/log`
+- [x] Benchmark: standard horizontal bar charts for decode tok/s and TTFT across your models (this one outlined), workload line, Run again (background, progress), history; data from `/admin/bench`
+- [x] Logs: per model, follow/pause, filter, from `/admin/models/{name}/log`
 
 ## F-028 Notebook, Gateway and Settings blades [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
