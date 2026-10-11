@@ -145,3 +145,12 @@ def test_cli_install_stops_when_env_setup_fails(monkeypatch):
 def test_cli_rejects_install_with_uninstall():
     r = CliRunner().invoke(cli.app, ["app", "--install", "--uninstall"])
     assert r.exit_code != 0 and "not both" in r.output
+
+
+def test_cli_install_on_mac_refuses_before_downloading_the_app_env(monkeypatch):
+    calls = []
+    monkeypatch.setattr(app.sys, "platform", "darwin")
+    monkeypatch.setattr(app, "prepare_env", lambda project: calls.append("prepare"))
+    r = CliRunner().invoke(cli.app, ["app", "--install"])
+    assert r.exit_code != 0 and ".app bundle comes later" in r.output
+    assert calls == []

@@ -1,6 +1,7 @@
 """`mxc`: the mxconsole command line."""
 from __future__ import annotations
 
+import sys
 import time
 import subprocess
 from pathlib import Path
@@ -460,6 +461,7 @@ def app_cmd(install: bool = typer.Option(False, "--install", help="Linux: add an
             _fail("pass --install or --uninstall, not both")
         if install or uninstall:
             if install:
+                desktop._require_linux(sys.platform)  # before the Qt env download, not after it
                 desktop.prepare_env(desktop.project_dir())
             for path in (desktop.install(desktop.project_dir()) if install else desktop.uninstall()):
                 typer.echo(("installed " if install else "removed ") + str(path))

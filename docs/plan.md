@@ -210,11 +210,12 @@ Brief: docs/briefs/console-1.0.md · Needs: none (UI hook in F-026)
 - [ ] `POST /admin/ports`, `GET /admin/ports/{id}`, cancel; `--json` progress lines
 - [ ] tested with a fake `claude` binary; nothing real runs in tests
 
-## F-030 Desktop app for Linux and Mac [todo]
+## F-030 Desktop app for Linux and Mac [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023
-- [ ] `mxc app` opens the console in a native window (pywebview), starting the daemon if it isn't running, and stops nothing on close
-- [ ] Linux: `mxc app --install` writes a `.desktop` launcher with the mxconsole icon
-- [ ] no Linux-only assumptions in the code path; Mac build verified later on a Mac
+- [x] `mxc app` opens the console in a native window (pywebview), starting the daemon if it isn't running, and stops nothing on close
+- [x] Linux: `mxc app --install` writes a `.desktop` launcher with the mxconsole icon
+- [x] no Linux-only assumptions in the code path; Mac build verified later on a Mac
+- Window: pywebview + Qt WebEngine in the pixi env `app` (`pixi install -e app`, ~1 GB, done by `--install`); falls back to a Chromium `--app` window. Mac still to verify on a Mac.
 
 ## F-031 Retire the old console pages [todo]
 Brief: docs/briefs/console-1.0.md · Needs: F-025..F-028
