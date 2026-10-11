@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from urllib.parse import quote
 import time
 
 from mxconsole.settings import daemon_url
@@ -23,8 +24,8 @@ def console_hash(page: str, model: str | None = None) -> str | None:
         return None
     if page in _MODEL_PAGES:
         name = _HASH.get(page, page)
-        if model:
-            return f"{name}/{model}"
+        if model:  # encoded like console/routes.js reads it (a name with a space or a slash survives)
+            return f"{name}/{quote(model, safe='')}"
         return "" if page in ("model", "logs") else name  # no model named: the console picks the first one
     return _HASH[page]
 

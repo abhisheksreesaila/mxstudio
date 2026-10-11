@@ -34,7 +34,7 @@ Old names keep working, in the CLI and as hashes typed into the console (`#overv
 | daemon, settings | Settings |
 | pull, add | Add a model |
 | model `<name>` | that model's blade |
-| security, bench (also `benchmarks`), logs, notebook `<name>` | model blade with that child blade open; `bench` with no name takes the first model, `logs`/`model` with no name stay on My models |
+| security, bench (also `benchmarks`), logs, notebook `<name>` | model blade with that child blade open. With no name, `bench`, `security` and `notebook` take the first registered model (My models if there is none); `logs` and `model` with no name stay on My models. Names are URL-encoded in the link (`my%20model`) |
 | api | `/docs` (not a blade) |
 
 The console keeps the hash in step with what is open (`#keys`, `#bench/<name>`), so a link can be shared or reloaded.

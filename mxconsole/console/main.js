@@ -42,7 +42,10 @@ function modelsLoaded() {
 }
 
 const startHash = location.hash; // read before the stack change below rewrites it
-const here = () => { try { return decodeURIComponent(location.hash.slice(1)); } catch (_) { return location.hash.slice(1); } };
+const decode = (v) => { try { return decodeURIComponent(v); } catch (_) { return v; } };
+// both sides decoded, so a name with a space or a slash compares equal
+const here = () => decode(location.hash.slice(1));
+const want = () => decode(hashFor(stack));
 mountJourney($("journey"));
 mountTopbar($("topbar"), $("hwpop"));
 push("home");
@@ -51,11 +54,11 @@ startSystemPolling();
 
 // the hash follows what is open (replaceState: no history entry per click, and no hashchange to answer)
 onStackChange(() => {
-  const want = hashFor(stack);
-  if (here() === want) return;
-  history.replaceState(null, "", `${location.pathname}${location.search}${want ? `#${want}` : ""}`);
+  if (here() === want()) return;
+  const hash = hashFor(stack);
+  history.replaceState(null, "", `${location.pathname}${location.search}${hash ? `#${hash}` : ""}`);
 });
 window.addEventListener("hashchange", () => {
-  if (here() !== hashFor(stack)) openHash(location.hash);
+  if (here() !== want()) openHash(location.hash);
 });
 if (startHash.length > 1) openHash(startHash);

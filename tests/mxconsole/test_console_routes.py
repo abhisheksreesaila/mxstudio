@@ -15,6 +15,7 @@ CASES = [  # (page, model, hash the CLI prints)
     ("model", "tiny", "model/tiny"), ("security", "tiny", "security/tiny"), ("bench", "tiny", "bench/tiny"),
     ("benchmarks", "tiny", "bench/tiny"), ("logs", "tiny", "logs/tiny"), ("notebook", "tiny", "notebook/tiny"),
     ("benchmarks", None, "bench"), ("logs", None, ""), ("model", None, ""),
+    ("model", "my model/x", "model/my%20model%2Fx"), ("bench", "o'b", "bench/o%27b"),
 ]
 
 
@@ -47,7 +48,7 @@ def test_the_console_opens_what_the_cli_links_to():
     assert "routes.js" in CONSOLE_ASSETS
     for page, model, want in CASES:
         plan = node(f"r.parseHash({json.dumps('#' + want)})")
-        if model:
+        if model:  # the console decodes what the CLI encoded
             kind = want.split("/")[0]
             assert plan["steps"][0] == {"name": "model", "opts": {"id": model}}, want
             assert names(plan)[-1] == (kind, model), want

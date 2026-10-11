@@ -1,6 +1,8 @@
 """The API reference at /docs: one plain HTML page rendered from the OpenAPI spec (no scripts, so the console's CSP holds)."""
 from __future__ import annotations
 
+import json
+import shlex
 from html import escape as e
 
 STYLE = "/console/docs.css"
@@ -34,18 +36,14 @@ def _fields(spec: dict, op: dict) -> list[tuple[str, str, bool, str]]:
 
 
 def _curl(path: str, method: str, base: str, model: str) -> str:
-    if path == "/v1/chat/completions":
-        data = '{"model": "%s", "messages": [{"role": "user", "content": "Say hello in five words."}]}' % model
-    elif path == "/v1/completions":
-        data = '{"model": "%s", "prompt": "Once upon a time", "max_tokens": 32}' % model
-    elif path == "/v1/embeddings":
-        data = '{"model": "%s", "input": "hello"}' % model
-    else:
-        data = None
-    auth = '' if path == "/health" else ' -H "Authorization: Bearer $MXC_API_KEY"'
-    if data is None:
+    bodies = {"/v1/chat/completions": {"model": model, "messages": [{"role": "user", "content": "Say hello in five words."}]},
+              "/v1/completions": {"model": model, "prompt": "Once upon a time", "max_tokens": 32},
+              "/v1/embeddings": {"model": model, "input": "hello"}}
+    auth = "" if path == "/health" else ' -H "Authorization: Bearer $MXC_API_KEY"'
+    if path not in bodies:
         return f"curl {base}{path}{auth}"
-    return f"curl {base}{path}{auth} \\\n  -H 'Content-Type: application/json' \\\n  -d '{data}'"
+    # the model name is user data: JSON-encode it, then shell-quote the whole body
+    return f"curl {base}{path}{auth} \\\n  -H 'Content-Type: application/json' \\\n  -d {shlex.quote(json.dumps(bodies[path]))}"
 
 
 def render(spec: dict, base: str) -> str:
@@ -54,8 +52,9 @@ def render(spec: dict, base: str) -> str:
     out = [f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>mxconsole API reference</title><meta name="color-scheme" content="light dark">
-<link rel="icon" href="/console/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="{STYLE}"></head>
-<body><header><a class="brand" href="/console">mxconsole</a><span class="mono">API reference</span>
+<link rel="icon" href="/console/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/console/blades.css">
+<link rel="stylesheet" href="{STYLE}"><script src="/console/theme.js"></script></head>
+<body class="docs"><header class="top"><a class="brand" href="/console">mxconsole</a><span class="mono">API reference</span>
 <a class="back" href="/console">Back to the console</a></header><main>
 <h1>OpenAI-compatible API</h1>
 <p>{md(spec['info']['description'])}</p>

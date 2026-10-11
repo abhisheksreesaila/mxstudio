@@ -172,8 +172,11 @@ async def test_docs_is_the_api_reference_page(http):
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
     for want in ("/v1/chat/completions", "/v1/embeddings", "Authorization: Bearer", "tiny", "/console/docs.css"):
         assert want in r.text, want
-    assert "<script" not in r.text and "Content-Security-Policy" in r.headers  # no scripts: the console's CSP holds
+    import re
+    assert not re.search(r"<script(?![^>]*\ssrc=)", r.text) and "Content-Security-Policy" in r.headers  # no scripts: the console's CSP holds
     assert (await http.get("/console/docs.css")).status_code == 200
+    for want in ("/console/blades.css", "/console/theme.js"):  # the console's own tokens and theme choice
+        assert want in r.text, want
     assert (await http.get("/docs", headers={"X-Forwarded-For": "192.168.1.20"})).status_code == 403
     assert (await http.get("/openapi.json")).status_code == 200  # the spec stays
 
@@ -205,3 +208,17 @@ def test_console_code_never_writes_html_or_loads_from_elsewhere():
         text = (CONSOLE_DIR / name).read_text()
         assert "http://" not in text and "https://" not in text, f"{name} points outside the daemon"
         assert not re.search(r"<style|\sstyle=\"|<script(?![^>]*\ssrc=)", text), f"{name} has inline code the CSP blocks"
+
+
+def test_docs_css_uses_the_console_tokens_not_its_own_colours():
+    import re
+    from mxconsole.gateway import CONSOLE_DIR
+    css = (CONSOLE_DIR / "docs.css").read_text()
+    assert not re.findall(r"#[0-9a-fA-F]{3,8}\b", css) and "prefers-color-scheme" not in css
+    assert "--canvas" not in css.split("{")[0] and "var(--card)" in css and "var(--accent)" in css
+
+
+async def test_docs_quotes_the_model_name_in_its_curl_examples(http, store):
+    store.add_model(name="o'brien", repo_id="x/y", revision="main", source="hf", architecture="Qwen2ForCausalLM")
+    text = (await http.get("/docs")).text
+    assert "o&#x27;&quot;&#x27;&quot;&#x27;brien" in text  # shlex-quoted: o'"'"'brien, then HTML-escaped
