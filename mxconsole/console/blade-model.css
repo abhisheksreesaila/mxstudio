@@ -17,8 +17,8 @@
 :is(.b-model, .b-security, .b-keys) .urlrow .ib:hover { background: var(--sunk); color: var(--text); }
 :is(.b-model, .b-security, .b-keys) .code { background: var(--code); color: var(--code-text); border-radius: 9px; padding: 12px 14px; position: relative; margin-top: 10px; box-shadow: inset 0 0 0 1px var(--card-line); }
 :is(.b-model, .b-security, .b-keys) .code .curl { margin: 0; font: 12px/1.6 var(--mono); white-space: pre-wrap; word-break: break-word; padding-right: 64px; }
-:is(.b-model, .b-security, .b-keys) .code .cp { position: absolute; top: 6px; right: 6px; color: #a1a1aa; background: #1a1a1f; border: 1px solid #2c2c33; border-radius: 6px; font: 11px var(--mono); padding: 3px 8px; display: flex; gap: 5px; align-items: center; }
-:is(.b-model, .b-security, .b-keys) .code .cp:hover { color: #fff; }
+:is(.b-model, .b-security, .b-keys) .code .cp { position: absolute; top: 6px; right: 6px; color: var(--chrome-muted); background: var(--chrome); border: 1px solid var(--chrome-line); border-radius: 6px; font: 11px var(--mono); padding: 3px 8px; display: flex; gap: 5px; align-items: center; }
+:is(.b-model, .b-security, .b-keys) .code .cp:hover { color: var(--chrome-text); }
 :is(.b-model, .b-security, .b-keys) .btn.danger { color: var(--bad-fg); }
 
 /* menu + content */

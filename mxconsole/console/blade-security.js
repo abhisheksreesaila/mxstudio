@@ -23,23 +23,28 @@ export function securityView(info, network) {
   };
 }
 
-/** The state of each step while the request runs: `at` is the step in progress; mode "run" | "done" | "fail". */
-export function stepStates(at, mode) {
-  return EXPOSE_STEPS.map((_, i) => (mode === "done" ? "done" : i < at ? "done" : i === at ? (mode === "fail" ? "fail" : "active") : "todo"));
+/** The state of each step. The server does all three in one request, so while it runs every step is in progress,
+ *  when it succeeds every step is done, and on failure none is claimed. mode: "run" | "done" | "fail". */
+export function stepStates(mode) {
+  return EXPOSE_STEPS.map(() => (mode === "done" ? "done" : mode === "run" ? "active" : "todo"));
 }
 
-const TRUST = [
-  ["Linux", "sudo cp ca.crt /usr/local/share/ca-certificates/mxconsole.crt && sudo update-ca-certificates"],
-  ["macOS", "Open ca.crt in Keychain Access, then set it to Always Trust"],
-  ["Windows", "Double-click ca.crt, install it into Trusted Root Certification Authorities"],
-  ["iPhone, Android", "Send ca.crt to the phone, install it as a profile or CA certificate, then trust it in settings"],
-];
+/** How to trust the CA on another device, using the real file name. */
+export function trustSteps(caPath) {
+  const file = String(caPath || "").split("/").pop() || "the CA file";
+  return [
+    ["Linux", `sudo cp ${file} /usr/local/share/ca-certificates/mxconsole.crt && sudo update-ca-certificates`],
+    ["macOS", `Open ${file} in Keychain Access, then set it to Always Trust`],
+    ["Windows", `Double-click ${file}, install it into Trusted Root Certification Authorities`],
+    ["iPhone, Android", `Send ${file} to the phone, install it as a profile or CA certificate, then trust it in settings`],
+  ];
+}
 
 register("security", (blade) => ({
   title: "Security", crumb: "Security", sub: "certificate, key and HTTPS on your LAN",
   icon: "lock", hue: "var(--hue-keys)", side: 520, min: 520,
   mount(body) {
-    let network = null, phase = "idle", at = 0, error = "", timer = 0, token = 0, shape = "";
+    let network = null, phase = "idle", error = "", token = 0, shape = "", stopBusy = false, stopArmed = false, stopTimer = 0;
     const idx = () => stack.indexOf(blade);
 
     const statusIcon = h("span", { class: "sq", style: { width: "28px", height: "28px" } });
@@ -56,15 +61,18 @@ register("security", (blade) => ({
         h("dt", {}, "HTTPS"), h("dd", {}, "Caddy and LiteLLM listen on your LAN; localhost keeps working over HTTP")));
     body.replaceChildren(h("div", { class: "pad" }, box, how, after));
 
+    async function reloadInfo() {  // core.js only re-reads /admin/info every 15 s: the LAN endpoint just changed
+      try { store.info = await api("GET", "/admin/info"); store.infoAt = Date.now(); } catch (_) { /* the poll catches up */ }
+      await refresh();
+    }
     async function loadNetwork() {
       try { network = await api("GET", "/admin/network"); } catch (_) { /* the view works without it */ }
       draw();
     }
     async function secure() {
       if (phase === "run") return;
-      phase = "run"; at = 0; error = ""; const mine = ++token;
+      phase = "run"; error = ""; const mine = ++token;
       draw();
-      timer = setInterval(() => { if (at < EXPOSE_STEPS.length - 1) { at += 1; draw(); } }, 1100);
       try {
         await api("POST", "/admin/expose", {});
         if (mine !== token || !blade.alive) return;
@@ -73,15 +81,22 @@ register("security", (blade) => ({
         if (mine !== token || !blade.alive) return;
         phase = "fail"; error = e.message;
       }
-      clearInterval(timer);
-      await refresh();
+      await reloadInfo();
       await loadNetwork();
       if (phase === "done") toast(`Secure: ${securityView(store.info, network).url || "HTTPS on your LAN"} · $ mxc expose`);
       draw();
     }
-    async function stopExposing() {
+    async function stopExposing(e) {
+      if (stopBusy) return;
+      const btn = e.currentTarget;
+      if (!stopArmed) {  // the second click confirms
+        stopArmed = true; btn.lastChild.textContent = "Click again to stop exposing";
+        stopTimer = setTimeout(() => { stopArmed = false; btn.lastChild.textContent = "Stop exposing"; }, 4000);
+        return;
+      }
+      clearTimeout(stopTimer); stopArmed = false; stopBusy = true; btn.disabled = true;
       try { await api("POST", "/admin/expose/stop"); toast("LAN access is off · $ mxc expose --stop"); } catch (e) { toast(`Could not stop: ${e.message}`); }
-      phase = "idle"; await refresh(); await loadNetwork();
+      phase = "idle"; stopBusy = false; await reloadInfo(); await loadNetwork();
     }
 
     function stepRows(states, v) {
@@ -92,7 +107,7 @@ register("security", (blade) => ({
     function draw() {
       if (!blade.alive) return;
       const v = securityView(store.info, network);
-      const running = phase !== "idle";
+      const running = phase === "run" || phase === "done";
       const sig = `${v.secure}|${phase}|${v.url}|${v.caPath}|${v.caExists}`;
       statusIcon.style.setProperty("--h", v.secure ? "var(--ok)" : "var(--hue-keys)");
       statusIcon.replaceChildren(icon(v.secure ? "lock" : "unlock", 16, "currentColor", 1.75));
@@ -101,7 +116,7 @@ register("security", (blade) => ({
       statusText.textContent = phase === "run" ? "$ mxc expose" : v.secure ? "HTTPS with a key. Other devices on your Wi-Fi can call it." : "Only this machine can call it. One click adds a certificate, a key and HTTPS.";
       // the steps are not focusable: rebuilt every draw while they run
       steps.hidden = !running;
-      if (running) steps.replaceChildren(...stepRows(stepStates(at, phase === "fail" ? "fail" : phase === "done" ? "done" : "run"), v));
+      if (running) steps.replaceChildren(...stepRows(stepStates(phase), v));
       errBox.hidden = phase !== "fail";
       errBox.replaceChildren(...(phase === "fail" ? [icon("triangle-alert", 15), h("span", {}, `Could not make it secure: ${error}`)] : []));
       if (sig === shape) return;  // buttons and the after-panel are focusable: rebuild only when they change
@@ -116,13 +131,13 @@ register("security", (blade) => ({
         h("div", { class: "h3 gap" }, "Trust the certificate"),
         h("p", { class: "note" }, v.caExists ? "Other devices need to trust the mxconsole CA once, or HTTPS calls fail with a certificate error. This machine already knows it." : "The CA file is created the first time Caddy starts; it is not there yet."),
         h("div", { class: "urlrow" }, h("span", { class: "tag" }, "ca"), h("span", { class: "u" }, v.caPath || "—"), v.caPath ? copyButton(() => v.caPath, "", "ib") : null),
-        h("ul", { class: "trust" }, TRUST.map(([os, how]) => h("li", {}, h("b", {}, os), h("span", { class: "mono" }, how)))),
+        h("ul", { class: "trust" }, trustSteps(v.caPath).map(([os, how]) => h("li", {}, h("b", {}, os), h("span", { class: "mono" }, how)))),
         h("div", { class: "h3 gap" }, "From another device on your Wi-Fi"),
         h("div", { class: "code" }, copyButton(() => v.curl, "copy", "cp"), h("pre", { class: "curl mono" }, v.curl)),
       ] : []));
     }
     blade.redraw = draw;
-    blade.onClose = (() => { const off = onData(draw); return () => { off(); clearInterval(timer); token += 1; }; })();
+    blade.onClose = (() => { const off = onData(draw); return () => { off(); clearTimeout(stopTimer); token += 1; }; })();
     draw();
     loadNetwork();
     if (blade.opts.run && !(store.info && store.info.lan_endpoint)) setTimeout(() => { if (blade.alive && phase === "idle") secure(); }, 300);

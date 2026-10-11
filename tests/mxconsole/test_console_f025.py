@@ -126,9 +126,10 @@ def test_security_view_local_then_secure():
 
 def test_expose_steps_advance_then_finish():
     assert node("m.EXPOSE_STEPS.map((s) => s.key)", "blade-security.js") == ["cert", "key", "https"]
-    assert node("m.stepStates(1, 'run')", "blade-security.js") == ["done", "active", "todo"]
-    assert node("m.stepStates(5, 'done')", "blade-security.js") == ["done", "done", "done"]
-    assert node("m.stepStates(1, 'fail')", "blade-security.js") == ["done", "fail", "todo"]
+    # one blocking request: nothing is checked until it returns, and a failure does not say which step broke
+    assert node("m.stepStates('run')", "blade-security.js") == ["active", "active", "active"]
+    assert node("m.stepStates('done')", "blade-security.js") == ["done", "done", "done"]
+    assert node("m.stepStates('fail')", "blade-security.js") == ["todo", "todo", "todo"]
 
 
 # -- keys ----------------------------------------------------------------------------------------
@@ -150,6 +151,12 @@ def test_app_name_validation_and_twins():
     assert node("m.keyTwin('rotate', 'web')", "blade-keys.js") == "mxc keys rotate web"
     assert node("m.keyTwin('revoke', 'web')", "blade-keys.js") == "mxc keys revoke web"
     assert node("m.keyTwin('ls')", "blade-keys.js") == "mxc keys ls"
+
+
+def test_trust_steps_use_the_real_ca_filename():
+    steps = node("m.trustSteps('/h/.mxc/pki/root.crt')", "blade-security.js")
+    assert all("ca.crt" not in t[1] for t in steps) and any("root.crt" in t[1] for t in steps)
+    assert node("m.trustSteps('')", "blade-security.js")
 
 
 # -- css and csp ---------------------------------------------------------------------------------

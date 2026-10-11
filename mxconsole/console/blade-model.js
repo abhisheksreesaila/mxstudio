@@ -95,7 +95,7 @@ register("model", (blade) => {
       const idx = () => stack.indexOf(blade);
       const child = () => stack[idx() + 1];
       const ctxNow = () => ({ metrics: store.metrics, series: store.series, info: store.info, system: system.crew, endpoint: (store.info && store.info.endpoint) || `${location.origin}/v1` });
-      let essigPrev = "", crashSig = "", busy = false, confirmTimer = 0, bar = null, barSig = "", subSig = "", gone = false;
+      let removing = false, essigPrev = "", crashSig = "", busy = false, confirmTimer = 0, bar = null, barSig = "", subSig = "", gone = false;
       const open = (blade2, opts = {}) => push(blade2, { id: name, ...opts }, idx());
 
       // -- skeleton, built once -----------------------------------------------------------------
@@ -172,13 +172,13 @@ register("model", (blade) => {
         }
         clearTimeout(confirmTimer);
         confirming = false;
-        if (btn) btn.disabled = true;
+        removing = true; paintBar();
         api("DELETE", path).then(() => {
           gone = true;
           truncate(1);
           toast(`Removed ${name} · $ ${cliTwin("rm", name)}`);
           refresh();
-        }).catch((e) => { toast(`Could not remove ${name}: ${e.message}`); if (btn) btn.disabled = false; paintConfirm(); });
+        }).catch((e) => { toast(`Could not remove ${name}: ${e.message}`); removing = false; paintBar(); paintConfirm(); });
       }
       function paintConfirm() {
         const btn = barHost.querySelector('[data-cmd="rm"]');
@@ -189,7 +189,7 @@ register("model", (blade) => {
         btn.classList.toggle("armed", confirming);
       }
       function paintBar() {
-        barHost.querySelectorAll("button").forEach((b) => { if (b.dataset.cmd !== "rm" || !confirming) b.disabled = busy; });
+        barHost.querySelectorAll("button").forEach((b) => { b.disabled = busy || removing; });
       }
       const currentModel = () => (store.models || []).find((m) => m.name === name);
 
