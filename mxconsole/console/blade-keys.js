@@ -79,7 +79,7 @@ register("keys", (blade) => ({
       try {
         const out = await api("POST", "/admin/keys", { app });
         toggleForm(false);
-        showSecret(app, out.key, `Key for ${app}`, "Copy it now. It is shown once and cannot be recovered; rotate it if you lose it.", `$ ${keyTwin("new", app)}`);
+        showSecret(app, out.key, `Key for ${app}`, "Copy it now. It is shown once and cannot be recovered; rotate it if you lose it.", keyTwin("new", app));
         toast(`Created ${app} · $ ${keyTwin("new", app)}`);
       } catch (e) { formErr.textContent = e.status === 409 ? `There is already a key for ${app}. Rotate it instead.` : e.message; }
       create.disabled = false;
@@ -88,7 +88,7 @@ register("keys", (blade) => ({
     async function rotate(app) {
       try {
         const out = await api("POST", `/admin/keys/${encodeURIComponent(app)}/rotate`);
-        showSecret(app, out.key, `New key for ${app}`, out.revived ? "Shown once. The old secret stopped working, and this brings the revoked app back to life." : "Shown once. The old secret has stopped working: update the app that uses it.", `$ ${keyTwin("rotate", app)}`);
+        showSecret(app, out.key, `New key for ${app}`, out.revived ? "Shown once. The old secret stopped working, and this brings the revoked app back to life." : "Shown once. The old secret has stopped working: update the app that uses it.", keyTwin("rotate", app));
         toast(`Rotated ${app} · $ ${keyTwin("rotate", app)}`);
       } catch (e) { toast(`Could not rotate ${app}: ${e.message}`); }
       load();

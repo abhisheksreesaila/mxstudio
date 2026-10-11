@@ -80,6 +80,11 @@
 .b-model.narrow .rmenu .ml, .b-model.narrow .rmenu .grp, .b-model.narrow .rmenu .twins, .b-model.narrow .rmenu button svg:last-child:not(:first-child) { display: none; }
 .b-model.narrow .rmenu button { justify-content: center; padding: 9px 0; }
 .b-model.narrow .metrics .v { font-size: 18px; }
+@container (max-width: 480px) {
+  .b-model .metrics { grid-template-columns: 1fr; gap: 6px; }
+  .b-model .metrics > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .b-model .metrics .v { font-size: 18px; margin-top: 0; }
+}
 @media (max-width: 860px) {
   .b-model .rwrap { grid-template-columns: 48px minmax(0, 1fr); }
   .b-model .rmenu .ml, .b-model .rmenu .grp, .b-model .rmenu .twins, .b-model .rmenu button svg:last-child:not(:first-child) { display: none; }

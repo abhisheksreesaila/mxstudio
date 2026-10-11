@@ -235,8 +235,8 @@ register("model", (blade) => {
           v.essentials.forEach(([, val], i) => dds[i].replaceChildren(val, ...(i === 5 && !v.secure ? [" · ", accessLink] : [])));
         }
         // tokens
-        mTps.replaceChildren(v.tokens.tps === null ? "—" : fmt(v.tokens.tps), v.tokens.tps === null ? null : h("small", {}, " tok/s"));
-        mTtft.replaceChildren(v.tokens.ttft === null ? "—" : fmt(v.tokens.ttft), v.tokens.ttft === null ? null : h("small", {}, " ms"));
+        mTps.replaceChildren(...(v.tokens.tps === null ? ["—"] : [fmt(v.tokens.tps), h("small", {}, " tok/s")]));
+        mTtft.replaceChildren(...(v.tokens.ttft === null ? ["—"] : [fmt(v.tokens.ttft), h("small", {}, " ms")]));
         mReq.textContent = v.state === "running" || v.tokens.requests ? fmt(v.tokens.requests) : "0";
         chart.replaceChildren(areaChart(v.tokens.points, colorOf(name)));
         // call it
@@ -254,7 +254,7 @@ register("model", (blade) => {
         secBtn.replaceChildren(icon("lock", 14, "currentColor", 1.75), v.secure ? "View security" : "Make it secure");
         const f = v.fit;
         fitNum.textContent = f.thisGb ? `${f.thisGb} GB` : "";
-        fitBar.replaceChildren(...f.others.map((o) => h("i", { title: `${o.name} · ${o.gb} GB`, class: "o", style: { width: `${o.pct}%` } })), f.thisGb ? h("i", { title: `${name} · ${f.thisGb} GB`, style: { width: `${f.thisPct}%`, background: colorOf(name) } }) : null);
+        fitBar.replaceChildren(...f.others.map((o) => h("i", { title: `${o.name} · ${o.gb} GB`, class: "o", style: { width: `${o.pct}%` } })), ...(f.thisGb ? [h("i", { title: `${name} · ${f.thisGb} GB`, style: { width: `${f.thisPct}%`, background: colorOf(name) } })] : []));
         fitCap.replaceChildren(h("span", {}, f.totalGb === null ? "no GPU found" : `others ${f.othersGb} GB`), h("span", {}, f.totalGb === null ? "" : `free ${f.freeGb} GB of ${f.totalGb} GB`));
         // command-line twins for this state
         const twin = [m.state === "ready" || m.state === "starting" ? cliTwin("stop", name) : cliTwin("start", name), cliTwin("rm", name)].join("|");
