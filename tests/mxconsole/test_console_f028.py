@@ -193,3 +193,12 @@ def test_blades_follow_the_contract_and_the_csp():
         assert "blade.onClose" in src  # everything started in mount is torn down
     notebook = (CONSOLE_DIR / "blade-notebook.js").read_text()
     assert "wide: true" in notebook and "data:image" not in notebook and 'src:' not in notebook  # images are never loaded
+
+
+@needs_node
+def test_a_link_label_can_hold_code_and_the_header_tools_are_one_node():
+    kids = md("[`org/tiny`](https://huggingface.co/org/tiny)")[0]["children"]
+    assert kids[0]["tag"] == "a" and kids[0]["children"] == [{"tag": "code", "children": [{"text": "org/tiny"}]}]
+    # blades.js takes `tools` as a single Node (an array would print as "[object HTMLElement]")
+    for name in ("blade-notebook", "blade-gateway"):
+        assert re.search(r"tools: (h\(|restartBtn,)", (CONSOLE_DIR / f"{name}.js").read_text()), name

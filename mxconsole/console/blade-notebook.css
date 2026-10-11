@@ -81,3 +81,4 @@
 
 @container (max-width: 1100px) { .nb-grid { grid-template-columns: 190px minmax(0, 1fr); } .nb-side { display: none; } }
 @container (max-width: 720px) { .nb-grid { grid-template-columns: minmax(0, 1fr); } .nb-toc { display: none; } .nb-out { padding-left: 16px; } .nb-in { grid-template-columns: 44px minmax(0, 1fr); } }
+.nb-tools { display: flex; align-items: center; gap: 8px; min-width: 0; }

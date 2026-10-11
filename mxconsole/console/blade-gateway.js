@@ -61,14 +61,14 @@ register("gateway", (blade) => {
     if (failed && !net) { status.replaceChildren(h("div", { class: "gw-fail" }, `Could not load the gateway: ${failed}`)); return; }
     if (!net) { status.replaceChildren(h("div", { class: "muted gw-pad" }, "Loading…")); return; }
     const info = store.info || {};
-    status.replaceChildren(
+    status.replaceChildren(...[
       h("div", { class: "h3" }, "Status"),
       h("dl", { class: "gw-kv" },
         h("dt", {}, "LiteLLM"), h("dd", {}, dot(v.litellm), v.litellm ? `running · :${v.port}` : "off"),
         h("dt", {}, "Caddy (HTTPS)"), h("dd", {}, dot(v.caddy), v.caddy ? "running" : "off"),
         h("dt", {}, "Local endpoint"), h("dd", { class: "mono" }, info.endpoint || "—"),
         h("dt", {}, "LAN endpoint"), h("dd", { class: "mono" }, v.lan || "off")),
-      !v.litellm ? h("p", { class: "gw-off" }, "LiteLLM is off, so only the daemon's own /v1 answers. The routes below apply once ", h("code", { class: "mono" }, "mxc expose"), " starts it.") : null);
+      !v.litellm ? h("p", { class: "gw-off" }, "LiteLLM is off, so only the daemon's own /v1 answers. The routes below apply once ", h("code", { class: "mono" }, "mxc expose"), " starts it.") : null].filter(Boolean));
   }
   function drawRoutes() {
     if (!net) { routes.replaceChildren(); return; }
@@ -115,7 +115,7 @@ register("gateway", (blade) => {
   return {
     title: "Gateway", crumb: "Gateway", sub: "LiteLLM · one endpoint routes to every model",
     icon: "route", hue: "var(--hue-gateway)", side: 640, min: 520,
-    tools: [restartBtn],
+    tools: restartBtn,
     mount(body) {
       body.replaceChildren(h("div", { class: "gw" }, status, routes, guards, logBox,
         h("div", { class: "gw-sec" }, h("div", { class: "h3" }, "From the terminal"), twin("mxc status"), twin("mxc expose"), twin("mxc expose --stop"))));

@@ -38,7 +38,7 @@ export function parseInline(src) {
     else if (m[4] !== undefined || m[5] !== undefined) push({ tag: "em", children: parseInline(m[4] ?? m[5]) });
     else {
       const href = safeUrl(m[7]);
-      if (href) push({ tag: "a", attrs: { href, target: "_blank", rel: "noopener noreferrer" }, children: [T(m[6])] });
+      if (href) push({ tag: "a", attrs: { href, target: "_blank", rel: "noopener noreferrer" }, children: parseInline(m[6]) });
       else push(T(m[0])); // javascript:, data:, relative: shown as the text it was, not a link
     }
   }
@@ -278,7 +278,7 @@ register("notebook", (blade) => {
   return {
     title: "Notebook", crumb: "Notebook", sub: id,
     icon: "book-open", hue: "var(--hue-notebook)", wide: true, min: 900,
-    tools: [chipEl, jupBtn],
+    tools: h("div", { class: "nb-tools" }, chipEl, jupBtn), // one Node: the engine takes a single node here
     mount(body) {
       body.replaceChildren(shell);
       paintChip();
