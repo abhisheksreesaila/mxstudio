@@ -450,6 +450,23 @@ def expose_cmd(host: str = typer.Option(None, help="Hostname clients use. Defaul
     typer.echo("           Linux: sudo trust anchor root.crt · or pass it as the CA bundle (curl --cacert root.crt)")
 
 
+@app.command("app")
+def app_cmd(install: bool = typer.Option(False, "--install", help="Linux: add an mxconsole launcher to the app menu."),
+            uninstall: bool = typer.Option(False, "--uninstall", help="Linux: remove that launcher.")) -> None:
+    """Open the console in its own window (starts the daemon if needed; closing the window stops nothing)."""
+    from mxconsole import app as desktop, report, serve
+    try:
+        if install or uninstall:
+            for path in (desktop.install(desktop.project_dir()) if install else desktop.uninstall()):
+                typer.echo(("installed " if install else "removed ") + str(path))
+            return
+        how = desktop.run(serve.ensure_daemon, desktop.open_native, desktop.open_browser_app,
+                          report.console_link(), say=typer.echo)
+        typer.echo(f"window: {how}")
+    except (desktop.AppError, serve.DaemonError) as e:
+        _fail(str(e))
+
+
 @app.command("daemon")
 def daemon() -> None:
     """Run the gateway in the foreground (logs to stdout). Ctrl-C stops it and unloads every model."""

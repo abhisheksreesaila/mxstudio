@@ -31,5 +31,14 @@ python = "3.12.*"
 [feature.gateway.pypi-dependencies]
 litellm = { version = ">=1.80", extras = ["proxy"] }
 
+[feature.app.dependencies]
+python = "3.12.*"
+pyside6 = "*"
+qtpy = "*"
+
+[feature.app.pypi-dependencies]
+pywebview = ">=6"
+
 [environments]
+app = { features = ["app"], no-default-feature = true }
 gateway = { features = ["gateway"], no-default-feature = true }
