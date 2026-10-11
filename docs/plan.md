@@ -172,7 +172,7 @@ Brief: docs/briefs/console-1.0.md · Needs: none
 
 ## F-024 Admin API for the 1.0 console [todo]
 Brief: docs/briefs/console-1.0.md · Needs: none
-- [ ] `mxc rm <model>` and `DELETE /admin/models/{name}`: stops it, unregisters it, deletes its compiled-graph cache; weights stay in the HF cache unless `--purge`
+- [ ] `mxc rm <model>` and `DELETE /admin/models/{name}`: unregisters it, stops it, deletes mxconsole's own per-model files; weights stay in the HF cache unless `--purge`. MAX's compiled-graph cache is shared and keyed by graph hash, so it is left alone (decided 2026-10-11)
 - [ ] `GET /admin/search?q=`: curated names, MAX catalog and Hugging Face repo ids, each with source, params, size, estimated VRAM, `fit` (ok / tight / no / port) against this machine's free GPU memory, and for `no` up to 3 suggestions that fit
 - [ ] `mxc keys rotate <app>` and `POST /admin/keys/{app}/rotate`: new secret shown once, old one revoked
 - [ ] `GET /admin/learn/{name}`: the generated notebook (cells, kernel spec, path), generating it if missing; `POST /admin/learn/{name}/open` starts Jupyter on it and returns the URL
@@ -210,11 +210,12 @@ Brief: docs/briefs/console-1.0.md · Needs: none (UI hook in F-026)
 - [ ] `POST /admin/ports`, `GET /admin/ports/{id}`, cancel; `--json` progress lines
 - [ ] tested with a fake `claude` binary; nothing real runs in tests
 
-## F-030 Desktop app for Linux and Mac [todo]
+## F-030 Desktop app for Linux and Mac [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023
-- [ ] `mxc app` opens the console in a native window (pywebview), starting the daemon if it isn't running, and stops nothing on close
-- [ ] Linux: `mxc app --install` writes a `.desktop` launcher with the mxconsole icon
-- [ ] no Linux-only assumptions in the code path; Mac build verified later on a Mac
+- [x] `mxc app` opens the console in a native window (pywebview), starting the daemon if it isn't running, and stops nothing on close
+- [x] Linux: `mxc app --install` writes a `.desktop` launcher with the mxconsole icon
+- [x] no Linux-only assumptions in the code path; Mac build verified later on a Mac
+- Window: pywebview + Qt WebEngine in the pixi env `app` (`pixi install -e app`, ~1 GB, done by `--install`); falls back to a Chromium `--app` window. Mac still to verify on a Mac.
 
 ## F-031 Retire the old console pages [todo]
 Brief: docs/briefs/console-1.0.md · Needs: F-025..F-028

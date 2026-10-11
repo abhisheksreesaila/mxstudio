@@ -1,6 +1,7 @@
 """`mxc`: the mxconsole command line."""
 from __future__ import annotations
 
+import sys
 import time
 import subprocess
 from pathlib import Path
@@ -448,6 +449,28 @@ def expose_cmd(host: str = typer.Option(None, help="Hostname clients use. Defaul
     typer.echo("keys       mxc keys new <app>   (send it as: Authorization: Bearer <key>)")
     typer.echo(f"trust      copy {expose.ca_root_path()} to each client (this machine too) and trust it once")
     typer.echo("           Linux: sudo trust anchor root.crt · or pass it as the CA bundle (curl --cacert root.crt)")
+
+
+@app.command("app")
+def app_cmd(install: bool = typer.Option(False, "--install", help="Linux: add an mxconsole launcher to the app menu."),
+            uninstall: bool = typer.Option(False, "--uninstall", help="Linux: remove that launcher.")) -> None:
+    """Open the console in its own window (starts the daemon if needed; closing the window stops nothing)."""
+    from mxconsole import app as desktop, report, serve
+    try:
+        if install and uninstall:
+            _fail("pass --install or --uninstall, not both")
+        if install or uninstall:
+            if install:
+                desktop._require_linux(sys.platform)  # before the Qt env download, not after it
+                desktop.prepare_env(desktop.project_dir())
+            for path in (desktop.install(desktop.project_dir()) if install else desktop.uninstall()):
+                typer.echo(("installed " if install else "removed ") + str(path))
+            return
+        how = desktop.run(serve.ensure_daemon, desktop.open_native, desktop.open_browser_app,
+                          report.console_link(), say=typer.echo)
+        typer.echo(f"window: {how}")
+    except (desktop.AppError, serve.DaemonError) as e:
+        _fail(str(e))
 
 
 @app.command("daemon")
