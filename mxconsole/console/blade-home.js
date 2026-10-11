@@ -1,7 +1,7 @@
 // mxconsole, the My models blade: the home of the console. List (default) or cards, remembered per browser;
 // a compact list when a model is open beside it, a strip of dots when it is folded into a rail.
 // Data: /admin/models + /admin/metrics + /admin/series (polled by core.js) and /admin/system (system-data.js).
-import { h, s, icon, store, onData, fmt, dur, colorOf, api, refresh, toast, copyButton } from "./core.js";
+import { h, s, icon, store, onData, fmt, dur, colorOf, api, refresh, toast, copyButton, reducedMotion } from "./core.js";
 import { register, push, truncate, stack, setHead } from "./blades.js";
 import { readView, writeView, safeStorage } from "./prefs.js";
 import { syncKeyed } from "./keyed.js";
@@ -32,6 +32,12 @@ export function modelView(m, ctx) {
     ttft: running && by.ttft_p50_ms !== undefined ? by.ttft_p50_ms : null, requests: by.requests ?? 0,
     vramGb: crew && crew.vram_gb > 0 ? Math.round(crew.vram_gb * 10) / 10 : null,
   };
+}
+/** Names present now that were not in the previous poll. `prev` is null before the first load: nothing is new then. Pure. */
+export function newNames(prev, names) {
+  if (prev === null || prev === undefined) return [];
+  const had = new Set(prev);
+  return names.filter((n) => !had.has(n));
 }
 export function filterModels(rows, query) {
   const q = String(query || "").trim().toLowerCase();
@@ -82,6 +88,8 @@ register("home", (blade) => ({
     // (full / side / rail), of the daemon's reachability or of the crashed set rebuilds anything.
     const storage = safeStorage();
     let view = readView(storage), query = "", shape = "", refs = null, toolsMode = "", crashSig = "";
+    let seenNames = null;  // model names of the previous poll, to flash a model that just appeared (not on first load)
+    const flashTimers = new Set();
     const ctxNow = () => ({ metrics: store.metrics, series: store.series, info: store.info, system: system.crew, endpoint: (store.info && store.info.endpoint) || `${location.origin}/v1` });
     const selected = () => (stack[1] && stack[1].name === "model" ? stack[1].opts.id : null);
 
@@ -268,11 +276,25 @@ register("home", (blade) => ({
         emptyNote(views, shown);
       }
       syncKeyed(refs.rowsParent, refs.rows, shown, refs.make, refs.update);
+      flashNew(store.models.map((m) => m.name));
+    }
+    function flashNew(names) {
+      const fresh = newNames(seenNames, names);
+      seenNames = names;
+      if (reducedMotion()) return;
+      for (const name of fresh) {
+        const el = refs && refs.rows && refs.rows.get(name);
+        if (!el) continue;
+        el.classList.add("flash");
+        const t = setTimeout(() => { flashTimers.delete(t); el.classList.remove("flash"); }, 1700);
+        flashTimers.add(t);
+      }
     }
     blade.redraw = draw;
     blade.onMode = draw;
     blade.sync = () => { if (refs && refs.rows) refs.rows.forEach(markSel); };
-    blade.onClose = onData(draw);
+    const off = onData(draw);
+    blade.onClose = () => { off(); flashTimers.forEach(clearTimeout); flashTimers.clear(); };
     draw();
   },
 }));

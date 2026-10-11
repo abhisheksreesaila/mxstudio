@@ -195,6 +195,47 @@ export function setupStages(run, now) {
   return rows;
 }
 
+// -- pure: the blade's control logic (tested under node) ------------------------------------------------
+/** What "Cancel" must send for a run in this phase, or null when there is nothing to send yet. */
+export function cancelPlan(run, flow) {
+  const post = (path) => ({ method: "POST", path });
+  const model = () => (run.name ? post(`/admin/models/${encodeURIComponent(run.name)}/stop`) : null);
+  if (run.phase === "fetch") {
+    if (run.kind === "port") {
+      if (run.port && run.port.status === "done") return model();  // the job is finished: stop what it served
+      return flow.portId ? post(`/admin/ports/${flow.portId}/cancel`) : null;
+    }
+    return flow.pullId ? post(`/admin/pulls/${flow.pullId}/cancel`) : null;
+  }
+  if (run.phase === "compile" || run.phase === "serve" || run.phase === "smoke") return model(); // supervisor.stop also cancels a start in progress
+  return null;
+}
+/** Every timer a blade starts goes through here, so closing it stops all of them and nothing starts afterwards. */
+export function timerScope(t = globalThis) {
+  const live = new Set();
+  let closed = false;
+  return {
+    later(fn, ms) { if (closed) return 0; const id = t.setTimeout(() => { live.delete(id); fn(); }, ms); live.add(id); return id; },
+    every(fn, ms) { if (closed) return 0; const id = t.setInterval(fn, ms); live.add(id); return id; },
+    stop(id) { t.clearTimeout(id); t.clearInterval(id); live.delete(id); },
+    closeAll() { closed = true; live.forEach((id) => { t.clearTimeout(id); t.clearInterval(id); }); live.clear(); },
+    closed: () => closed,
+  };
+}
+/** Search responses can arrive out of order: only the newest request's answer may be drawn. */
+export function searchGuard() {
+  let n = 0;
+  return { next: () => ++n, isCurrent: (k) => k === n };
+}
+/** What a failed POST /admin/ports means. `e` is the Error from api(): {status, code, body, message}. */
+export function classifyPortError(e) {
+  if (e.status === 404 || e.status === 405) return { kind: "unavailable", message: e.message };
+  if (e.status === 409 && e.body && e.body.port) return { kind: "follow", job: e.body.port, message: e.message };
+  if (e.status === 400 && e.code === "no_sandbox") return { kind: "no_sandbox", message: e.message };
+  if (e.status === 400) return { kind: "refused", message: e.message };
+  return { kind: "other", message: e.message };
+}
+
 // -- the blade -------------------------------------------------------------------------------------
 const DEBOUNCE_MS = 250, PULL_POLL_MS = 700, PORT_POLL_MS = 1500, TICK_MS = 500, MAX_POLL_ERRORS = 6;
 const DEFAULT_SUB = "Search the MAX catalog and Hugging Face · every result is checked against this machine's memory";
@@ -214,14 +255,12 @@ register("add", (blade) => ({
 
 function mountAdd(blade, body) {
   const ui = { q: "", resp: null, loading: true, error: null, filter: "all", seq: 0, flow: 0, run: null, logOpen: true };
-  const timers = new Set();
-  let closed = false, debounce = 0;
-  const live = () => !closed && blade.alive !== false;
-  const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); return t; };
-  const every = (fn, ms) => { const t = setInterval(fn, ms); timers.add(t); return t; };
-  const stop = (t) => { clearTimeout(t); clearInterval(t); timers.delete(t); };
+  const scope = timerScope(), guard = searchGuard();
+  let debounce = 0;
+  const live = () => !scope.closed() && blade.alive !== false;
+  const later = scope.later, every = scope.every, stop = scope.stop;
   const sleep = (ms) => new Promise((res) => later(res, ms));
-  blade.onClose = () => { closed = true; ui.flow++; clearTimeout(debounce); timers.forEach((t) => { clearTimeout(t); clearInterval(t); }); timers.clear(); };
+  blade.onClose = () => { ui.flow++; scope.closeAll(); };
 
   // ---- find view ----
   const input = h("input", { type: "search", placeholder: "Search the MAX catalog, or paste a Hugging Face repo id (owner/name)", "aria-label": "Search models", autocomplete: "off", spellcheck: "false" });
@@ -262,15 +301,15 @@ function mountAdd(blade, body) {
     return btn;
   }
   async function runSearch() {
-    const seq = ++ui.seq;
+    const seq = guard.next();
     ui.loading = true; ui.error = null;
     drawResults();
     try {
       const resp = await api("GET", `/admin/search?q=${encodeURIComponent(ui.q.trim())}`);
-      if (seq !== ui.seq || !live()) return;
+      if (!guard.isCurrent(seq) || !live()) return;
       ui.resp = resp;
     } catch (e) {
-      if (seq !== ui.seq || !live()) return;
+      if (!guard.isCurrent(seq) || !live()) return;
       ui.error = e.message;
     }
     ui.loading = false;
@@ -278,11 +317,11 @@ function mountAdd(blade, body) {
   }
   input.addEventListener("input", () => {
     ui.q = input.value;
-    clearTimeout(debounce);
-    debounce = setTimeout(runSearch, DEBOUNCE_MS);
+    stop(debounce);
+    debounce = later(runSearch, DEBOUNCE_MS);
   });
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { clearTimeout(debounce); runSearch(); }
+    if (e.key === "Enter") { stop(debounce); runSearch(); }
   });
 
   function pick(r) {
@@ -337,7 +376,7 @@ function mountAdd(blade, body) {
       opts.guided ? h("p", { class: "warn-text" }, "Automatic porting is not in this daemon yet. Run the guided port from a terminal instead:") : null,
       opts.note ? h("p", { class: "warn-text" }, opts.note) : null,
       opts.refused ? h("p", { class: "warn-text" }, opts.refused) : null,
-      opts.refused ? h("p", { class: "muted small" }, "Without a sandbox the agent would run with your full permissions, so it is not offered here. If you accept that, the terminal can: ", h("span", { class: "mono" }, `${twin("port", ref)} --unsandboxed`)) : null,
+      opts.sandbox ? h("p", { class: "muted small" }, "Without a sandbox the agent would run with your full permissions, so it is not offered here. If you accept that, the terminal can: ", h("span", { class: "mono" }, `${twin("port", ref)} --unsandboxed`)) : null,
       h("dl", { class: "kv" }, h("dt", {}, "architecture"), h("dd", {}, r.architecture || "unknown"),
         h("dt", {}, "size"), h("dd", {}, [paramsText(r.params), sizeText(r.size_gb)].filter(Boolean).join(" · ") || "unknown"),
         h("dt", {}, "skill"), h("dd", {}, "import-model")),
@@ -422,6 +461,7 @@ function mountAdd(blade, body) {
 
   function showFind() {
     ui.flow++;
+    if (ui.tick) stop(ui.tick);
     ui.run = null;
     body.replaceChildren(findWrap);
     setHead(blade, { title: "Add a model", crumb: "Add a model", sub: DEFAULT_SUB });
@@ -488,9 +528,8 @@ function mountAdd(blade, body) {
       endRun();
       backActions("Start again", () => (run.kind === "port" ? startPort : startPull)(run.source));
       try {
-        if (at === "fetch" && flow.pullId) await api("POST", `/admin/pulls/${flow.pullId}/cancel`);
-        else if (at === "fetch" && flow.portId) await api("POST", `/admin/ports/${flow.portId}/cancel`);
-        else if (at === "compile" && run.name) await api("POST", `/admin/models/${encodeURIComponent(run.name)}/stop`);
+        const plan = cancelPlan({ ...run, phase: at }, flow);
+        if (plan) await api(plan.method, plan.path);
       } catch (e) {
         toast(`Could not cancel cleanly: ${e.message}`);
       }
@@ -525,12 +564,16 @@ function mountAdd(blade, body) {
       let job;
       try { job = await api("POST", "/admin/pulls", { ref }); } catch (e) {
         if (e.status !== 409) throw e;
-        const all = await api("GET", "/admin/pulls");
-        job = (all.pulls || []).find((p) => p.ref === ref && p.status === "running");
+        job = e.body && e.body.pull;
+        if (!job) job = ((await api("GET", "/admin/pulls")).pulls || []).find((p) => p.ref === ref && p.status === "running");
         if (!job) throw e;
-        logLine(`${ref} is already being pulled · following it`);
+        if (flow.ok()) logLine(`${ref} is already being pulled · following it`);
       }
-      if (!flow.ok()) return;
+      if (!flow.ok()) {
+        // cancelled (or the blade closed) while the POST was in flight: stop that pull on the server too
+        if (flow.aborted && job && live()) api("POST", `/admin/pulls/${job.id}/cancel`).catch(() => {});
+        return;
+      }
       flow.pullId = job.id;
       logLine(`pull #${job.id} started for ${ref}`);
       const seen = new Map();
@@ -568,17 +611,15 @@ function mountAdd(blade, body) {
     const ref = r.repo_id || r.id;
     let job;
     try { job = await api("POST", "/admin/ports", { ref }); } catch (e) {
-      if (e.status === 404 || e.status === 405) return showPortOffer(r, { guided: true });
-      if (e.status === 409) {
-        try { job = ((await api("GET", "/admin/ports")).ports || []).find((p) => p.ref === ref && p.status === "running"); } catch (_) { /* fall through */ }
-        if (!job) return toast(e.message);
-      } else if (e.status === 400) {
-        return showPortOffer(r, { refused: e.message }); // e.g. no sandbox: bubblewrap is missing
-      } else {
-        toast(`Could not start the port: ${e.message}`);
-        return;
-      }
+      const c = classifyPortError(e);
+      if (!live()) return;
+      if (c.kind === "unavailable") return showPortOffer(r, { guided: true });
+      if (c.kind === "no_sandbox") return showPortOffer(r, { refused: c.message, sandbox: true });
+      if (c.kind === "refused") return showPortOffer(r, { refused: c.message });
+      if (c.kind !== "follow") return toast(`Could not start the port: ${c.message}`);
+      job = c.job;
     }
+    if (!live()) return;
     const flow = begin(), now = Date.now();
     flow.portId = job.id;
     ui.run = { kind: "port", source: r, ref, name: job.name || ref, phase: "fetch", hw: hwDetail(r, ui.resp && ui.resp.memory), port: job, smoke: "", times: { check: { start: now, end: now }, fetch: { start: now } } };

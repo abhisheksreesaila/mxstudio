@@ -2,6 +2,7 @@
 import json
 import re
 import shutil
+import subprocess
 
 import pytest
 from test_console_blades import node
@@ -266,3 +267,84 @@ def test_the_stylesheet_is_scoped_and_balanced():
         assert depth >= 0
     for sel in re.findall(r"^\s*([.:][^{}@]*)\{", css, flags=re.M):
         assert all(part.strip().startswith(".b-add") for part in sel.split(",")), sel
+
+
+# -- review fixes: cancel, timers, stale searches, port start errors, api errors ----------------------------
+@needs_node
+def test_cancel_plan_hits_the_right_endpoint_for_every_stage():
+    pull = {"kind": "pull", "phase": "fetch", "name": "q"}
+    assert call("cancelPlan", pull, {"pullId": 7}) == {"method": "POST", "path": "/admin/pulls/7/cancel"}
+    assert call("cancelPlan", pull, {"pullId": None}) is None  # the POST is still in flight: the blade cancels it once it lands
+    port = {"kind": "port", "phase": "fetch", "name": "weird", "port": {"status": "running"}}
+    assert call("cancelPlan", port, {"portId": 3}) == {"method": "POST", "path": "/admin/ports/3/cancel"}
+    finished = {"kind": "port", "phase": "fetch", "name": "weird", "port": {"status": "done"}}
+    assert call("cancelPlan", finished, {"portId": 3}) == {"method": "POST", "path": "/admin/models/weird/stop"}
+    for phase in ("compile", "serve", "smoke"):
+        assert call("cancelPlan", {"kind": "pull", "phase": phase, "name": "a b"}, {"pullId": 7}) == {"method": "POST", "path": "/admin/models/a%20b/stop"}
+    assert call("cancelPlan", {"kind": "pull", "phase": "ready", "name": "q"}, {}) is None
+
+
+@needs_node
+def test_closing_the_blade_stops_every_timer_and_nothing_starts_after():
+    out = node("""(() => {
+      let id = 0; const live = new Set();
+      const fake = { setTimeout: () => { live.add(++id); return id; }, clearTimeout: (i) => live.delete(i),
+                     setInterval: () => { live.add(++id); return id; }, clearInterval: (i) => live.delete(i) };
+      const s = m.timerScope(fake);
+      s.later(() => {}, 10); const iv = s.every(() => {}, 500); s.later(() => {}, 20);
+      const before = live.size; s.stop(iv); const afterStop = live.size;
+      s.every(() => {}, 500);
+      s.closeAll();
+      const late = [s.later(() => {}, 5), s.every(() => {}, 5)];
+      return { before, afterStop, afterClose: live.size, late, closed: s.closed() };
+    })()""", JS)
+    assert out == {"before": 3, "afterStop": 2, "afterClose": 0, "late": [0, 0], "closed": True}
+
+
+@needs_node
+def test_only_the_newest_search_response_counts():
+    out = node("(() => { const g = m.searchGuard(); const a = g.next(), b = g.next(); return [g.isCurrent(a), g.isCurrent(b)]; })()", JS)
+    assert out == [False, True]
+
+
+@needs_node
+def test_port_start_errors_are_told_apart():
+    def err(status, code=None, body=None, message="boom"):
+        return {"status": status, "code": code, "body": body, "message": message}
+    assert call("classifyPortError", err(404))["kind"] == "unavailable"
+    assert call("classifyPortError", err(405))["kind"] == "unavailable"
+    job = {"id": 4, "ref": "x/y", "status": "running"}
+    assert call("classifyPortError", err(409, "port_in_progress", {"port": job})) == {"kind": "follow", "job": job, "message": "boom"}
+    assert call("classifyPortError", err(409, "port_in_progress", {}))["kind"] == "other"
+    assert call("classifyPortError", err(400, "no_sandbox", message="install bubblewrap"))["kind"] == "no_sandbox"
+    assert call("classifyPortError", err(400, "invalid_request_body"))["kind"] == "refused"
+    assert call("classifyPortError", err(500))["kind"] == "other"
+
+
+@needs_node
+def test_api_keeps_the_error_code_and_body_on_the_thrown_error():
+    script = f"""
+      import {{ api }} from {json.dumps((CONSOLE_DIR / "core.js").as_uri())};
+      globalThis.fetch = async () => ({{ ok: false, status: 409, headers: {{ get: () => "application/json" }},
+        json: async () => ({{ error: {{ message: "busy", code: "port_in_progress" }}, port: {{ id: 4 }} }}) }});
+      try {{ await api("POST", "/x", {{}}); }} catch (e) {{ console.log(JSON.stringify({{ m: e.message, s: e.status, c: e.code, b: e.body }})); }}
+      globalThis.fetch = async () => ({{ ok: false, status: 502, headers: {{ get: () => "text/html" }}, json: async () => {{ throw new Error("no"); }} }});
+      try {{ await api("GET", "/y"); }} catch (e) {{ console.log(JSON.stringify({{ m: e.message, s: e.status, c: e.code ?? null, b: e.body ?? null }})); }}
+    """
+    out = subprocess.run(["node", "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    first, second = [json.loads(line) for line in out.stdout.splitlines()]
+    assert first == {"m": "busy", "s": 409, "c": "port_in_progress", "b": {"error": {"message": "busy", "code": "port_in_progress"}, "port": {"id": 4}}}
+    assert second == {"m": "HTTP 502", "s": 502, "c": None, "b": None}
+
+
+@needs_node
+def test_home_flashes_only_names_that_appeared_since_the_last_poll():
+    assert node('m.newNames(null, ["a", "b"])', "blade-home.js") == []  # first load: nothing is new
+    assert node('m.newNames(["a"], ["a", "b", "c"])', "blade-home.js") == ["b", "c"]
+    assert node('m.newNames(["a", "b"], ["a"])', "blade-home.js") == []
+
+
+def test_stylesheet_has_no_raw_hex_colours():
+    css = (CONSOLE_DIR / "blade-add.css").read_text()
+    assert not re.search(r"#[0-9a-fA-F]{3,6}\b", css), re.findall(r"#[0-9a-fA-F]{3,6}\b", css)

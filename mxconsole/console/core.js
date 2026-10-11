@@ -68,10 +68,12 @@ export async function api(method, path, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try { message = (await res.json()).error.message; } catch (_) { /* keep the status */ }
+    let message = `HTTP ${res.status}`, body = null, code = null;
+    try { body = await res.json(); message = body.error.message; code = body.error.code ?? null; } catch (_) { /* keep the status */ }
     const err = new Error(message);
     err.status = res.status;
+    if (body !== null) err.body = body;   // the parsed JSON (e.g. {error, port: job} on a 409)
+    if (code !== null) err.code = code;   // the OpenAI-shape error.code
     throw err;
   }
   const type = res.headers.get("content-type") || "";
