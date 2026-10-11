@@ -315,6 +315,16 @@ def prepare(ref: str, *, catalog: dict | None = None, hf=None, runner: Runner | 
     skills = list_skills(skills_root)
     if ENTRY_SKILL not in skills:
         raise PortError(f"Modular's skills in {skills_root} have no {ENTRY_SKILL} skill")
+    workspace, config, donor = make_workspace(ref, res, catalog, fetch_config=fetch_config, arch_dir=arch_dir)
+    finish_workspace(ref, res, workspace, config, donor, skills_root)
+    command = f'cd {shlex.quote(str(workspace))} && claude {shlex.quote(f"/{ENTRY_SKILL} {res.repo_id}")}'
+    return PortResult(res, workspace, command, skills, donor, message=res.message)
+
+
+def make_workspace(ref: str, res: resolve.Resolution, catalog: dict, *,
+                   fetch_config: Callable[[str, str], Path] | None = None,
+                   arch_dir: Path | None = None) -> tuple[Path, dict, Donor]:
+    """The workspace folder with the model's config.json, and the donor chosen for it."""
     workspace = mxc_home() / "ports" / _workspace_name(ref, res.repo_id)
     workspace.mkdir(parents=True, exist_ok=True)
     cfg_path = (fetch_config or _download_config)(res.repo_id, res.revision)
@@ -322,11 +332,17 @@ def prepare(ref: str, *, catalog: dict | None = None, hf=None, runner: Runner | 
     config = json.loads((workspace / "config.json").read_text())
     donor = pick_donor(res.architecture, config.get("model_type"), catalog,
                        arch_dir=arch_dir or max_architectures_dir())
+    return workspace, config, donor
+
+
+def finish_workspace(ref: str, res: resolve.Resolution, workspace: Path, config: dict, donor: Donor,
+                     skills_root: Path) -> list[str]:
+    """PORT.md and the skill links, once the skills are on disk. Returns the skill names."""
+    skills = list_skills(skills_root)
     (workspace / "PORT.md").write_text(
         _port_md(res, config, donor, skills_root=skills_root, workspace=workspace))
     _link_skills(workspace, skills_root, skills)
-    command = f'cd {shlex.quote(str(workspace))} && claude {shlex.quote(f"/{ENTRY_SKILL} {res.repo_id}")}'
-    return PortResult(res, workspace, command, skills, donor, message=res.message)
+    return skills
 
 
 # ---- register ------------------------------------------------------------
