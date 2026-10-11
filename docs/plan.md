@@ -170,14 +170,14 @@ Brief: docs/briefs/console-1.0.md · Needs: none
 - [ ] light and dark themes from tokens (dark follows the system until toggled, remembered); colour-coded outline icons (icon in the action's hue, label a quieter tint; Remove red); CSP unchanged, data as text nodes
 - [ ] the daemon-down state; narrow screens show only the newest blade
 
-## F-024 Admin API for the 1.0 console [todo]
+## F-024 Admin API for the 1.0 console [done]
 Brief: docs/briefs/console-1.0.md · Needs: none
-- [ ] `mxc rm <model>` and `DELETE /admin/models/{name}`: unregisters it, stops it, deletes mxconsole's own per-model files; weights stay in the HF cache unless `--purge`. MAX's compiled-graph cache is shared and keyed by graph hash, so it is left alone (decided 2026-10-11)
-- [ ] `GET /admin/search?q=`: curated names, MAX catalog and Hugging Face repo ids, each with source, params, size, estimated VRAM, `fit` (ok / tight / no / port) against this machine's free GPU memory, and for `no` up to 3 suggestions that fit
-- [ ] `mxc keys rotate <app>` and `POST /admin/keys/{app}/rotate`: new secret shown once, old one revoked
-- [ ] `GET /admin/learn/{name}`: the generated notebook (cells, kernel spec, path), generating it if missing; `POST /admin/learn/{name}/open` starts Jupyter on it and returns the URL
-- [ ] `GET /admin/system` also returns the GPU name, total and used VRAM, and VRAM per running model
-- [ ] every new route is admin-only and loopback-only like the others; each has its CLI twin with `--json`
+- [x] `mxc rm <model>` and `DELETE /admin/models/{name}`: unregisters it, stops it, deletes mxconsole's own per-model files; weights stay in the HF cache unless `--purge`. MAX's compiled-graph cache is shared and keyed by graph hash, so it is left alone (decided 2026-10-11)
+- [x] `GET /admin/search?q=`: curated names, MAX catalog and Hugging Face repo ids, each with source, params, size, estimated VRAM, `fit` (ok / tight / no / port) against this machine's free GPU memory, and for `no` up to 3 suggestions that fit
+- [x] `mxc keys rotate <app>` and `POST /admin/keys/{app}/rotate`: new secret shown once, old one revoked
+- [x] `GET /admin/learn/{name}`: the generated notebook (cells, kernel spec, path), generating it if missing; `POST /admin/learn/{name}/open` starts Jupyter on it and returns the URL
+- [x] `GET /admin/system` also returns the GPU name, total and used VRAM, and VRAM per running model
+- [x] every new route is admin-only and loopback-only like the others; each has its CLI twin with `--json`
 
 ## F-025 A model's resource blade, Security and API keys [todo]
 Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
