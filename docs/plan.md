@@ -198,10 +198,11 @@ Brief: docs/briefs/console-1.0.md · Needs: F-023
 - [ ] Benchmark: standard horizontal bar charts for decode tok/s and TTFT across your models (this one outlined), workload line, Run again (background, progress), history; data from `/admin/bench`
 - [ ] Logs: per model, follow/pause, filter, from `/admin/models/{name}/log`
 
-## F-028 Notebook, Gateway and Settings blades [todo]
+## F-028 Notebook, Gateway and Settings blades [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
-- [ ] Notebook (wide): chapters, the generated notebook's markdown and code cells read-only with saved outputs, architecture panel, kernel chip, "Open in Jupyter" (`/admin/learn/{name}/open`)
-- [ ] Gateway: LiteLLM routes (model → upstream), status, restart; Settings: theme, idle unload default, daemon info
+- [x] Notebook (wide): chapters, the generated notebook's markdown and code cells read-only with saved outputs, architecture panel, kernel chip, "Open in Jupyter" (`/admin/learn/{name}/open`)
+- [x] Gateway: LiteLLM routes (model → upstream), status, restart; Settings: theme, idle unload default, daemon info
+- Idle-unload default is shown read-only (no daemon-wide route yet); per-model via `mxc set <model> --keep-alive`.
 
 ## F-029 Automatic port for unsupported architectures [done]
 Brief: docs/briefs/console-1.0.md · Needs: none (UI hook in F-026)
