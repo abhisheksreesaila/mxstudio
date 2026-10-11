@@ -2,11 +2,10 @@
 // copy. Polls GET /admin/models/{name}/log every 2 s while open (the daemon returns the last ~8 KB as text) and
 // stops on close. Log text only ever goes in as a text node.
 import { register } from "./blades.js";
-import { h, icon, api, store, onData, copyButton } from "./core.js";
+import { h, icon, ADMIN, store, onData, copyButton } from "./core.js";
 
 const POLL_MS = 2000;
 const MAX_LINES = 2000;
-const TAIL_BYTES = 8000;
 
 // -- pure helpers (tested under node) ------------------------------------------------------------
 const ERR = /\b(error|exception|traceback|fatal|critical|out of memory|exited with code [1-9]\d*)\b/i;
@@ -29,10 +28,22 @@ export function visibleLines(text, needle, truncated) {
   return { lines: q ? lines.filter((l) => l.toLowerCase().includes(q)) : lines, total };
 }
 
+/** A self-rescheduling poll. `tick` is awaited, then the next one is scheduled `delay()` ms later; after stop() no further
+ * tick runs, even one that was already waiting on its timer or still in flight. `timers` is injectable for tests. */
+export function createPoller(tick, delay, timers = { set: (f, ms) => setTimeout(f, ms), clear: (id) => clearTimeout(id) }) {
+  let alive = false, id = 0, gen = 0;
+  const loop = async (mine) => {
+    if (!alive || mine !== gen) return;
+    try { await tick(); } catch (_) { /* a failed poll is shown by the tick itself */ }
+    if (alive && mine === gen) id = timers.set(() => loop(mine), delay());
+  };
+  return { start() { if (!alive) { alive = true; loop(++gen); } }, stop() { alive = false; gen++; timers.clear(id); } };
+}
+
 // -- the blade -------------------------------------------------------------------------------------
 register("logs", (blade) => {
   const id = blade.opts.id || "";
-  let text = "", shownText = null, shownNeedle = null, error = "", follow = true, timer = 0, token = 0, firstDone = false;
+  let text = "", truncated = false, shownText = null, shownNeedle = null, error = "", follow = true, firstDone = false;
 
   const modelState = () => (store.models || []).find((m) => m.name === id);
   const running = () => { const m = modelState(); return !!m && (m.state === "ready" || m.state === "starting"); };
@@ -42,20 +53,25 @@ register("logs", (blade) => {
   const count = h("span", { class: "lg-count mono" });
   const note = h("div", { class: "lg-note", role: "status", hidden: true });
   const followBtn = h("button", { class: "btn ghost sm", type: "button", "aria-pressed": "true" });
-  const copy = copyButton(() => visibleLines(text, filter.value, text.length >= TAIL_BYTES - 100).lines.join("\n"), "Copy", "btn ghost sm");
+  const copy = copyButton(() => visibleLines(text, filter.value, truncated).lines.join("\n"), "Copy", "btn ghost sm");
 
   const setFollowLabel = () => {
     followBtn.replaceChildren(icon(follow ? "pause" : "play", 13), follow ? "Pause" : "Follow");
     followBtn.setAttribute("aria-pressed", String(follow));
     followBtn.title = follow ? "Stop updating and scrolling" : "Resume updating and scroll to the newest line";
   };
+  const selectionInPane = () => {
+    const sel = typeof getSelection === "function" ? getSelection() : null;
+    return !!sel && !sel.isCollapsed && pane.contains(sel.anchorNode);
+  };
   const toBottom = () => { pane.scrollTop = pane.scrollHeight; };
 
   const render = () => {
     const needle = filter.value;
     if (text === shownText && needle === shownNeedle && !error) return; // nothing changed: leave the DOM, scroll and selection alone
+    if (selectionInPane()) return; // the user is selecting text here: don't rebuild under them (the next poll retries)
     shownText = text; shownNeedle = needle;
-    const { lines, total } = visibleLines(text, needle, text.length >= TAIL_BYTES - 100);
+    const { lines, total } = visibleLines(text, needle, truncated);
     if (error) {
       pane.replaceChildren(h("div", { class: "lg-line err" }, error));
       count.textContent = "";
@@ -80,26 +96,25 @@ register("logs", (blade) => {
   };
 
   const fetchLog = async () => {
-    clearTimeout(timer);
-    const mine = ++token;
     try {
-      const t = await api("GET", `/admin/models/${encodeURIComponent(id)}/log`);
-      if (mine === token && blade.alive) { text = typeof t === "string" ? t : ""; error = ""; }
+      const res = await fetch(`/admin/models/${encodeURIComponent(id)}/log`, { headers: ADMIN });
+      if (!blade.alive) return;
+      if (!res.ok) { error = res.status === 404 ? `${id} is not a registered model.` : `Could not read this log: HTTP ${res.status}`; }
+      else { text = await res.text(); truncated = res.headers.get("X-Log-Truncated") === "1"; error = ""; }
     } catch (e) {
-      if (mine === token && blade.alive) error = e.status === 404 ? `${id} is not a registered model.` : `Could not read this log: ${e.message}`;
+      if (!blade.alive) return;
+      error = `Could not read this log: ${e.message}`;
     }
-    if (!blade.alive || mine !== token) return;
     firstDone = true;
     render();
     drawNote();
-    if (follow) timer = setTimeout(fetchLog, POLL_MS);
   };
+  const poller = createPoller(fetchLog, () => POLL_MS);
 
   const setFollow = (on) => {
     follow = on;
     setFollowLabel();
-    clearTimeout(timer);
-    if (on) { shownText = null; fetchLog(); toBottom(); }
+    if (on) { shownText = null; poller.stop(); poller.start(); toBottom(); } else poller.stop();
   };
 
   followBtn.addEventListener("click", () => setFollow(!follow));
@@ -115,19 +130,19 @@ register("logs", (blade) => {
     crumb: "Logs",
     sub: `${id} · max serve`,
     icon: "scroll-text", hue: "var(--hue-logs)", side: 620, min: 520,
+    tools: [followBtn, copy],
     mount(body) {
-      blade.toolsEl.replaceChildren(followBtn, copy); // the engine takes tools as one Node at open; set several here
       body.replaceChildren(h("div", { class: "lg" },
         h("div", { class: "lg-bar" },
           h("label", { class: "lg-search" }, icon("search", 14), filter), count),
         note, pane,
         h("div", { class: "lg-foot" }, h("span", { class: "cli mono" }, `mxc logs ${id} -f`), h("span", { class: "grow" }),
-          h("span", { class: "small muted" }, `the last ${TAIL_BYTES / 1000} KB · refreshes every ${POLL_MS / 1000} s`))));
+          h("span", { class: "small muted" }, `the last 8 KB · refreshes every ${POLL_MS / 1000} s`))));
       pane.replaceChildren(h("div", { class: "lg-empty" }, "Loading…"));
-      fetchLog();
+      poller.start();
       // the model's state (running or not) comes from the console's shared poll
       const off = onData(drawNote);
-      blade.onClose = () => { off(); clearTimeout(timer); token++; };
+      blade.onClose = () => { off(); poller.stop(); };
     },
   };
 });

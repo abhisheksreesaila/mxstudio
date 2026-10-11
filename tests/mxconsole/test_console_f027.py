@@ -15,7 +15,7 @@ BANNED = re.compile(r"innerHTML|outerHTML|insertAdjacentHTML|document\.write|set
 def node(expr: str, module: str):
     script = f"""
       import * as m from {json.dumps((CONSOLE_DIR / module).as_uri())};
-      console.log(JSON.stringify({expr}) ?? "null");
+      console.log(JSON.stringify(await ({expr})) ?? "null");
     """
     out = subprocess.run(["node", "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
@@ -88,6 +88,67 @@ def test_blades_follow_the_contract_and_the_csp():
         css = (CONSOLE_DIR / f"blade-{n}.css").read_text()
         assert css.count("{") == css.count("}") and ".b-" in css, n
     logs = (CONSOLE_DIR / "blade-logs.js").read_text()
-    assert "clearTimeout" in logs and "/log" in logs
+    assert "poller.stop()" in logs and "/log" in logs and "X-Log-Truncated" in logs
+    assert "tools: [followBtn, copy]" in logs and "toolsEl" not in logs
     bench = (CONSOLE_DIR / "blade-bench.js").read_text()
-    assert "/admin/bench" in bench and "clearTimeout" in bench and "higher is better" in bench and "lower is better" in bench
+    assert "poller.stop()" in bench and "tools: runBtn" in bench and "toolsEl" not in bench
+    assert "/admin/bench" in bench and "higher is better" in bench and "lower is better" in bench
+
+
+RUN1 = {"id": 1, "started_at": 100, "status": "done", "results": [
+    {"model": "a", "status": "done", "decode_tps": 300, "ttft_p50_ms": 40},
+    {"model": "b", "status": "done", "decode_tps": 80, "ttft_p50_ms": 50},
+    {"model": "c", "status": "failed", "decode_tps": None}]}
+RUN2 = {"id": 2, "started_at": 200, "status": "done", "results": [{"model": "b", "status": "done", "decode_tps": 90, "ttft_p50_ms": 45}]}
+
+
+@needs_node
+def test_a_single_model_rerun_keeps_the_others_from_the_older_run():
+    got = node(f"m.mergeLatest([{json.dumps(RUN2)}, {json.dumps(RUN1)}], null)", "blade-bench.js")
+    by = {r["model"]: r for r in got}
+    assert set(by) == {"a", "b"}  # c failed everywhere: no bar
+    assert by["b"]["decode_tps"] == 90 and by["b"]["older"] is False  # this model: from the new run
+    assert by["a"]["decode_tps"] == 300 and by["a"]["older"] is True and by["a"]["at"] == 100
+    # input order does not matter, and `known` drops models that were removed
+    assert {r["model"] for r in node(f"m.mergeLatest([{json.dumps(RUN1)}, {json.dumps(RUN2)}], ['b'])", "blade-bench.js")} == {"b"}
+    rows = node(f"m.barRows(m.mergeLatest([{json.dumps(RUN2)}, {json.dumps(RUN1)}]), 'decode_tps', false, 'b')", "blade-bench.js")
+    assert [(r["model"], r["older"], r["me"]) for r in rows] == [("a", True, False), ("b", False, True)]
+
+
+@needs_node
+@pytest.mark.parametrize("module", ["blade-bench.js", "blade-logs.js"])
+def test_closing_stops_the_poll_no_further_calls(module):
+    expr = """(async () => {
+      const calls = [], timers = [];
+      const p = m.createPoller(async () => { calls.push(1); }, () => 10, { set: (f) => timers.push(f) && timers.length, clear: () => {} });
+      const tick = () => new Promise((r) => setTimeout(r, 0));
+      p.start(); await tick(); const first = calls.length;
+      timers.shift()(); await tick(); const second = calls.length;   // a scheduled tick runs while open
+      const pending = timers.shift(); p.stop();                      // close with one tick still scheduled
+      if (pending) pending(); await tick(); timers.forEach((f) => f()); await tick();
+      return [first, second, calls.length]; })()"""
+    assert node(expr, module) == [1, 2, 2]
+
+
+@needs_node
+def test_a_tick_in_flight_when_closed_schedules_nothing():
+    expr = """(async () => { const timers = []; let n = 0, release;
+      const p = m.createPoller(() => new Promise((r) => { n++; release = r; }), () => 1, { set: (f) => timers.push(f), clear: () => {} });
+      p.start(); p.stop(); release(); await new Promise((r) => setTimeout(r, 0));
+      return [n, timers.length]; })()"""
+    assert node(expr, "blade-logs.js") == [1, 0]
+
+
+from test_console import ADMIN  # noqa: E402
+from test_gateway import http, store, sup  # noqa: E402,F401  (shared fixtures)
+
+
+async def test_log_route_says_whether_the_tail_was_cut(http):
+    from mxconsole.store import mxc_home
+    logs = mxc_home() / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    (logs / "tiny.log").write_text("line\n" * 2000)
+    assert (await http.get("/admin/models/tiny/log", headers=ADMIN)).headers["x-log-truncated"] == "1"
+    (logs / "tiny.log").write_text("short\n")
+    assert (await http.get("/admin/models/tiny/log", headers=ADMIN)).headers["x-log-truncated"] == "0"
+    assert (await http.get("/admin/models/other/log", headers=ADMIN)).headers["x-log-truncated"] == "0"  # no file yet

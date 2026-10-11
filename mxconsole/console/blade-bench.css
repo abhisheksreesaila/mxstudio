@@ -49,3 +49,4 @@
   .bn-hwho { display: none; }
 }
 .bn > div:empty { display: none; }
+.bn-old { color: var(--faint); font-size: 10.5px; }

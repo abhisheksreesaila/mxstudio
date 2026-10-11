@@ -521,11 +521,13 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         try:
             with open(path, "rb") as f:
                 f.seek(0, os.SEEK_END)
-                f.seek(max(0, f.tell() - LOG_TAIL_BYTES))
+                size = f.tell()
+                f.seek(max(0, size - LOG_TAIL_BYTES))
                 tail = f.read().decode(errors="replace")
+                cut = size > LOG_TAIL_BYTES
         except FileNotFoundError:
-            tail = ""
-        return Response(tail, media_type="text/plain; charset=utf-8")
+            tail, cut = "", False
+        return Response(tail, media_type="text/plain; charset=utf-8", headers={"X-Log-Truncated": "1" if cut else "0"})
 
     @app.get("/admin/info")
     def admin_info(request: Request):
