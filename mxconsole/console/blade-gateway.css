@@ -1,0 +1,2 @@
+/* mxconsole, the Gateway blade (F-028). Styles for this blade only; shared pieces live in blades.css. */
+.b-gateway .bb { background: var(--canvas); }

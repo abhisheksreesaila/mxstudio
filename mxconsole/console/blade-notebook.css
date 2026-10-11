@@ -1,0 +1,2 @@
+/* mxconsole, the Notebook blade (F-028). Styles for this blade only; shared pieces live in blades.css. */
+.b-notebook .bb { background: var(--canvas); }

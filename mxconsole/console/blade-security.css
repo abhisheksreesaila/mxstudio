@@ -1,0 +1,2 @@
+/* mxconsole, the Security blade (F-025). Styles for this blade only; shared pieces live in blades.css. */
+.b-security .bb { background: var(--canvas); }

@@ -32,9 +32,16 @@ CONSOLE_FONTS = {"geist-variable.woff2", "geist-mono-variable.woff2"}
 CONSOLE_SCRIPTS = {"page-bench.js", "theme.js", "main.js", "core.js", "icons.js", "charts.js", "shell.js", "palette.js", "actions.js",
                    "page-overview.js", "page-models.js", "page-metrics.js", "page-api.js", "page-keys.js",
                    "page-network.js", "page-activity.js", "page-ports.js", "page-logs.js", "page-gateway.js",
-                   "page-daemon.js", "page-pull.js"}
+                   "page-daemon.js", "page-pull.js",
+                   # the blades console (F-023): engine, shell and one file per blade, each with its own CSS
+                   "blades.js", "blade-layout.js", "blade-stack.js", "keyed.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "blade-home.js",
+                   "blade-model.js", "blade-add.js", "blade-security.js", "blade-keys.js", "blade-bench.js", "blade-logs.js",
+                   "blade-notebook.js", "blade-gateway.js", "blade-settings.js"}
+CONSOLE_STYLES = {"console.css", "blades.css", "topbar.css", "blade-home.css", "blade-model.css", "blade-add.css",
+                  "blade-security.css", "blade-keys.css", "blade-bench.css", "blade-logs.css", "blade-notebook.css",
+                  "blade-gateway.css", "blade-settings.css"}
 CONSOLE_IMAGES = {"favicon.svg"}
-CONSOLE_ASSETS = {"console.css"} | CONSOLE_SCRIPTS | CONSOLE_FONTS | CONSOLE_IMAGES
+CONSOLE_ASSETS = CONSOLE_STYLES | CONSOLE_SCRIPTS | CONSOLE_FONTS | CONSOLE_IMAGES
 LOG_TAIL_BYTES = 8000
 TRY_MAX_TOKENS = 1024  # the API page's "Try it" is for a quick look, not for load
 # no-cache: an upgraded mxconsole never shows a stale console. The rest: no other site can frame the

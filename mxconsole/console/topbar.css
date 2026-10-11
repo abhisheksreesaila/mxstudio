@@ -1,0 +1,49 @@
+/* mxconsole, the top bar: brand, breadcrumb, hardware chip + popover, shared blades, theme toggle, daemon dot. */
+.top { position: fixed; top: 0; left: 0; right: 0; height: var(--top); z-index: 50; background: var(--chrome); border-bottom: 1px solid var(--chrome-line); display: flex; align-items: center; gap: 12px; padding: 0 10px; color: var(--chrome-text); }
+.brand { display: flex; align-items: center; gap: 9px; font: 600 15px/1 var(--sans); color: var(--chrome-text); letter-spacing: -.01em; background: none; border: 0; padding: 7px 9px; border-radius: 7px; flex: none; }
+.brand:hover { background: var(--chrome-hover); }
+.brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent); }
+.brand .dot.down { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 25%, transparent); }
+.brand small { font-size: 11px; font-weight: 400; color: var(--chrome-muted); margin-left: 2px; }
+.bc { display: flex; align-items: center; gap: 1px; min-width: 0; flex: 1; overflow: hidden; font-size: 13px; padding-left: 12px; border-left: 1px solid var(--chrome-line); height: 24px; }
+.bc button { background: none; border: 0; color: var(--chrome-muted); padding: 4px 7px; border-radius: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.bc button:hover { background: var(--chrome-hover); color: var(--chrome-text); }
+.bc button.cur { color: var(--chrome-text); font-weight: 500; cursor: default; background: none; }
+.bc svg { width: 12px; height: 12px; opacity: .45; flex: none; }
+
+.hwchip { display: flex; align-items: center; gap: 8px; background: var(--chrome-on); border: 1px solid var(--chrome-line); border-radius: 7px; padding: 5px 9px; font: 12px var(--mono); color: var(--chrome-muted); flex: none; white-space: nowrap; }
+.hwchip:hover, .hwchip[aria-expanded="true"] { border-color: var(--chrome-line-2); color: var(--chrome-text); }
+.hwchip b { color: var(--chrome-text); font-weight: 500; }
+.hwchip .vbar { width: 64px; height: 6px; background: var(--chrome-track); }
+
+.tnav { display: flex; align-items: center; gap: 2px; flex: none; }
+.tn { display: flex; align-items: center; gap: 7px; background: none; border: 0; color: var(--chrome-muted); padding: 7px 10px; border-radius: 7px; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.tn svg { color: var(--hue, currentColor); }
+.tn:hover { background: var(--chrome-hover); color: var(--chrome-text); }
+.tn.on { background: var(--chrome-on); color: var(--chrome-text); box-shadow: inset 0 -2px 0 var(--hue, var(--accent)); }
+.tn.icon { padding: 8px; }
+.live { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent); flex: none; }
+.live.down { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 25%, transparent); }
+
+/* the hardware popover */
+.hwpop { position: fixed; top: calc(var(--top) + 6px); right: 150px; width: 360px; max-width: calc(100vw - 20px); background: var(--card); color: var(--text); border: 1px solid var(--card-line); border-radius: 10px; box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .35); padding: 14px 16px; z-index: 60; animation: popIn .2s var(--ease) backwards; }
+@keyframes popIn { from { transform: translateY(6px); opacity: 0; } }
+.pop-head { display: flex; align-items: center; gap: 10px; }
+.pop-head .sq { width: 28px; height: 28px; }
+.pop-title { min-width: 0; }
+.pop-title b { font-weight: 600; }
+.pop-body { margin-top: 14px; }
+.hwpop .vbar { height: 12px; margin: 8px 0 8px; }
+.legend { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 5px 8px; font: 12px var(--mono); color: var(--text-2); align-items: center; }
+.legend i { width: 8px; height: 8px; border-radius: 2px; }
+.pop-foot { margin-top: 12px; }
+
+@media (max-width: 1240px) { .tn span { display: none; } .tn { padding: 8px; } }
+@media (max-width: 1100px) { .hwchip .gname { display: none; } }
+@media (max-width: 860px) {
+  .bc .far { display: none; }
+  .bc { padding-left: 6px; }
+  .brand small, .hwchip .vbar { display: none; }
+  .hwpop { right: 10px; }
+}
+@media (max-width: 520px) { .bc { display: none; } .top { gap: 4px; } .brand { margin-right: auto; } .hwchip b { display: none; } }

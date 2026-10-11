@@ -22,7 +22,7 @@ def node(expr: str, module: str = "page-pull.js"):
 
 def test_the_page_is_served_and_wired_in():
     assert "page-pull.js" in CONSOLE_ASSETS
-    assert "pull: pullPage" in (CONSOLE_DIR / "main.js").read_text()
+    assert (CONSOLE_DIR / "page-pull.js").is_file()  # no longer wired into main.js: the blades shell replaced the pages (F-031 removes them)
 
 
 def test_shard_rate_follows_the_download_speed():
