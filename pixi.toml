@@ -35,6 +35,7 @@ litellm = { version = ">=1.80", extras = ["proxy"] }
 python = "3.12.*"
 pyside6 = "*"
 qtpy = "*"
+qt6-webengine = ">=6.11.1,<7"
 
 [feature.app.pypi-dependencies]
 pywebview = ">=6"
