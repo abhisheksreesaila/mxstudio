@@ -351,6 +351,9 @@ def register(ref: str, port_dir: Path, *, store: Store | None = None, catalog: d
 
     Raises PortError for a bad port dir or weights; resolve.PullError / ResolveError as `pull` does.
     """
+    from mxconsole.pulls import NAME_RE  # the same rule `mxc pull --name` enforces
+    if name is not None and not NAME_RE.fullmatch(name):
+        raise PortError(f"the name {name!r} must be 1 to 64 letters, digits, '.', '_' or '-', starting with a letter or digit")
     port_dir = Path(port_dir).expanduser().resolve()
     check_port_dir(port_dir)
     hf = hf or resolve.HubClient()

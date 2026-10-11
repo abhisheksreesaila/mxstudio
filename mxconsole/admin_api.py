@@ -89,11 +89,14 @@ def register(app, store: Store, supervisor: Supervisor, admin_only, *, refused, 
         if store.get_model(name) is None:
             return not_registered(name)
         purge = request.query_params.get("purge", "") in ("1", "true", "yes")
-        await supervisor.stop(name)
+        # Unregister first: from here a request for this model gets 404 and cannot respawn a child
+        # that the stop below would then miss.
         try:
-            result = removal.remove(store, name, purge=purge)
+            model = removal.unregister(store, name)
         except removal.UnknownModel:  # removed by a concurrent call between the check and here
             return not_registered(name)
+        await supervisor.stop(name)
+        result = removal.cleanup(store, model, purge=purge)
         try:  # LiteLLM lists models by name: refresh it so the LAN endpoint stops offering this one
             result["lan_refreshed"] = bool(await asyncio.to_thread(expose.refresh_if_running, store))
         except Exception:

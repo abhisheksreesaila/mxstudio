@@ -1,14 +1,24 @@
 """F-024: `mxc rm` and DELETE /admin/models/{name}."""
+import asyncio
 import json
+
+import pytest
 
 from typer.testing import CliRunner
 
 from mxconsole import cli
 from mxconsole.store import Store
 from test_console import ADMIN
-from test_gateway import client, http, key, state, store, sup  # noqa: F401  (shared fixtures)
+from mxconsole import keys
+from test_gateway import CHAT, auth, client, http, key, state, store, sup  # noqa: F401  (shared fixtures)
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def hf_cache(tmp_path, monkeypatch):
+    """Point the Hugging Face cache root at tmp_path/hub, where fake_hf_cache builds its layout."""
+    monkeypatch.setattr("mxconsole.removal.hf_cache_root", lambda: tmp_path / "hub")
 
 
 def fake_hf_cache(tmp_path, repo="org--tiny"):
@@ -102,3 +112,65 @@ def test_cli_rm_without_a_daemon_edits_the_store_directly(monkeypatch):
     r = runner.invoke(cli.app, ["rm", "tiny"])
     assert r.exit_code == 0 and "removed tiny" in r.output
     assert store.get_model("tiny") is None
+
+
+async def test_a_request_during_removal_gets_404_and_leaves_no_child(http, store, sup, monkeypatch):
+    """Unregister comes before stop: a request landing between them must not respawn the model."""
+    real_stop, seen = sup.stop, {}
+
+    async def stop_after_a_request(name):
+        seen["during"] = await http.post("/v1/chat/completions", headers=auth(seen["key"]), json=CHAT)
+        await real_stop(name)
+    monkeypatch.setattr(sup, "stop", stop_after_a_request)
+    seen["key"] = keys.create_key(store, "app")
+    r = await http.delete("/admin/models/tiny", headers=ADMIN)
+    assert r.status_code == 200
+    assert seen["during"].status_code == 404 and seen["during"].json()["error"]["code"] == "model_not_found"
+    assert "tiny" not in [s["name"] for s in sup.status()]
+
+
+async def test_removing_a_model_while_a_request_is_starting_it(http, store, sup, monkeypatch):
+    monkeypatch.setenv("FAKE_MAX_DELAY", "1.5")  # a slow start, so the request is still in flight
+    k = keys.create_key(store, "app")
+    chat = asyncio.create_task(http.post("/v1/chat/completions", headers=auth(k), json=CHAT))
+    for _ in range(100):
+        if "tiny" in sup._starts:
+            break
+        await asyncio.sleep(0.02)
+    assert "tiny" in sup._starts
+    assert (await http.delete("/admin/models/tiny", headers=ADMIN)).status_code == 200
+    assert (await chat).status_code in (404, 503)  # never a 200 from a model that was removed
+    assert "tiny" not in [s["name"] for s in sup.status()] and not sup._children
+    again = await http.post("/v1/chat/completions", headers=auth(k), json=CHAT)
+    assert again.status_code == 404 and not sup._children
+
+
+async def test_graph_cache_deletion_stays_inside_graph_cache(store, mxc_home, tmp_path):
+    from mxconsole import removal
+    outside = tmp_path / "precious"
+    outside.mkdir()
+    (outside / "keep").write_text("x")
+    (mxc_home / "graph-cache").mkdir(parents=True)
+    (mxc_home / "graph-cache" / "linked").symlink_to(outside, target_is_directory=True)
+    store.add_model(name="linked", repo_id="o/l", revision="a", source="hf", architecture="X")
+    assert removal.remove(store, "linked")["graph_cache_deleted"] is False
+    assert (outside / "keep").exists()
+    store.add_model(name="..", repo_id="o/dots", revision="a", source="hf", architecture="X")  # a name that should never exist
+    (mxc_home / "marker").write_text("x")
+    assert removal.remove(store, "..")["graph_cache_deleted"] is False
+    assert (mxc_home / "graph-cache").exists() and (mxc_home / "marker").exists()
+
+
+async def test_purge_only_inside_the_hf_cache_root_and_never_a_symlink(store, tmp_path):
+    from mxconsole import removal
+    other = tmp_path / "elsewhere" / "models--org--tiny"
+    snap = other / "snapshots" / "abc"
+    snap.mkdir(parents=True)
+    register(store, "tiny", snap)
+    out = removal.remove(store, "tiny", purge=True)
+    assert out["purged"] is False and other.exists()  # looks like a HF cache, but not THE cache
+    real, snap2 = fake_hf_cache(tmp_path, "org--linked")
+    link = tmp_path / "hub" / "models--org--sym"
+    link.symlink_to(real, target_is_directory=True)
+    register(store, "sym", link / "snapshots" / "abc", repo_id="org/sym")
+    assert removal.remove(store, "sym", purge=True)["purged"] is False and real.exists()
