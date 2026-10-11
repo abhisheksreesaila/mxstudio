@@ -116,7 +116,7 @@ export function pullDetail(job) {
 
 const PORT_LABELS = {
   workspace: "Prepare workspace", skills: "Load Modular skills", generate: "Generate the model", build: "Build the graph",
-  parity: "Parity check", "parity check": "Parity check", register: "Register the model",
+  parity: "Parity check", "parity check": "Parity check", register: "Register the model", serve: "Serve on localhost",
 };
 const portKey = (name) => String(name || "").toLowerCase().replace(/[_\s-]+/g, " ").trim();
 export const portLabel = (name) => PORT_LABELS[portKey(name)] || capital(portKey(name));
@@ -126,14 +126,18 @@ export function portStageRows(job, now) {
     const status = s.status || "pending";
     const end = s.ended ? s.ended * 1000 : status === "running" ? now : null;
     return {
-      id: `port:${portKey(s.name)}`, label: portLabel(s.name), status, percent: null, twin: "",
+      id: `port:${portKey(s.name)}${s.attempt ? `:${s.attempt}` : ""}`,
+      label: portLabel(s.name) + (s.attempt > 1 ? ` · attempt ${s.attempt}` : ""), status, percent: null, twin: "",
       elapsed: s.started && end ? Math.max(0, end - s.started * 1000) : null,
-      detail: [s.detail, s.attempt > 1 ? `attempt ${s.attempt}` : ""].filter(Boolean).join(" · "),
+      detail: s.detail || "",
     };
   });
 }
 export function portLogLines(job) {
-  return ((job && job.log_tail) || []).map((l) => (typeof l === "string" ? l : l.line || l.text || l.message || JSON.stringify(l)));
+  const tail = job && job.log_tail;
+  if (!tail) return [];
+  const lines = typeof tail === "string" ? tail.split("\n") : tail; // the daemon sends one string; arrays are accepted too
+  return lines.map((l) => (typeof l === "string" ? l : l.line || l.text || l.message || JSON.stringify(l)));
 }
 
 const ORDER = ["check", "fetch", "compile", "serve", "smoke"];
@@ -186,7 +190,8 @@ export function setupStages(run, now) {
   const smoke = base("smoke");
   if (smoke.status === "running") smoke.detail = "asking for one short reply";
   else if (smoke.status === "done" && run.smoke) smoke.detail = `“${run.smoke}”`;
-  rows.push(compile, serve, smoke);
+  // a port job registers and serves the model itself (its own register and serve rows), so only the smoke test follows it
+  if (run.kind === "port") rows.push(smoke); else rows.push(compile, serve, smoke);
   return rows;
 }
 
@@ -318,6 +323,8 @@ function mountAdd(blade, body) {
     const row = h("div", { class: "cmd-row" });
     if (opts.guided) {
       row.append(h("code", { class: "cmd mono" }, twin("guided", ref)), copyButton(() => twin("guided", ref), "Copy"));
+    } else if (opts.refused) {
+      row.append(h("span", { class: "cli mono" }, twin("guided", ref)));
     } else {
       const go = h("button", { type: "button", class: "btn port" }, icon("hammer", 15, "currentColor", 1.9), "Port it");
       go.addEventListener("click", () => startPort(r));
@@ -328,6 +335,9 @@ function mountAdd(blade, body) {
       h("h4", {}, `${ref.split("/").pop()} uses ${r.architecture || "an architecture"}, which MAX cannot run yet.`),
       h("p", {}, "“Port it” runs Claude Code with Modular’s import-model skill, unattended and in a sandbox: it reads the config, writes the model as a MAX graph, checks it against the reference and fixes what fails. It may take a while, often several minutes and sometimes much longer, and it uses your Claude Code session. You will see every stage and the full log, and you can cancel."),
       opts.guided ? h("p", { class: "warn-text" }, "Automatic porting is not in this daemon yet. Run the guided port from a terminal instead:") : null,
+      opts.note ? h("p", { class: "warn-text" }, opts.note) : null,
+      opts.refused ? h("p", { class: "warn-text" }, opts.refused) : null,
+      opts.refused ? h("p", { class: "muted small" }, "Without a sandbox the agent would run with your full permissions, so it is not offered here. If you accept that, the terminal can: ", h("span", { class: "mono" }, `${twin("port", ref)} --unsandboxed`)) : null,
       h("dl", { class: "kv" }, h("dt", {}, "architecture"), h("dd", {}, r.architecture || "unknown"),
         h("dt", {}, "size"), h("dd", {}, [paramsText(r.params), sizeText(r.size_gb)].filter(Boolean).join(" · ") || "unknown"),
         h("dt", {}, "skill"), h("dd", {}, "import-model")),
@@ -540,6 +550,10 @@ function mountAdd(blade, body) {
       const final = ["done", "failed", "cancelled", "unsupported"].includes(job.status) ? job
         : await follow(flow, () => api("GET", `/admin/pulls/${job.id}`), PULL_POLL_MS, onJob, (j) => ["done", "failed", "cancelled", "unsupported"].includes(j.status));
       if (!final) return;
+      if (final.status === "unsupported") {
+        showFind();
+        return showPortOffer({ ...r, fit: "port" }, { note: pullDetail(final) });
+      }
       if (final.status !== "done") return fail(flow, pullDetail(final) || `the pull ${final.status}`);
       ui.run.name = final.model || ref;
       refresh();
@@ -555,8 +569,15 @@ function mountAdd(blade, body) {
     let job;
     try { job = await api("POST", "/admin/ports", { ref }); } catch (e) {
       if (e.status === 404 || e.status === 405) return showPortOffer(r, { guided: true });
-      toast(`Could not start the port: ${e.message}`);
-      return;
+      if (e.status === 409) {
+        try { job = ((await api("GET", "/admin/ports")).ports || []).find((p) => p.ref === ref && p.status === "running"); } catch (_) { /* fall through */ }
+        if (!job) return toast(e.message);
+      } else if (e.status === 400) {
+        return showPortOffer(r, { refused: e.message }); // e.g. no sandbox: bubblewrap is missing
+      } else {
+        toast(`Could not start the port: ${e.message}`);
+        return;
+      }
     }
     const flow = begin(), now = Date.now();
     flow.portId = job.id;
@@ -575,21 +596,32 @@ function mountAdd(blade, body) {
       freezeTail();
       if (final.status !== "done") {
         const bad = (final.stages || []).filter((s) => s.status === "failed").pop();
-        return fail(flow, final.error || (bad && bad.detail) || `the port ${final.status}: the log above says what was tried`);
+        return fail(flow, final.message || (bad && bad.detail) || `the port ${final.status}: the log above says what was tried`);
       }
-      const name = final.model || final.name;
+      const name = final.model;
       if (!name) return fail(flow, "the port finished but no model was registered");
       ui.run.name = name;
       refresh();
-      await bringUp(flow, name, ref);
+      await bringUp(flow, name, ref, true);
     } catch (e) {
       fail(flow, e.message);
     }
   }
 
   /** compile (load) -> serve -> smoke test -> ready, for a model that is registered. Shared by pull and port. */
-  async function bringUp(flow, name, ref) {
+  async function bringUp(flow, name, ref, served = false) {
     const run = ui.run;
+    if (served) {
+      // the port job already served it: confirm, then go straight to the smoke test
+      run.endpoint = endpointNow();
+      try {
+        const m = (await api("GET", "/admin/models")).find((x) => x.name === name);
+        if (!m || m.state !== "ready") await api("POST", `/admin/models/${encodeURIComponent(name)}/load`);
+      } catch (e) { return fail(flow, e.message); }
+      if (!flow.ok()) return;
+      logLine(`serving on ${run.endpoint}`, "okl");
+      return smokeTest(flow, name);
+    }
     advance("compile");
     logLine(`loading ${name} · compiling the graph (${twin("serve", name)})`);
     try {
@@ -607,6 +639,10 @@ function mountAdd(blade, body) {
     if (!flow.ok()) return;
     logLine(`serving on ${run.endpoint}`, "okl");
     refresh();
+    return smokeTest(flow, name);
+  }
+  async function smokeTest(flow, name) {
+    const run = ui.run;
     advance("smoke");
     logLine("smoke test: asking for one short reply");
     try {

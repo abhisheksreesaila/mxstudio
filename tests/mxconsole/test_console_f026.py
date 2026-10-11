@@ -125,26 +125,115 @@ def test_setup_stages_later_phases_failure_cancel_and_ready():
     assert {r["status"] for r in s.values()} == {"done"} and s["smoke"]["detail"] == "“Hello there, friend!”"
 
 
+# A job as the daemon sends it: copied from a real run of test_port_auto's happy path (fake claude, fake checks), paths shortened.
+REAL_PORT = json.loads(r'''{
+ "id": 1,
+ "ref": "acme/weird",
+ "name": "weird",
+ "repo_id": "acme/weird",
+ "status": "done",
+ "stage": "serve",
+ "message": "Ported weird (acme/weird@abc123) and serving it.",
+ "started_at": 1791759501.5582724,
+ "finished_at": 1791759502.1401293,
+ "max_attempts": 3,
+ "stages": [
+  {
+   "name": "workspace",
+   "status": "done",
+   "started": 1791759501.5585124,
+   "ended": 1791759501.5592391,
+   "detail": "WeirdForCausalLM, donor Qwen2ForCausalLM, workspace ~/.mxc/ports/weird",
+   "attempt": null
+  },
+  {
+   "name": "skills",
+   "status": "done",
+   "started": 1791759501.5593143,
+   "ended": 1791759501.562284,
+   "detail": "2 skills in ~/.mxc/skills/modular, read-only for the agent and the gates",
+   "attempt": null
+  },
+  {
+   "name": "generate",
+   "status": "done",
+   "started": 1791759501.562357,
+   "ended": 1791759501.5882955,
+   "detail": "claude finished; package at ~/.mxc/ports/weird/port/weird",
+   "attempt": 1
+  },
+  {
+   "name": "build",
+   "status": "done",
+   "started": 1791759501.5884047,
+   "ended": 1791759501.6086001,
+   "detail": "the package imports and every weight maps",
+   "attempt": 1
+  },
+  {
+   "name": "parity",
+   "status": "done",
+   "started": 1791759501.6086962,
+   "ended": 1791759502.1387503,
+   "detail": "matches the Hugging Face reference",
+   "attempt": 1
+  },
+  {
+   "name": "register",
+   "status": "done",
+   "started": 1791759502.1388698,
+   "ended": 1791759502.1395304,
+   "detail": "registered weird with custom architecture ~/.mxc/ports/weird/port/weird",
+   "attempt": null
+  },
+  {
+   "name": "serve",
+   "status": "done",
+   "started": 1791759502.1396222,
+   "ended": 1791759502.1398106,
+   "detail": "weird is up",
+   "attempt": null
+  }
+ ],
+ "log": "~/.mxc/ports/weird/port.log",
+ "log_tail": "== workspace: looking up acme/weird\u2026\n-- workspace done: WeirdForCausalLM, donor Qwen2ForCausalLM, workspace ~/.mxc/ports/weird\n== skills: installing Modular's skills\u2026\n-- skills done: 2 skills in ~/.mxc/skills/modular, read-only for the agent and the gates\n== generate (attempt 1): running Claude Code headless\u2026\n[agent] NOT sandboxed (sandbox disabled)",
+ "model": "weird"
+}''')
 PORT = {"id": 1, "ref": "org/Mamba2-1.3b", "name": "mamba2-1.3b", "status": "running", "stage": "build",
-        "stages": [{"name": "workspace", "status": "done", "started": 10.0, "ended": 12.5, "detail": "~/.mxc/ports/mamba2", "attempt": 1},
+        "stages": [{"name": "workspace", "status": "done", "started": 10.0, "ended": 12.5, "detail": "~/.mxc/ports/mamba2", "attempt": None},
                    {"name": "generate", "status": "done", "started": 12.5, "ended": 80.0, "detail": "", "attempt": 1},
-                   {"name": "build", "status": "running", "started": 80.0, "ended": None, "detail": "compiling graph", "attempt": 2},
-                   {"name": "parity check", "status": "pending", "started": None, "ended": None, "detail": "", "attempt": 0}],
-        "log_tail": ["step one", "error: dtype mismatch"], "model": None}
+                   {"name": "build", "status": "failed", "started": 80.0, "ended": 90.0, "detail": "tests failed", "attempt": 1},
+                   {"name": "generate", "status": "done", "started": 90.0, "ended": 95.0, "detail": "", "attempt": 2},
+                   {"name": "build", "status": "running", "started": 95.0, "ended": None, "detail": "checking the package…", "attempt": 2},
+                   {"name": "parity", "status": "pending", "started": None, "ended": None, "detail": "", "attempt": 2}],
+        "log_tail": "step one\nerror: dtype mismatch", "model": None}
 
 
 @needs_node
-def test_port_job_maps_to_stage_rows():
-    rows = call("portStageRows", PORT, 85_000)
-    assert [r["label"] for r in rows] == ["Prepare workspace", "Generate the model", "Build the graph", "Parity check"]
-    assert [r["status"] for r in rows] == ["done", "done", "running", "pending"]
-    assert rows[0]["elapsed"] == 2500 and rows[2]["elapsed"] == 5000 and rows[3]["elapsed"] is None
-    assert rows[2]["detail"] == "compiling graph · attempt 2" and rows[0]["detail"] == "~/.mxc/ports/mamba2"
-    s = call("setupStages", {"kind": "port", "phase": "fetch", "port": PORT, "ref": "org/Mamba2-1.3b", "hw": "x", "times": {"check": {"start": 0, "end": 0}}}, 85_000)
-    assert [r["id"] for r in s][-3:] == ["compile", "serve", "smoke"] and s[1]["id"].startswith("port:") and s[1]["twin"] == "mxc port org/Mamba2-1.3b --auto"
+def test_port_job_maps_to_stage_rows_one_per_attempt():
+    rows = call("portStageRows", PORT, 100_000)
+    assert [r["label"] for r in rows] == ["Prepare workspace", "Generate the model", "Build the graph", "Generate the model · attempt 2",
+                                          "Build the graph · attempt 2", "Parity check · attempt 2"]
+    assert len({r["id"] for r in rows}) == 6, "attempt rows need their own ids"
+    assert [r["status"] for r in rows] == ["done", "done", "failed", "done", "running", "pending"]
+    assert rows[0]["elapsed"] == 2500 and rows[4]["elapsed"] == 5000 and rows[5]["elapsed"] is None and rows[2]["detail"] == "tests failed"
+
+
+@needs_node
+def test_a_real_port_job_maps_and_is_followed_by_only_the_smoke_test():
+    rows = call("portStageRows", REAL_PORT, 0)
+    assert [r["label"] for r in rows] == ["Prepare workspace", "Load Modular skills", "Generate the model", "Build the graph",
+                                          "Parity check", "Register the model", "Serve on localhost"]
+    assert {r["status"] for r in rows} == {"done"} and all(r["elapsed"] is not None for r in rows)
+    run = {"kind": "port", "phase": "smoke", "port": REAL_PORT, "ref": "acme/weird", "name": REAL_PORT["model"], "hw": "x",
+           "times": {"check": {"start": 0, "end": 0}, "smoke": {"start": 1000}}}
+    s = call("setupStages", run, 3000)
+    assert s[-1]["id"] == "smoke" and "compile" not in [r["id"] for r in s] and s[-1]["status"] == "running" and s[-1]["elapsed"] == 2000
+    assert s[1]["twin"] == "mxc port acme/weird --auto"
+    lines = call("portLogLines", REAL_PORT)
+    assert lines[0].startswith("== workspace") and len(lines) == 6
+    assert call("portLogLines", {"log_tail": ["a", {"line": "b"}]}) == ["a", "b"] and call("portLogLines", {}) == []
     assert call("portStageRows", {"stages": [{"name": "mystery_step", "status": "skipped"}]}, 0)[0]["label"] == "Mystery step"
-    assert call("portLogLines", {"log_tail": ["a", {"line": "b"}, {"text": "c"}, "d"]}) == ["a", "b", "c", "d"]
-    assert call("portLogLines", {}) == []
 
 
 @needs_node
