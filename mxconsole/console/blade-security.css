@@ -1,2 +1,31 @@
-/* mxconsole, the Security blade (F-025). Styles for this blade only; shared pieces live in blades.css. */
-.b-security .bb { background: var(--canvas); }
+/* mxconsole, the Security blade (F-025). Shared pieces (box, urlrow, code, ess) are in blade-model.css. */
+.b-security .secbox { border: 1px solid var(--card-line); border-radius: 12px; padding: 14px; background: var(--card); display: grid; gap: 12px; }
+.b-security .secbox.done { border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.b-security .secbox .hd { display: flex; align-items: center; gap: 12px; }
+.b-security .secbox .hd .tx { flex: 1; min-width: 0; }
+.b-security .secbox .hd b { display: block; font-weight: 600; }
+.b-security .secbox .hd span { font-size: 12.5px; color: var(--muted); }
+.b-security .secact { display: flex; gap: 8px; flex-wrap: wrap; }
+.b-security .secact .cli { margin-left: auto; align-self: center; }
+.b-security .secsteps { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.b-security .secsteps li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); min-width: 0; }
+.b-security .secsteps li .m { margin-left: auto; font: 11.5px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.b-security .secsteps li.active { color: var(--text); }
+.b-security .secsteps li.done { color: var(--text-2); }
+.b-security .secsteps li.fail { color: var(--bad-fg); }
+.b-security .ring { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--card-line); display: grid; place-items: center; background: var(--card); flex: none; color: var(--faint); }
+.b-security .active > .ring { border-color: var(--hue-network); border-top-color: transparent; animation: spin .8s linear infinite; }
+.b-security .active > .ring svg { display: none; }
+.b-security .done > .ring { border-color: var(--ok); color: var(--ok); }
+.b-security .fail > .ring { border-color: var(--bad); color: var(--bad); }
+.b-security .attn { margin: 0; }
+.b-security .after { display: grid; gap: 10px; align-content: start; }
+.b-security .after .h3.gap { margin: 12px 0 0; }
+.b-security .note { margin: 0; font-size: 12.5px; color: var(--muted); }
+.b-security .trust { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.b-security .trust li { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; font-size: 12.5px; align-items: baseline; }
+.b-security .trust li span { color: var(--text-2); font-size: 11.5px; overflow-wrap: anywhere; }
+.b-security .after .code { margin-top: 0; }
+@media (max-width: 520px) {
+  .b-security .trust li { grid-template-columns: 1fr; gap: 2px; }
+}
