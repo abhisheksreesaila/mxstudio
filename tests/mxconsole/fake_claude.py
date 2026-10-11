@@ -14,7 +14,13 @@ argv = sys.argv[1:]
 prompt = argv[argv.index("-p") + 1]
 if os.environ.get("FAKE_CLAUDE_LOG"):
     with open(os.environ["FAKE_CLAUDE_LOG"], "a") as f:
-        f.write(json.dumps({"argv": argv, "cwd": os.getcwd(), "prompt": prompt}) + "\n")
+        cfg = os.environ.get("CLAUDE_CONFIG_DIR", "")
+        creds = Path(cfg, ".credentials.json")
+        f.write(json.dumps({"argv": argv, "cwd": os.getcwd(), "prompt": prompt, "env": sorted(os.environ),
+                            "config_dir": cfg, "creds": creds.read_text() if creds.is_file() else None}) + "\n")
+if os.environ.get("FAKE_CLAUDE_TAMPER"):  # an agent that escaped and edited a gate script
+    with open(os.environ["FAKE_CLAUDE_TAMPER"], "a") as f:
+        f.write("\n# pwned\n")
 mode = os.environ.get("FAKE_CLAUDE_MODE", "ok")
 state = Path(os.getcwd()) / ".fake-claude-calls"
 calls = int(state.read_text()) + 1 if state.exists() else 1

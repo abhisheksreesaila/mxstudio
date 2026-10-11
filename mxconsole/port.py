@@ -335,13 +335,36 @@ def make_workspace(ref: str, res: resolve.Resolution, catalog: dict, *,
     return workspace, config, donor
 
 
+def _copy_skills(workspace: Path, skills_root: Path, names: list[str]) -> Path:
+    """Real copies of the skills in the workspace (no .git, no environments): the agent may edit them, the
+    clone it came from stays untouched."""
+    target = workspace / ".claude" / "skills"
+    target.mkdir(parents=True, exist_ok=True)
+    for n in names:
+        dest = target / n
+        if dest.is_symlink():
+            dest.unlink()
+        elif dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(skills_root / n, dest, symlinks=False,
+                        ignore=shutil.ignore_patterns(".git", ".pixi", "__pycache__"))
+    return target
+
+
 def finish_workspace(ref: str, res: resolve.Resolution, workspace: Path, config: dict, donor: Donor,
-                     skills_root: Path) -> list[str]:
-    """PORT.md and the skill links, once the skills are on disk. Returns the skill names."""
+                     skills_root: Path, *, copy: bool = False) -> list[str]:
+    """PORT.md and the skills in the workspace, once the skills are on disk. Returns the skill names.
+
+    By default the skills are symlinked to the clone (the guided port). With copy=True they are copied
+    and PORT.md points at the copies, which is what the unattended agent works on."""
     skills = list_skills(skills_root)
-    (workspace / "PORT.md").write_text(
-        _port_md(res, config, donor, skills_root=skills_root, workspace=workspace))
-    _link_skills(workspace, skills_root, skills)
+    if copy:
+        root = _copy_skills(workspace, skills_root, skills)
+    else:
+        root = skills_root
+    (workspace / "PORT.md").write_text(_port_md(res, config, donor, skills_root=root, workspace=workspace))
+    if not copy:
+        _link_skills(workspace, skills_root, skills)
     return skills
 
 

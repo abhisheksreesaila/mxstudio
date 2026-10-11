@@ -16,10 +16,18 @@ When build or parity fails, generate runs again with the error output appended (
 `max_attempts` times; each attempt is its own set of stage rows. The whole transcript of the agent and
 of every command goes to MXC_HOME/ports/<id>/port.log. Cancel kills the process tree of whatever runs.
 Everything outside this process (claude, the skill's checks, max) is injectable, so tests run fakes.
+
+Safety (config.json and the model card are untrusted, so assume prompt injection): the agent, the checks
+and the smoke server run under bubblewrap (port_sandbox.py) with a scrubbed environment and a job-private
+Claude config; the agent edits a COPY of the skills, and the gates run from the pristine clone, whose
+scripts are hash-checked (and restored from git) before every use; the allow list is only the skill's
+own scripts. Without bwrap it says "NOT sandboxed" in the log and asks Claude Code for its own sandbox.
 """
 from __future__ import annotations
 
+import atexit
 import contextlib
+import hashlib
 import json
 import logging
 import os
@@ -30,6 +38,7 @@ import socket
 import subprocess
 import threading
 import time
+import weakref
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,7 +46,7 @@ from typing import Callable
 
 import httpx
 
-from mxconsole import port, resolve
+from mxconsole import port, port_sandbox, resolve
 from mxconsole.pulls import NAME_RE, REF_RE, BadPull
 from mxconsole.store import Store, mxc_home
 
@@ -60,12 +69,16 @@ SMOKE_PROMPT = "The capital of France is"
 NO_CLAUDE = ("Claude Code (`claude`) was not found. Install Claude Code, or run the guided `mxc port {ref}`. "
              "(Set MXC_CLAUDE to its full path if it is installed but not on the daemon's PATH.)")
 
-# What the agent may do: read and edit files in the workspace (acceptEdits), run the skill's pixi
-# commands and plain file tools, and read the model card. No network tools beyond that, no git push.
+# What the agent may do. Files: Read/Edit/Write/Glob/Grep (acceptEdits confines edits to the workspace).
+# Commands: only the skill's own scripts through its pixi env, `pixi install`, and `cd` (to reach the skill
+# root). No general shell tools: file work goes through Read/Edit/Write/Glob/Grep. The model card may be read
+# from huggingface.co. Anything else would prompt, and prompts are denied (--permission-prompts none).
+SKILL_SCRIPTS = ("inspect_hf.py", "list_checkpoint_keys.py", "list_native_archs.py", "check_walls.py",
+                 "scaffold.py", "check_port.py", "run_oss_gates.py", "compare_layers.py", "import_model.py")
 ALLOWED_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebFetch(domain:huggingface.co)",
-                 "Bash(pixi run:*)", "Bash(pixi install:*)", "Bash(cd:*)", "Bash(cp:*)", "Bash(mkdir:*)",
-                 "Bash(ls:*)", "Bash(cat:*)", "Bash(head:*)", "Bash(tail:*)", "Bash(grep:*)", "Bash(rg:*)",
-                 "Bash(find:*)", "Bash(diff:*)", "Bash(sed:*)", "Bash(wc:*)", "Bash(echo:*)"]
+                 "Bash(cd:*)", "Bash(pixi install)", "Bash(pixi install --locked)",
+                 *[f"Bash(pixi run python scripts/{n}:*)" for n in SKILL_SCRIPTS],
+                 *[f"Bash(pixi run -e cuda python scripts/{n}:*)" for n in SKILL_SCRIPTS]]
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS ports (
@@ -80,7 +93,8 @@ CREATE TABLE IF NOT EXISTS ports (
     finished_at REAL,
     max_attempts INTEGER NOT NULL DEFAULT 3,
     stages TEXT NOT NULL DEFAULT '[]',
-    model TEXT
+    model TEXT,
+    procs TEXT
 );
 """
 
@@ -112,7 +126,10 @@ class Ctx:
     name: str
     workspace: Path
     port_dir: Path
-    skills_root: Path
+    skills_root: Path             # the pristine clone: the build/parity gates run from here, never the agent
+    agent_skill: Path = None      # the agent's own writable copy of the import-model skill, in the workspace
+    gate_hash: str = ""           # hash of the gate scripts right after the clone was updated
+    extra_allowed: tuple = ()     # per-model additions to the allow list (the donor copy commands)
 
 
 @dataclass
@@ -148,14 +165,19 @@ def find_claude(explicit: str | None = None) -> str | None:
     return shutil.which(cand)
 
 
-def claude_argv(claude: str, prompt: str, skills_root: Path) -> list[str]:
-    """The headless Claude Code call. `-p` runs once and exits; acceptEdits lets it write files in the
-    workspace; the allow list covers the skill's commands; no session is saved. stream-json (needs
-    --verbose) gives one event per line, which the log renders readably."""
-    return [claude, "-p", prompt, "--permission-mode", "acceptEdits",
-            "--allowedTools", *ALLOWED_TOOLS,
-            "--add-dir", str(skills_root),
+def claude_argv(claude: str, prompt: str, extra_allowed: tuple[str, ...] = (), *, fallback_sandbox: bool = False) -> list[str]:
+    """The headless Claude Code call. `-p` runs once and exits; acceptEdits lets it edit inside the
+    workspace; the allow list covers the skill's scripts; anything that would prompt is denied; only the
+    (job-private) user settings load, no MCP servers, no saved session. stream-json (needs --verbose)
+    gives one event per line, which the log renders readably. `fallback_sandbox` turns on Claude Code's
+    own sandbox when bubblewrap is not available."""
+    argv = [claude, "-p", prompt, "--permission-mode", "acceptEdits", "--permission-prompts", "none",
+            "--allowedTools", *ALLOWED_TOOLS, *extra_allowed,
+            "--setting-sources", "project", "--strict-mcp-config",
             "--output-format", "stream-json", "--verbose", "--no-session-persistence"]
+    if fallback_sandbox:
+        argv += ["--settings", json.dumps({"sandbox": {"enabled": True, "autoAllowBashIfSandboxed": False}})]
+    return argv
 
 
 def package_slug(name: str) -> str:
@@ -168,13 +190,13 @@ def build_prompt(c: Ctx, attempt: int, feedback: str | None, donor_note: str) ->
 
 Model: {c.repo_id}
 Workspace (your working directory): {c.workspace}
-Read PORT.md and config.json here first. Follow the `import-model` skill (.claude/skills/import-model/SKILL.md, the skill root is {c.skills_root / port.ENTRY_SKILL}) for this model, phase by phase, and write the custom architecture package for it.
+Read PORT.md and config.json here first. Follow the `import-model` skill (.claude/skills/import-model/SKILL.md; that folder, {c.agent_skill}, is your working copy and the skill root) for this model, phase by phase, and write the custom architecture package for it.
 
 {donor_note}
 Package folder: {c.port_dir}
 That exact folder must end up holding arch.py and an __init__.py that exposes ARCHITECTURES. Scaffold with `--output-dir {c.port_dir.parent} --slug {c.port_dir.name}` (or create it by hand). Do not write outside the workspace, except by running the skill's own commands.
 
-You are done when `pixi run python scripts/check_port.py {c.repo_id} --port-dir {c.port_dir}` (run from the skill root) passes and the implementation-complete criteria in the skill are met. Do not start `max serve` yourself and do not install packages with pip; mxconsole serves and verifies the port afterwards, against the Hugging Face reference. Finish with a short summary of what you changed."""
+You are done when `pixi run python scripts/check_port.py {c.repo_id} --port-dir {c.port_dir}` (run from {c.agent_skill}) passes and the implementation-complete criteria in the skill are met. Do not start `max serve` yourself and do not install packages with pip; mxconsole serves and verifies the port afterwards, against the Hugging Face reference. Finish with a short summary of what you changed."""
     if attempt <= 1 and not feedback:
         return base
     return (base + f"""
@@ -185,6 +207,46 @@ The last check failed with this output. Fix this:
 {feedback}""")
 
 
+GATE_PATHS = ("scripts", "pixi.toml", "SKILL.md")
+GIT_PATHSPECS = [f"{port.ENTRY_SKILL}/{x}" for x in GATE_PATHS]
+
+
+def gate_hash(skills_root: Path) -> str:
+    """Hash of the files the gates run (the skill's scripts and manifest), so tampering is detectable."""
+    h = hashlib.sha256()
+    base = skills_root / port.ENTRY_SKILL
+    files = []
+    for g in GATE_PATHS:
+        q = base / g
+        files += sorted(f for f in q.rglob("*") if f.is_file() and "__pycache__" not in f.parts) if q.is_dir() else ([q] if q.is_file() else [])
+    for f in files:
+        h.update(str(f.relative_to(base)).encode() + b"\0" + f.read_bytes() + b"\0")
+    return h.hexdigest()
+
+
+def _group_matches(pgid: int, marker: str) -> bool:
+    """Is process group `pgid` still led by the command we started (and not a reused pid)?"""
+    if not pgid or not marker:
+        return False
+    try:
+        out = subprocess.run(["ps", "-o", "args=", "-p", str(pgid)], capture_output=True, text=True, timeout=5).stdout
+        return os.getpgid(pgid) == pgid and marker in out
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+_LIVE_MANAGERS: "weakref.WeakSet[PortManager]" = weakref.WeakSet()
+_ATEXIT = []
+
+
+def cleanup_at_exit(manager: "PortManager") -> None:
+    """Cancel this manager's jobs when the process exits. One atexit hook for all managers."""
+    _LIVE_MANAGERS.add(manager)
+    if not _ATEXIT:
+        _ATEXIT.append(True)
+        atexit.register(lambda: [m.cancel_all(2.0) for m in list(_LIVE_MANAGERS)])
+
+
 def _kill_tree(proc: subprocess.Popen, grace: float = 5.0) -> None:
     with contextlib.suppress(ProcessLookupError, PermissionError):
         os.killpg(proc.pid, signal.SIGTERM)
@@ -193,6 +255,11 @@ def _kill_tree(proc: subprocess.Popen, grace: float = 5.0) -> None:
     except subprocess.TimeoutExpired:
         with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(proc.pid, signal.SIGKILL)
+
+
+def _items(content) -> list[dict]:
+    """Content blocks that are dicts; a string or anything else in there is ignored, not a crash."""
+    return [b for b in content if isinstance(b, dict)] if isinstance(content, list) else []
 
 
 def _render_event(line: str) -> list[str]:
@@ -206,19 +273,19 @@ def _render_event(line: str) -> list[str]:
     kind = ev.get("type")
     out = []
     if kind == "assistant":
-        for b in (ev.get("message") or {}).get("content") or []:
-            if b.get("type") == "text" and b.get("text", "").strip():
+        for b in _items((ev.get("message") or {}).get("content")):
+            if b.get("type") == "text" and str(b.get("text", "")).strip():
                 out.append("claude: " + b["text"].strip())
             elif b.get("type") == "tool_use":
                 inp = b.get("input") or {}
                 what = inp.get("command") or inp.get("file_path") or inp.get("pattern") or inp.get("url") or ""
                 out.append(f"claude> {b.get('name')} {str(what)[:300]}".rstrip())
     elif kind == "user":
-        for b in (ev.get("message") or {}).get("content") or []:
-            if isinstance(b, dict) and b.get("type") == "tool_result":
+        for b in _items((ev.get("message") or {}).get("content")):
+            if b.get("type") == "tool_result":
                 body = b.get("content")
                 if isinstance(body, list):
-                    body = " ".join(x.get("text", "") for x in body if isinstance(x, dict))
+                    body = " ".join(str(x.get("text", "")) for x in body if isinstance(x, dict))
                 text = str(body or "").strip().splitlines()
                 if text:
                     out.append("  " + text[0][:300] + (f" (+{len(text) - 1} more lines)" if len(text) > 1 else ""))
@@ -238,6 +305,7 @@ class _Job:
         self.tail: deque[str] = deque(maxlen=TAIL_LINES)
         self.cancel = threading.Event()
         self.proc: subprocess.Popen | None = None
+        self.procs: dict[int, tuple[subprocess.Popen, str]] = {}
         self.lock = threading.RLock()
         self.thread: threading.Thread | None = None
         self.dir = mxc_home() / "ports" / str(id)
@@ -287,7 +355,9 @@ class PortManager:
                  claude: str | None = None, max_command: tuple[str, ...] = ("max",), tools: PortTools | None = None,
                  serve: Callable[[str], None] | None = None, git_runner=None, fetch_config=None,
                  arch_dir: Path | None = None, generate_timeout: float = GENERATE_TIMEOUT,
-                 check_timeout: float = CHECK_TIMEOUT, smoke_timeout: float = SMOKE_TIMEOUT):
+                 check_timeout: float = CHECK_TIMEOUT, smoke_timeout: float = SMOKE_TIMEOUT,
+                 sandbox: bool = True, bwrap: str = "bwrap", claude_home: Path | None = None,
+                 serve_timeout: float = SERVE_TIMEOUT):
         self.store = store
         self.hub_factory = hub_factory or (lambda: resolve.HubClient())
         self.catalog_loader = catalog_loader or (lambda: resolve.load_catalog())
@@ -296,11 +366,23 @@ class PortManager:
         self.serve = serve
         self.git_runner, self.fetch_config, self.arch_dir = git_runner, fetch_config, arch_dir
         self.generate_timeout, self.check_timeout, self.smoke_timeout = generate_timeout, check_timeout, smoke_timeout
+        self.sandbox, self.bwrap, self.serve_timeout = sandbox, bwrap, serve_timeout
+        self.claude_home = claude_home
         self.db_lock = threading.Lock()
         self.live: dict[int, _Job] = {}
         self.live_lock = threading.Lock()
         with self.db_lock:
             store.db.executescript(SCHEMA)
+            cols = {r[1] for r in store.db.execute("PRAGMA table_info(ports)")}
+            if "procs" not in cols:
+                store.db.execute("ALTER TABLE ports ADD COLUMN procs TEXT")
+            # agents and checks a dead daemon left running: stop their process groups, if still ours
+            for r in store.db.execute("SELECT procs FROM ports WHERE status='running' AND procs IS NOT NULL").fetchall():
+                for pgid, marker in json.loads(r["procs"] or "[]"):
+                    if _group_matches(pgid, marker):
+                        with contextlib.suppress(ProcessLookupError, PermissionError):
+                            os.killpg(pgid, signal.SIGKILL)
+            store.db.execute("UPDATE ports SET procs=NULL")
             store.db.execute("UPDATE ports SET status='failed', finished_at=?, "
                              "message='interrupted: the daemon stopped during this port. Run it again.' "
                              "WHERE status='running'", (time.time(),))
@@ -315,9 +397,10 @@ class PortManager:
         if not isinstance(max_attempts, int) or isinstance(max_attempts, bool) or not 1 <= max_attempts <= MAX_ATTEMPTS:
             raise BadPull(f"`max_attempts` must be a whole number from 1 to {MAX_ATTEMPTS}.")
         key = resolve.CURATED.get(ref.lower(), ref).lower()
+        name = name or resolve.model_name(ref, resolve.CURATED.get(ref.lower(), ref))
         with self.live_lock:
-            for j in self.live.values():
-                if resolve.CURATED.get(j.ref.lower(), j.ref).lower() == key and j.status == "running":
+            for j in self.live.values():  # the same repo, or two repos that would register the same name
+                if j.status == "running" and (resolve.CURATED.get(j.ref.lower(), j.ref).lower() == key or j.name == name):
                     raise PortBusy(j.view())
             with self.db_lock:
                 cur = self.store.db.execute("INSERT INTO ports (ref, name, status, stage, started_at, max_attempts) "
@@ -348,8 +431,8 @@ class PortManager:
             return self.get(port_id)
         job.cancel.set()
         with job.lock:
-            proc = job.proc
-        if proc is not None:
+            procs = [p for p, _ in job.procs.values()]
+        for proc in procs:
             _kill_tree(proc, grace=2.0)
         return job.view()
 
@@ -411,19 +494,91 @@ class PortManager:
                     r["status"] = "skipped"
 
     # -- running things --------------------------------------------------------------------------
-    def _exec(self, job: _Job, argv: list[str], cwd: Path, *, timeout: float, render=None, env=None) -> tuple[int, str]:
-        """Run a command in its own process group, stream every line to the log, and return
-        (exit code, the last of its output). Cancel and the timeout kill the whole group."""
+    def _confine(self, job: _Job, argv: list[str], role: str, ctx: Ctx | None) -> tuple[list[str], dict, str]:
+        """(argv, env, note) for running `argv` as the agent, a gate check, or the smoke server: the
+        environment is scrubbed of secrets (claude keeps only its own auth), and when bubblewrap is
+        available the process runs confined to the workspace and job dir. The note says what happened."""
+        keep = port_sandbox.CLAUDE_AUTH if role == "agent" else ()
+        env = port_sandbox.scrub_env(dict(os.environ), keep)
+        home = Path.home()
+        if role == "agent":
+            cfg = self._claude_config(job)
+            env["CLAUDE_CONFIG_DIR"] = str(cfg)
+        bw = port_sandbox.have_bwrap(self.bwrap) if self.sandbox else None
+        if bw is None:
+            why = "sandbox disabled" if not self.sandbox else "bubblewrap (bwrap) not found"
+            return argv, env, f"NOT sandboxed ({why})" + ("; using Claude Code's own sandbox setting" if role == "agent" and self.sandbox else "")
+        hf = Path(os.environ.get("HF_HOME") or home / ".cache" / "huggingface")
+        rattler = home / ".cache" / "rattler"
+        ws = ctx.workspace if ctx else job.dir
+        tools = port_sandbox.tool_roots(argv[0], "pixi", "git")
+        ro_after: list[Path] = []
+        if role == "agent":
+            # claude reads project settings from the workspace; the agent must not be able to widen its own
+            # permissions there, so those files are bound read-only on top of the writable workspace
+            for name in ("settings.json", "settings.local.json"):
+                f = ws / ".claude" / name
+                f.parent.mkdir(parents=True, exist_ok=True)
+                if not f.exists():
+                    f.write_text("{}\n")
+                ro_after.append(f)
+            rw, ro, gpu = [ws, job.dir, rattler], tools, False
+        else:
+            skill = ctx.skills_root if ctx else ws
+            rw = [job.dir, skill / port.ENTRY_SKILL, rattler, hf, home / ".modular", home / ".cache" / "modular"]
+            ro = [*tools, ws]
+            gpu = role == "serve"
+        wrapped = port_sandbox.bwrap_argv(argv, bwrap=bw, cwd=Path(ws), home=home, mxc_home=mxc_home(),
+                                          rw=rw, ro=ro, ro_after=ro_after, gpu=gpu)
+        return wrapped, env, "sandboxed with bubblewrap (read-only system, empty $HOME and MXC_HOME, private /tmp, writable: " \
+            + ", ".join(str(x) for x in rw[:2]) + ")"
+
+    def _claude_config(self, job: _Job) -> Path:
+        """A job-private Claude Code config dir holding only the login, so the user's settings, hooks,
+        CLAUDE.md and MCP servers cannot widen what the agent may do."""
+        cfg = job.dir / "claude-cfg"
+        cfg.mkdir(parents=True, exist_ok=True)
+        src = (self.claude_home or Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")) / ".credentials.json"
+        if src.is_file():
+            dst = cfg / ".credentials.json"
+            dst.write_bytes(src.read_bytes())
+            dst.chmod(0o600)
+        return cfg
+
+    def _track(self, job: _Job, proc: subprocess.Popen, marker: str, add: bool = True) -> None:
+        """Remember the process groups a job has running, in memory (for cancel) and in the database (so a
+        restarted daemon can stop what a dead one left behind)."""
+        with job.lock:
+            if add:
+                job.procs[proc.pid] = (proc, marker)
+            else:
+                job.procs.pop(proc.pid, None)
+            job.proc = next(iter(job.procs.values()))[0] if job.procs else None
+            listing = json.dumps([[pid, m] for pid, (_, m) in job.procs.items()]) if job.procs else None
+        try:
+            with self.db_lock:
+                self.store.db.execute("UPDATE ports SET procs=? WHERE id=?", (listing, job.id))
+        except Exception:
+            log.exception("could not record the process groups of port %s", job.id)
+
+    def _exec(self, job: _Job, argv: list[str], cwd: Path, *, timeout: float, render=None, role: str = "check",
+              ctx: Ctx | None = None) -> tuple[int, str]:
+        """Run a command in its own process group (confined, with a scrubbed environment), stream every
+        line to the log, and return (exit code, the last of its output). Cancel and the timeout kill the
+        whole group."""
         self._check(job)
+        run_argv, env, note = self._confine(job, argv, role, ctx)
+        job.say(f"[{role}] {note}")
         job.say("$ " + " ".join(argv if len(" ".join(argv)) < 600 else argv[:3] + ["..."]) + f"   (cwd {cwd})")
         try:
-            proc = subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+            proc = subprocess.Popen(run_argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                                     text=True, errors="replace", start_new_session=True, env=env)
         except OSError as e:
-            job.say(f"could not run {argv[0]}: {e}")
-            return 127, f"could not run {argv[0]}: {e}"
-        with job.lock:
-            job.proc = proc
+            job.say(f"could not run {run_argv[0]}: {e}")
+            return 127, f"could not run {run_argv[0]}: {e}"
+        self._track(job, proc, run_argv[0])
+        if job.cancel.is_set():  # cancel() ran before the process was registered: it could not kill it
+            _kill_tree(proc, grace=2.0)
         timed_out = threading.Event()
 
         def expire():
@@ -439,11 +594,12 @@ class PortManager:
                 captured.append(line)
                 for out in (render(line) if render else [line]):
                     job.say(out)
+                if job.cancel.is_set():
+                    _kill_tree(proc, grace=2.0)
             proc.wait()
         finally:
             timer.cancel()
-            with job.lock:
-                job.proc = None
+            self._track(job, proc, run_argv[0], add=False)
             if proc.poll() is None:
                 _kill_tree(proc)
         self._check(job)
@@ -452,6 +608,20 @@ class PortManager:
             captured.append(f"(timed out after {timeout:g}s)")
             return 124, "\n".join(captured)
         return proc.returncode, "\n".join(captured)
+
+    def _pristine(self, job: _Job, ctx: Ctx) -> None:
+        """Before a gate runs: the skill's check scripts must be exactly what was cloned. If the clone was
+        touched, restore it from git; if it still differs, the gate does not count and the job fails."""
+        runner = self.git_runner or port._run
+        code, out = runner(["git", "status", "--porcelain", "--untracked-files=no", "--", *GIT_PATHSPECS], cwd=ctx.skills_root)
+        if gate_hash(ctx.skills_root) == ctx.gate_hash and not (code == 0 and out.strip()):
+            return
+        job.say("the skill's gate scripts were modified; restoring them from git")
+        runner(["git", "checkout", "--", *GIT_PATHSPECS], cwd=ctx.skills_root)
+        runner(["git", "clean", "-fd", "--", *GIT_PATHSPECS], cwd=ctx.skills_root)
+        if gate_hash(ctx.skills_root) != ctx.gate_hash:
+            raise _StageFailed(f"the skill's check scripts in {ctx.skills_root} were modified and could not be restored; "
+                               f"the build and parity checks cannot be trusted")
 
     # -- the pipeline ----------------------------------------------------------------------------
     def _run(self, job: _Job) -> None:
@@ -506,9 +676,13 @@ class PortManager:
         skills_root = port.ensure_skills(runner=self.git_runner)
         if port.ENTRY_SKILL not in port.list_skills(skills_root):
             raise _StageFailed(f"Modular's skills in {skills_root} have no {port.ENTRY_SKILL} skill")
-        skills = port.finish_workspace(job.ref, res, workspace, config, donor, skills_root)
-        self._end(job, row, detail=f"{len(skills)} skills in {skills_root}")
-        ctx = Ctx(job.ref, res.repo_id, name, workspace, workspace / "port" / package_slug(name), skills_root)
+        # the agent gets its own writable COPY of the skills; the clone stays pristine for the gates
+        skills = port.finish_workspace(job.ref, res, workspace, config, donor, skills_root, copy=True)
+        self._end(job, row, detail=f"{len(skills)} skills, copied into the workspace; gates run from the pristine clone {skills_root}")
+        allowed = tuple(f"Bash(cp -r {d}/:*)" for d in (donor.source_dir, donor.v3_dir) if d)
+        ctx = Ctx(job.ref, res.repo_id, name, workspace, workspace / "port" / package_slug(name), skills_root,
+                  agent_skill=workspace / ".claude" / "skills" / port.ENTRY_SKILL, gate_hash=gate_hash(skills_root),
+                  extra_allowed=allowed)
 
         feedback: str | None = None
         for attempt in range(1, job.max_attempts + 1):
@@ -532,12 +706,30 @@ class PortManager:
         if self.serve is None:
             self._end(job, row, "skipped", "no server attached; the model starts on its first request")
         else:
-            try:
-                self.serve(model.name)
-            except Exception as e:
-                raise _StageFailed(f"{model.name} is registered but did not start: {str(e)[-500:]}") from e
+            err = self._serve(job, model.name)
+            if err:
+                raise _StageFailed(f"{model.name} is registered but did not start: {err[-500:]}")
             self._end(job, row, detail=f"{model.name} is up")
         self._finish(job, "done", f"Ported {model.name} ({model.repo_id}@{model.revision[:8]}) and serving it.")
+
+    def _serve(self, job: _Job, name: str) -> str | None:
+        """Start the model on a helper thread, polling for cancel and a deadline. Returns an error or None."""
+        box: dict = {}
+
+        def go():
+            try:
+                self.serve(name)
+            except Exception as e:  # reported to the job, not raised in a helper thread
+                box["err"] = str(e) or type(e).__name__
+        t = threading.Thread(target=go, name=f"port-{job.id}-serve", daemon=True)
+        t.start()
+        deadline = time.monotonic() + self.serve_timeout
+        while t.is_alive():
+            self._check(job)
+            if time.monotonic() > deadline:
+                return f"it did not start within {self.serve_timeout:g}s"
+            t.join(0.2)
+        return box.get("err")
 
     def _attempt(self, job: _Job, ctx: Ctx, attempt: int, feedback: str | None, donor_note: str, hub, res) -> _StageFailed | None:
         """generate, build, parity once. Returns None on success, or the failure (retryable or not)."""
@@ -548,8 +740,10 @@ class PortManager:
             msg = NO_CLAUDE.format(ref=job.ref)
             self._end(job, row, "failed", msg)
             raise _StageFailed(msg)
-        argv = claude_argv(claude, build_prompt(ctx, attempt, feedback, donor_note), ctx.skills_root)
-        code, out = self._exec(job, argv, ctx.workspace, timeout=self.generate_timeout, render=_render_event)
+        fallback = self.sandbox and port_sandbox.have_bwrap(self.bwrap) is None
+        argv = claude_argv(claude, build_prompt(ctx, attempt, feedback, donor_note), ctx.extra_allowed, fallback_sandbox=fallback)
+        code, out = self._exec(job, argv, ctx.workspace, timeout=self.generate_timeout, render=_render_event,
+                               role="agent", ctx=ctx)
         if code != 0:
             msg = f"claude exited with code {code}" + (" (timed out)" if code == 124 else "")
             self._end(job, row, "failed", msg)
@@ -562,11 +756,12 @@ class PortManager:
         except port.PortError as e:
             self._end(job, row, "failed", str(e))
             return _StageFailed(f"build failed: {e}", retry=True, output=str(e))
+        self._pristine(job, ctx)
         cmd = self.tools.build_cmd(ctx)
         if cmd is None:
             self._end(job, row, detail="package layout is valid (the skill has no check_port.py to run)")
         else:
-            code, out = self._exec(job, cmd[0], cmd[1], timeout=self.check_timeout)
+            code, out = self._exec(job, cmd[0], cmd[1], timeout=self.check_timeout, role="check", ctx=ctx)
             if code != 0:
                 msg = f"the build check failed (exit {code})"
                 self._end(job, row, "failed", msg)
@@ -591,19 +786,21 @@ class PortManager:
         self._detail(job, row, f"compiling and serving on :{port_} (a cold compile takes 5 to 25 minutes)…")
         argv = [*self.max_command, "serve", "--port", str(port_), "--served-model-name", ctx.repo_id,
                 "--custom-architectures", str(ctx.port_dir), "--model-path", str(weights)]
+        run_argv, env, note = self._confine(job, argv, "serve", ctx)
+        job.say(f"[serve] {note}")
         job.say("$ " + " ".join(argv))
         log_file = open(job.log_path, "ab")
         try:
-            proc = subprocess.Popen(argv, cwd=ctx.workspace, stdout=log_file, stderr=subprocess.STDOUT,
+            proc = subprocess.Popen(run_argv, cwd=ctx.workspace, stdout=log_file, stderr=subprocess.STDOUT,
                                     stdin=subprocess.DEVNULL, start_new_session=True,
-                                    env={**os.environ, "MAX_SERVE_HOST": "127.0.0.1"})
+                                    env={**env, "MAX_SERVE_HOST": "127.0.0.1"})
         except OSError as e:
             return _StageFailed(f"could not run {' '.join(self.max_command)}: {e}", retry=False)
         finally:
             log_file.close()
-        with job.lock:
-            job.proc = proc
+        self._track(job, proc, run_argv[0])
         try:
+            self._check(job)  # a cancel that landed before the server was registered
             problem = self._smoke(job, proc, port_, ctx, row)
             if problem:
                 return problem
@@ -612,15 +809,15 @@ class PortManager:
                 self._detail(job, row, "smoke generation passed (the skill has no verify gate to run)")
                 return None
             self._detail(job, row, "smoke passed; comparing with the Hugging Face reference…")
-            code, out = self._exec(job, vc[0], vc[1], timeout=self.check_timeout)
+            self._pristine(job, ctx)
+            code, out = self._exec(job, vc[0], vc[1], timeout=self.check_timeout, role="check", ctx=ctx)
             if code != 0:
                 return _StageFailed(f"parity check failed (exit {code}): the port's output does not match Hugging Face",
                                     retry=True, output=f"{' '.join(vc[0])}\n{out}")
             self._detail(job, row, "matches the Hugging Face reference")
             return None
         finally:
-            with job.lock:
-                job.proc = None
+            self._track(job, proc, run_argv[0], add=False)
             _kill_tree(proc)
 
     def _smoke(self, job: _Job, proc: subprocess.Popen, port_: int, ctx: Ctx, row: dict) -> _StageFailed | None:

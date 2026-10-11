@@ -52,9 +52,14 @@ def make_manager(tmp_path, claude, store=None, **kw):
     started = []
     kw.setdefault("tools", check_tools())
     kw.setdefault("serve", started.append)
+    (tmp_path / "archs" / "qwen2").mkdir(parents=True, exist_ok=True)
+    kw.setdefault("arch_dir", tmp_path / "archs")
+    kw.setdefault("sandbox", False)
+    kw.setdefault("git_runner", Runner())
+    kw.setdefault("claude_home", tmp_path / "claude-home")
     m = PortManager(store, hub_factory=lambda: SlowHub(weights_bytes=CHUNK), catalog_loader=lambda: CATALOG,
                     claude=claude, max_command=(sys.executable, str(HERE / "fake_max.py")),
-                    git_runner=Runner(), fetch_config=fake_fetch, **kw)
+                    fetch_config=fake_fetch, **kw)
     m.started = started
     return m
 
@@ -80,19 +85,42 @@ def test_happy_path_registers_and_serves(tmp_path, fake_claude):
     assert (Path(model.custom_arch_path) / "arch.py").is_file()
 
 
-def test_claude_is_run_headless_in_the_workspace_with_the_prompt(tmp_path, fake_claude):
+SKILL_SCRIPTS = ["inspect_hf.py", "list_checkpoint_keys.py", "list_native_archs.py", "check_walls.py", "scaffold.py",
+                 "check_port.py", "run_oss_gates.py", "compare_layers.py", "import_model.py"]
+ALLOWED = (["Read", "Write", "Edit", "Glob", "Grep", "WebFetch(domain:huggingface.co)",
+            "Bash(cd:*)", "Bash(pixi install)", "Bash(pixi install --locked)"]
+           + [f"Bash(pixi run python scripts/{n}:*)" for n in SKILL_SCRIPTS]
+           + [f"Bash(pixi run -e cuda python scripts/{n}:*)" for n in SKILL_SCRIPTS])
+
+
+def test_claude_is_run_headless_in_the_workspace_with_exactly_these_flags(tmp_path, fake_claude):
     run(make_manager(tmp_path, fake_claude))
     (call,) = calls(tmp_path)
-    argv = call["argv"]
-    assert argv[0] == "-p" and argv[argv.index("--permission-mode") + 1] == "acceptEdits"
-    assert "--output-format" in argv and "stream-json" in argv and "--no-session-persistence" in argv
-    allowed = argv[argv.index("--allowedTools") + 1:argv.index("--add-dir")]
-    assert "Bash(pixi run:*)" in allowed and "Bash" not in allowed and "Bash(*)" not in allowed
-    assert call["cwd"] == str(mxc_home() / "ports" / "weird")
-    p = call["prompt"]
-    for needle in ("acme/weird", "import-model", "Package folder: ", "PORT.md", "check_port.py", "Nobody is available"):
-        assert needle in p
-    assert "Fix this" not in p
+    prompt = call["prompt"]
+    assert call["argv"] == ["-p", prompt, "--permission-mode", "acceptEdits", "--permission-prompts", "none",
+                            "--allowedTools", *ALLOWED, f"Bash(cp -r {tmp_path}/archs/qwen2/:*)",
+                            "--setting-sources", "project", "--strict-mcp-config",
+                            "--output-format", "stream-json", "--verbose", "--no-session-persistence"]
+    assert "--add-dir" not in call["argv"]
+    for broad in ("Bash", "Bash(*)", "Bash(pixi run:*)", "Bash(sed:*)", "Bash(cp:*)", "Bash(cat:*)", "Bash(find:*)"):
+        assert broad not in call["argv"]
+    ws = mxc_home() / "ports" / "weird"
+    assert call["cwd"] == str(ws)
+    agent_skill = ws / ".claude" / "skills" / "import-model"
+    for needle in ("acme/weird", "import-model", "Package folder: ", "PORT.md", "check_port.py", "Nobody is available",
+                   str(agent_skill)):
+        assert needle in prompt
+    assert str(mxc_home() / "skills" / "modular") not in prompt  # the agent never hears of the pristine clone
+    assert "Fix this" not in prompt
+
+
+def test_the_agent_works_on_a_copy_of_the_skills_not_the_clone(tmp_path, fake_claude):
+    run(make_manager(tmp_path, fake_claude))
+    ws = mxc_home() / "ports" / "weird"
+    skill = ws / ".claude" / "skills" / "import-model"
+    assert skill.is_dir() and not skill.is_symlink() and (skill / "SKILL.md").is_file()
+    assert not (skill / ".git").exists()
+    assert str(skill) in (ws / "PORT.md").read_text()
 
 
 def test_log_file_has_everything_and_tail_is_streamed(tmp_path, fake_claude):
@@ -232,6 +260,8 @@ def test_job_survives_in_the_database(tmp_path, fake_claude):
 @pytest.fixture
 def daemon_env(tmp_path, fake_claude, monkeypatch):
     monkeypatch.setenv("MXC_CLAUDE", fake_claude)
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude-home"))
+    monkeypatch.setattr("mxconsole.port_sandbox.have_bwrap", lambda path="bwrap": None)
     monkeypatch.setattr("mxconsole.resolve.HubClient", lambda: SlowHub(weights_bytes=CHUNK))
     monkeypatch.setattr("mxconsole.resolve.load_catalog", lambda **kw: CATALOG)
     monkeypatch.setattr("mxconsole.port._run", Runner())

@@ -6,13 +6,12 @@ refuses anything that is not an admin call from this machine, like the other /ad
 from __future__ import annotations
 
 import asyncio
-import atexit
 import json
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from mxconsole.port_auto import DEFAULT_ATTEMPTS, PortBusy, PortManager
+from mxconsole.port_auto import DEFAULT_ATTEMPTS, PortBusy, PortManager, cleanup_at_exit
 from mxconsole.pulls import BadPull
 
 MAX_BODY = 4096
@@ -37,7 +36,7 @@ def register(app, store, supervisor, admin_only, *, manager: PortManager | None 
     if manager is None:
         manager = PortManager(store, max_command=supervisor.max_command, serve=serve)
 
-    atexit.register(manager.cancel_all, 2.0)  # a stopping daemon must not leave an agent running
+    cleanup_at_exit(manager)  # a stopping daemon must not leave an agent running
 
     def refused() -> Response:
         return Response("admin is only served to this machine", status_code=403)
