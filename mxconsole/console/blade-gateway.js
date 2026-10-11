@@ -85,9 +85,11 @@ register("gateway", (blade) => {
     guards.replaceChildren(...(lines.length ? [h("div", { class: "h3" }, "Safeguards", h("span", { class: "r muted" }, "counted today")),
       h("dl", { class: "gw-kv wide" }, lines.map(([k, v]) => [h("dt", {}, k), h("dd", {}, v)]))] : []));
   }
-  function drawLog(text) {
-    if (text === logText) return;
-    logText = text;
+  function drawLog(text, failedWith) {
+    const key = failedWith ? `!${failedWith}` : text;
+    if (key === logText) return;
+    logText = key;
+    if (failedWith) { logPre.textContent = `Could not read the LiteLLM log: ${failedWith}`; return; }
     const lines = tailLines(text);
     const atEnd = logPre.scrollHeight - logPre.scrollTop - logPre.clientHeight < 24;
     logPre.textContent = lines.length ? lines.join("\n") : "No LiteLLM log yet: it appears once `mxc expose` starts LiteLLM.";
@@ -99,7 +101,7 @@ register("gateway", (blade) => {
     if (!blade.alive) return;
     if (n.status === "fulfilled") { net = n.value; failed = null; } else failed = n.reason.message;
     if (g.status === "fulfilled") gw = g.value;
-    drawLog(l.status === "fulfilled" ? l.value : "");
+    drawLog(l.status === "fulfilled" ? l.value : "", l.status === "rejected" ? l.reason.message : null);
     drawStatus(); drawRoutes(); drawGuards();
   }
 
@@ -107,7 +109,7 @@ register("gateway", (blade) => {
     busy = true; drawStatus();
     toast("Restarting the gateway (Caddy + LiteLLM)… it can take up to a minute.", 6000);
     try { await api("POST", "/admin/litellm/restart"); if (blade.alive) toast("Gateway restarted."); }
-    catch (e) { toast(`Could not restart the gateway: ${e.message}`, 7000); }
+    catch (e) { if (blade.alive) toast(`Could not restart the gateway: ${e.message}`, 7000); }
     busy = false;
     if (blade.alive) await load();
   });
@@ -121,8 +123,10 @@ register("gateway", (blade) => {
         h("div", { class: "gw-sec" }, h("div", { class: "h3" }, "From the terminal"), twin("mxc status"), twin("mxc expose"), twin("mxc expose --stop"))));
       drawStatus(); drawRoutes(); drawGuards();
       load();
-      timers.push(setInterval(load, POLL));
-      blade.onClose = () => timers.forEach(clearInterval);
+      // a timeout chain, not an interval: the next poll starts only after the last one finished (no pile-up)
+      const next = () => { if (blade.alive) timers.push(setTimeout(async () => { await load(); next(); }, POLL)); };
+      next();
+      blade.onClose = () => timers.forEach(clearTimeout);
     },
   };
 });

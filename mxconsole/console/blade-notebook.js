@@ -18,12 +18,20 @@ export function safeUrl(url) {
   } catch (_) { return null; }
 }
 
+/** Jupyter is started by the daemon on this machine: only an http://127.0.0.1 link is ever opened. */
+export function localUrl(url) {
+  const u = safeUrl(url);
+  return u && new URL(u).protocol === "http:" && new URL(u).hostname === "127.0.0.1" ? u : null;
+}
+
 const T = (text) => ({ text });
-const INLINE = /`([^`\n]+)`|\*\*([^\n]+?)\*\*|(?<![\w])__([^\n]+?)__(?![\w])|\*([^\s*][^*\n]*?)\*|(?<![\w])_([^\s_][^_\n]*?)_(?![\w])|\[([^\]\n]+)\]\(([^)\s]+)\)/g;
+// Every quantifier is bounded, so each start position costs at most ~500 steps: linear overall, whatever the input.
+const INLINE = /`([^`\n]{1,500})`|\*\*([^*\n]{1,500})\*\*|(?<![\w])__([^_\n]{1,500})__(?![\w])|\*([^\s*][^*\n]{0,499})\*|(?<![\w])_([^\s_][^_\n]{0,499})_(?![\w])|\[([^\]\n]{1,500})\]\(([^)\s]{1,2000})\)/g;
+const MAX_MD = 200000; // a notebook cell is never this big; the rest is dropped rather than parsed
 
 /** Inline markdown to nodes: **bold**, *italic*, `code`, [text](http-url). Everything else stays text. */
 export function parseInline(src) {
-  const text = String(src ?? ""), out = [];
+  const text = String(src ?? "").slice(0, MAX_MD), out = [];
   let last = 0;
   const push = (node) => {
     const prev = out[out.length - 1];
@@ -47,14 +55,15 @@ export function parseInline(src) {
 }
 
 const FENCE = /^\s*(```+|~~~+)\s*([\w+.-]*)\s*$/;
-const HEADING = /^(#{1,6})\s+(.*?)(?:\s+#+)?\s*$/;
+const HEADING = /^(#{1,6})\s+(.*)$/;
+const headText = (t) => t.replace(/\s+$/, "").replace(/\s+#+$/, "");
 const ITEM = /^\s*([-*+]|\d+[.)])\s+(.*)$/;
 const blank = (l) => /^\s*$/.test(l);
 
 /** Block markdown to a node-description tree: headings, paragraphs, lists, fenced code. Anything else is text.
  * A node is {tag, attrs?, children?} or {text}. */
 export function parseMarkdown(src) {
-  const lines = String(src ?? "").replace(/\r\n?/g, "\n").split("\n");
+  const lines = String(src ?? "").slice(0, MAX_MD).replace(/\r\n?/g, "\n").split("\n");
   const out = [];
   let i = 0;
   while (i < lines.length) {
@@ -70,7 +79,7 @@ export function parseMarkdown(src) {
       continue;
     }
     const head = HEADING.exec(line);
-    if (head) { out.push({ tag: `h${head[1].length}`, children: parseInline(head[2]) }); i++; continue; }
+    if (head) { out.push({ tag: `h${head[1].length}`, children: parseInline(headText(head[2])) }); i++; continue; }
     const item = ITEM.exec(line);
     if (item) {
       const ordered = /\d/.test(item[1][0]), items = [];
@@ -207,7 +216,7 @@ register("notebook", (blade) => {
   const shell = h("div", { class: "nb" });
 
   function paintChip() {
-    const v = kernelChip((store.models || []).find((m) => m.name === id), store.info && (store.info.lan_endpoint || store.info.endpoint));
+    const v = kernelChip((store.models || []).find((m) => m.name === id), store.info && store.info.endpoint);
     chipEl.classList.toggle("off", !v.on);
     chipEl.lastChild.textContent = v.text;
   }
@@ -220,8 +229,8 @@ register("notebook", (blade) => {
     try {
       const r = await api("POST", `/admin/learn/${enc}/open`);
       if (!blade.alive) return;
-      const url = safeUrl(r.url);
-      if (!url) throw new Error("Jupyter returned a link that is not http(s), so it was not opened");
+      const url = localUrl(r.url);
+      if (!url) throw new Error("Jupyter returned a link that is not on this machine (http://127.0.0.1), so it was not opened");
       window.open(url, "_blank", "noopener,noreferrer");
       say(icon("check", 13), "Jupyter is running. ", h("a", { href: url, target: "_blank", rel: "noopener noreferrer" }, "Open it again"), icon("external-link", 12));
     } catch (e) {
@@ -278,7 +287,7 @@ register("notebook", (blade) => {
   return {
     title: "Notebook", crumb: "Notebook", sub: id,
     icon: "book-open", hue: "var(--hue-notebook)", wide: true, min: 900,
-    tools: h("div", { class: "nb-tools" }, chipEl, jupBtn), // one Node: the engine takes a single node here
+    tools: [chipEl, jupBtn],
     mount(body) {
       body.replaceChildren(shell);
       paintChip();

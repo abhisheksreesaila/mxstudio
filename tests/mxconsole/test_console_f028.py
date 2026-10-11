@@ -199,6 +199,29 @@ def test_blades_follow_the_contract_and_the_csp():
 def test_a_link_label_can_hold_code_and_the_header_tools_are_one_node():
     kids = md("[`org/tiny`](https://huggingface.co/org/tiny)")[0]["children"]
     assert kids[0]["tag"] == "a" and kids[0]["children"] == [{"tag": "code", "children": [{"text": "org/tiny"}]}]
-    # blades.js takes `tools` as a single Node (an array would print as "[object HTMLElement]")
     for name in ("blade-notebook", "blade-gateway"):
-        assert re.search(r"tools: (h\(|restartBtn,)", (CONSOLE_DIR / f"{name}.js").read_text()), name
+        assert re.search(r"tools: (\[chipEl, jupBtn\]|restartBtn),", (CONSOLE_DIR / f"{name}.js").read_text()), name
+
+
+@needs_node
+def test_parsers_are_linear_on_hostile_input():
+    import time
+    for line in ["[" * 40000, "*" * 40000, "`" * 40000, "_a" * 20000, "# " + "#" * 40000, "[a](" + "b" * 40000, "**" + "a" * 40000, "# " + " " * 40000 + "x"]:
+        t = time.time()
+        md(line)
+        assert time.time() - t < 1.0, line[:10]  # includes node start-up; was seconds when quadratic
+    script = f"""
+      import * as m from {json.dumps((CONSOLE_DIR / 'blade-notebook.js').as_uri())};
+      const t = performance.now(); m.parseMarkdown("[".repeat(40000)); m.parseMarkdown("# " + "#".repeat(40000));
+      console.log(performance.now() - t);
+    """
+    out = subprocess.run(["node", "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    assert float(out.stdout) < 200, out.stdout
+
+
+@needs_node
+def test_jupyter_opens_only_on_this_machine_and_the_chip_uses_the_local_endpoint():
+    assert node("blade-notebook", 'm.localUrl("http://127.0.0.1:8899/lab/tree/a.ipynb?token=t")') == "http://127.0.0.1:8899/lab/tree/a.ipynb?token=t"
+    for bad in ["https://127.0.0.1:1/", "http://evil.example/", "http://localhost:1/", "http://127.0.0.1.evil.example/", "javascript:alert(1)"]:
+        assert node("blade-notebook", f"m.localUrl({json.dumps(bad)})") is None, bad
+    assert "store.info.lan_endpoint" not in (CONSOLE_DIR / "blade-notebook.js").read_text()
