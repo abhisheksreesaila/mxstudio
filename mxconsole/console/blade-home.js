@@ -3,7 +3,8 @@
 // Data: /admin/models + /admin/metrics + /admin/series (polled by core.js) and /admin/system (system-data.js).
 import { h, s, icon, store, onData, fmt, dur, colorOf, api, refresh, toast, copyButton } from "./core.js";
 import { register, push, truncate, stack, setHead } from "./blades.js";
-import { readView, writeView } from "./prefs.js";
+import { readView, writeView, safeStorage } from "./prefs.js";
+import { syncKeyed } from "./keyed.js";
 import { hardwareView } from "./hardware.js";
 import { system } from "./system-data.js";
 
@@ -76,27 +77,127 @@ function viewLogs(name) {
 register("home", (blade) => ({
   title: "My models", crumb: "My models", icon: "layout-grid", hue: "var(--hue-models)", side: 300, min: 0,
   mount(body) {
-    let view = readView(localStorage), query = "";
-    const rows = () => (store.models || []);
+    // The poll redraws every 3 s. Nothing focusable is rebuilt by it: rows, cards, dots and the filter keep their
+    // element per model name (keyed.js), so keyboard focus, hover and scroll survive. Only a change of mode
+    // (full / side / rail), of the daemon's reachability or of the crashed set rebuilds anything.
+    const storage = safeStorage();
+    let view = readView(storage), query = "", shape = "", refs = null, toolsMode = "", crashSig = "";
     const ctxNow = () => ({ metrics: store.metrics, series: store.series, info: store.info, system: system.crew, endpoint: (store.info && store.info.endpoint) || `${location.origin}/v1` });
     const selected = () => (stack[1] && stack[1].name === "model" ? stack[1].opts.id : null);
 
     function addButton(compact) {
-      const btn = h("button", { class: compact ? "ib" : "btn primary", type: "button", "data-act": "add", title: "Add a model", "aria-label": "Add a model", onClick: (e) => { e.stopPropagation(); openAdd(); } },
+      return h("button", { class: compact ? "ib" : "btn primary", type: "button", "data-act": "add", title: "Add a model", "aria-label": "Add a model", onClick: (e) => { e.stopPropagation(); openAdd(); } },
         icon("plus", compact ? 15 : 14, "currentColor", 2), compact ? null : "Add a model");
-      return btn;
     }
-    const modelButton = (cls, name, ...kids) => h("button", { class: cls, type: "button", "data-id": name, onClick: (e) => { e.stopPropagation(); openModel(name); } }, ...kids);
-
     function heading(views, mode) {
       const running = views.filter((v) => v.stateKey === "running").length;
       setHead(blade, {
         title: h("span", { class: "t-row" }, "My models", h("span", { class: "count mono" }, String(views.length))),
         sub: mode === "full" ? `Everything this machine serves, behind one OpenAI-compatible endpoint: ${shortEndpoint(ctxNow().endpoint)}` : `${running} running`,
       });
-      blade.toolsEl.replaceChildren(...(mode === "full" ? [cliHint("mxc serve <model>"), addButton(false)] : [addButton(true)]));
+      const want = mode === "full" || mode === "narrow" ? "full" : "compact";
+      if (want !== toolsMode) {  // the Add button is focusable: only rebuild it when the mode changes
+        toolsMode = want;
+        blade.toolsEl.replaceChildren(...(want === "full" ? [cliHint("mxc serve <model>"), addButton(false)] : [addButton(true)]));
+      }
     }
 
+    // -- one element per model, updated in place -----------------------------------------------------
+    const markSel = (el) => el.classList.toggle(el._sel, el.dataset.id === selected());
+    function makeRow(v) {
+      const nameBtn = h("button", { class: "namebtn", type: "button", "data-id": v.name, onClick: (e) => { e.stopPropagation(); openModel(v.name); } });
+      const rep = h("span", { class: "rep" });
+      const cells = Array.from({ length: 7 }, () => h("td", {}));
+      const tr = h("tr", { class: "row", "data-id": v.name, onClick: () => openModel(v.name) }, h("td", { class: "nm" }, nameBtn, rep), ...cells);
+      Object.assign(tr, { _sel: "on", _nameBtn: nameBtn, _rep: rep, _cells: cells });
+      return tr;
+    }
+    function updateRow(tr, v) {
+      tr._nameBtn.replaceChildren(mdot(v.name), h("span", { class: "trunc" }, v.name));
+      tr._rep.textContent = v.repo;
+      const [state, access, tps, ttft, req, vram, arch] = tr._cells;
+      state.replaceChildren(...[stateEl(v), v.note ? h("span", { class: "rep" }, v.note) : null].filter(Boolean));
+      access.replaceChildren(accessEl(v));
+      tps.className = "num";
+      tps.replaceChildren(h("span", { class: "tpsrow" }, h("span", { class: "tpsn" }, v.tps === null ? "—" : fmt(v.tps)), v.points.length > 1 ? sparkline(v.points, 64, 18, colorOf(v.name)) : null));
+      ttft.className = req.className = vram.className = "num";
+      ttft.textContent = v.ttft === null || v.ttft === undefined ? "—" : `${fmt(v.ttft)} ms`;
+      req.textContent = v.stateKey === "running" ? fmt(v.requests) : "—";
+      vram.textContent = v.vramGb === null ? "—" : `${v.vramGb} GB`;
+      arch.className = "num muted";
+      arch.textContent = v.arch;
+      markSel(tr);
+    }
+    function makeCard(v) {
+      const card = h("button", { class: "card", type: "button", "data-id": v.name, onClick: () => openModel(v.name) });
+      card._sel = "sel";
+      return card;
+    }
+    function updateCard(card, v) {
+      card.style.setProperty("--mc", colorOf(v.name));
+      card.setAttribute("aria-label", `${v.name}, ${v.stateLabel}`);
+      card.replaceChildren(
+        h("span", { class: "r" }, mdot(v.name), h("span", { class: "nm" }, v.name), stateEl(v)),
+        h("span", { class: "r" }, accessEl(v), h("span", { class: "ep" }, shortEndpoint(v.endpoint))),
+        v.crashed ? h("span", { class: "crashnote" }, "crashed · open it for the log")
+          : h("span", { class: "tps" }, h("span", { class: "n" }, h("span", {}, v.tps === null ? "—" : fmt(v.tps)), h("small", {}, " tok/s")), v.points.length > 1 ? sparkline(v.points, 110, 28, colorOf(v.name)) : null),
+        h("span", { class: "foot" }, h("span", { class: "mono" }, v.note || v.repo), v.vramGb === null ? null : h("span", { class: "mono" }, `${v.vramGb} GB`)));
+      markSel(card);
+    }
+    function makeMrow(v) {
+      const btn = h("button", { class: "mrow", type: "button", "data-id": v.name, onClick: (e) => { e.stopPropagation(); openModel(v.name); } });
+      btn._sel = "on";
+      return btn;
+    }
+    function updateMrow(btn, v) {
+      btn.style.setProperty("--mc", colorOf(v.name));
+      btn.replaceChildren(mdot(v.name), h("span", { class: "mrow-main" }, h("span", { class: "nm trunc" }, v.name),
+        h("span", { class: "sub" }, stateEl(v), v.access === "secure" ? h("span", { class: "acc secure" }, icon("lock", 11, "currentColor", 2), "Secure") : null)),
+        h("span", { class: "tp mono" }, v.tps === null ? "—" : fmt(v.tps), h("small", {}, v.tps === null ? "" : "tok/s")));
+      markSel(btn);
+    }
+    function makeDot(v) {
+      const dot = h("button", { class: "rdot", type: "button", "data-id": v.name, onClick: (e) => { e.stopPropagation(); openModel(v.name); } }, h("i", {}));
+      dot._sel = "on";
+      return dot;
+    }
+    function updateDot(dot, v) {
+      dot.title = `${v.name} · ${v.stateLabel}`;
+      dot.setAttribute("aria-label", dot.title);
+      dot.firstChild.style.setProperty("--c", colorOf(v.name));
+      markSel(dot);
+    }
+
+    // -- skeletons: built once per shape -----------------------------------------------------------
+    function buildContent(host) {  // the list or the card grid; rebuilt when the choice changes
+      refs.rows = new Map();
+      if (view === "list") {
+        const tbody = h("tbody", {});
+        refs.rowsParent = tbody; refs.make = makeRow; refs.update = updateRow;
+        host.replaceChildren(h("div", { class: "table tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Model", "State", "Access", "Tokens/s", "First token", "Req · 5 min", "VRAM", "Architecture"].map((t) => h("th", {}, t)))), tbody)));
+      } else {
+        const grid = h("div", { class: "grid" }, h("button", { class: "card add", type: "button", onClick: openAdd }, icon("plus", 18, "currentColor", 2), h("span", {}, "Add a model"), h("span", { class: "mono small" }, "mxc serve <model>")));
+        refs.rowsParent = grid; refs.make = makeCard; refs.update = updateCard;
+        host.replaceChildren(grid);
+      }
+    }
+    function buildFull() {
+      const input = h("input", { placeholder: "Filter models", "aria-label": "Filter models", value: query, onInput: (e) => { query = e.target.value; draw(); } });
+      const seg = (id, label, ic) => h("button", { type: "button", "data-view": id, onClick: () => { view = id; writeView(storage, id); buildContent(refs.content); draw(); } }, icon(ic, 14), label);
+      refs = { kpis: h("div", { class: "kpis-host" }), callouts: h("div", {}), stale: h("div", { class: "stale mono", role: "status", hidden: true }, "daemon not answering: showing the last numbers"),
+        empty: h("div", {}), content: h("div", {}), input, segs: h("div", { class: "seg", role: "group", "aria-label": "View" }, seg("list", "List", "list"), seg("cards", "Cards", "layout-grid")) };
+      crashSig = "";
+      buildContent(refs.content);
+      body.replaceChildren(h("div", { class: "hbody" }, refs.stale, refs.kpis, refs.callouts, h("div", { class: "homebar" }, h("label", { class: "filter" }, icon("search", 14), input), h("span", { class: "grow" }), refs.segs), refs.empty, refs.content));
+    }
+    function buildCompact(kind) {
+      const parent = h("div", { class: kind === "side" ? "compact" : "rdots" });
+      refs = { rows: new Map(), rowsParent: parent, make: kind === "side" ? makeMrow : makeDot, update: kind === "side" ? updateMrow : updateDot };
+      parent.append(kind === "side"
+        ? h("button", { class: "addrow", type: "button", onClick: openAdd }, icon("plus", 14, "currentColor", 2), "Add a model")
+        : h("button", { class: "rdot plus", type: "button", title: "Add a model", "aria-label": "Add a model", onClick: (e) => { e.stopPropagation(); openAdd(); } }, icon("plus", 14, "currentColor", 2)));
+      body.replaceChildren(parent);
+    }
     function downPanel() {
       return h("div", { class: "hbody" }, h("div", { class: "notice down", role: "alert" },
         h("div", { class: "lab mono" }, icon("triangle-alert", 14), "the daemon is not answering"),
@@ -105,7 +206,9 @@ register("home", (blade) => ({
         h("div", { class: "cmd-row" }, h("code", { class: "mono cmd" }, "mxc daemon"), copyButton(() => "mxc daemon", "Copy", "btn ghost sm"),
           h("button", { class: "btn dark sm", type: "button", onClick: () => refresh() }, icon("refresh-cw", 13), "Try again"))));
     }
+    const setShape = (next, build) => { if (shape !== next) { shape = next; build(); } };
 
+    // -- the parts that change every poll ----------------------------------------------------------
     function kpis(views) {
       const running = views.filter((v) => v.stateKey === "running");
       const tps = running.reduce((a, v) => a + (v.tps || 0), 0);
@@ -113,98 +216,63 @@ register("home", (blade) => ({
       const counts = [["starting", views.filter((v) => v.stateKey === "starting").length], ["idle", views.filter((v) => v.stateKey === "idle").length], ["crashed", views.filter((v) => v.crashed).length]]
         .filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(" · ") || "all running";
       const tile = (label, value, unit, sub, extra) => h("div", { class: "kpi" }, h("div", { class: "lbl mono" }, label), h("div", { class: "v mono" }, value, unit ? h("small", {}, ` ${unit}`) : null), sub ? h("div", { class: "sub" }, sub) : null, extra);
-      return h("div", { class: "kpis" },
+      refs.kpis.replaceChildren(h("div", { class: "kpis" },
         tile("Serving", String(running.length), `of ${views.length} models`, counts),
         tile("Throughput now", fmt(tps), "tok/s", `across ${running.length} running model${running.length === 1 ? "" : "s"}`),
         tile("Requests · 5 min", fmt(store.metrics ? store.metrics.requests : null), "", store.info && store.info.lan_endpoint ? "secured for your LAN" : "localhost only"),
         tile("GPU memory", hw.present ? hw.label.split("/")[0] : "—", hw.present ? `/ ${hw.totalGb} GB` : "no GPU found", null,
-          hw.present ? h("div", { class: "vbar" }, hw.segments.map((seg) => h("span", { title: `${seg.name} · ${seg.gb} GB`, style: { width: `${seg.pct}%`, background: seg.name === "other" || seg.name === "in use" ? "var(--faint)" : colorOf(seg.name) } }))) : null));
+          hw.present ? h("div", { class: "vbar" }, hw.segments.map((seg) => h("span", { title: `${seg.name} · ${seg.gb} GB`, style: { width: `${seg.pct}%`, background: seg.name === "other" || seg.name === "in use" ? "var(--faint)" : colorOf(seg.name) } }))) : null)));
     }
-
-    function crashCallouts(views) {
-      return views.filter((v) => v.crashed).map((v) => h("div", { class: "attn", role: "alert" },
+    function callouts(views) {
+      const crashed = views.filter((v) => v.crashed);
+      const sig = crashed.map((v) => v.name).join("|");
+      if (sig === crashSig) return;  // its buttons are focusable: rebuild only when the crashed set changes
+      crashSig = sig;
+      refs.callouts.replaceChildren(...crashed.map((v) => h("div", { class: "attn", role: "alert" },
         icon("triangle-alert", 16), h("span", {}, h("b", { class: "mono" }, v.name), " crashed. Its log says why."), h("span", { class: "grow" }),
         h("button", { class: "btn ghost sm", type: "button", onClick: () => viewLogs(v.name) }, icon("scroll-text", 13), "View logs"),
-        h("button", { class: "btn dark sm", type: "button", onClick: () => restart(v.name) }, icon("refresh-cw", 13), "Restart")));
+        h("button", { class: "btn dark sm", type: "button", onClick: () => restart(v.name) }, icon("refresh-cw", 13), "Restart"))));
     }
-
-    function listTable(views) {
-      const head = ["Model", "State", "Access", "Tokens/s", "First token", "Req · 5 min", "VRAM", "Architecture"];
-      return h("div", { class: "table tablewrap" }, h("table", {},
-        h("thead", {}, h("tr", {}, head.map((t) => h("th", {}, t)))),
-        h("tbody", {}, views.map((v) => h("tr", { class: `row ${v.name === selected() ? "on" : ""}`, tabindex: "0", "data-id": v.name, onClick: () => openModel(v.name),
-          onKeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openModel(v.name); } } },
-          h("td", { class: "nm" }, h("span", { class: "nmrow" }, mdot(v.name), h("span", { class: "trunc" }, v.name)), h("span", { class: "rep" }, v.repo)),
-          h("td", {}, stateEl(v), v.note ? h("span", { class: "rep" }, v.note) : null),
-          h("td", {}, accessEl(v)),
-          h("td", { class: "num" }, h("span", { class: "tpsrow" }, h("span", { class: "tpsn" }, v.tps === null ? "—" : fmt(v.tps)), v.points.length > 1 ? sparkline(v.points, 64, 18, colorOf(v.name)) : null)),
-          h("td", { class: "num" }, v.ttft === null || v.ttft === undefined ? "—" : `${fmt(v.ttft)} ms`),
-          h("td", { class: "num" }, v.stateKey === "running" ? fmt(v.requests) : "—"),
-          h("td", { class: "num" }, v.vramGb === null ? "—" : `${v.vramGb} GB`),
-          h("td", { class: "num muted" }, v.arch))))));
-    }
-
-    function cardGrid(views) {
-      return h("div", { class: "grid" },
-        views.map((v) => h("div", { class: `card ${v.name === selected() ? "sel" : ""}`, role: "button", tabindex: "0", "data-id": v.name, style: { "--mc": colorOf(v.name) }, "aria-label": `${v.name}, ${v.stateLabel}`,
-          onClick: () => openModel(v.name), onKeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openModel(v.name); } } },
-          h("div", { class: "r" }, mdot(v.name), h("span", { class: "nm" }, v.name), stateEl(v)),
-          h("div", { class: "r" }, accessEl(v), h("span", { class: "ep" }, shortEndpoint(v.endpoint))),
-          v.crashed ? h("div", { class: "crashnote" }, "crashed · open it for the log")
-            : h("div", { class: "tps" }, h("div", { class: "n" }, h("span", {}, v.tps === null ? "—" : fmt(v.tps)), h("small", {}, " tok/s")), v.points.length > 1 ? sparkline(v.points, 110, 28, colorOf(v.name)) : null),
-          h("div", { class: "foot" }, h("span", { class: "mono" }, v.note || v.repo), v.vramGb === null ? null : h("span", { class: "mono" }, `${v.vramGb} GB`)))),
-        h("button", { class: "card add", type: "button", onClick: openAdd }, icon("plus", 18, "currentColor", 2), h("span", {}, "Add a model"), h("span", { class: "mono small" }, "mxc serve <model>")));
-    }
-
-    function emptyPanel() {
-      return h("div", { class: "empty-state" }, h("h4", {}, "No models yet"), h("p", {}, "Add one: search the MAX catalog or Hugging Face, and it is serving on localhost in a few steps."),
+    function emptyNote(views, shown) {
+      let note = null;
+      if (views.length === 0) note = h("div", { class: "empty-state" }, h("h4", {}, "No models yet"), h("p", {}, "Add one: search the MAX catalog or Hugging Face, and it is serving on localhost in a few steps."),
         h("div", { class: "cmd-row" }, addButton(false), cliHint("mxc serve qwen2.5-0.5b")));
-    }
-
-    function fullBody(views) {
-      const input = h("input", { placeholder: "Filter models", "aria-label": "Filter models", value: query, onInput: (e) => { query = e.target.value; draw(); } });
-      const seg = (id, label, ic) => h("button", { type: "button", class: view === id ? "on" : "", "aria-pressed": String(view === id),
-        onClick: () => { view = id; writeView(localStorage, id); draw(); } }, icon(ic, 14), label);
-      const shown = filterModels(store.models, query).map((m) => views.find((v) => v.name === m.name));
-      return h("div", { class: "hbody" }, kpis(views), crashCallouts(views),
-        h("div", { class: "homebar" }, h("label", { class: "filter" }, icon("search", 14), input), h("span", { class: "grow" }),
-          h("div", { class: "seg", role: "group", "aria-label": "View" }, seg("list", "List", "list"), seg("cards", "Cards", "layout-grid"))),
-        views.length === 0 ? emptyPanel() : shown.length === 0 ? h("div", { class: "empty" }, `No model matches "${query}".`) : view === "list" ? listTable(shown) : cardGrid(shown));
-    }
-
-    function sideBody(views) {
-      return h("div", { class: "compact" }, views.map((v) => modelButton(`mrow ${v.name === selected() ? "on" : ""}`, v.name,
-        mdot(v.name), h("span", { class: "mrow-main" }, h("span", { class: "nm trunc" }, v.name), h("span", { class: "sub" }, stateEl(v), v.access === "secure" ? h("span", { class: "acc secure" }, icon("lock", 11, "currentColor", 2), "Secure") : null)),
-        h("span", { class: "tp mono" }, v.tps === null ? "—" : fmt(v.tps), h("small", {}, v.tps === null ? "" : "tok/s")))),
-      h("button", { class: "addrow", type: "button", onClick: openAdd }, icon("plus", 14, "currentColor", 2), "Add a model"));
-    }
-
-    function railBody(views) {
-      return h("div", { class: "rdots" }, views.map((v) => modelButton(`rdot ${v.name === selected() ? "on" : ""}`, v.name, h("i", { style: { "--c": colorOf(v.name) } }))),
-        h("button", { class: "rdot plus", type: "button", title: "Add a model", "aria-label": "Add a model", onClick: (e) => { e.stopPropagation(); openAdd(); } }, icon("plus", 14, "currentColor", 2)));
+      else if (shown.length === 0) note = h("div", { class: "empty" }, `No model matches "${query}".`);
+      const sig = views.length === 0 ? "none" : shown.length === 0 ? `nomatch:${query}` : "";
+      if (refs.emptySig !== sig) { refs.emptySig = sig; refs.empty.replaceChildren(...(note ? [note] : [])); }
+      refs.content.hidden = !!note;
     }
 
     function draw() {
       if (!blade.alive) return;
       const mode = blade.mode || "full";
-      const refocus = document.activeElement && document.activeElement.matches && document.activeElement.matches(".b-home .filter input");
-      if (store.error && !store.models) { heading([], mode); body.replaceChildren(mode === "full" ? downPanel() : h("div", { class: "empty" }, "Daemon not answering")); return; }
-      if (store.models === null) { heading([], mode); body.replaceChildren(h("div", { class: "empty" }, "Loading…")); return; }
-      const ctx = ctxNow();
-      const views = rows().map((m) => modelView(m, ctx));
-      heading(views, mode);
-      const next = mode === "rail" ? railBody(views) : mode === "full" || mode === "narrow" ? fullBody(views) : sideBody(views);
-      body.replaceChildren(store.error && mode === "full" ? h("div", { class: "stale mono", role: "status" }, "daemon not answering: showing the last numbers", next) : next);
-      if (refocus) {
-        const input = body.querySelector(".filter input");
-        if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+      const wide = mode === "full" || mode === "narrow";
+      if (store.error && !store.models) {
+        heading([], mode);
+        setShape(`down|${wide}`, () => body.replaceChildren(wide ? downPanel() : h("div", { class: "empty" }, "Daemon not answering")));
+        return;
       }
+      if (store.models === null) { heading([], mode); setShape("loading", () => body.replaceChildren(h("div", { class: "empty" }, "Loading…"))); return; }
+      const ctx = ctxNow();
+      const views = store.models.map((m) => modelView(m, ctx));
+      heading(views, mode);
+      setShape(wide ? "full" : mode, () => (wide ? buildFull() : buildCompact(mode === "rail" ? "rail" : "side")));
+      let shown = views;
+      if (wide) {
+        const keep = new Set(filterModels(store.models, query).map((m) => m.name));
+        shown = views.filter((v) => keep.has(v.name));
+        kpis(views);
+        callouts(views);
+        refs.stale.hidden = !store.error;
+        refs.segs.querySelectorAll("button").forEach((b) => { b.classList.toggle("on", b.dataset.view === view); b.setAttribute("aria-pressed", String(b.dataset.view === view)); });
+        emptyNote(views, shown);
+      }
+      syncKeyed(refs.rowsParent, refs.rows, shown, refs.make, refs.update);
     }
     blade.redraw = draw;
     blade.onMode = draw;
-    blade.sync = () => body.querySelectorAll("[data-id]").forEach((el) => el.classList.toggle(el.matches("tr") ? "on" : el.matches(".card") ? "sel" : "on", el.dataset.id === selected()));
-    const off = onData(draw);
-    blade.onClose = off;
+    blade.sync = () => { if (refs && refs.rows) refs.rows.forEach(markSel); };
+    blade.onClose = onData(draw);
     draw();
   },
 }));

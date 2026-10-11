@@ -7,7 +7,7 @@
 
 :root {
   /* chrome (the top bar) */
-  --chrome: #1f1f23; --chrome-line: #36363c; --chrome-text: #ededef; --chrome-muted: #a1a1aa; --chrome-hover: #2c2c31; --chrome-on: #34343b;
+  --chrome: #1f1f23; --chrome-line: #36363c; --chrome-text: #ededef; --chrome-muted: #a1a1aa; --chrome-hover: #2c2c31; --chrome-on: #34343b; --chrome-line-2: #55555c; --chrome-track: #3a3a40;
   /* surfaces and text */
   --canvas: #f5f5f7; --card: #fff; --card-line: #e4e4e7; --card-line-2: #f1f1f3; --sunk: #f4f4f5; --hover: #fafafa; --hover-2: #f0f0f2; --sel: #eef5fc;
   --text: #0a0a0b; --text-2: #3f3f46; --muted: #71717a; --faint: #a1a1aa; --inv: #0a0a0b; --inv-text: #fff;

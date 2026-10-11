@@ -34,7 +34,7 @@ CONSOLE_SCRIPTS = {"page-bench.js", "theme.js", "main.js", "core.js", "icons.js"
                    "page-network.js", "page-activity.js", "page-ports.js", "page-logs.js", "page-gateway.js",
                    "page-daemon.js", "page-pull.js",
                    # the blades console (F-023): engine, shell and one file per blade, each with its own CSS
-                   "blades.js", "blade-layout.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "blade-home.js",
+                   "blades.js", "blade-layout.js", "blade-stack.js", "keyed.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "blade-home.js",
                    "blade-model.js", "blade-add.js", "blade-security.js", "blade-keys.js", "blade-bench.js", "blade-logs.js",
                    "blade-notebook.js", "blade-gateway.js", "blade-settings.js"}
 CONSOLE_STYLES = {"console.css", "blades.css", "topbar.css", "blade-home.css", "blade-model.css", "blade-add.css",

@@ -10,7 +10,7 @@ from test_gateway import http, key, store, sup  # noqa: F401  (shared fixtures)
 from mxconsole.gateway import CONSOLE_ASSETS, CONSOLE_DIR
 
 STUBS = ["model", "add", "security", "keys", "bench", "logs", "notebook", "gateway", "settings"]
-NEW_JS = ["blades.js", "blade-layout.js", "prefs.js", "hardware.js", "topbar.js", "blade-home.js", *[f"blade-{n}.js" for n in STUBS]]
+NEW_JS = ["blades.js", "blade-layout.js", "blade-stack.js", "keyed.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "blade-home.js", *[f"blade-{n}.js" for n in STUBS]]
 NEW_CSS = ["blades.css", "topbar.css", "blade-home.css", *[f"blade-{n}.css" for n in STUBS]]
 needs_node = pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
 
@@ -122,13 +122,6 @@ def test_on_a_phone_only_the_newest_blade_shows():
     assert plan(specs, 800) == ["hidden", "full"]
     assert plan("[{side:300,min:0}]", 390) == ["full"]
     assert node("m.planLayout([], 1200)", "blade-layout.js") == []
-
-
-@needs_node
-def test_closing_back_to_a_blade_keeps_it_and_drops_the_rest():
-    assert node("m.keepFirst(['a','b','c'], 2)", "blade-layout.js") == ["a", "b"]
-    assert node("m.keepFirst(['a','b','c'], 0)", "blade-layout.js") == ["a"]  # the home blade never closes
-    assert node("m.keepFirst(['a'], 5)", "blade-layout.js") == ["a"]
 
 
 # -- preferences --------------------------------------------------------------------------------

@@ -7,14 +7,14 @@
 .brand small { font-size: 11px; font-weight: 400; color: var(--chrome-muted); margin-left: 2px; }
 .bc { display: flex; align-items: center; gap: 1px; min-width: 0; flex: 1; overflow: hidden; font-size: 13px; padding-left: 12px; border-left: 1px solid var(--chrome-line); height: 24px; }
 .bc button { background: none; border: 0; color: var(--chrome-muted); padding: 4px 7px; border-radius: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-.bc button:hover { background: var(--chrome-hover); color: #fff; }
+.bc button:hover { background: var(--chrome-hover); color: var(--chrome-text); }
 .bc button.cur { color: var(--chrome-text); font-weight: 500; cursor: default; background: none; }
 .bc svg { width: 12px; height: 12px; opacity: .45; flex: none; }
 
 .hwchip { display: flex; align-items: center; gap: 8px; background: var(--chrome-on); border: 1px solid var(--chrome-line); border-radius: 7px; padding: 5px 9px; font: 12px var(--mono); color: var(--chrome-muted); flex: none; white-space: nowrap; }
-.hwchip:hover, .hwchip[aria-expanded="true"] { border-color: #55555c; color: var(--chrome-text); }
+.hwchip:hover, .hwchip[aria-expanded="true"] { border-color: var(--chrome-line-2); color: var(--chrome-text); }
 .hwchip b { color: var(--chrome-text); font-weight: 500; }
-.hwchip .vbar { width: 64px; height: 6px; background: #3a3a40; }
+.hwchip .vbar { width: 64px; height: 6px; background: var(--chrome-track); }
 
 .tnav { display: flex; align-items: center; gap: 2px; flex: none; }
 .tn { display: flex; align-items: center; gap: 7px; background: none; border: 0; color: var(--chrome-muted); padding: 7px 10px; border-radius: 7px; font-size: 13px; font-weight: 500; white-space: nowrap; }
@@ -46,4 +46,4 @@
   .brand small, .hwchip .vbar { display: none; }
   .hwpop { right: 10px; }
 }
-@media (max-width: 520px) { .bc { display: none; } .top { gap: 6px; } .tnav .tn[data-nav="gateway"], .tnav .tn[data-nav="keys"] { display: none; } .bc + .hwchip { margin-left: auto; } }
+@media (max-width: 520px) { .bc { display: none; } .top { gap: 4px; } .brand { margin-right: auto; } .hwchip b { display: none; } }

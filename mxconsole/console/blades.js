@@ -1,24 +1,40 @@
 // mxconsole, the blade engine: blades dock side by side, the newest on the right; older ones fold into
-// clickable rails; the breadcrumb and Esc close back. The layout math is pure, in blade-layout.js.
+// clickable rails; the breadcrumb and Esc close back. The layout math is pure, in blade-layout.js; the
+// stack rules (open, close, Esc) are pure too, in blade-stack.js.
 //
-// BLADE CONTRACT (what a later ticket's blade-*.js follows):
+// BLADE CONTRACT (what a later ticket's blade follows)
 //
-//   import { register } from "./blades.js";
-//   register("keys", (blade) => ({
-//     title: "API keys",              // string or Node; the header's big text
-//     crumb: "API keys",              // the breadcrumb label (defaults to title when that is a string)
-//     sub: "one line under the title",// string or Node, optional
-//     icon: "key-round", hue: "var(--hue-keys)",     // header icon in its section hue
-//     side: 600, narrow: 0, min: 520, wide: false,   // widths in px; wide:true folds everything to its left
-//     tools: [node, ...],             // header buttons, optional
-//     mount(body, blade) { ... },     // fill `body` (a Node tree built with h()/s(); text as text nodes)
-//   }));
+//   1. A blade lives in exactly one JS file and one CSS file: blade-<name>.js and blade-<name>.css (both already
+//      exist as stubs, linked from index.html and allowlisted in gateway.py). Do not add other files: every new
+//      file needs an allowlist edit in gateway.py, which is how parallel tickets collide.
 //
-//   `blade.opts` is what push() was given. `blade.alive` turns false when the blade closes. Optional hooks the
-//   factory may set on `blade`: onClose(), onMode(mode) ("full"|"side"|"narrow"|"rail"), redraw(), sync().
-//   Open one with push("name", opts, atIndex); close back to n blades with truncate(n).
+//   2. Register it by name in that file:
+//
+//        import { register } from "./blades.js";
+//        register("keys", (blade) => ({
+//          title: "API keys",              // string or Node; the header's big text
+//          crumb: "API keys",              // breadcrumb label (defaults to title when that is a string)
+//          sub: "one line under the title",// string or Node, optional
+//          icon: "key-round", hue: "var(--hue-keys)",     // header icon (icons.js) in its section hue
+//          side: 600, narrow: 0, min: 520, wide: false,   // widths in px; wide:true folds everything to its left
+//          tools: [node, ...],             // header buttons, optional
+//          mount(body, blade) { ... },     // fill `body` with a Node tree built by h()/s(); data as text nodes
+//        }));
+//
+//   3. `blade.opts` is what push() was given. `blade.alive` turns false once the blade closes.
+//
+//   4. A blade opens a child next to itself with  push(name, opts, stack.indexOf(blade))  (everything right of it
+//      closes first). push(name, opts, 0) opens next to My models. truncate(n) keeps the first n blades.
+//
+//   5. Everything started in mount (onData subscriptions, intervals, timeouts, fetch loops, AbortControllers,
+//      document listeners) must be torn down in blade.onClose. onData() returns its unsubscribe function:
+//          const off = onData(draw);  blade.onClose = off;
+//      The engine calls onClose exactly once, newest blade first, and survives one that throws.
+//
+//   6. Optional hooks set on `blade`: onClose(), onMode(mode) ("full"|"side"|"narrow"|"rail"|"hidden"), redraw(), sync().
 import { h, icon, reducedMotion } from "./core.js";
 import { planLayout } from "./blade-layout.js";
+import { closeFrom, openAt, escapeTarget } from "./blade-stack.js";
 
 const factories = new Map();
 export const stack = [];
@@ -50,10 +66,11 @@ export function mountJourney(el) {
   if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => layout()).observe(el);
   window.addEventListener("resize", layout);
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape" || e.defaultPrevented || stack.length < 2) return;
-    if (document.querySelector("dialog[open]")) return;
+    if (e.key !== "Escape" || e.defaultPrevented) return;
+    const to = escapeTarget(stack.length);
+    if (to === null || document.querySelector("dialog[open]")) return;
     e.preventDefault();
-    truncate(stack.length - 1);
+    truncate(to);
   });
 }
 
@@ -61,7 +78,6 @@ export function mountJourney(el) {
 export function push(name, opts = {}, at = stack.length - 1) {
   const factory = factories.get(name);
   if (!factory) throw new Error(`no blade registered as "${name}"`);
-  closeFrom(at + 1);
   const blade = { name, opts, alive: true, mode: null, railAt: 0 };
   const def = factory(blade);
   Object.assign(blade, { crumb: crumbOf(def), wide: !!def.wide, side: def.side || 600, narrow: def.narrow || 0, min: def.min ?? 520 });
@@ -74,19 +90,22 @@ export function push(name, opts = {}, at = stack.length - 1) {
   Object.assign(blade, { el, body, titleEl, subEl, toolsEl, header });
   setText(titleEl, def.title);
   setText(subEl, def.sub);
+  const back = () => { const i = stack.indexOf(blade); if (i < stack.length - 1) truncate(i + 1); };
   if (closeBtn) closeBtn.addEventListener("click", (e) => { e.stopPropagation(); truncate(stack.indexOf(blade)); });
   // like Azure: the header of a blade that has others to its right closes those; a rail brings its blade back
   header.addEventListener("click", (e) => {
     if (e.target.closest("button") || e.timeStamp <= blade.railAt) return;
-    const i = stack.indexOf(blade);
-    if (i < stack.length - 1) truncate(i + 1);
+    back();
+  });
+  header.addEventListener("keydown", (e) => {
+    if (e.target === header && (e.key === "Enter" || e.key === " ") && blade.mode === "rail") { e.preventDefault(); back(); }
   });
   el.addEventListener("click", (e) => {
     if (!el.classList.contains("rail") || e.timeStamp <= blade.railAt || e.target.closest("[data-id],[data-act]")) return;
-    truncate(stack.indexOf(blade) + 1);
+    back();
   });
   el.addEventListener("animationend", () => el.classList.remove("enter"), { once: true });
-  stack.push(blade);
+  openAt(stack, blade, at, (gone) => gone.el.remove());
   journey.append(el);
   if (def.mount) def.mount(body, blade);
   layout();
@@ -104,17 +123,9 @@ export function setHead(blade, { title, sub, crumb } = {}) {
   notify();
 }
 
-function closeFrom(n) {
-  const gone = stack.splice(Math.max(1, n));
-  for (const blade of gone.reverse()) {
-    blade.alive = false;
-    if (blade.onClose) blade.onClose();
-    blade.el.remove();
-  }
-}
 /** Keep the first n blades (the home blade always stays) and close the rest. */
 export function truncate(n) {
-  closeFrom(n);
+  closeFrom(stack, n, (gone) => gone.el.remove());
   layout();
 }
 
@@ -135,7 +146,10 @@ export function layout() {
       : mode === "side" ? { width: `${blade.side}px`, minWidth: `${blade.side}px`, flex: "none" }
       : { width: "auto", minWidth: `${modes.includes("hidden") ? 0 : blade.min}px`, flex: "1 1 0" };
     Object.assign(el.style, size);
-    el.firstChild.title = mode === "rail" ? `Back to ${blade.crumb}` : mode === "side" || mode === "narrow" ? "Close what's open to the right" : "";
+    // a folded blade is a button: focusable, and Enter brings it back
+    if (mode === "rail") { blade.header.setAttribute("tabindex", "0"); blade.header.setAttribute("role", "button"); blade.header.setAttribute("aria-label", `Back to ${blade.crumb}`); }
+    else { blade.header.removeAttribute("tabindex"); blade.header.removeAttribute("role"); blade.header.removeAttribute("aria-label"); }
+    blade.header.title = mode === "rail" ? `Back to ${blade.crumb}` : mode === "side" || mode === "narrow" ? "Close what's open to the right" : "";
     if (prev !== mode && mode === "rail") blade.railAt = performance.now();
     if (prev !== mode && blade.onMode) blade.onMode(mode);
     if (blade.sync) blade.sync();

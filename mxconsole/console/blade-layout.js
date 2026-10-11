@@ -20,8 +20,3 @@ export function planLayout(specs, width, phone = PHONE_W) {
   if (need() > width) modes.forEach((mode, i) => { if (mode === "side" || mode === "narrow") modes[i] = "rail"; });
   return modes;
 }
-
-/** The first n items; the home blade (the first one) never closes. */
-export function keepFirst(items, n) {
-  return items.slice(0, Math.max(1, n));
-}

@@ -2,6 +2,11 @@
 export const VIEW_KEY = "mxc-view";
 export const THEME_KEY = "mxc-theme";
 
+/** window.localStorage, or null when storage is blocked (reading it can throw): every caller must accept null. */
+export function safeStorage() {
+  try { return window.localStorage || null; } catch (_) { return null; }
+}
+
 function read(storage, key) {
   try { return storage.getItem(key); } catch (_) { return null; }
 }

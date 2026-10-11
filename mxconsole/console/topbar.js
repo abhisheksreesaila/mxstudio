@@ -4,7 +4,7 @@ import { h, icon, store, onData, colorOf } from "./core.js";
 import { stack, push, truncate, onStackChange, hueSquare } from "./blades.js";
 import { hardwareView } from "./hardware.js";
 import { system } from "./system-data.js";
-import { readTheme, writeTheme, resolveTheme, nextTheme } from "./prefs.js";
+import { readTheme, writeTheme, resolveTheme, nextTheme, safeStorage } from "./prefs.js";
 
 const SHARED = [["keys", "API keys", "key-round", "var(--hue-keys)"], ["gateway", "Gateway", "route", "var(--hue-gateway)"], ["settings", "Settings", "sliders-horizontal", null]];
 
@@ -15,7 +15,7 @@ export function applyTheme(pref) {
 
 export function mountTopbar(bar, pop) {
   const sysDark = window.matchMedia("(prefers-color-scheme: dark)");
-  let pref = readTheme(localStorage), popOpen = false;
+  let pref = readTheme(safeStorage()), popOpen = false;
   applyTheme(pref);
 
   const brand = h("button", { class: "brand", type: "button", title: "My models", onClick: () => truncate(1) }, h("span", { class: "dot" }), "mxconsole", h("small", { class: "mono" }, "local"));
@@ -24,7 +24,7 @@ export function mountTopbar(bar, pop) {
   const nav = h("nav", { class: "tnav", "aria-label": "Shared by every model" }, SHARED.map(([name, label, ic, hue]) =>
     h("button", { class: `tn ${hue ? "" : "icon"}`, type: "button", "data-nav": name, title: label, "aria-label": label, style: hue ? { "--hue": hue } : {},
       onClick: () => { if (stack[1] && stack[1].name === name) truncate(2); else push(name, {}, 0); } }, icon(ic, 16, "currentColor", 1.75), hue ? h("span", {}, label) : null)));
-  const themeBtn = h("button", { class: "tn icon", type: "button", onClick: () => { pref = nextTheme(isDark() ? "dark" : "light"); writeTheme(localStorage, pref); applyTheme(pref); paintTheme(); } });
+  const themeBtn = h("button", { class: "tn icon", type: "button", onClick: () => { pref = nextTheme(isDark() ? "dark" : "light"); writeTheme(safeStorage(), pref); applyTheme(pref); paintTheme(); } });
   const live = h("span", { class: "live" });
   bar.replaceChildren(brand, crumbs, chip, nav, themeBtn, live);
 
@@ -43,7 +43,7 @@ export function mountTopbar(bar, pop) {
     const n = stack.length;
     crumbs.replaceChildren(...stack.flatMap((b, i) => [
       i ? icon("chevron-right", 12, "currentColor", 2) : null,
-      h("button", { type: "button", class: `${i === n - 1 ? "cur" : ""} ${i < n - 2 ? "far" : ""}`, onClick: () => { if (i !== n - 1) truncate(i + 1); } }, b.crumb || b.name),
+      h("button", { type: "button", class: `${i === n - 1 ? "cur" : ""} ${i < n - 2 ? "far" : ""}`, "aria-current": i === n - 1 ? "page" : false, onClick: () => { if (i !== n - 1) truncate(i + 1); } }, b.crumb || b.name),
     ]).filter(Boolean));
     nav.querySelectorAll(".tn[data-nav]").forEach((t) => t.classList.toggle("on", !!stack[1] && stack[1].name === t.dataset.nav));
   }

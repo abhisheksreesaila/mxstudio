@@ -30,7 +30,9 @@
 .table tr.row:last-child td { border-bottom: 0; }
 .table td.nm { font: 600 13px var(--mono); }
 .table .num { font: 12.5px var(--mono); }
-.nmrow { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
+.namebtn { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; }
+.crashnote { display: block; }
+.card .foot, .card .tps { display: flex; }
 .rep { display: block; font: 11.5px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; font-weight: 400; }
 .tpsrow { display: inline-flex; align-items: center; gap: 8px; }
 .tpsn { min-width: 3ch; }
