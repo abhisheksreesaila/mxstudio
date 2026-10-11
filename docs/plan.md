@@ -203,12 +203,14 @@ Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
 - [ ] Notebook (wide): chapters, the generated notebook's markdown and code cells read-only with saved outputs, architecture panel, kernel chip, "Open in Jupyter" (`/admin/learn/{name}/open`)
 - [ ] Gateway: LiteLLM routes (model → upstream), status, restart; Settings: theme, idle unload default, daemon info
 
-## F-029 Automatic port for unsupported architectures [todo]
+## F-029 Automatic port for unsupported architectures [done]
 Brief: docs/briefs/console-1.0.md · Needs: none (UI hook in F-026)
-- [ ] `mxc port <ref> --auto` runs Modular's `import-model` skill unattended with Claude Code (`claude -p`) in the port workspace, as a background job with stages (workspace, skills, generate, build, parity check, register) and a full log
-- [ ] a failing stage is retried with the error fed back (auto-fix, bounded attempts); on success the model is registered and served like any other; on failure the log says what it tried
-- [ ] `POST /admin/ports`, `GET /admin/ports/{id}`, cancel; `--json` progress lines
-- [ ] tested with a fake `claude` binary; nothing real runs in tests
+- [x] `mxc port <ref> --auto` runs Modular's `import-model` skill unattended with Claude Code (`claude -p`) in the port workspace, as a background job with stages (workspace, skills, generate, build, parity check, register) and a full log
+- [x] a failing stage is retried with the error fed back (auto-fix, bounded attempts); on success the model is registered and served like any other; on failure the log says what it tried
+- [x] `POST /admin/ports`, `GET /admin/ports/{id}`, cancel; `--json` progress lines
+- [x] tested with a fake `claude` binary; nothing real runs in tests
+- Runs under bubblewrap (private caches, read-only skills clone, scrubbed env, Claude login bound in); refuses without bwrap unless `--unsandboxed`. Accepted risks in port_auto.py's docstring.
+- Not yet proven: one real `mxc port <ref> --auto` end to end (uses Claude Code and can take hours; waiting for the person's go).
 
 ## F-030 Desktop app for Linux and Mac [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023

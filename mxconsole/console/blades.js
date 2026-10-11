@@ -53,7 +53,8 @@ export function onStackChange(fn) {
 }
 const notify = () => listeners.forEach((fn) => fn(stack));
 
-const asNodes = (v) => (v instanceof Node ? [v] : v === undefined || v === null ? [] : [String(v)]);
+/** One Node, a (nested) list of Nodes, a string, or nothing → a list for replaceChildren. */
+export const asNodes = (v) => (Array.isArray(v) ? v.flatMap(asNodes) : v instanceof Node ? [v] : v === undefined || v === null ? [] : [String(v)]);
 const crumbOf = (def) => String(def.crumb ?? (typeof def.title === "string" ? def.title : "")) || "";
 
 /** The little square with an outline icon in the blade's hue (also used by stubs and the hardware popover). */

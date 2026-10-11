@@ -137,3 +137,20 @@ def test_the_contract_in_blades_js_names_the_rules_later_blades_must_follow():
     for phrase in ("exactly one JS file and one CSS file", "stack.indexOf(blade)", "onClose", "onData"):
         assert phrase in doc, phrase
     assert "onClose" in (CONSOLE_DIR / "blade-logs.js").read_text()  # the stub shows the pattern
+
+
+def test_header_tools_accept_one_node_a_list_of_nodes_or_nothing():
+    """The contract says `tools: [node, ...]`; a list must not render as "[object HTMLButtonElement]"."""
+    import subprocess, json as _json
+    from mxconsole.gateway import CONSOLE_DIR
+    script = f"""
+      globalThis.Node = class {{}};
+      const m = await import({_json.dumps((CONSOLE_DIR / "blades.js").as_uri())});
+      const a = new Node(), b = new Node();
+      const r = [m.asNodes(a).length, m.asNodes([a, null, [b]]).length, m.asNodes(undefined).length,
+                 m.asNodes([a, b]).every(x => x instanceof Node), m.asNodes("hi")];
+      console.log(JSON.stringify(r));
+    """
+    out = subprocess.run(["node", "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    assert _json.loads(out.stdout) == [1, 2, 0, True, ["hi"]]
