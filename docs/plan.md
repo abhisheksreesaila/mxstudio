@@ -172,7 +172,7 @@ Brief: docs/briefs/console-1.0.md · Needs: none
 
 ## F-024 Admin API for the 1.0 console [todo]
 Brief: docs/briefs/console-1.0.md · Needs: none
-- [ ] `mxc rm <model>` and `DELETE /admin/models/{name}`: stops it, unregisters it, deletes its compiled-graph cache; weights stay in the HF cache unless `--purge`
+- [ ] `mxc rm <model>` and `DELETE /admin/models/{name}`: unregisters it, stops it, deletes mxconsole's own per-model files; weights stay in the HF cache unless `--purge`. MAX's compiled-graph cache is shared and keyed by graph hash, so it is left alone (decided 2026-10-11)
 - [ ] `GET /admin/search?q=`: curated names, MAX catalog and Hugging Face repo ids, each with source, params, size, estimated VRAM, `fit` (ok / tight / no / port) against this machine's free GPU memory, and for `no` up to 3 suggestions that fit
 - [ ] `mxc keys rotate <app>` and `POST /admin/keys/{app}/rotate`: new secret shown once, old one revoked
 - [ ] `GET /admin/learn/{name}`: the generated notebook (cells, kernel spec, path), generating it if missing; `POST /admin/learn/{name}/open` starts Jupyter on it and returns the URL
