@@ -415,6 +415,8 @@ class PortManager:
                         with contextlib.suppress(ProcessLookupError, PermissionError):
                             os.killpg(pgid, signal.SIGKILL)
             store.db.execute("UPDATE ports SET procs=NULL")
+            for r in store.db.execute("SELECT id FROM ports WHERE status='running'").fetchall():
+                shutil.rmtree(mxc_home() / "ports" / str(r["id"]) / "work", ignore_errors=True)  # private caches
             store.db.execute("UPDATE ports SET status='failed', finished_at=?, "
                              "message='interrupted: the daemon stopped during this port. Run it again.' "
                              "WHERE status='running'", (time.time(),))
