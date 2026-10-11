@@ -109,6 +109,8 @@ async def test_learn_routes_are_admin_only(store, sup):
 
 
 class FakeProc:
+    pid = 4321
+
     def __init__(self, alive=True):
         self.alive = alive
 
@@ -164,3 +166,37 @@ def test_cli_learn_json_prints_the_same_payload(inproc_daemon, monkeypatch):
     body = json.loads(r.output)
     assert body["name"] == "tiny" and body["cells"] and body["architecture"]["architecture"] == "Qwen2ForCausalLM"
     assert "url" not in body  # --json never launches Jupyter
+
+
+def test_concurrent_opens_start_one_server(tmp_path):
+    import threading
+    import time
+    spawned = []
+
+    def slow_popen(cmd, **kw):
+        spawned.append(cmd)
+        time.sleep(0.2)
+        return FakeProc()
+    launcher = JupyterLauncher(popen=slow_popen, free_port=lambda: 8902, port_open=lambda p: True)
+    urls = []
+    threads = [threading.Thread(target=lambda: urls.append(launcher(tmp_path / "tiny.ipynb"))) for _ in range(4)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert len(spawned) == 1 and len(set(urls)) == 1
+
+
+def test_a_restarted_daemon_reuses_the_recorded_server(tmp_path, mxc_home):
+    first = JupyterLauncher(popen=lambda cmd, **kw: FakeProc(), free_port=lambda: 8903, port_open=lambda p: True)
+    url = first(tmp_path / "tiny.ipynb")
+    record = mxc_home / "run" / "jupyter.json"
+    assert record.stat().st_mode & 0o777 == 0o600 and json.loads(record.read_text())["pid"] == 4321
+    spawned = []
+    second = JupyterLauncher(popen=lambda cmd, **kw: spawned.append(cmd), port_open=lambda p: True,
+                             is_jupyter=lambda pid: pid == 4321)  # a new daemon: nothing in memory
+    assert second(tmp_path / "tiny.ipynb") == url and spawned == []
+    stale = JupyterLauncher(popen=lambda cmd, **kw: FakeProc(), free_port=lambda: 8904, port_open=lambda p: True,
+                            is_jupyter=lambda pid: False)  # the pid is now some other program
+    assert stale(tmp_path / "tiny.ipynb") != url
+    gone = JupyterLauncher(popen=lambda cmd, **kw: FakeProc(), free_port=lambda: 8905,
+                           port_open=lambda p: p == 8905, is_jupyter=lambda pid: True)  # port no longer answers
+    assert ":8905/" in gone(tmp_path / "tiny.ipynb")
