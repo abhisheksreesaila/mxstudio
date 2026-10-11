@@ -16,7 +16,7 @@ from fasthtml.common import FastHTML
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
-from mxconsole import admin_api, admin_bench, admin_pull, admin_system, expose, insights, keys, metrics, system
+from mxconsole import admin_api, admin_bench, admin_port, admin_pull, admin_system, expose, insights, keys, metrics, system
 from mxconsole.settings import DAEMON_PORT
 from mxconsole.store import Store, mxc_home
 from mxconsole.supervisor import StartFailed, Supervisor, UnknownModel
@@ -193,6 +193,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         return loopback_only(request) and request.headers.get(ADMIN_HEADER) == "1" and origin_ok
 
     admin_pull.register(app, store, supervisor, admin_only)  # /admin/pulls: background pulls with progress
+    admin_port.register(app, store, supervisor, admin_only)  # /admin/ports: automatic ports (claude headless)
 
     @app.get("/health")
     def health():
