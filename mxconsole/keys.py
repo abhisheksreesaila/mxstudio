@@ -86,3 +86,14 @@ def list_keys(store: Store) -> list[KeyInfo]:
         KeyInfo(r["app"], r["prefix"], r["created_at"], r["last_used_at"], r["revoked_at"])
         for r in store.db.execute("SELECT * FROM keys ORDER BY app")
     ]
+
+
+class KeyNotFound(Exception):
+    pass
+
+
+def rotate_key(store: Store, app: str) -> str:
+    """Replace an existing app's key: the old secret stops working, the new one is returned (once)."""
+    if app.startswith("_") or not any(k.app == app for k in list_keys(store)):
+        raise KeyNotFound(f"there is no key for {app}. Create one with: mxc keys new {app}")
+    return create_key(store, app, rotate=True)

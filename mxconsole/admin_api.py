@@ -11,7 +11,7 @@ import logging
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from mxconsole import expose, removal
+from mxconsole import expose, keys, removal
 from mxconsole.store import Store
 from mxconsole.supervisor import Supervisor
 
@@ -23,6 +23,16 @@ def register(app, store: Store, supervisor: Supervisor, admin_only, *, refused, 
 
     def not_registered(name: str) -> JSONResponse:
         return error(404, f"The model `{name}` is not registered.", "model_not_found")
+
+    @app.post("/admin/keys/{app_name}/rotate")
+    def admin_key_rotate(request: Request, app_name: str):
+        if not admin_only(request):
+            return refused()
+        try:
+            plaintext = keys.rotate_key(store, app_name)
+        except keys.KeyNotFound as e:
+            return error(404, str(e), "key_not_found")
+        return JSONResponse({"app": app_name, "key": plaintext})  # the only time it is shown
 
     @app.delete("/admin/models/{name}")
     async def admin_model_remove(request: Request, name: str):

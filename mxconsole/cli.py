@@ -277,6 +277,20 @@ def keys_new(app_name: str = typer.Argument(..., metavar="APP"),
     typer.echo("This key will not be shown again. Copy it now.")
 
 
+@keys_app.command("rotate")
+def keys_rotate(app_name: str = typer.Argument(..., metavar="APP"), as_json: bool = JSON) -> None:
+    """Issue a new key for an app and revoke the old one. The new key is printed once."""
+    try:
+        key = keys.rotate_key(Store.open(), app_name)
+    except keys.KeyNotFound as e:
+        _fail(str(e))
+    if as_json:
+        typer.echo(report.dump({"app": app_name, "key": key}))
+        return
+    typer.echo(key)
+    typer.echo("This key will not be shown again. Copy it now. The old key no longer works.")
+
+
 @keys_app.command("ls")
 def keys_ls(as_json: bool = JSON) -> None:
     """List keys (never the secret)."""
