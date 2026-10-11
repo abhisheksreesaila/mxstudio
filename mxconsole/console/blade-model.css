@@ -1,0 +1,2 @@
+/* mxconsole, the Model blade (F-025). Styles for this blade only; shared pieces live in blades.css. */
+.b-model .bb { background: var(--canvas); }

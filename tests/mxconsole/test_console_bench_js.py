@@ -38,7 +38,7 @@ def test_the_page_script_is_served_and_the_palette_offers_the_run():
     assert "page-bench.js" in CONSOLE_ASSETS
     palette = (CONSOLE_DIR / "palette.js").read_text()
     assert '"Run benchmark"' in palette and "mxc bench --all" in palette
-    assert "benchPage" in (CONSOLE_DIR / "main.js").read_text()
+    assert "export function benchPage" in (CONSOLE_DIR / "page-bench.js").read_text()
 
 
 def run_node(body: str):

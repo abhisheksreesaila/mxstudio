@@ -1,0 +1,2 @@
+/* mxconsole, the Settings blade (F-028). Styles for this blade only; shared pieces live in blades.css. */
+.b-settings .bb { background: var(--canvas); }

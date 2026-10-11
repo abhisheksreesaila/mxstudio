@@ -1,28 +1,29 @@
 <!doctype html>
-<html lang="en" data-theme="contrast">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>mxconsole</title>
-<meta name="color-scheme" content="dark light">
+<meta name="color-scheme" content="light dark">
 <link rel="icon" href="/console/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/console/console.css">
+<link rel="stylesheet" href="/console/blades.css">
+<link rel="stylesheet" href="/console/topbar.css">
+<link rel="stylesheet" href="/console/blade-home.css">
+<link rel="stylesheet" href="/console/blade-model.css">
+<link rel="stylesheet" href="/console/blade-add.css">
+<link rel="stylesheet" href="/console/blade-security.css">
+<link rel="stylesheet" href="/console/blade-keys.css">
+<link rel="stylesheet" href="/console/blade-bench.css">
+<link rel="stylesheet" href="/console/blade-logs.css">
+<link rel="stylesheet" href="/console/blade-notebook.css">
+<link rel="stylesheet" href="/console/blade-gateway.css">
+<link rel="stylesheet" href="/console/blade-settings.css">
 <script src="/console/theme.js"></script>
 </head>
 <body>
-<div class="app" id="app">
-  <header class="topbar" id="topbar"></header>
-  <div class="shell">
-    <nav class="menu" id="menu" aria-label="Console"></nav>
-    <div class="scrim-menu" id="menu-scrim" hidden></div>
-    <main class="main" id="main">
-      <div class="banner" id="banner" role="alert" hidden></div>
-      <div class="page" id="view"></div>
-    </main>
-  </div>
-  <footer class="statusbar mono" id="statusbar"></footer>
-</div>
-<div id="layer"></div>
+<header class="top" id="topbar"></header>
+<div class="hwpop" id="hwpop" hidden role="dialog" aria-label="Hardware"></div>
+<main class="journey" id="journey"></main>
 <div class="toast mono" id="toast" role="status" aria-live="polite" hidden></div>
 <script type="module" src="/console/main.js"></script>
 </body>

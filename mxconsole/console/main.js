@@ -1,24 +1,22 @@
-// mxconsole: wires the shell, the pages and the palette together.
-import { startPolling } from "./core.js";
-import { mountShell } from "./shell.js";
-import { installPaletteShortcut } from "./palette.js";
-import { overviewPage } from "./page-overview.js";
-import { modelsPage } from "./page-models.js";
-import { metricsPage } from "./page-metrics.js";
-import { apiPage } from "./page-api.js";
-import { keysPage } from "./page-keys.js";
-import { networkPage } from "./page-network.js";
-import { activityPage, soonPage } from "./page-activity.js";
-import { portsPage } from "./page-ports.js";
-import { logsPage } from "./page-logs.js";
-import { gatewayPage } from "./page-gateway.js";
-import { daemonPage } from "./page-daemon.js";
-import { benchPage } from "./page-bench.js";
-import { pullPage } from "./page-pull.js";
+// mxconsole: the blades console. A dark top bar, a journey of blades docked side by side, My models at home.
+// Each blade is its own blade-*.js (registered on import) with its own CSS; see blades.js for the contract.
+import { $, startPolling } from "./core.js";
+import { mountJourney, push } from "./blades.js";
+import { mountTopbar } from "./topbar.js";
+import { startSystemPolling } from "./system-data.js";
+import "./blade-home.js";
+import "./blade-model.js";
+import "./blade-add.js";
+import "./blade-security.js";
+import "./blade-keys.js";
+import "./blade-bench.js";
+import "./blade-logs.js";
+import "./blade-notebook.js";
+import "./blade-gateway.js";
+import "./blade-settings.js";
 
-mountShell({
-  overview: overviewPage, activity: activityPage, models: modelsPage, keys: keysPage, network: networkPage, api: apiPage, metrics: metricsPage,
-  pull: pullPage, ports: portsPage, benchmarks: benchPage, logs: logsPage, gateway: gatewayPage, daemon: daemonPage,
-});
-installPaletteShortcut();
+mountJourney($("journey"));
+mountTopbar($("topbar"), $("hwpop"));
+push("home");
 startPolling();
+startSystemPolling();
