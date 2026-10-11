@@ -399,8 +399,20 @@ def pull(ref: str = typer.Argument(..., help="Short name (qwen2.5-0.5b) or Huggi
 
 
 @app.command("port")
-def port_model(ref: str = typer.Argument(..., help="Short name or Hugging Face repo id MAX does not support yet")) -> None:
-    """Set up a workspace to port an unsupported architecture to MAX with Claude Code."""
+def port_model(ref: str = typer.Argument(..., help="Short name or Hugging Face repo id MAX does not support yet"),
+               auto: bool = typer.Option(False, "--auto", help="Run the port unattended with Claude Code (headless) in the daemon."),
+               max_attempts: int = typer.Option(3, "--max-attempts", help="With --auto: tries before giving up (a failed build or parity check is fed back)."),
+               unsandboxed: bool = typer.Option(False, "--unsandboxed", help="With --auto: run even without bubblewrap (no confinement; not recommended)."),
+               as_json: bool = typer.Option(False, "--json", help="With --auto: one JSON object per change, for scripts and agents.")) -> None:
+    """Set up a workspace to port an unsupported architecture to MAX with Claude Code (--auto does it for you)."""
+    if auto:
+        from mxconsole import port_cli
+        code, text = port_cli.run(ref, None, as_json, max_attempts, unsandboxed=unsandboxed)
+        if text:
+            typer.echo(text, err=code != 0)
+        if code:
+            raise typer.Exit(code)
+        return
     from mxconsole import port
     try:
         result = port.prepare(ref)
