@@ -396,3 +396,20 @@ def test_one_atexit_hook_for_all_managers(tmp_path, fake_claude):
     port_auto.cleanup_at_exit(make_manager(tmp_path, fake_claude))
     port_auto.cleanup_at_exit(make_manager(tmp_path, fake_claude))
     assert len(port_auto._ATEXIT) == max(before, 1)
+
+
+def test_restart_removes_the_work_dir_of_interrupted_jobs_only(tmp_path):
+    store = Store(tmp_path / "mst.db")
+    PortManager(store)
+    for ref, status in (("a/one", "running"), ("b/two", "done")):
+        store.db.execute("INSERT INTO ports (ref, status, stage, started_at) VALUES (?, ?, 'generate', 0)", (ref, status))
+    ids = {r["ref"]: r["id"] for r in store.db.execute("SELECT id, ref FROM ports").fetchall()}
+    for i in ids.values():
+        w = mxc_home() / "ports" / str(i) / "work" / "cache"
+        w.mkdir(parents=True)
+        (w / "big").write_text("x")
+        (mxc_home() / "ports" / str(i) / "port.log").write_text("log")
+    PortManager(store)
+    assert not (mxc_home() / "ports" / str(ids["a/one"]) / "work").exists()
+    assert (mxc_home() / "ports" / str(ids["a/one"]) / "port.log").exists()   # the log stays
+    assert (mxc_home() / "ports" / str(ids["b/two"]) / "work").exists()       # finished jobs are not touched
