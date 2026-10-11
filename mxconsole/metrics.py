@@ -201,6 +201,28 @@ def _nvidia_smi() -> str:
          "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=5, check=True).stdout
 
 
+def _nvidia_smi_apps() -> str:
+    return subprocess.run(["nvidia-smi", "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],
+                          capture_output=True, text=True, timeout=5, check=True).stdout
+
+
+def gpu_processes(runner=_nvidia_smi_apps) -> dict[int, int]:
+    """GPU memory in MB per process id, summed over GPUs; {} when nvidia-smi is missing or lists none."""
+    try:
+        out = runner()
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    result: dict[int, int] = {}
+    for line in out.strip().splitlines():
+        parts = [p.strip() for p in line.split(",")]
+        try:
+            pid, mb = int(parts[0]), int(parts[1])
+        except (ValueError, IndexError):  # "[N/A]" where the driver hides a process's memory
+            continue
+        result[pid] = result.get(pid, 0) + mb
+    return result
+
+
 def gpus(runner=_nvidia_smi) -> list[dict]:
     """Memory and utilisation per NVIDIA GPU; [] when there is no nvidia-smi."""
     try:

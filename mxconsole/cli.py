@@ -55,6 +55,71 @@ def list_models(as_json: bool = JSON) -> None:
     typer.echo(f"\nconsole  {report.console_link('models')}")
 
 
+@app.command("search")
+def search_models(query: str = typer.Argument("", help="Part of a name, an architecture, or a Hugging Face repo id (owner/name)"),
+                  as_json: bool = JSON) -> None:
+    """Find a model (curated names, the MAX catalog, a Hugging Face repo) and see whether it fits this machine."""
+    from mxconsole import search
+    if len(query) > search.MAX_QUERY:
+        _fail("the search text is too long")
+    try:
+        out = search.search(query)
+    except resolve.ResolveError as e:
+        _fail(str(e))
+    if as_json:
+        typer.echo(report.dump(out))
+        return
+    mem = out["memory"]
+    typer.echo(f"memory: {mem['free_gb']} GB free of {mem['total_gb']} GB on {mem['name']}")
+    for w in out["warnings"]:
+        typer.echo(f"warning: {w}", err=True)
+    if not out["results"]:
+        typer.echo("no models match. Try a Hugging Face repo id (owner/name), or a shorter search.")
+        return
+
+    def num(v, unit=""):
+        return "?" if v is None else f"{v:g}{unit}"
+    typer.echo(f"{'ID':<34} {'FIT':<6} {'PARAMS':<8} {'SIZE':<9} {'EST VRAM':<9} {'SOURCE':<7} ARCHITECTURE")
+    for r in out["results"]:
+        params = "?" if r["params"] is None else f"{r['params'] / 1e9:g}B"
+        typer.echo(f"{r['id'][:34]:<34} {r['fit'] or '?':<6} {params:<8} {num(r['size_gb'], ' GB'):<9} "
+                   f"{num(r['est_vram_gb'], ' GB'):<9} {r['source']:<7} {r['architecture'] or '?'}")
+        if r["fit"] == "port":
+            typer.echo(f"{'':<34} MAX does not support this architecture yet: mxc port {r['repo_id']}")
+        for s in r["suggestions"]:
+            typer.echo(f"{'':<34} too big here; smaller: {s['id']} (~{s['est_vram_gb']:g} GB)")
+    typer.echo("pull one with: mxc pull <id>")
+
+
+@app.command("rm")
+def remove_model(model: str = typer.Argument(..., help="A registered model name"),
+                 purge: bool = typer.Option(False, "--purge", help="Also delete its weights from the Hugging Face cache."),
+                 as_json: bool = JSON) -> None:
+    """Stop a model, unregister it and delete its compiled-graph cache. Weights stay unless --purge."""
+    from mxconsole import removal, serve
+    store = Store.open()
+    if store.get_model(model) is None:
+        _fail(f"the model `{model}` is not registered. See: mxc ls")
+    if serve.daemon_running():  # the daemon owns the running process: let it stop the model first
+        try:
+            status, body = serve.admin_call("DELETE", f"models/{model}", params={"purge": "1"} if purge else None, timeout=None)
+        except serve.DaemonError as e:
+            _fail(str(e))
+        if status != 200:
+            _fail(serve.error_message(status, body))
+        result = body
+    else:
+        result = removal.remove(store, model, purge=purge)
+    if as_json:
+        typer.echo(report.dump(result))
+        return
+    typer.echo(f"removed {model}" + (" and deleted its weights" if result["purged"] else ""))
+    if result.get("purge_note"):
+        typer.echo(f"note: {result['purge_note']}")
+    if not purge:
+        typer.echo("its weights are still in the Hugging Face cache (mxc rm --purge deletes them too)")
+
+
 @app.command("set")
 def set_model(model: str = typer.Argument(..., help="A registered model name"),
               pin: bool = typer.Option(False, "--pin", help="Keep it loaded; never unload when idle."),
@@ -205,8 +270,10 @@ def status_cmd(as_json: bool = JSON) -> None:
 @app.command("ps")
 def ps_cmd(as_json: bool = JSON) -> None:
     """The crew: daemon, Caddy, LiteLLM and each `max serve`, with pid, port, memory and uptime. Works without the daemon."""
-    from mxconsole import serve, system
+    from mxconsole import metrics, serve, system
     crew = system.collect(health=system.daemon_answers)
+    if metrics.gpus():  # models get `vram_gb` (in --json) when there is an NVIDIA GPU to ask
+        system.add_vram(crew, metrics.gpu_processes())
     states = serve.live_states()
     for c in crew:  # the daemon knows starting/ready; pid files only know "running"
         if c["kind"] == "model" and c["name"] in states:
@@ -247,6 +314,22 @@ def keys_new(app_name: str = typer.Argument(..., metavar="APP"),
         _fail(str(e))
     typer.echo(key)
     typer.echo("This key will not be shown again. Copy it now.")
+
+
+@keys_app.command("rotate")
+def keys_rotate(app_name: str = typer.Argument(..., metavar="APP"), as_json: bool = JSON) -> None:
+    """Issue a new key for an app and revoke the old one. The new key is printed once."""
+    try:
+        key, revived = keys.rotate_key(Store.open(), app_name)
+    except keys.KeyNotFound as e:
+        _fail(str(e))
+    if as_json:
+        typer.echo(report.dump({"app": app_name, "key": key, "revived": revived}))
+        return
+    typer.echo(key)
+    typer.echo("This key will not be shown again. Copy it now. The old key no longer works.")
+    if revived:
+        typer.echo(f"note: the old key had been revoked, so {app_name} is active again with this new key.")
 
 
 @keys_app.command("ls")
@@ -338,9 +421,16 @@ def port_model(ref: str = typer.Argument(..., help="Short name or Hugging Face r
 def learn_model(
     model: str = typer.Argument(..., help="A registered model name or a Hugging Face repo id."),
     no_open: bool = typer.Option(False, "--no-open", help="Write the notebook but don't launch Jupyter Lab."),
+    as_json: bool = typer.Option(False, "--json", help="Print the notebook (path, cells, architecture) as JSON; never launches Jupyter."),
 ) -> None:
     """Build a notebook about a model from Hugging Face metadata and open it in Jupyter Lab."""
     from mxconsole import learn
+    if as_json:
+        try:
+            typer.echo(report.dump(learn.notebook_payload(model)))
+        except Exception as exc:
+            _fail(f"could not build a notebook for {model}: {exc}")
+        return
     try:
         path = learn.write_notebook(model)
     except Exception as exc:

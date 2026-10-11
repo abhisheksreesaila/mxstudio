@@ -2,7 +2,7 @@
 
 One data source for `mxc ps` and the console's System pages. Everything is read from pid files and /proc
 (a `proc_root` argument lets tests hand in a fake one), so it works with the daemon down. GPU memory is
-not readable from /proc, so it is never reported."""
+not readable from /proc: the daemon's /admin/system adds it from nvidia-smi (gpu_summary, add_vram)."""
 from __future__ import annotations
 
 import os
@@ -153,6 +153,43 @@ def _model_children(proc_root) -> list[dict]:
         if _is_max_serve(cmd) and proc_stats(pid, proc_root) is not None:
             out.append({"name": name, "pid": pid, "port": _port_from(cmd), "state": "running"})
     return out
+
+
+# -- GPU memory ----------------------------------------------------------------------------------
+def parent_pid(pid: int, proc_root: str | Path = "/proc") -> int | None:
+    try:
+        return int((Path(proc_root) / str(pid) / "stat").read_text().rsplit(")", 1)[1].split()[1])
+    except (OSError, IndexError, ValueError):
+        return None
+
+
+def gpu_summary(gpus: list[dict]) -> tuple[dict | None, list[dict]]:
+    """(one summary over all GPUs or None, per-GPU rows) in GB, from metrics.gpus()."""
+    rows = [{"index": g["index"], "name": g["name"], "vram_total_gb": round(g["total_mb"] / 1024, 1),
+             "vram_used_gb": round(g["used_mb"] / 1024, 1)} for g in gpus]
+    if not rows:
+        return None, []
+    distinct = list(dict.fromkeys(r["name"] for r in rows))
+    name = ", ".join(distinct) if len(distinct) > 1 else distinct[0] + (f" x{len(rows)}" if len(rows) > 1 else "")
+    return ({"name": name, "count": len(rows), "vram_total_gb": round(sum(r["vram_total_gb"] for r in rows), 1),
+             "vram_used_gb": round(sum(r["vram_used_gb"] for r in rows), 1)}, rows)
+
+
+def add_vram(crew: list[dict], procs: dict[int, int], ppid=parent_pid) -> None:
+    """Set `vram_gb` on each model in the crew: the GPU memory of its process and of the processes below it
+    (MAX may compute in a child). None when the driver does not list the model, so the console shows a dash."""
+    for c in crew:
+        if c["kind"] != "model":
+            continue
+        total, found = 0, False
+        for pid, mb in procs.items():
+            node, hops = pid, 0
+            while node and hops < 16:  # walk up the parents; a model's workers sit a few levels below it
+                if node == c["pid"]:
+                    total, found = total + mb, True
+                    break
+                node, hops = ppid(node), hops + 1
+        c["vram_gb"] = round(total / 1024, 2) if found else None
 
 
 # -- the crew ------------------------------------------------------------------------------------

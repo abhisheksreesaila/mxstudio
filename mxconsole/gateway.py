@@ -16,7 +16,7 @@ from fasthtml.common import FastHTML
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
-from mxconsole import admin_bench, admin_pull, admin_system, expose, insights, keys, metrics, system
+from mxconsole import admin_api, admin_bench, admin_pull, admin_system, expose, insights, keys, metrics, system
 from mxconsole.settings import DAEMON_PORT
 from mxconsole.store import Store, mxc_home
 from mxconsole.supervisor import StartFailed, Supervisor, UnknownModel
@@ -116,7 +116,9 @@ def openapi_spec(model_names: list[str]) -> dict:
     }
 
 
-def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 15.0):
+def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 15.0, api_deps: dict | None = None):
+    """`api_deps` are test doubles: a "system" dict for admin_system.register (GPU readers) and the keyword
+    arguments of admin_api.register (search sources, notebook source, Jupyter launcher)."""
     async def lifespan(app):
         async def reaper():
             while True:
@@ -599,6 +601,8 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             return Response("docs are only served to this machine", status_code=403)
         return RedirectResponse("/console#api", status_code=307)  # the API reference lives in the console
 
+    api_deps = dict(api_deps or {})
     admin_system.register(app, store, supervisor, admin_only, counters=counters,
-                          refused=admin_refused, error=openai_error)
+                          refused=admin_refused, error=openai_error, **api_deps.pop("system", {}))
+    admin_api.register(app, store, supervisor, admin_only, refused=admin_refused, error=openai_error, **api_deps)
     return app

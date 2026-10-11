@@ -119,6 +119,14 @@ def test_register_port_stores_it(tmp_path):
     assert Store.open().get_model("weird") == m
 
 
+@pytest.mark.parametrize("bad", ["..", ".", "a/b", "../x", "-x", ""])
+def test_register_rejects_names_that_could_escape_a_folder(tmp_path, bad):
+    d = make_port(tmp_path / "weird")
+    with pytest.raises(port.PortError, match="name"):
+        port.register("acme/weird", d, name=bad, catalog=CAT, hf=make_hf())
+    assert Store.open().models() == []
+
+
 def test_register_rejects_incomplete_port(tmp_path):
     d = make_port(tmp_path / "weird", with_arch=False)
     with pytest.raises(port.PortError, match="arch.py"):

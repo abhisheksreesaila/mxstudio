@@ -148,6 +148,11 @@ class HubClient:
         except (httpx.HTTPError, OSError) as e:
             raise ResolveError(f"could not reach Hugging Face ({type(e).__name__}); check your network") from e
 
+    def param_count(self, repo_id: str) -> int | None:
+        """Total parameters from the repo's safetensors metadata, or None when it isn't published."""
+        st = getattr(self.api.model_info(repo_id), "safetensors", None)
+        return getattr(st, "total", None) if st else None
+
     def read_json(self, repo_id: str, revision: str, filename: str) -> dict:
         from huggingface_hub import hf_hub_download
         try:
