@@ -6,20 +6,20 @@ import os
 import sys
 
 
-def main(url: str) -> int:
+def main(url: str, storage: str) -> int:
     # Hardware GPU compositing rendered a blank page on Wayland/Hyprland (NVIDIA); the console is light, so
     # software rendering costs nothing. Override with QTWEBENGINE_CHROMIUM_FLAGS.
     os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu")
     import webview  # only present in the `app` environment
 
-    # private_mode (pywebview's default) keeps no cookies or storage between runs; the console keeps
-    # its own preferences in the daemon, so the window remembers nothing it doesn't need.
+    # Browser storage persists in `storage` (under ~/.mxc): the console keeps its theme and view
+    # preferences in localStorage. Nothing else is remembered (no window size or position).
     webview.create_window("mxconsole", url, width=1440, height=900)
-    webview.start(gui="qt")
+    webview.start(gui="qt", private_mode=False, storage_path=storage)
     return 0
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        sys.exit("usage: window.py <url>")
-    sys.exit(main(sys.argv[1]))
+    if len(sys.argv) != 3:
+        sys.exit("usage: window.py <url> <storage-dir>")
+    sys.exit(main(sys.argv[1], sys.argv[2]))

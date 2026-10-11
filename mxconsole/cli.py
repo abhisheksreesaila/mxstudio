@@ -456,7 +456,11 @@ def app_cmd(install: bool = typer.Option(False, "--install", help="Linux: add an
     """Open the console in its own window (starts the daemon if needed; closing the window stops nothing)."""
     from mxconsole import app as desktop, report, serve
     try:
+        if install and uninstall:
+            _fail("pass --install or --uninstall, not both")
         if install or uninstall:
+            if install:
+                desktop.prepare_env(desktop.project_dir())
             for path in (desktop.install(desktop.project_dir()) if install else desktop.uninstall()):
                 typer.echo(("installed " if install else "removed ") + str(path))
             return

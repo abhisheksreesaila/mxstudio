@@ -33,14 +33,26 @@ def project_dir() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def native_command(project: Path, url: str, pixi: str | None = None) -> list[str]:
+def storage_dir() -> Path:
+    """Where the window keeps its browser storage (theme, view prefs), next to the rest of ~/.mxc."""
+    from mxconsole.store import mxc_home
+    return mxc_home() / "webview"
+
+
+def native_command(project: Path, url: str, storage: Path | str, pixi: str | None = None) -> list[str]:
     return [pixi or shutil.which("pixi") or "pixi", "run", "--manifest-path", str(project / "pixi.toml"),
-            "-e", APP_ENV, "python", str(Path(__file__).with_name("window.py")), url]
+            "-e", APP_ENV, "python", str(Path(__file__).with_name("window.py")), url, str(storage)]
+
+
+MAC_CHROME = ("/Applications/Google Chrome.app", "~/Applications/Google Chrome.app")
 
 
 def fallback_command(url: str, platform: str = sys.platform,
-                     which: Callable[[str], str | None] = shutil.which) -> list[str] | None:
+                     which: Callable[[str], str | None] = shutil.which,
+                     exists: Callable[[str], bool] = lambda p: Path(p).expanduser().exists()) -> list[str] | None:
     if platform == "darwin":
+        if not any(exists(p) for p in MAC_CHROME):
+            return None
         return ["open", "-na", "Google Chrome", "--args", f"--app={url}"]
     for name in BROWSERS:
         found = which(name)
@@ -52,7 +64,7 @@ def fallback_command(url: str, platform: str = sys.platform,
 def open_native(url: str) -> bool:
     """Open the pywebview window and wait until it is closed. False if it could not open."""
     try:
-        return subprocess.run(native_command(project_dir(), url), stdin=subprocess.DEVNULL).returncode == 0
+        return subprocess.run(native_command(project_dir(), url, storage_dir()), stdin=subprocess.DEVNULL).returncode == 0
     except OSError:
         return False
 
@@ -97,11 +109,35 @@ def _paths(home: Path) -> tuple[Path, Path]:
     return (home / ".local/share/applications" / DESKTOP_NAME, home / ".local/share/icons" / ICON_NAME)
 
 
+def _arg(value: str | Path) -> str:
+    """One Exec argument per the Desktop Entry spec: double-quoted, " ` $ and backslash escaped, % doubled.
+    (The spec's string escaping then doubles each backslash again.)"""
+    out = str(value).replace("\\", "\\\\").replace("%", "%%")
+    for ch in '"`$':
+        out = out.replace(ch, "\\" + ch)
+    return '"' + out.replace("\\", "\\\\") + '"'
+
+
 def desktop_entry(project: Path, icon: str | Path, pixi: str | None = None) -> str:
     pixi = pixi or shutil.which("pixi") or "pixi"
+    exec_line = f"{_arg(pixi)} run --manifest-path {_arg(Path(project) / 'pixi.toml')} mxc app"
     return ("[Desktop Entry]\nType=Application\nName=mxconsole\nComment=Local AI runtime on Modular MAX\n"
-            f"Exec={pixi} run mxc app\nPath={project}\nIcon={icon}\nTerminal=false\n"
+            f"Exec={exec_line}\nIcon={icon}\nTerminal=false\n"
             "Categories=Development;Utility;\n")
+
+
+def prepare_env(project: Path, pixi: str | None = None, runner: Callable[[list[str]], int] | None = None) -> None:
+    """`pixi install -e app`, output visible, so the first launch from the menu isn't a silent wait."""
+    cmd = [pixi or shutil.which("pixi") or "pixi", "install", "--manifest-path", str(project / "pixi.toml"),
+           "-e", APP_ENV]
+    run_ = runner or (lambda c: subprocess.run(c).returncode)
+    try:
+        code = run_(cmd)
+    except OSError as e:
+        raise AppError(f"could not run pixi to set up the app environment: {e}")
+    if code != 0:
+        raise AppError(f"setting up the app environment failed (`{' '.join(cmd)}` exited {code}); "
+                       "fix that and run `mxc app --install` again")
 
 
 def install(project: Path, home: Path | None = None, platform: str = sys.platform,
