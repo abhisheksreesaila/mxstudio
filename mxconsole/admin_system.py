@@ -14,21 +14,26 @@ from mxconsole.store import Store
 from mxconsole.supervisor import Supervisor
 
 
-def register(app, store: Store, supervisor: Supervisor, admin_only, *, counters: system.Counters, refused, error) -> None:
+def register(app, store: Store, supervisor: Supervisor, admin_only, *, counters: system.Counters, refused, error,
+             gpus=metrics.gpus, gpu_procs=metrics.gpu_processes, ppid=system.parent_pid) -> None:
     """Add the System routes. `admin_only` is the gateway's guard, `refused()` its 403 answer and
-    `error(status, message, code, type_)` its OpenAI-shaped error."""
+    `error(status, message, code, type_)` its OpenAI-shaped error. `gpus()`, `gpu_procs()` and `ppid(pid)`
+    are the nvidia-smi and /proc readers, replaceable in tests."""
 
-    def crew_now() -> list[dict]:
-        return system.collect(supervisor.status(), daemon=os.getpid())
+    def crew_now() -> tuple[list[dict], dict | None, list[dict]]:
+        crew = system.collect(supervisor.status(), daemon=os.getpid())
+        summary, per_gpu = system.gpu_summary(gpus())
+        system.add_vram(crew, gpu_procs() if summary else {}, ppid)
+        return crew, summary, per_gpu
 
     @app.get("/admin/system")
     async def admin_system(request: Request):
         if not admin_only(request):
             return refused()
-        crew = await asyncio.to_thread(crew_now)
+        crew, summary, per_gpu = await asyncio.to_thread(crew_now)
         names = [m.name for m in store.models()]
         return JSONResponse({"crew": crew, "listeners": system.listeners(crew), "home": str(system.mxc_home()),
-                             "logs": system.log_sources(names)})
+                             "logs": system.log_sources(names), "gpu": summary, "gpus": per_gpu})
 
     @app.get("/admin/gateway")
     def admin_gateway(request: Request):

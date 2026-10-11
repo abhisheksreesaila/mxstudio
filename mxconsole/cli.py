@@ -267,8 +267,10 @@ def status_cmd(as_json: bool = JSON) -> None:
 @app.command("ps")
 def ps_cmd(as_json: bool = JSON) -> None:
     """The crew: daemon, Caddy, LiteLLM and each `max serve`, with pid, port, memory and uptime. Works without the daemon."""
-    from mxconsole import serve, system
+    from mxconsole import metrics, serve, system
     crew = system.collect(health=system.daemon_answers)
+    if metrics.gpus():  # models get `vram_gb` (in --json) when there is an NVIDIA GPU to ask
+        system.add_vram(crew, metrics.gpu_processes())
     states = serve.live_states()
     for c in crew:  # the daemon knows starting/ready; pid files only know "running"
         if c["kind"] == "model" and c["name"] in states:
