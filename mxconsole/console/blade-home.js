@@ -30,7 +30,7 @@ export function modelView(m, ctx) {
     access: secure ? "secure" : "local", endpoint: secure ? ctx.info.lan_endpoint : ctx.endpoint,
     tps: running && live !== null && live !== undefined ? Math.round(live) : null, points: running ? points : [],
     ttft: running && by.ttft_p50_ms !== undefined ? by.ttft_p50_ms : null, requests: by.requests ?? 0,
-    vramGb: crew && crew.gpu_mb ? Math.round((crew.gpu_mb / 1024) * 10) / 10 : null,
+    vramGb: crew && crew.vram_gb > 0 ? Math.round(crew.vram_gb * 10) / 10 : null,
   };
 }
 export function filterModels(rows, query) {

@@ -150,7 +150,7 @@ def test_the_theme_follows_the_system_until_one_is_chosen():
 @needs_node
 def test_the_hardware_chip_shows_vram_per_running_model():
     gpus = "[{index:0,name:'NVIDIA GeForce RTX 4090',used_mb:6144,total_mb:24576,util:3}]"
-    crew = "[{id:'daemon'},{id:'model:a',gpu_mb:4096},{id:'model:b',gpu_mb:1024},{id:'caddy'}]"
+    crew = "[{id:'daemon'},{id:'model:a',vram_gb:4},{id:'model:b',vram_gb:1},{id:'model:c',vram_gb:null},{id:'caddy'}]"
     v = node(f"m.hardwareView({gpus}, {crew})", "hardware.js")
     assert v["present"] and v["name"] == "NVIDIA GeForce RTX 4090" and v["short"] == "RTX 4090"
     assert v["usedGb"] == 6 and v["totalGb"] == 24 and v["freeGb"] == 18
@@ -196,3 +196,10 @@ def test_the_list_is_filtered_by_name_or_repo():
     rows = "[{name:'qwen',repo_id:'Qwen/Q'},{name:'gemma',repo_id:'google/gemma-3'}]"
     assert node(f"m.filterModels({rows}, 'GOOG').map(r => r.name)", "blade-home.js") == ["gemma"]
     assert node(f"m.filterModels({rows}, '  ').length", "blade-home.js") == 2
+
+
+@needs_node
+def test_a_model_row_shows_the_vram_the_daemon_reports():
+    ctx = "{metrics:null, series:null, info:{lan_endpoint:null}, system:[{id:'model:qwen',vram_gb:3.04},{id:'model:b',vram_gb:null}], endpoint:'x'}"
+    assert node(f"m.modelView({ROW}, {ctx}).vramGb", "blade-home.js") == 3
+    assert node(f"m.modelView({{name:'b',state:'ready'}}, {ctx}).vramGb", "blade-home.js") is None

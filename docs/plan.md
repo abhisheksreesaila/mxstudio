@@ -161,14 +161,14 @@ Brief: docs/brief.md · Needs: F-019, F-020, F-021 merged
 Design: concept D, https://claude.ai/artifact/CSZMDSYDhyCzja8pjHpotw (local copy `.lavish/concepts/d-console.html`).
 Order: F-023 and F-024 first (in parallel); then F-025 to F-028 in parallel (each its own blade file); F-029 and F-030 any time; F-031 last.
 
-## F-023 Blades shell and My models [todo]
+## F-023 Blades shell and My models [done]
 Brief: docs/briefs/console-1.0.md · Needs: none
-- [ ] `/console` is the new layout: dark top bar (brand → home, breadcrumb, hardware chip with a VRAM bar per running model and a popover, API keys, Gateway, Settings, theme toggle, daemon dot); no left menu, no global Logs
-- [ ] blade engine: blades dock side by side, the newest on the right; older ones fold into clickable rails when space runs out; breadcrumb and Esc close back; a wide blade (notebook, add) folds everything left of it
-- [ ] My models blade from `/admin/models` + `/admin/metrics`: list (default) and cards toggle remembered per browser, state, access, live tok/s, a crashed model called out with "View logs"; compact list when a model is open beside it; "Add a model"
-- [ ] blade registry: each later blade is its own `blade-*.js` + CSS section, stubs registered now so F-025..F-028 touch only their own files
-- [ ] light and dark themes from tokens (dark follows the system until toggled, remembered); colour-coded outline icons (icon in the action's hue, label a quieter tint; Remove red); CSP unchanged, data as text nodes
-- [ ] the daemon-down state; narrow screens show only the newest blade
+- [x] `/console` is the new layout: dark top bar (brand → home, breadcrumb, hardware chip with a VRAM bar per running model and a popover, API keys, Gateway, Settings, theme toggle, daemon dot); no left menu, no global Logs
+- [x] blade engine: blades dock side by side, the newest on the right; older ones fold into clickable rails when space runs out; breadcrumb and Esc close back; a wide blade (notebook, add) folds everything left of it
+- [x] My models blade from `/admin/models` + `/admin/metrics`: list (default) and cards toggle remembered per browser, state, access, live tok/s, a crashed model called out with "View logs"; compact list when a model is open beside it; "Add a model"
+- [x] blade registry: each later blade is its own `blade-*.js` + CSS section, stubs registered now so F-025..F-028 touch only their own files
+- [x] light and dark themes from tokens (dark follows the system until toggled, remembered); colour-coded outline icons (icon in the action's hue, label a quieter tint; Remove red); CSP unchanged, data as text nodes
+- [x] the daemon-down state; narrow screens show only the newest blade
 
 ## F-024 Admin API for the 1.0 console [done]
 Brief: docs/briefs/console-1.0.md · Needs: none
