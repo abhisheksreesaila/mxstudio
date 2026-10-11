@@ -186,12 +186,12 @@ Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
 - [x] Security blade: Make it secure runs `/admin/expose` with its steps shown, then the HTTPS URL, key and CA path
 - [x] API keys blade: list, new (shown once), rotate, revoke; each shows its `mxc` command
 
-## F-026 Add a model [todo]
+## F-026 Add a model [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023, F-024
-- [ ] wide blade: search (`/admin/search`), results marked fits / tight / too big / needs porting; too big shows why and the suggestions
-- [ ] picking one runs the stages (check hardware, fetch, compile graph, serve on localhost, smoke test) from `/admin/pulls`, the load call and a one-line chat; live log; cancel
-- [ ] ends on a Ready card (endpoint, curl, Make it secure, Open); the model appears in My models with a short flash
-- [ ] needs porting → "Port it" hands over to F-029's job (until F-029 lands: shows the `mxc port` command)
+- [x] wide blade: search (`/admin/search`), results marked fits / tight / too big / needs porting; too big shows why and the suggestions
+- [x] picking one runs the stages (check hardware, fetch, compile graph, serve on localhost, smoke test) from `/admin/pulls`, the load call and a one-line chat; live log; cancel
+- [x] ends on a Ready card (endpoint, curl, Make it secure, Open); the model appears in My models with a short flash
+- [x] needs porting → "Port it" hands over to F-029's job (until F-029 lands: shows the `mxc port` command)
 
 ## F-027 Benchmark and Logs blades [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023
