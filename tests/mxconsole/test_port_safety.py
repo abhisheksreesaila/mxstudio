@@ -488,7 +488,7 @@ def test_the_checks_and_the_agent_see_the_gpu_too(tmp_path, fake_claude, fake_bw
 
 
 
-def test_the_sandbox_hf_cache_holds_only_this_models_weights_read_only_and_offline(tmp_path, fake_claude, fake_bwrap):
+def test_the_sandbox_hf_cache_holds_only_this_models_weights_read_only(tmp_path, fake_claude, fake_bwrap):
     job = run(make_manager(tmp_path, fake_claude, sandbox=True, bwrap=fake_bwrap))
     assert job["status"] == "done", job["message"]
     log = Path(job["log"]).read_text()
@@ -500,4 +500,7 @@ def test_the_sandbox_hf_cache_holds_only_this_models_weights_read_only_and_offli
     build = next(r for r in runs if r["cmd"][:3] == [py, script, "build"])
     pairs = bind_pairs(build["bwrap"], "--ro-bind-try")
     assert (str(repo), str(work / "hf" / "hub" / repo.name)) in pairs
-    assert build["env"]["HF_HUB_OFFLINE"] == "1"
+    # online: the verify gate reads safetensors metadata from the Hub (get_safetensors_metadata has no
+    # offline mode); the weights themselves are cache hits from the read-only bind, and no token is visible
+    assert build["env"].get("HF_HUB_OFFLINE") != "1"
+    assert not any(k in build["env"] for k in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"))

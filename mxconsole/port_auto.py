@@ -561,7 +561,10 @@ class PortManager:
         env.update(PIXI_CACHE_DIR=str(cache / "pixi"), RATTLER_CACHE_DIR=str(cache / "rattler"),
                    UV_CACHE_DIR=str(cache / "uv"), XDG_CACHE_HOME=str(cache / "xdg"),
                    MODULAR_DERIVED_PATH=str(cache / "modular"), HF_HOME=str(work / "hf"),
-                   HF_HUB_CACHE=str(work / "hf" / "hub"), HF_HUB_OFFLINE="1" if getattr(ctx, "weights", "") else "0")
+                   HF_HUB_CACHE=str(work / "hf" / "hub"))
+        # Not offline: the verify gate reads safetensors metadata from the Hub (no offline mode for that). The
+        # model's own files are cache hits from the read-only bind below; the HF token is scrubbed.
+        env.pop("HF_HUB_OFFLINE", None)
         binds: list[tuple[Path, Path]] = []
         if role == "agent":
             cfg = work / "claude-cfg"
