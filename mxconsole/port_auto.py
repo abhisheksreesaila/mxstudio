@@ -594,7 +594,7 @@ class PortManager:
             ro.append(ws)
             ro += self._weights_roots(ctx)
             rw = [work]
-        gpu = role == "serve"
+        gpu = True  # MAX picks its device by what it can see; without the GPU, bf16 weights fail on CPU
         wrapped = port_sandbox.bwrap_argv(argv, bwrap=bw, cwd=Path(cwd or ws), home=home, mxc_home=mxc_home(),
                                           rw=rw, ro=ro, ro_after=ro_after, binds=binds, gpu=gpu)
         return wrapped, env, "sandboxed with bubblewrap (read-only system and skills, empty $HOME and MXC_HOME, " \

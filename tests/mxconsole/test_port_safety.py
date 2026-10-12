@@ -129,7 +129,7 @@ def test_agent_checks_and_server_run_inside_bwrap_with_nothing_shared_writable(t
     server = next(r for r in runs if "serve" in r["cmd"])
     assert len(checks) == 2
     assert agent["bwrap"][:9] == ["--die-with-parent", "--new-session", "--unshare-pid", "--unshare-ipc",
-                                  "--unshare-uts", "--ro-bind", "/", "/", "--dev"]
+                                  "--unshare-uts", "--ro-bind", "/", "/", "--dev-bind"]
     allowed_rw = {"agent": {str(ws), str(work)}, "check": {str(work)}, "serve": {str(work)}}
     for role, r in (("agent", agent), ("check", checks[0]), ("check", checks[1]), ("serve", server)):
         rw = {src for src, dst in bind_pairs(r["bwrap"], "--bind-try") if src == dst}
@@ -141,7 +141,7 @@ def test_agent_checks_and_server_run_inside_bwrap_with_nothing_shared_writable(t
         f = str(ws / ".claude" / name)
         i = agent["bwrap"].index(f)
         assert i > ws_at and agent["bwrap"][i - 1] == "--ro-bind-try"
-    assert "--dev-bind" in server["bwrap"] and "--dev-bind" not in agent["bwrap"]
+    assert all("--dev-bind" in r["bwrap"] for r in (server, agent, *checks))  # MAX needs the GPU to load bf16
     log = Path(job["log"]).read_text()
     assert "[agent] sandboxed with bubblewrap" in log and "[serve] sandboxed with bubblewrap" in log
     assert not str(Path(job["log"])).startswith(str(work))   # port.log is outside everything the agent can write
@@ -469,3 +469,17 @@ def test_the_skill_checks_are_pointed_at_the_local_weights(tmp_path):
     assert verify[verify.index("--served-model-name") + 1] == "acme/weird"
     c.weights = ""
     assert port_auto._skill_build(c)[0][port_auto._skill_build(c)[0].index("scripts/check_port.py") + 1] == "acme/weird"
+
+
+def test_the_checks_and_the_agent_see_the_gpu_too(tmp_path, fake_claude, fake_bwrap):
+    """check_port.py has no device flag: with no GPU in the sandbox MAX picks the CPU, where bfloat16 weights
+    are refused ("encoding 'bfloat16' is not compatible with the selected device type 'cpu'", OLMoE)."""
+    py, script = sys.executable, str(HERE / "fake_port_check.py")
+    job = run(make_manager(tmp_path, fake_claude, sandbox=True, bwrap=fake_bwrap))
+    assert job["status"] == "done", job["message"]
+    runs = [json.loads(line) for line in (tmp_path / "bwrap.log").read_text().splitlines()]
+    agent = next(r for r in runs if r["cmd"][0] == fake_claude)
+    build = next(r for r in runs if r["cmd"][:3] == [py, script, "build"])
+    for r in (agent, build):
+        a = r["bwrap"]
+        assert a[a.index("--dev-bind") + 1] == "/dev", r["cmd"][:3]
