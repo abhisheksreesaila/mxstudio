@@ -12,7 +12,7 @@ mxstudio = "PYTHONPATH=notebooks python -m mxstudio.cli"
 mxs = "PYTHONPATH=notebooks python -m mxstudio.cli"
 
 [dependencies]
-modular = ">=26.5.0.dev2026080106,<27"
+modular = "==26.7.0.dev2026100905"
 openai = ">=2.52.0,<3"
 numpy = ">=2.5.1,<3"
 pytest = ">=9.1.1,<10"
