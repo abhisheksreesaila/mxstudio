@@ -465,7 +465,9 @@ def test_the_skill_checks_are_pointed_at_the_local_weights(tmp_path):
     build, _ = port_auto._skill_build(c)
     assert build[build.index("scripts/check_port.py") + 1] == c.weights
     verify, _ = port_auto._skill_verify(c, 9000)
-    assert verify[verify.index("scripts/run_oss_gates.py") + 1] == c.weights
+    # the verify gate loads the Hub config by repo id: it gets the id and finds the weights in its private,
+    # offline HF cache (a local path failed its hub_config preflight on the first real port)
+    assert verify[verify.index("scripts/run_oss_gates.py") + 1] == "acme/weird"
     assert verify[verify.index("--served-model-name") + 1] == "acme/weird"
     c.weights = ""
     assert port_auto._skill_build(c)[0][port_auto._skill_build(c)[0].index("scripts/check_port.py") + 1] == "acme/weird"
@@ -483,3 +485,19 @@ def test_the_checks_and_the_agent_see_the_gpu_too(tmp_path, fake_claude, fake_bw
     for r in (agent, build):
         a = r["bwrap"]
         assert a[a.index("--dev-bind") + 1] == "/dev", r["cmd"][:3]
+
+
+
+def test_the_sandbox_hf_cache_holds_only_this_models_weights_read_only_and_offline(tmp_path, fake_claude, fake_bwrap):
+    job = run(make_manager(tmp_path, fake_claude, sandbox=True, bwrap=fake_bwrap))
+    assert job["status"] == "done", job["message"]
+    log = Path(job["log"]).read_text()
+    weights = Path(log.split("weights at ", 1)[1].splitlines()[0].strip())
+    repo = next((a for a in [weights, *weights.parents] if a.name.startswith("models--")), weights)
+    runs = [json.loads(line) for line in (tmp_path / "bwrap.log").read_text().splitlines()]
+    work = mxc_home() / "ports" / str(job["id"]) / "work"
+    py, script = sys.executable, str(HERE / "fake_port_check.py")
+    build = next(r for r in runs if r["cmd"][:3] == [py, script, "build"])
+    pairs = bind_pairs(build["bwrap"], "--ro-bind-try")
+    assert (str(repo), str(work / "hf" / "hub" / repo.name)) in pairs
+    assert build["env"]["HF_HUB_OFFLINE"] == "1"

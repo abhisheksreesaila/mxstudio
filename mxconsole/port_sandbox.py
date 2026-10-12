@@ -57,7 +57,8 @@ def tool_roots(*exes: str) -> list[Path]:
 
 
 def bwrap_argv(cmd: list[str], *, bwrap: str = "bwrap", cwd: Path, home: Path, mxc_home: Path,
-               rw: list[Path] = (), ro: list[Path] = (), ro_after: list[Path] = (), binds: list[tuple[Path, Path]] = (), gpu: bool = False) -> list[str]:
+               rw: list[Path] = (), ro: list[Path] = (), ro_after: list[Path] = (), binds: list[tuple[Path, Path]] = (),
+               ro_binds: list[tuple[Path, Path]] = (), gpu: bool = False) -> list[str]:
     """`cmd` wrapped to run confined. Paths in `rw`/`ro` are bound at the same place when they exist
     (ro-bind-try / bind-try); order matters: tmpfs first, then the binds on top of it, and `ro_after` last
     (read-only files inside a writable directory)."""
@@ -72,6 +73,8 @@ def bwrap_argv(cmd: list[str], *, bwrap: str = "bwrap", cwd: Path, home: Path, m
         argv += ["--bind-try", str(p), str(p)]
     for src, dst in binds:  # a file or dir exposed read-write at another path (the Claude login)
         argv += ["--bind-try", str(src), str(dst)]
+    for src, dst in ro_binds:  # a dir exposed read-only at another path (the model's weights in a private HF cache)
+        argv += ["--ro-bind-try", str(src), str(dst)]
     for p in ro_after:
         argv += ["--ro-bind-try", str(p), str(p)]
     return argv + ["--chdir", str(cwd), "--", *cmd]

@@ -7,5 +7,6 @@ import sys
 args = sys.argv[1:]
 cut = args.index("--")
 with open(os.environ["FAKE_BWRAP_LOG"], "a") as f:
-    f.write(json.dumps({"bwrap": args[:cut], "cmd": args[cut + 1:]}) + "\n")
+    f.write(json.dumps({"bwrap": args[:cut], "cmd": args[cut + 1:],
+                        "env": {k: v for k, v in os.environ.items() if k.startswith("HF_")}}) + "\n")
 os.execvp(args[cut + 1], args[cut + 1:])

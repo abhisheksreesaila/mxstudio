@@ -190,7 +190,8 @@ def _skill_build(c: Ctx):
 
 
 def _skill_verify(c: Ctx, port_: int):
-    return _pixi_run(c, "run_oss_gates.py", c.weights or c.repo_id, "--port-dir", str(c.port_dir),
+    # by repo id: the gate loads the Hub config; the weights are found in the sandbox's offline HF cache
+    return _pixi_run(c, "run_oss_gates.py", c.repo_id, "--port-dir", str(c.port_dir),
                      "--phase", "verify", "--port", str(port_), "--served-model-name", c.repo_id)
 
 
@@ -560,7 +561,7 @@ class PortManager:
         env.update(PIXI_CACHE_DIR=str(cache / "pixi"), RATTLER_CACHE_DIR=str(cache / "rattler"),
                    UV_CACHE_DIR=str(cache / "uv"), XDG_CACHE_HOME=str(cache / "xdg"),
                    MODULAR_DERIVED_PATH=str(cache / "modular"), HF_HOME=str(work / "hf"),
-                   HF_HUB_CACHE=str(work / "hf" / "hub"))
+                   HF_HUB_CACHE=str(work / "hf" / "hub"), HF_HUB_OFFLINE="1" if getattr(ctx, "weights", "") else "0")
         binds: list[tuple[Path, Path]] = []
         if role == "agent":
             cfg = work / "claude-cfg"
@@ -599,8 +600,13 @@ class PortManager:
             ro += self._weights_roots(ctx)
             rw = [work]
         gpu = True  # MAX picks its device by what it can see; without the GPU, bf16 weights fail on CPU
+        ro_binds = []
+        for repo in self._weights_roots(ctx):  # this model only, in the job's private HF cache, read-only
+            dst = work / "hf" / "hub" / repo.name
+            dst.mkdir(parents=True, exist_ok=True)
+            ro_binds.append((repo, dst))
         wrapped = port_sandbox.bwrap_argv(argv, bwrap=bw, cwd=Path(cwd or ws), home=home, mxc_home=mxc_home(),
-                                          rw=rw, ro=ro, ro_after=ro_after, binds=binds, gpu=gpu)
+                                          rw=rw, ro=ro, ro_after=ro_after, binds=binds, ro_binds=ro_binds, gpu=gpu)
         return wrapped, env, "sandboxed with bubblewrap (read-only system and skills, empty $HOME and MXC_HOME, " \
             "private /tmp and caches, writable: " + ", ".join(str(x) for x in rw) + ")"
 
