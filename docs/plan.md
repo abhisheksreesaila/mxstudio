@@ -220,10 +220,10 @@ Brief: docs/briefs/console-1.0.md · Needs: F-023
 - [x] no Linux-only assumptions in the code path; Mac build verified later on a Mac
 - Window: pywebview + Qt WebEngine in the pixi env `app` (`pixi install -e app`, ~1 GB, done by `--install`); falls back to a Chromium `--app` window. Mac still to verify on a Mac.
 
-## F-031 Retire the old console pages [todo]
+## F-031 Retire the old console pages [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-025..F-028
-- [ ] old page files and their CSS are gone; every old capability is reachable from a blade or the CLI; `mxc console [page]` maps old page names to blades
-- [ ] full suite green; live check in the running app (`/verify`) in both themes
+- [x] old page files and their CSS are gone; every old capability is reachable from a blade or the CLI; `mxc console [page]` maps old page names to blades
+- [x] full suite green; live check in the running app (`/verify`) in both themes
 
 ## Parked: console layout redesign
 Superseded 2026-10-11 by Console 1.0 above (concept D chosen).

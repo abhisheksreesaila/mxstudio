@@ -1,4 +1,4 @@
-"""The API reference at /docs: one plain HTML page rendered from the OpenAPI spec (no scripts, so the console's CSP holds)."""
+"""The API reference at /docs: one plain HTML page rendered from the OpenAPI spec (no inline scripts; it loads theme.js from the daemon, so the console's CSP holds)."""
 from __future__ import annotations
 
 import json
