@@ -4,19 +4,13 @@ import { h, icon, store, onData, colorOf } from "./core.js";
 import { stack, push, truncate, onStackChange, hueSquare } from "./blades.js";
 import { hardwareView } from "./hardware.js";
 import { system } from "./system-data.js";
-import { readTheme, writeTheme, resolveTheme, nextTheme, safeStorage } from "./prefs.js";
+import { readTheme, nextTheme, safeStorage, applyTheme, currentTheme, setTheme, onTheme } from "./prefs.js";
 
 const SHARED = [["keys", "API keys", "key-round", "var(--hue-keys)"], ["gateway", "Gateway", "route", "var(--hue-gateway)"], ["settings", "Settings", "sliders-horizontal", null]];
 
-export function applyTheme(pref) {
-  if (pref) document.documentElement.dataset.theme = pref;
-  else delete document.documentElement.dataset.theme;
-}
-
 export function mountTopbar(bar, pop) {
-  const sysDark = window.matchMedia("(prefers-color-scheme: dark)");
-  let pref = readTheme(safeStorage()), popOpen = false;
-  applyTheme(pref);
+  let popOpen = false;
+  applyTheme(readTheme(safeStorage()));
 
   const brand = h("button", { class: "brand", type: "button", title: "My models", onClick: () => truncate(1) }, h("span", { class: "dot" }), "mxconsole", h("small", { class: "mono" }, "local"));
   const crumbs = h("nav", { class: "bc", "aria-label": "Breadcrumb" });
@@ -24,19 +18,18 @@ export function mountTopbar(bar, pop) {
   const nav = h("nav", { class: "tnav", "aria-label": "Shared by every model" }, SHARED.map(([name, label, ic, hue]) =>
     h("button", { class: `tn ${hue ? "" : "icon"}`, type: "button", "data-nav": name, title: label, "aria-label": label, style: hue ? { "--hue": hue } : {},
       onClick: () => { if (stack[1] && stack[1].name === name) truncate(2); else push(name, {}, 0); } }, icon(ic, 16, "currentColor", 1.75), hue ? h("span", {}, label) : null)));
-  const themeBtn = h("button", { class: "tn icon", type: "button", onClick: () => { pref = nextTheme(isDark() ? "dark" : "light"); writeTheme(safeStorage(), pref); applyTheme(pref); paintTheme(); } });
+  const themeBtn = h("button", { class: "tn icon", type: "button", onClick: () => setTheme(nextTheme(currentTheme())) });
   const live = h("span", { class: "live" });
   bar.replaceChildren(brand, crumbs, chip, nav, themeBtn, live);
 
-  const isDark = () => resolveTheme(pref, sysDark.matches) === "dark";
   function paintTheme() {
-    const dark = isDark();
+    const dark = currentTheme() === "dark";
     themeBtn.replaceChildren(icon(dark ? "sun" : "moon", 16, "currentColor", 1.75));
     themeBtn.title = dark ? "Light mode" : "Dark mode";
     themeBtn.setAttribute("aria-label", themeBtn.title);
     themeBtn.setAttribute("aria-pressed", String(dark));
   }
-  sysDark.addEventListener("change", paintTheme);
+  onTheme(paintTheme);
   paintTheme();
 
   function drawCrumbs() {

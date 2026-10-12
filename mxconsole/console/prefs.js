@@ -32,3 +32,34 @@ export function writeTheme(storage, theme) {
 }
 export const resolveTheme = (pref, systemDark) => pref || (systemDark ? "dark" : "light");
 export const nextTheme = (current) => (current === "dark" ? "light" : "dark");
+
+// -- the one place the theme is changed ---------------------------------------------------------------
+// The top-bar toggle and Settings both call setTheme(); anything that draws the theme listens with onTheme().
+export const THEME_EVENT = "mxc:theme";
+const systemIsDark = () => { try { return window.matchMedia("(prefers-color-scheme: dark)").matches; } catch (_) { return false; } };
+
+/** Put a theme on the page: "light" or "dark" is explicit, null follows the system. */
+export function applyTheme(pref) {
+  if (pref === "light" || pref === "dark") document.documentElement.dataset.theme = pref;
+  else delete document.documentElement.dataset.theme;
+}
+/** The theme in force right now: what the page shows (even when storage is blocked), else the remembered choice, else the system's. */
+export function currentTheme() {
+  const shown = document.documentElement.dataset.theme;
+  return resolveTheme(shown === "light" || shown === "dark" ? shown : readTheme(safeStorage()), systemIsDark());
+}
+/** Choose a theme ("light" | "dark"): remember it, apply it, and tell every listener. */
+export function setTheme(theme) {
+  if (theme !== "light" && theme !== "dark") return;
+  const storage = safeStorage();
+  if (storage) writeTheme(storage, theme);
+  applyTheme(theme);
+  window.dispatchEvent(new CustomEvent(THEME_EVENT, { detail: theme }));
+}
+/** Run fn whenever the theme changes (by setTheme, or by the system while no choice is saved). Returns the unsubscribe. */
+export function onTheme(fn) {
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  window.addEventListener(THEME_EVENT, fn);
+  mq.addEventListener("change", fn);
+  return () => { window.removeEventListener(THEME_EVENT, fn); mq.removeEventListener("change", fn); };
+}

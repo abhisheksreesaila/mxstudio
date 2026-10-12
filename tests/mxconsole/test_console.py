@@ -10,8 +10,8 @@ async def test_console_page_is_served_to_this_machine(http):
     assert "<title>mxconsole</title>" in r.text and "/console/main.js" in r.text
     js = await http.get("/console/core.js")
     assert js.status_code == 200 and "X-Mst-Admin" in js.text
-    css = await http.get("/console/console.css")
-    assert css.status_code == 200 and "--page" in css.text and 'data-theme="dark"' in css.text
+    css = await http.get("/console/blades.css")
+    assert css.status_code == 200 and "--canvas" in css.text and 'data-theme="dark"' in css.text
 
 
 def test_the_product_is_one_lowercase_word_everywhere_people_read_it():
@@ -82,7 +82,7 @@ async def test_admin_info_for_the_top_bar(http):
 
 
 async def test_console_cannot_be_framed_and_loads_nothing_from_elsewhere(http):
-    for path in ("/console", "/console/main.js", "/console/console.css"):
+    for path in ("/console", "/console/main.js", "/console/blades.css"):
         r = await http.get(path)
         assert r.headers["x-frame-options"] == "DENY"
         csp = r.headers["content-security-policy"]
@@ -92,7 +92,7 @@ async def test_console_cannot_be_framed_and_loads_nothing_from_elsewhere(http):
 
 
 async def test_console_fonts_are_served_locally(http):
-    css = (await http.get("/console/console.css")).text
+    css = (await http.get("/console/blades.css")).text
     for font in ("geist-variable.woff2", "geist-mono-variable.woff2"):
         assert f"/console/{font}" in css
         r = await http.get(f"/console/{font}")

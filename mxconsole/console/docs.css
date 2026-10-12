@@ -1,0 +1,25 @@
+/* mxconsole, the API reference page (/docs): plain server-rendered HTML, no scripts of its own.
+   Loaded after blades.css, so it uses the console's tokens (and theme.js sets data-theme like the console). */
+html, body.docs { height: auto; overflow: auto; }
+body.docs { min-height: 100%; }
+.docs header.top { display: flex; align-items: center; gap: 14px; padding: 0 16px; height: var(--top); background: var(--chrome); color: var(--chrome-text); border-bottom: 1px solid var(--chrome-line); }
+.docs header a { color: inherit; text-decoration: none; }
+.docs header .brand { font-weight: 600; }
+.docs header .back { margin-left: auto; font-size: 13px; color: var(--chrome-muted); }
+.docs header .mono { font-size: 12px; color: var(--chrome-muted); }
+.docs main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+.docs h1 { font-size: 22px; margin: 8px 0; }
+.docs h2 { font-size: 15px; margin: 0 0 6px; }
+.docs section, .docs dl { background: var(--card); border: 1px solid var(--card-line); border-radius: 12px; padding: 14px 16px; margin: 12px 0; }
+.docs dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 18px; }
+.docs dt { color: var(--muted); }
+.docs dd { margin: 0; overflow-wrap: anywhere; }
+.docs code { font-family: var(--mono); background: var(--sunk); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; }
+.docs table { width: 100%; border-collapse: collapse; font-size: 13px; display: block; overflow-x: auto; }
+.docs th { text-align: left; color: var(--muted); font: 500 10.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; }
+.docs th, .docs td { padding: 6px 12px 6px 0; border-bottom: 1px solid var(--card-line-2); vertical-align: top; }
+.docs pre { background: var(--code); color: var(--code-text); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; margin: 10px 0; }
+.docs .m { font: 600 11px var(--mono); padding: 2px 7px; border-radius: 5px; background: var(--sunk); color: var(--accent); }
+.docs .codes { color: var(--muted); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.docs .foot { color: var(--muted); font-size: 12.5px; }
+.docs a { color: var(--accent); }

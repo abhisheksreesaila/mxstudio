@@ -30,11 +30,11 @@ Architecture decision: [docs/adr/0001](docs/adr/0001-mst-core-architecture.md)
 |---|---|---|
 | **Resolver** | `qwen2.5-0.5b` → HF repo → architecture → is it in MAX's catalog (`max list --json`)? Downloads safetensors at a pinned commit. | `mxconsole/resolve.py` |
 | **Supervisor** (the "hypervisor") | One `max serve` child per model on a free loopback port. Starts it on demand (concurrent callers share one start), stops it after `keep_alive` idle (default 5m) unless pinned, never mid-request. Cleans up orphans after a crash. | `mxconsole/supervisor.py` |
-| **Gateway** (`mxc daemon`) | OpenAI-compatible `/v1/*` on `127.0.0.1:11435`. Checks the Bearer key, routes by `model`, streams through, and serves the console (mxconsole, with the API reference) at `/console`; `/docs` redirects to it. Admin routes are for the CLI and the console only. | `mxconsole/gateway.py` |
+| **Gateway** (`mxc daemon`) | OpenAI-compatible `/v1/*` on `127.0.0.1:11435`. Checks the Bearer key, routes by `model`, streams through, and serves the console at `/console` and the API reference at `/docs`. Admin routes are for the CLI and the console only. | `mxconsole/gateway.py` |
 | **Keys** | `mst-…` keys, one per app, stored only as SHA-256 hashes. Shown once. | `mxconsole/keys.py` |
 | **Expose** | Writes and runs Caddy (`tls internal`, forward_auth) and LiteLLM (its own pixi env, master key, no Postgres) as your user. | `mxconsole/expose.py` |
 | **Learn** | A Jupyter notebook built only from the Hugging Face API: model card, config table, parameter breakdown, sample code, and a pointer to MAX's source. | `mxconsole/learn.py` |
-| **Console** | `http://127.0.0.1:11435/console`: mxconsole in the Graphite style (live strip, models table with a side sheet, metrics, API keys, network patch bay, API reference, ⌘K palette). This machine only. | `mxconsole/console/` |
+| **Console** | `http://127.0.0.1:11435/console`: a dark top bar (hardware chip, API keys, Gateway, Settings, theme) and blades that open side by side. **My models** (list or cards, live tok/s) opens a blade per model (Overview, Security, Benchmark, Logs, Notebook); **Add a model** searches the MAX catalog and Hugging Face and sets it up; `mxc app` opens it in its own window; `mxc console [page] [model]` deep-links. The API reference is at `/docs`. This machine only. | `mxconsole/console/` |
 | **Port** | For unsupported architectures: clones `modular/skills`, picks a donor architecture, and writes `PORT.md` plus the `claude '/import-model …'` command. | `mxconsole/port.py` |
 
 State lives in `~/.mxc/` (override with `MXC_HOME`; the old `HOTFIRE_HOME` and `MST_HOME` still work; an existing `~/.hotfire` or `~/.mst` is moved here once): `mst.db` (models, key hashes), `logs/`,

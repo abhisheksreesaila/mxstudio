@@ -23,3 +23,7 @@
 .gw-log { margin: 0; background: var(--code); color: var(--code-text); border-radius: 8px; padding: 10px 12px; font-size: 11.5px; line-height: 1.55; height: 220px; overflow: auto; white-space: pre; }
 .gw-twin { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .gw-twin .cli { flex: 1; }
+
+.b-gateway .ok-text { color: var(--ok-fg); }
+.b-gateway .bad-text { color: var(--bad-fg); }
+.b-gateway a.btn { text-decoration: none; margin-top: 4px; }

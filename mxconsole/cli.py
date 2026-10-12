@@ -126,7 +126,7 @@ def set_model(model: str = typer.Argument(..., help="A registered model name"),
               unpin: bool = typer.Option(False, "--unpin", help="Let it unload when idle again."),
               keep_alive: str = typer.Option(None, "--keep-alive", help="Unload after this idle time: 90s, 10m, 1h."),
               as_json: bool = JSON) -> None:
-    """Change a model's pin and keep-alive (what the console's Models page edits)."""
+    """Change a model's pin and keep-alive (what the console's model blade and Settings show)."""
     if pin and unpin:
         _fail("--pin and --unpin together make no sense")
     if not (pin or unpin or keep_alive):
@@ -146,7 +146,7 @@ def set_model(model: str = typer.Argument(..., help="A registered model name"),
         typer.echo(report.dump(report.model_row(m, serve.live_states() if running else {}, running)))
         return
     typer.echo(f"{m.name}: {report.lifecycle(m)}")
-    typer.echo(f"console  {report.console_link('models')}")
+    typer.echo(f"console  {report.console_link('model', m.name)}")
 
 
 @app.command("logs")
@@ -188,7 +188,7 @@ def metrics_cmd(range_: str = typer.Option("5m", "--range", help="Window: " + ",
         typer.echo(report.dump({"range": range_, **data, "gpus": gpus}))
         return
     typer.echo(report.metrics_text(data, range_, gpus))
-    typer.echo(f"\nconsole  {report.console_link('metrics')}")
+    typer.echo(f"\nconsole  {report.console_link('home')}")
 
 
 @app.command("requests")
@@ -204,7 +204,7 @@ def requests_cmd(limit: int = typer.Option(20, "--limit", min=1, help="How many 
         typer.echo("no requests yet")
     else:
         typer.echo(report.requests_text(rows))
-    typer.echo(f"\nconsole  {report.console_link('activity')}")
+    typer.echo(f"\nconsole  {report.console_link('gateway')}")
 
 
 @app.command("bench")
@@ -284,9 +284,13 @@ def ps_cmd(as_json: bool = JSON) -> None:
 
 
 @app.command("console")
-def console_cmd(page: str = typer.Argument("overview", help="One of: " + ", ".join(report.PAGES)),
+def console_cmd(page: str = typer.Argument("home", help="One of: " + ", ".join(report.PAGES)),
+                model: str = typer.Argument(None, help="The model, for model, security, bench, logs and notebook."),
                 no_open: bool = typer.Option(False, "--no-open", help="Only print the link.")) -> None:
-    """Print the console link for a page and open it in the browser. Starts the daemon if needed."""
+    """Print the console link for a page and open it in the browser. Starts the daemon if needed.
+
+    Pages are the console's blades (keys, gateway, settings, add, model, security, bench, logs, notebook); the old
+    page names still work (overview, models, daemon, pull, ...). `mxc console api` opens the API reference."""
     import webbrowser
 
     from mxconsole import serve
@@ -296,7 +300,7 @@ def console_cmd(page: str = typer.Argument("overview", help="One of: " + ", ".jo
         serve.ensure_daemon()
     except serve.DaemonError as e:
         _fail(str(e))
-    url = report.console_link(page)
+    url = report.console_link(page, model)
     typer.echo(url)
     if not no_open:
         webbrowser.open(url)
@@ -499,7 +503,7 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
         _fail(str(e))
     typer.echo("")
     typer.echo(serve.usage(name, serve.first_key(store)))
-    typer.echo(f"\nmanage it in the console: {report.console_link('models')}   (or: mxc status, mxc set {name} --pin)")
+    typer.echo(f"\nmanage it in the console: {report.console_link('model', name)}   (or: mxc status, mxc set {name} --pin)")
 
 
 @app.command("stop")

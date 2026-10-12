@@ -16,7 +16,7 @@ def test_set_pin_and_keep_alive_change_the_store_and_link_the_console():
     r = runner.invoke(app, ["set", "tiny", "--pin"])
     assert r.exit_code == 0, r.output
     assert Store.open().get_model("tiny").pinned
-    assert "pinned" in r.output and "/console#models" in r.output
+    assert "pinned" in r.output and "/console#model/" in r.output
     r = runner.invoke(app, ["set", "tiny", "--unpin", "--keep-alive", "10m"])
     m = Store.open().get_model("tiny")
     assert r.exit_code == 0 and not m.pinned and m.keep_alive == 600
