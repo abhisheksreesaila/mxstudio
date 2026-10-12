@@ -211,7 +211,7 @@ Brief: docs/briefs/console-1.0.md · Needs: none (UI hook in F-026)
 - [x] `POST /admin/ports`, `GET /admin/ports/{id}`, cancel; `--json` progress lines
 - [x] tested with a fake `claude` binary; nothing real runs in tests
 - Runs under bubblewrap (private caches, read-only skills clone, scrubbed env, Claude login bound in); refuses without bwrap unless `--unsandboxed`. Accepted risks in port_auto.py's docstring.
-- Not yet proven: one real `mxc port <ref> --auto` end to end (uses Claude Code and can take hours; waiting for the person's go).
+- First real run (OLMoE-1B-7B, 2026-10-11): found and fixed four harness bugs (pixi activation leak, check cwd, weights re-downloaded per attempt, no GPU in the sandbox). The port then passed the build check every attempt but could not load in mxconsole's MAX 26.5 (written for the skill env's 26.7). Next: align mxconsole's MAX with the skill's (the person's call).
 
 ## F-030 Desktop app for Linux and Mac [done]
 Brief: docs/briefs/console-1.0.md · Needs: F-023
