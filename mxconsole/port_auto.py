@@ -57,7 +57,7 @@ from typing import Callable
 
 import httpx
 
-from mxconsole import port, port_sandbox, resolve
+from mxconsole import port, port_sandbox, resolve, supervisor
 from mxconsole.pulls import NAME_RE, REF_RE, BadPull
 from mxconsole.store import Store, mxc_home
 
@@ -866,7 +866,7 @@ class PortManager:
         self._check(job)
         port_ = _free_port()
         self._detail(job, row, f"compiling and serving on :{port_} (a cold compile takes 5 to 25 minutes)…")
-        argv = [*self.max_command, "serve", "--port", str(port_), "--served-model-name", ctx.repo_id,
+        argv = [*self.max_command, "serve", *supervisor.launch_flags(), "--port", str(port_), "--served-model-name", ctx.repo_id,
                 "--custom-architectures", str(ctx.port_dir), "--model-path", str(weights)]
         run_argv, env, note = self._confine(job, argv, "serve", ctx)
         job.say(f"[serve] {note}")
