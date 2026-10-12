@@ -438,3 +438,34 @@ def test_a_sandboxed_check_runs_in_the_directory_it_asked_for(tmp_path, fake_cla
     chdir = argv[argv.index("--chdir") + 1]
     assert chdir.endswith("skills/modular") or "skills" in chdir, (chdir, job["status"])
     assert chdir != str(mxc_home() / "ports" / "weird")  # not the workspace
+
+
+def test_weights_are_downloaded_once_outside_the_sandbox_before_the_agent_and_checks_use_them(tmp_path, fake_claude, fake_bwrap):
+    """check_port.py loads the real weights; with each sandbox's private HF cache it re-downloaded the whole
+    model on every attempt (14 GB for OLMoE). Download once, outside, and hand the checks the local path."""
+    job = run(make_manager(tmp_path, fake_claude, sandbox=True, bwrap=fake_bwrap))
+    assert job["status"] == "done", job["message"]
+    log = Path(job["log"]).read_text()
+    assert log.index("downloading the weights") < log.index("== generate (attempt 1)")
+    runs = [json.loads(line) for line in (tmp_path / "bwrap.log").read_text().splitlines()]
+    agent = next(r for r in runs if r["cmd"][0] == fake_claude)
+    ro = bind_pairs(agent["bwrap"], "--ro-bind-try")
+    weights = Path(log.split("weights at ", 1)[1].splitlines()[0].strip())
+    assert any(weights == Path(src) or Path(src) in weights.parents for src, _ in ro), "the agent sees the weights read-only"
+
+
+def test_the_skill_checks_are_pointed_at_the_local_weights(tmp_path):
+    from mxconsole import port, port_auto
+    scripts = tmp_path / "s" / port.ENTRY_SKILL / "scripts"
+    scripts.mkdir(parents=True)
+    for f in ("check_port.py", "run_oss_gates.py"):
+        (scripts / f).write_text("")
+    c = port_auto.Ctx("acme/weird", "acme/weird", "weird", Path("/w"), Path("/w/port/weird"), tmp_path / "s")
+    c.weights = "/hf/models--acme--weird/snapshots/abc"
+    build, _ = port_auto._skill_build(c)
+    assert build[build.index("scripts/check_port.py") + 1] == c.weights
+    verify, _ = port_auto._skill_verify(c, 9000)
+    assert verify[verify.index("scripts/run_oss_gates.py") + 1] == c.weights
+    assert verify[verify.index("--served-model-name") + 1] == "acme/weird"
+    c.weights = ""
+    assert port_auto._skill_build(c)[0][port_auto._skill_build(c)[0].index("scripts/check_port.py") + 1] == "acme/weird"

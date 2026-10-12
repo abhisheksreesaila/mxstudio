@@ -145,7 +145,7 @@ class Ctx:
     workspace: Path
     port_dir: Path
     skills_root: Path             # the pristine clone: the build/parity gates run from here, never the agent
-    weights: str = ""            # the downloaded snapshot, set before the sandboxed parity step
+    weights: str = ""            # the downloaded snapshot, set once before the agent runs (outside the sandbox)
     gate_hash: str = ""           # hash of the gate scripts right after the clone was updated
     extra_allowed: tuple = ()     # per-model additions to the allow list (the donor copy commands)
 
@@ -183,12 +183,14 @@ def _skill_install(c: Ctx):
 
 
 def _skill_build(c: Ctx):
-    return _pixi_run(c, "check_port.py", c.repo_id, "--port-dir", str(c.port_dir))
+    # the local snapshot, not the repo id: inside the sandbox the HF cache is private and empty, so a repo id
+    # would re-download the whole model on every attempt
+    return _pixi_run(c, "check_port.py", c.weights or c.repo_id, "--port-dir", str(c.port_dir))
 
 
 def _skill_verify(c: Ctx, port_: int):
-    return _pixi_run(c, "run_oss_gates.py", c.repo_id, "--port-dir", str(c.port_dir),
-                     "--phase", "verify", "--port", str(port_))
+    return _pixi_run(c, "run_oss_gates.py", c.weights or c.repo_id, "--port-dir", str(c.port_dir),
+                     "--phase", "verify", "--port", str(port_), "--served-model-name", c.repo_id)
 
 
 def find_claude(explicit: str | None = None) -> str | None:
@@ -227,7 +229,7 @@ Read PORT.md and config.json here first. Follow the `import-model` skill (.claud
 Package folder: {c.port_dir}
 That exact folder must end up holding arch.py and an __init__.py that exposes ARCHITECTURES. Scaffold with `--output-dir {c.port_dir.parent} --slug {c.port_dir.name}` (or create it by hand). Do not write outside the workspace, except by running the skill's own commands.
 
-You are done when `pixi run python scripts/check_port.py {c.repo_id} --port-dir {c.port_dir}` (run from the skill root) passes and the implementation-complete criteria in the skill are met. Do not start `max serve` yourself and do not install packages with pip; mxconsole serves and verifies the port afterwards, against the Hugging Face reference. Finish with a short summary of what you changed."""
+You are done when `pixi run python scripts/check_port.py {c.weights or c.repo_id} --port-dir {c.port_dir}` (run from the skill root; the weights are already downloaded there, read-only — use that path, not the repo id, or the model is downloaded again) passes and the implementation-complete criteria in the skill are met. Do not start `max serve` yourself and do not install packages with pip; mxconsole serves and verifies the port afterwards, against the Hugging Face reference. Finish with a short summary of what you changed."""
     if attempt <= 1 and not feedback:
         return base
     return (base + f"""
@@ -587,6 +589,7 @@ class PortManager:
                     f.write_text("{}\n")
                 ro_after.append(f)
             rw = [ws, work]
+            ro += self._weights_roots(ctx)  # so the agent's own check_port.py runs use the local weights too
         else:
             ro.append(ws)
             ro += self._weights_roots(ctx)
@@ -748,7 +751,14 @@ class PortManager:
             code, out = self._exec(job, cmd[0], cmd[1], timeout=INSTALL_TIMEOUT, role="install", ctx=ctx)
             if code != 0:
                 raise _StageFailed(f"could not install the skill's pixi environment (exit {code}): {out[-300:]}")
-        self._end(job, row, detail=f"{len(skills)} skills in {skills_root}, read-only for the agent and the gates")
+        self._detail(job, row, f"downloading the weights of {res.repo_id} (once, outside the sandbox)…")
+        job.say(f"-- downloading the weights of {res.repo_id} (once, outside the sandbox)…")
+        try:
+            ctx.weights = str(resolve.download_snapshot(res, hub, cancel=job.cancel))
+        except resolve.PullCancelled:
+            raise _Cancelled()
+        self._end(job, row, detail=f"{len(skills)} skills in {skills_root}, read-only for the agent and the gates; "
+                                   f"weights at {ctx.weights}")
 
         feedback: str | None = None
         for attempt in range(1, job.max_attempts + 1):
@@ -843,11 +853,12 @@ class PortManager:
         return None
 
     def _parity(self, job: _Job, ctx: Ctx, row: dict, hub, res) -> _StageFailed | None:
-        try:
-            weights = resolve.download_snapshot(res, hub, cancel=job.cancel)
-        except resolve.PullCancelled:
-            raise _Cancelled()
-        ctx.weights = str(weights)
+        if not ctx.weights:  # downloaded in the skills stage; this covers a manager driven another way
+            try:
+                ctx.weights = str(resolve.download_snapshot(res, hub, cancel=job.cancel))
+            except resolve.PullCancelled:
+                raise _Cancelled()
+        weights = ctx.weights
         self._check(job)
         port_ = _free_port()
         self._detail(job, row, f"compiling and serving on :{port_} (a cold compile takes 5 to 25 minutes)…")
