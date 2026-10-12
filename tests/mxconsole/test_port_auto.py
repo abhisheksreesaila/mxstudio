@@ -368,3 +368,14 @@ def test_guided_port_is_unchanged_without_auto(monkeypatch):
     monkeypatch.setattr("mxconsole.resolve.load_catalog", lambda **kw: {})
     out = CliRunner().invoke(cli.app, ["port", "--help"])
     assert "--auto" in out.output and "--max-attempts" in out.output and "--json" in out.output
+
+
+def test_the_prompt_names_the_max_that_will_serve_the_port(tmp_path):
+    """The skill's env can run a newer MAX than mxconsole serves with (26.7 vs 26.5 on the first real port,
+    which then failed with `cannot import name 'tree' from 'max'`): the agent must write for the server's MAX."""
+    from mxconsole.port_auto import Ctx, build_prompt
+    c = Ctx("acme/weird", "acme/weird", "weird", tmp_path, tmp_path / "port" / "weird", tmp_path / "s",
+            serving_max="26.5.0.dev2026080106")
+    p = build_prompt(c, 1, None, "donor note")
+    assert "26.5.0.dev2026080106" in p and "newer" in p
+    assert "26.5" not in build_prompt(Ctx("a/b", "a/b", "b", tmp_path, tmp_path / "p", tmp_path / "s"), 1, None, "")

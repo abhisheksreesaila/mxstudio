@@ -148,6 +148,7 @@ class Ctx:
     weights: str = ""            # the downloaded snapshot, set once before the agent runs (outside the sandbox)
     gate_hash: str = ""           # hash of the gate scripts right after the clone was updated
     extra_allowed: tuple = ()     # per-model additions to the allow list (the donor copy commands)
+    serving_max: str = ""         # the MAX that will serve the port (mxconsole's), which the skill env may not match
 
 
 @dataclass
@@ -219,6 +220,9 @@ def package_slug(name: str) -> str:
 
 
 def build_prompt(c: Ctx, attempt: int, feedback: str | None, donor_note: str) -> str:
+    serving = (f"The port will be served by MAX {c.serving_max} (mxconsole's), which may be older than the MAX in "
+               f"the skill's environment: use only APIs that exist in {c.serving_max}, nothing newer.\n"
+               if c.serving_max else "")
     base = f"""You are porting a Hugging Face model to MAX, unattended. Nobody is available to answer questions or confirm a plan: where the skill says to propose a plan and wait for a veto, state your default in one paragraph and carry on.
 
 Model: {c.repo_id}
@@ -226,7 +230,7 @@ Workspace (your working directory): {c.workspace}
 Read PORT.md and config.json here first. Follow the `import-model` skill (.claude/skills/import-model/SKILL.md; the skill root is {c.skills_root / port.ENTRY_SKILL}, read-only, with its pixi environment already installed) for this model, phase by phase, and write the custom architecture package for it.
 
 {donor_note}
-Package folder: {c.port_dir}
+{serving}Package folder: {c.port_dir}
 That exact folder must end up holding arch.py and an __init__.py that exposes ARCHITECTURES. Scaffold with `--output-dir {c.port_dir.parent} --slug {c.port_dir.name}` (or create it by hand). Do not write outside the workspace, except by running the skill's own commands.
 
 You are done when `pixi run python scripts/check_port.py {c.weights or c.repo_id} --port-dir {c.port_dir}` (run from the skill root; the weights are already downloaded there, read-only — use that path, not the repo id, or the model is downloaded again) passes and the implementation-complete criteria in the skill are met. Do not start `max serve` yourself and do not install packages with pip; mxconsole serves and verifies the port afterwards, against the Hugging Face reference. Finish with a short summary of what you changed."""
@@ -744,7 +748,7 @@ class PortManager:
         skills = port.finish_workspace(job.ref, res, workspace, config, donor, skills_root)
         allowed = tuple(f"Bash(cp -r {d}/:*)" for d in (donor.source_dir, donor.v3_dir) if d)
         ctx = Ctx(job.ref, res.repo_id, name, workspace, workspace / "port" / package_slug(name), skills_root,
-                  gate_hash=gate_hash(skills_root), extra_allowed=allowed)
+                  gate_hash=gate_hash(skills_root), extra_allowed=allowed, serving_max=port.mst_max_version() or "")
         cmd = self.tools.install_cmd(ctx)
         if cmd is not None:
             self._detail(job, row, "installing the skill's environment (outside the sandbox; the first time takes a while)…")
