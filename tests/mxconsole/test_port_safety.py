@@ -504,3 +504,44 @@ def test_the_sandbox_hf_cache_holds_only_this_models_weights_read_only(tmp_path,
     # offline mode); the weights themselves are cache hits from the read-only bind, and no token is visible
     assert build["env"].get("HF_HUB_OFFLINE") != "1"
     assert not any(k in build["env"] for k in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"))
+
+
+BUGGY_COMPARE = '''    ids = tok(prompt, return_tensors="pt").input_ids
+    seq_len = ids.shape[1]
+    for pos in positions:
+        prefix = tok.decode(
+            input_ids[0, :pos].tolist(), skip_special_tokens=True
+        )
+'''
+
+
+def test_known_skill_bugs_are_patched_in_the_clone_and_patching_is_idempotent(tmp_path):
+    """Modular's compare_layers.py reads `input_ids` where it stored `ids`, so the logits_multi gate crashed
+    for every model ("HF side failed: name 'input_ids' is not defined", first real port)."""
+    from mxconsole.port_auto import apply_skill_patches
+    f = tmp_path / "import-model" / "scripts" / "compare_layers.py"
+    f.parent.mkdir(parents=True)
+    f.write_text(BUGGY_COMPARE)
+    assert len(apply_skill_patches(tmp_path)) == 1
+    assert "ids[0, :pos]" in f.read_text() and "input_ids[0, :pos]" not in f.read_text()
+    assert apply_skill_patches(tmp_path) == []          # already patched
+    assert apply_skill_patches(tmp_path / "nope") == []  # no such file: nothing to do
+
+
+def test_a_restored_clone_gets_its_patches_back_before_the_gate_hash_is_compared(tmp_path, fake_claude, monkeypatch):
+    from mxconsole import port_auto
+    clone = mxc_home() / "skills" / "modular"
+    applied = []
+    real = port_auto.apply_skill_patches
+    monkeypatch.setattr(port_auto, "apply_skill_patches", lambda root: applied.append(root) or real(root))
+    runner = GateRunner(restore=True)
+    monkeypatch.setenv("FAKE_CLAUDE_TAMPER", str(clone / "import-model" / "scripts" / "check_port.py"))
+    job = run(make_manager(tmp_path, fake_claude, git_runner=runner))
+    assert job["status"] == "done", job["message"]
+    assert len(applied) >= 2                              # once after the clone, again after the restore
+
+
+def test_the_parity_server_can_return_logprobs():
+    """The verify gate asks for log probabilities, which MAX refuses under its overlap scheduler."""
+    from mxconsole.port_auto import PARITY_SERVE_FLAGS
+    assert "--no-enable-overlap-scheduler" in PARITY_SERVE_FLAGS

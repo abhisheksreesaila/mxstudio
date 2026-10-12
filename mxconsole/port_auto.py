@@ -249,6 +249,34 @@ GATE_PATHS = ("scripts", "pixi.toml", "SKILL.md")
 GIT_PATHSPECS = [f"{port.ENTRY_SKILL}/{x}" for x in GATE_PATHS]
 
 
+# Known bugs in Modular's published skill that break a gate for every model, fixed in our clone (trusted,
+# mxconsole's own code). Each: (file under the skills root, the buggy text, the fix, why). Applied right after
+# the clone is updated and again after any restore, before the gate hash is taken or compared.
+SKILL_PATCHES = [
+    ("import-model/scripts/compare_layers.py",
+     "            input_ids[0, :pos].tolist(), skip_special_tokens=True",
+     "            ids[0, :pos].tolist(), skip_special_tokens=True",
+     "the multi-position probe reads `input_ids` where it stored `ids` (NameError in logits_multi)"),
+]
+# The verify gate asks the parity server for log probabilities, which MAX refuses under its overlap scheduler.
+PARITY_SERVE_FLAGS = ["--no-enable-overlap-scheduler"]
+
+
+def apply_skill_patches(skills_root: Path) -> list[str]:
+    """Apply SKILL_PATCHES where the buggy text is present; returns what was patched (idempotent)."""
+    done = []
+    for rel, old, new, why in SKILL_PATCHES:
+        f = skills_root / rel
+        try:
+            text = f.read_text()
+        except OSError:
+            continue
+        if old in text:
+            f.write_text(text.replace(old, new))
+            done.append(f"{rel}: {why}")
+    return done
+
+
 def gate_hash(skills_root: Path) -> str:
     """Hash of the files the gates run (the skill's scripts and manifest), so tampering is detectable."""
     h = hashlib.sha256()
@@ -691,12 +719,12 @@ class PortManager:
         """Before a gate runs: the skill's check scripts must be exactly what was cloned. If the clone was
         touched, restore it from git; if it still differs, the gate does not count and the job fails."""
         runner = self.git_runner or port._run
-        code, out = runner(["git", "status", "--porcelain", "--untracked-files=no", "--", *GIT_PATHSPECS], cwd=ctx.skills_root)
-        if gate_hash(ctx.skills_root) == ctx.gate_hash and not (code == 0 and out.strip()):
+        if gate_hash(ctx.skills_root) == ctx.gate_hash:  # the hash covers every gate file (our patches included)
             return
         job.say("the skill's gate scripts were modified; restoring them from git")
         runner(["git", "checkout", "--", *GIT_PATHSPECS], cwd=ctx.skills_root)
         runner(["git", "clean", "-fd", "--", *GIT_PATHSPECS], cwd=ctx.skills_root)
+        apply_skill_patches(ctx.skills_root)
         if gate_hash(ctx.skills_root) != ctx.gate_hash:
             raise _StageFailed(f"the skill's check scripts in {ctx.skills_root} were modified and could not be restored; "
                                f"the build and parity checks cannot be trusted")
@@ -751,9 +779,14 @@ class PortManager:
         self._end(job, row, detail=f"{res.architecture}, donor {donor.architecture}, workspace {workspace}")
         # skills
         row = self._begin(job, "skills", detail="installing Modular's skills…")
+        clone = mxc_home() / "skills" / "modular"
+        if (clone / ".git").exists():  # drop our own patches first, or `git pull --ff-only` refuses to update
+            (self.git_runner or port._run)(["git", "checkout", "--", *GIT_PATHSPECS], cwd=clone)
         skills_root = port.ensure_skills(runner=self.git_runner)
         if port.ENTRY_SKILL not in port.list_skills(skills_root):
             raise _StageFailed(f"Modular's skills in {skills_root} have no {port.ENTRY_SKILL} skill")
+        for note in apply_skill_patches(skills_root):
+            job.say(f"-- patched a known bug in Modular's skill: {note}")
         skills = port.finish_workspace(job.ref, res, workspace, config, donor, skills_root)
         allowed = tuple(f"Bash(cp -r {d}/:*)" for d in (donor.source_dir, donor.v3_dir) if d)
         ctx = Ctx(job.ref, res.repo_id, name, workspace, workspace / "port" / package_slug(name), skills_root,
@@ -875,7 +908,7 @@ class PortManager:
         self._check(job)
         port_ = _free_port()
         self._detail(job, row, f"compiling and serving on :{port_} (a cold compile takes 5 to 25 minutes)…")
-        argv = [*self.max_command, "serve", *supervisor.launch_flags(), "--port", str(port_), "--served-model-name", ctx.repo_id,
+        argv = [*self.max_command, "serve", *supervisor.launch_flags(), *PARITY_SERVE_FLAGS, "--port", str(port_), "--served-model-name", ctx.repo_id,
                 "--custom-architectures", str(ctx.port_dir), "--model-path", str(weights)]
         run_argv, env, note = self._confine(job, argv, "serve", ctx)
         job.say(f"[serve] {note}")
