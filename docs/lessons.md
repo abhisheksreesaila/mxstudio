@@ -17,3 +17,4 @@ Claude reads this at the start of each session. -->
 - 2026-10-03 · The menu must collapse to an icon rail (☰ in the top bar), with tooltips on hover.
 - 2026-10-10 · Show design concepts and mockups as Claude Artifacts, not Lavish Editor: that's where the person reviews them.
 - 2026-10-11 · A port must be built against the MAX that will serve it: the skill's env ran MAX 26.7 while mxconsole served 26.5, so OLMoE passed the build check and failed to load (max.tree, ModuleV3Outputs). Keep the two MAX versions aligned.
+- 2026-10-13 · Ports: don't burn tokens chasing an architecture's edge cases. Popular architectures get ported (by Modular or the catalog); for a hard one, document the finding and move on, and help only if someone actually asks.

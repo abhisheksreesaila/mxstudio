@@ -1,5 +1,8 @@
 # Port study (F-033)
 
+Rule (the person's call, 2026-10-13): a port that is too hard gets its findings written down and is left for
+later, not chased. Popular architectures will be ported anyway; obscure ones only matter if someone asks.
+
 Can the import-model skill port unsupported architectures reliably, and which steps are mechanical enough
 for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude Code, MAX 26.7.0.dev2026100905.
 
@@ -44,6 +47,7 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - Attempt 3 rewrote ALiBi entirely (heads padded, ALiBi carried through the RoPE kernel), but the verify gate's
   `checkpoint_meta` got HTTP 429 from huggingface.co (unauthenticated: the HF token is scrubbed), so the logit
   gates were skipped and the attempt was wasted on an infrastructure error.
+- Parked: not retried. Revisit only if someone asks for a BLOOM-family model.
 - For the LoRA question: writing the port was mechanical; debugging numerics against a wall is the hard part,
   and even Claude can't do it without seeing intermediate values.
 
@@ -60,6 +64,8 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
       bugs are debugged with data, not guessed (BLOOM). The biggest open item.
 - [ ] an infrastructure failure (Hub 429, network) retries the gate instead of using up an attempt; read
       checkpoint metadata from the local weights where possible (BLOOM)
+- [ ] stop early on a known wall (check_walls flags it): say what blocks it and park, instead of spending all
+      attempts (BLOOM)
 - [ ] feed compare_layers' per-layer output into the retry prompt, not only the gate summary (BLOOM)
 - note: the OLMoE port still has `supports_overlap_scheduler=False` from run 11; it can be dropped now.
 
