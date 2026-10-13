@@ -13,6 +13,7 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 | OlmoeForCausalLM (MoE, 64 experts, top-8) | allenai/OLMoE-1B-7B-0924-Instruct | passed parity, serving, answers | 2 | no (reused 2026-10-11) | run 11, 2026-10-13 |
 | GPT2LMHeadModel | openai-community/gpt2 | passed parity, serving | 1 | yes | run 13: 13 min total, agent 9.3 min, 109 turns, $3.85; ran its own checks 13 times |
 | BloomForCausalLM (ALiBi) | bigscience/bloomz-560m | failed parity after 3 attempts | 3 | yes | run 14: 24 min; logits close but off (rel_diff 0.30); attempt 3 lost to a Hub 429 |
+| GPTNeoXForCausalLM (parallel residual, partial rotary) | EleutherAI/pythia-1.4b-deduped | passed parity, serving | 1 | yes | run 15: 17.5 min total, agent 5.9 min, 83 turns, $2.98 |
 
 ## Findings
 
