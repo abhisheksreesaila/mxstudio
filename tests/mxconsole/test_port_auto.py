@@ -99,6 +99,7 @@ def test_claude_is_run_headless_in_the_workspace_with_exactly_these_flags(tmp_pa
     prompt = call["prompt"]
     assert call["argv"] == ["-p", prompt, "--permission-mode", "acceptEdits", "--permission-prompts", "none",
                             "--allowedTools", *ALLOWED, f"Bash(cp -r {tmp_path}/archs/qwen2/:*)",
+                            *port_auto.skill_script_allowed(mxc_home() / "skills" / "modular"),
                             "--setting-sources", "project", "--strict-mcp-config",
                             "--output-format", "stream-json", "--verbose", "--no-session-persistence"]
     assert "--add-dir" not in call["argv"]

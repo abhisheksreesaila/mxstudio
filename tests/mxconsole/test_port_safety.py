@@ -167,8 +167,9 @@ def test_private_caches_are_in_the_job_work_dir(tmp_path, fake_claude):
     job = _Job(5, "acme/weird", "weird", 1)
     job.dir = tmp_path / "j"
     _, env, _ = m._confine(job, ["x"], "check", None)
-    for k in ("PIXI_CACHE_DIR", "RATTLER_CACHE_DIR", "UV_CACHE_DIR", "XDG_CACHE_HOME", "MODULAR_DERIVED_PATH", "HF_HOME", "HF_HUB_CACHE"):
-        assert env[k].startswith(str(job.dir / "work")), k
+    for k in ("PIXI_CACHE_DIR", "RATTLER_CACHE_DIR", "UV_CACHE_DIR", "XDG_CACHE_HOME", "MODULAR_DERIVED_PATH", "MODULAR_CACHE_DIR",
+              "HF_HOME", "HF_HUB_CACHE"):
+        assert env[k].startswith(str(job.dir / "work")), k   # MODULAR_CACHE_DIR: compiles cached across attempts
 
 
 def test_skill_env_is_installed_outside_the_sandbox_before_the_agent(tmp_path, fake_claude, fake_bwrap):
@@ -616,3 +617,18 @@ def test_the_parity_server_can_return_logprobs():
     """The verify gate asks for log probabilities, which MAX refuses under its overlap scheduler."""
     from mxconsole.port_auto import PARITY_SERVE_FLAGS
     assert "--no-enable-overlap-scheduler" in PARITY_SERVE_FLAGS
+    assert "--force" in PARITY_SERVE_FLAGS   # without it MAX 26.7 keeps an arch's overlap scheduler on (OLMoE)
+
+
+def test_the_agent_may_run_the_skills_checks_the_way_it_calls_them(tmp_path, fake_claude):
+    """OLMoE: the agent ran `pixi run --manifest-path <skill>/pixi.toml python <skill>/scripts/check_port.py`
+    from the workspace, which the allow list refused, so it never checked its own work. The prompt now gives
+    that exact form and the allow list permits it, for the skill's own scripts only."""
+    job = run(make_manager(tmp_path, fake_claude))
+    assert job["status"] == "done", job["message"]
+    (call,) = calls(tmp_path)
+    root = mxc_home() / "skills" / "modular" / "import-model"
+    form = f"pixi run --manifest-path {root}/pixi.toml python {root}/scripts/check_port.py"
+    assert f"Bash({form}:*)" in call["argv"]
+    assert not any(a.startswith(f"Bash(pixi run --manifest-path {root}/pixi.toml python:") for a in call["argv"])
+    assert form in call["prompt"]

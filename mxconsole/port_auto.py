@@ -203,6 +203,17 @@ def find_claude(explicit: str | None = None) -> str | None:
     return shutil.which(cand)
 
 
+def skill_script_command(skills_root: Path, script: str) -> str:
+    """How the agent runs one of the skill's scripts from its workspace (it can't change into the skill root)."""
+    root = skills_root / port.ENTRY_SKILL
+    return f"pixi run --manifest-path {root}/pixi.toml python {root}/scripts/{script}"
+
+
+def skill_script_allowed(skills_root: Path) -> tuple[str, ...]:
+    """Allow-list entries for that form, for the skill's own scripts only."""
+    return tuple(f"Bash({skill_script_command(skills_root, n)}:*)" for n in SKILL_SCRIPTS)
+
+
 def claude_argv(claude: str, prompt: str, extra_allowed: tuple[str, ...] = (), *, fallback_sandbox: bool = False) -> list[str]:
     """The headless Claude Code call. `-p` runs once and exits; acceptEdits lets it edit inside the
     workspace; the allow list covers the skill's scripts; anything that would prompt is denied; only the
@@ -237,7 +248,9 @@ Read PORT.md and config.json here first. Follow the `import-model` skill (.claud
 {serving}Package folder: {c.port_dir}
 That exact folder must end up holding arch.py and an __init__.py that exposes ARCHITECTURES. Scaffold with `--output-dir {c.port_dir.parent} --slug {c.port_dir.name}` (or create it by hand). Do not write outside the workspace, except by running the skill's own commands.
 
-You are done when `pixi run python scripts/check_port.py {c.weights or c.repo_id} --port-dir {c.port_dir}` (run from the skill root; the weights are already downloaded there, read-only — use that path, not the repo id, or the model is downloaded again) passes and the implementation-complete criteria in the skill are met. Do not start `max serve` yourself and do not install packages with pip; mxconsole serves and verifies the port afterwards, against the Hugging Face reference. Finish with a short summary of what you changed."""
+Run the skill's scripts exactly in this form (allowed from here; other shell commands are refused, so use Read, Glob and Grep to look at files): `{skill_script_command(c.skills_root, "<script>.py")} …`.
+
+You are done when `{skill_script_command(c.skills_root, "check_port.py")} {c.weights or c.repo_id} --port-dir {c.port_dir}` (the weights are already downloaded there, read-only — use that path, not the repo id, or the model is downloaded again) passes and the implementation-complete criteria in the skill are met. Do not start `max serve` yourself and do not install packages with pip; mxconsole serves and verifies the port afterwards, against the Hugging Face reference. Finish with a short summary of what you changed."""
     if attempt <= 1 and not feedback:
         return base
     return (base + f"""
@@ -262,7 +275,9 @@ SKILL_PATCHES = [
      "the multi-position probe reads `input_ids` where it stored `ids` (NameError in logits_multi)"),
 ]
 # The verify gate asks the parity server for log probabilities, which MAX refuses under its overlap scheduler.
-PARITY_SERVE_FLAGS = ["--no-enable-overlap-scheduler"]
+# `--force` makes the flag win over an architecture that turns the scheduler on (MAX 26.7, OLMoE), so a port can
+# keep the faster scheduler for normal serving.
+PARITY_SERVE_FLAGS = ["--no-enable-overlap-scheduler", "--force"]
 
 
 # The skill's manifest allows any MAX 26.x, so a fresh solve picks whatever nightly is newest. A port must be
@@ -619,7 +634,7 @@ class PortManager:
             d.mkdir(parents=True, exist_ok=True)
         env.update(PIXI_CACHE_DIR=str(cache / "pixi"), RATTLER_CACHE_DIR=str(cache / "rattler"),
                    UV_CACHE_DIR=str(cache / "uv"), XDG_CACHE_HOME=str(cache / "xdg"),
-                   MODULAR_DERIVED_PATH=str(cache / "modular"), HF_HOME=str(work / "hf"),
+                   MODULAR_DERIVED_PATH=str(cache / "modular"), MODULAR_CACHE_DIR=str(cache / "modular"), HF_HOME=str(work / "hf"),
                    HF_HUB_CACHE=str(work / "hf" / "hub"))
         # Not offline: the verify gate reads safetensors metadata from the Hub (no offline mode for that). The
         # model's own files are cache hits from the read-only bind below; the HF token is scrubbed.
@@ -843,7 +858,7 @@ class PortManager:
         skills = port.finish_workspace(job.ref, res, workspace, config, donor, skills_root)
         allowed = tuple(f"Bash(cp -r {d}/:*)" for d in (donor.source_dir, donor.v3_dir) if d)
         ctx = Ctx(job.ref, res.repo_id, name, workspace, workspace / "port" / package_slug(name), skills_root,
-                  gate_hash=gate_hash(skills_root), extra_allowed=allowed, serving_max=serving_max)
+                  gate_hash=gate_hash(skills_root), extra_allowed=allowed + skill_script_allowed(skills_root), serving_max=serving_max)
         cmd = self.tools.install_cmd(ctx)
         if cmd is not None:
             self._detail(job, row, "installing the skill's environment (outside the sandbox; the first time takes a while)…")
