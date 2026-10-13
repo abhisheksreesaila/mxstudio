@@ -259,3 +259,7 @@ Brief: needed (docs/briefs/porting-agent.md) · Needs: F-033's verdict
 ## F-035 Finished-ports catalog [todo]
 Brief: needed (docs/briefs/ports-catalog.md) · Needs: F-033
 - a port that passes the checks is published once per architecture; `mxc pull` uses it with no agent; the catalog keeps the successful transcripts
+
+## F-036 Embeddings pooling check [todo]
+Brief: docs/brief.md · Needs: none
+- [ ] one live `/v1/embeddings` call against a pulled `all-minilm-l6`: does MAX read the pooling mode from `modules.json` / `1_Pooling/config.json` (never downloaded), or hard-code mean pooling? Download them if it reads them (found in review of 2ea97c4)

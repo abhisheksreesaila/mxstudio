@@ -17,5 +17,6 @@ build-backend = "hatchling.build"
 packages = ["mxconsole"]
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]  # scripts/test_chat.py calls a live server on import
 asyncio_mode = "auto"
 timeout = 180  # pytest-timeout: a stuck test fails with a traceback naming it, never hangs the suite
