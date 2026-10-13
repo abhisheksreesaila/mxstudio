@@ -1,4 +1,5 @@
-"""Stand-in for the skill's check_port.py / run_oss_gates.py: `fake_port_check.py build|verify <port dir>`."""
+"""Stand-in for the skill's check_port.py / run_oss_gates.py / compare_layers.py:
+`fake_port_check.py build|verify|probe <port dir>`."""
 import json
 import os
 import sys

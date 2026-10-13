@@ -167,7 +167,7 @@ def test_private_caches_are_in_the_job_work_dir(tmp_path, fake_claude):
     job = _Job(5, "acme/weird", "weird", 1)
     job.dir = tmp_path / "j"
     _, env, _ = m._confine(job, ["x"], "check", None)
-    for k in ("PIXI_CACHE_DIR", "RATTLER_CACHE_DIR", "UV_CACHE_DIR", "XDG_CACHE_HOME", "MODULAR_DERIVED_PATH", "MODULAR_CACHE_DIR",
+    for k in ("PIXI_CACHE_DIR", "RATTLER_CACHE_DIR", "UV_CACHE_DIR", "XDG_CACHE_HOME", "MODULAR_DERIVED_PATH", "MODULAR_CACHE_DIR", "MODULAR_MAX_CACHE_DIR",
               "HF_HOME", "HF_HUB_CACHE"):
         assert env[k].startswith(str(job.dir / "work")), k   # MODULAR_CACHE_DIR: compiles cached across attempts
 
@@ -643,3 +643,62 @@ def test_the_agent_may_run_the_skills_checks_the_way_it_calls_them(tmp_path, fak
     assert f"Bash({form}:*)" in call["argv"]
     assert not any(a.startswith(f"Bash(pixi run --manifest-path {root}/pixi.toml python:") for a in call["argv"])
     assert form in call["prompt"]
+
+
+def test_the_agent_gets_try_port_wired_to_the_same_server_and_checks_as_the_final_check(tmp_path, fake_claude):
+    """try-port: the agent compiles, serves and compares its own package (port study: it never saw the model run)."""
+    job = run(make_manager(tmp_path, fake_claude))
+    assert job["status"] == "done", job["message"]
+    (call,) = calls(tmp_path)
+    cfg_path = Path(job["log"]).parent / "work" / "try" / "config.json"
+    command = f"{sys.executable} -m mxconsole.port_try --config {cfg_path}"
+    assert f"Bash({command}:*)" in call["argv"]
+    assert command in call["prompt"] and "600000" in call["prompt"]       # the Bash timeout it must ask for
+    assert "Do not start `max serve` yourself" not in call["prompt"]
+
+
+def test_try_port_config_matches_the_final_check(tmp_path, fake_claude, monkeypatch):
+    seen = []
+    real = port_auto.port_try.write_config
+    monkeypatch.setattr(port_auto.port_try, "write_config", lambda d, cfg: seen.append(cfg) or real(d, cfg))
+    job = run(make_manager(tmp_path, fake_claude))
+    assert job["status"] == "done", job["message"]
+    cfg = seen[0]
+    for flag in port_auto.PARITY_SERVE_FLAGS:
+        assert flag in cfg["serve"]
+    ws = mxc_home() / "ports" / "weird"
+    assert cfg["serve"][-4:] == ["--custom-architectures", str(ws / "port" / "weird"), "--model-path", cfg["serve"][-1]]
+    assert "--port" not in cfg["serve"]                                     # try-port picks a free one
+    root = mxc_home() / "skills" / "modular" / "import-model"
+    assert " ".join(cfg["gates"]).startswith(f"pixi run --manifest-path {root}/pixi.toml python {root}/scripts/run_oss_gates.py")
+    assert "{port}" in cfg["gates"] and "{port}" in cfg["probe"]
+    assert cfg["port_dir"] == str(ws / "port" / "weird") and cfg["max_tries"] >= 1
+
+
+def test_each_attempt_resets_try_port_and_a_leftover_run_is_stopped(tmp_path, fake_claude, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "fail_once")
+    configs, stopped = [], []
+    real = port_auto.port_try.write_config
+    monkeypatch.setattr(port_auto.port_try, "write_config", lambda d, cfg: configs.append(d) or real(d, cfg))
+    monkeypatch.setattr(port_auto.port_try, "stop", lambda d: stopped.append(d))
+    job = run(make_manager(tmp_path, fake_claude))
+    assert job["status"] == "done", job["message"]
+    assert len(configs) == 2                                                # a fresh config (and try count) per attempt
+    assert len(stopped) >= 2                                                # after each agent run
+
+
+def test_the_agent_sandbox_can_run_try_port_read_only(tmp_path, fake_claude, fake_bwrap):
+    """try-port runs mxconsole's own Python and package inside the agent's sandbox ($HOME is emptied there), so both
+    are bound back read-only, never writable."""
+    if not sys.platform.startswith("linux"):
+        pytest.skip("bubblewrap is Linux only")
+    import mxconsole
+    job = run(make_manager(tmp_path, fake_claude, sandbox=True, bwrap=fake_bwrap))
+    assert job["status"] == "done", job["message"]
+    runs = [json.loads(line) for line in (tmp_path / "bwrap.log").read_text().splitlines()]
+    agent = next(r for r in runs if r["cmd"][0] == fake_claude)
+    ro = [src for src, _ in bind_pairs(agent["bwrap"], "--ro-bind-try")]
+    rw = [src for src, _ in bind_pairs(agent["bwrap"], "--bind-try")]
+    pkg = str(Path(mxconsole.__file__).parent)
+    assert sys.prefix in ro and pkg in ro
+    assert sys.prefix not in rw and pkg not in rw

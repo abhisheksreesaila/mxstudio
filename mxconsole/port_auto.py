@@ -49,6 +49,7 @@ import shutil
 import signal
 import socket
 import subprocess
+import sys
 import threading
 import time
 import weakref
@@ -59,7 +60,8 @@ from typing import Callable
 
 import httpx
 
-from mxconsole import port, port_sandbox, resolve, supervisor
+import mxconsole
+from mxconsole import port, port_sandbox, port_try, resolve, supervisor
 from mxconsole.pulls import NAME_RE, REF_RE, BadPull
 from mxconsole.store import Store, mxc_home
 
@@ -151,6 +153,7 @@ class Ctx:
     gate_hash: str = ""           # hash of the gate scripts right after the clone was updated
     extra_allowed: tuple = ()     # per-model additions to the allow list (the donor copy commands)
     serving_max: str = ""         # the MAX that will serve the port (mxconsole's), which the skill env may not match
+    try_command: str = ""         # try-port for this attempt: the agent compiles, serves and compares its package
 
 
 @dataclass
@@ -196,6 +199,36 @@ def _skill_verify(c: Ctx, port_: int):
     # by repo id: the gate loads the Hub config; the weights are found in the sandbox's offline HF cache
     return _pixi_run(c, "run_oss_gates.py", c.repo_id, "--port-dir", str(c.port_dir),
                      "--phase", "verify", "--port", str(port_), "--served-model-name", c.repo_id)
+
+
+TRY_MAX = 4  # try-port runs per attempt: each one compiles, so this bounds the agent's time on a hard port
+
+
+def _try_text(c: Ctx) -> str:
+    if not c.try_command:
+        return ""
+    return (f"Once check_port.py passes, see your package actually run: `{c.try_command}` compiles it, serves it, sends a "
+            f"prompt, runs the skill's compare_layers probe and the same verify gates mxconsole's final check uses, then "
+            f"stops the server and prints a report ending in RESULT: PASS or FAIL. Run it with the Bash timeout set to "
+            f"600000 ms. A cold compile can take 5 to 25 minutes: if it says \"still running\", run the same command "
+            f"again. You have {TRY_MAX} tries per attempt, so fix what a report shows before trying again. If it passes, "
+            f"you are done.\n\n")
+
+
+def try_config(c: Ctx, max_command: tuple[str, ...]) -> dict:
+    """try-port's config for one attempt: the final check's server and gates, from the agent's workspace."""
+    root = c.skills_root / port.ENTRY_SKILL
+    def script(name: str, *a: str) -> list[str]:
+        return [*skill_script_command(c.skills_root, name).split(" "), *a]
+    return {
+        "serve": [*max_command, "serve", *supervisor.launch_flags(), *PARITY_SERVE_FLAGS, "--served-model-name",
+                  c.repo_id, "--custom-architectures", str(c.port_dir), "--model-path", str(c.weights or c.repo_id)],
+        "probe": script("compare_layers.py", c.repo_id, "--served-model-name", c.repo_id, "--port", "{port}",
+                        "--skip-hf-layers"),
+        "gates": script("run_oss_gates.py", c.repo_id, "--port-dir", str(c.port_dir), "--phase", "verify",
+                        "--port", "{port}", "--served-model-name", c.repo_id),
+        "cwd": str(root), "port_dir": str(c.port_dir), "repo_id": c.repo_id, "smoke_prompt": SMOKE_PROMPT,
+        "max_tries": TRY_MAX, "health_timeout": 1500, "step_timeout": 900}
 
 
 def find_claude(explicit: str | None = None) -> str | None:
@@ -250,7 +283,7 @@ That exact folder must end up holding arch.py and an __init__.py that exposes AR
 
 Run the skill's scripts exactly in this form (allowed from here; general shell commands such as ls, cat or grep are refused, so use Read, Glob and Grep to look at files): `{skill_script_command(c.skills_root, "<script>.py")} …`.
 
-You are done when `{skill_script_command(c.skills_root, "check_port.py")} {c.weights or c.repo_id} --port-dir {c.port_dir}` (the weights are already downloaded there, read-only — use that path, not the repo id, or the model is downloaded again) passes and the implementation-complete criteria in the skill are met. Do not start `max serve` yourself and do not install packages with pip; mxconsole serves and verifies the port afterwards, against the Hugging Face reference. Finish with a short summary of what you changed."""
+{_try_text(c)}You are done when `{skill_script_command(c.skills_root, "check_port.py")} {c.weights or c.repo_id} --port-dir {c.port_dir}` (the weights are already downloaded there, read-only — use that path, not the repo id, or the model is downloaded again) passes and the implementation-complete criteria in the skill are met. Do not start `max serve` any other way and do not install packages with pip; mxconsole serves and verifies the port again afterwards, against the Hugging Face reference. Finish with a short summary of what you changed."""
     if attempt <= 1 and not feedback:
         return base
     return (base + f"""
@@ -632,11 +665,12 @@ class PortManager:
             return argv, env, "trusted install of the pristine skill env, not sandboxed"
         work = job.dir / "work"
         cache = work / "cache"
-        for d in (cache / "pixi", cache / "rattler", cache / "uv", cache / "xdg", cache / "modular", cache / "modular" / "cache", work / "hf" / "hub"):
+        for d in (cache / "pixi", cache / "rattler", cache / "uv", cache / "xdg", cache / "modular", cache / "modular" / "cache", cache / "modular" / "max", work / "hf" / "hub"):
             d.mkdir(parents=True, exist_ok=True)
         env.update(PIXI_CACHE_DIR=str(cache / "pixi"), RATTLER_CACHE_DIR=str(cache / "rattler"),
                    UV_CACHE_DIR=str(cache / "uv"), XDG_CACHE_HOME=str(cache / "xdg"),
-                   MODULAR_DERIVED_PATH=str(cache / "modular"), MODULAR_CACHE_DIR=str(cache / "modular" / "cache"), HF_HOME=str(work / "hf"),
+                   MODULAR_DERIVED_PATH=str(cache / "modular"), MODULAR_CACHE_DIR=str(cache / "modular" / "cache"),
+                   MODULAR_MAX_CACHE_DIR=str(cache / "modular" / "max"), HF_HOME=str(work / "hf"),
                    HF_HUB_CACHE=str(work / "hf" / "hub"))
         # Not offline: the verify gate reads safetensors metadata from the Hub (no offline mode for that). The
         # model's own files are cache hits from the read-only bind below; the HF token is scrubbed.
@@ -674,6 +708,7 @@ class PortManager:
                 ro_after.append(f)
             rw = [ws, work]
             ro += self._weights_roots(ctx)  # so the agent's own check_port.py runs use the local weights too
+            ro += [Path(sys.prefix), Path(mxconsole.__file__).parent]  # try-port: mxconsole's Python, max and package
         else:
             ro.append(ws)
             ro += self._weights_roots(ctx)
@@ -933,9 +968,14 @@ class PortManager:
             self._end(job, row, "failed", msg)
             raise _StageFailed(msg)
         fallback = self.sandbox and port_sandbox.have_bwrap(self.bwrap) is None
-        argv = claude_argv(claude, build_prompt(ctx, attempt, feedback, donor_note), ctx.extra_allowed, fallback_sandbox=fallback)
+        try_dir = job.dir / "work" / "try"
+        cfg = port_try.write_config(try_dir, try_config(ctx, self.max_command))  # fresh tries for each attempt
+        ctx.try_command = f"{sys.executable} -m mxconsole.port_try --config {cfg}"
+        argv = claude_argv(claude, build_prompt(ctx, attempt, feedback, donor_note),
+                           (*ctx.extra_allowed, f"Bash({ctx.try_command}:*)"), fallback_sandbox=fallback)
         code, out = self._exec(job, argv, ctx.workspace, timeout=self.generate_timeout, render=_render_event,
                                role="agent", ctx=ctx, raw=job.dir / f"agent-{attempt}.jsonl")
+        port_try.stop(try_dir)  # a try the agent left running (its sandbox normally takes it down with it)
         if code != 0:
             msg = f"claude exited with code {code}" + (" (timed out)" if code == 124 else "")
             self._end(job, row, "failed", msg)
