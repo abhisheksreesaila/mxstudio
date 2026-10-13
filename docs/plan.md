@@ -228,3 +228,20 @@ Brief: docs/briefs/console-1.0.md · Needs: F-025..F-028
 ## Parked: console layout redesign
 Superseded 2026-10-11 by Console 1.0 above (concept D chosen).
 Still mockup-only ideas, not built: `mxc set --gpu`, `mxc expose --deny`, the ask box.
+
+## Standalone porting (goal set 2026-10-13)
+Goal: porting an unsupported architecture works on a machine with no Claude account, through a local model
+(possibly a LoRA fine-tuned for this). Fallback when that isn't good enough: Claude Code or Codex.
+Order: learn with Claude first (F-032, F-033); the brief for the local-model agent (clarify) comes after the
+study says whether the steps are easy enough for a small model.
+
+## F-032 Keep each attempt's raw agent transcript [review]
+Brief: this section · Needs: F-029
+- [x] every generate attempt writes the agent's raw stream-json to `ports/<id>/agent-<attempt>.jsonl` beside port.log (training data and study material)
+
+## F-033 Port study with Claude [doing]
+Brief: this section · Needs: F-032
+- [ ] port 5 to 10 unsupported architectures, each in a fresh workspace, through `mxc port <ref> --auto`
+- [ ] `docs/port-study.md`: per architecture the outcome, attempts, time, which parity gate failed and why, the fixes Claude made, and which skill parts it used
+- [ ] the verdict: which steps are mechanical (a LoRA candidate) and which needed real reasoning; harness and skill fixes found along the way
+- Findings so far (OLMoE, run 11): the run reused the 2026-10-11 workspace (not a clean test); parity attempt 1 failed (output differs from HF); MAX's compile cache isn't writable in the sandbox, so every parity check compiles cold

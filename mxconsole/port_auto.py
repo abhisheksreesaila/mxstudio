@@ -14,7 +14,8 @@ result and registers it. Stages, in order:
 
 When build or parity fails, generate runs again with the error output appended ("fix this"), up to
 `max_attempts` times; each attempt is its own set of stage rows. The whole transcript of the agent and
-of every command goes to MXC_HOME/ports/<id>/port.log. Cancel kills the process tree of whatever runs.
+of every command goes to MXC_HOME/ports/<id>/port.log, and the agent's raw stream-json of each attempt to
+agent-<attempt>.jsonl beside it (what a port study or a fine-tune learns from). Cancel kills the process tree of whatever runs.
 Everything outside this process (claude, the skill's checks, max) is injectable, so tests run fakes.
 
 Safety (config.json and the model card are untrusted, so assume prompt injection):
@@ -697,7 +698,7 @@ class PortManager:
             log.exception("could not record the process groups of port %s", job.id)
 
     def _exec(self, job: _Job, argv: list[str], cwd: Path, *, timeout: float, render=None, role: str = "check",
-              ctx: Ctx | None = None) -> tuple[int, str]:
+              ctx: Ctx | None = None, raw: Path | None = None) -> tuple[int, str]:
         """Run a command in its own process group (confined, with a scrubbed environment), stream every
         line to the log, and return (exit code, the last of its output). Cancel and the timeout kill the
         whole group."""
@@ -723,8 +724,12 @@ class PortManager:
         timer.daemon = True
         timer.start()
         captured: deque[str] = deque(maxlen=400)
+        raw_file = open(raw, "a", encoding="utf-8") if raw else None
         try:
             for line in proc.stdout:
+                if raw_file:
+                    raw_file.write(line)
+                    raw_file.flush()
                 line = line.rstrip("\n")
                 captured.append(line)
                 for out in (render(line) if render else [line]):
@@ -734,6 +739,8 @@ class PortManager:
             proc.wait()
         finally:
             timer.cancel()
+            if raw_file:
+                raw_file.close()
             self._track(job, proc, run_argv[0], add=False)
             if proc.poll() is None:
                 _kill_tree(proc)
@@ -900,7 +907,7 @@ class PortManager:
         fallback = self.sandbox and port_sandbox.have_bwrap(self.bwrap) is None
         argv = claude_argv(claude, build_prompt(ctx, attempt, feedback, donor_note), ctx.extra_allowed, fallback_sandbox=fallback)
         code, out = self._exec(job, argv, ctx.workspace, timeout=self.generate_timeout, render=_render_event,
-                               role="agent", ctx=ctx)
+                               role="agent", ctx=ctx, raw=job.dir / f"agent-{attempt}.jsonl")
         if code != 0:
             msg = f"claude exited with code {code}" + (" (timed out)" if code == 124 else "")
             self._end(job, row, "failed", msg)

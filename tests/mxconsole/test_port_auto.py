@@ -379,3 +379,16 @@ def test_the_prompt_names_the_max_that_will_serve_the_port(tmp_path):
     p = build_prompt(c, 1, None, "donor note")
     assert "26.5.0.dev2026080106" in p and "newer" in p
     assert "26.5" not in build_prompt(Ctx("a/b", "a/b", "b", tmp_path, tmp_path / "p", tmp_path / "s"), 1, None, "")
+
+
+def test_each_attempt_keeps_the_agents_raw_transcript(tmp_path, fake_claude, monkeypatch):
+    """The raw stream-json of every attempt is kept beside port.log: what the port study and any future
+    fine-tune learn from (port.log only has a readable rendering)."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "fail_once")
+    job = run(make_manager(tmp_path, fake_claude))
+    assert job["status"] == "done", job["message"]
+    folder = Path(job["log"]).parent
+    for attempt in (1, 2):
+        events = [json.loads(line) for line in (folder / f"agent-{attempt}.jsonl").read_text().splitlines()]
+        assert any(c.get("type") == "tool_use" for e in events for c in e.get("message", {}).get("content", []))
+    assert not (folder / "agent-3.jsonl").exists()
