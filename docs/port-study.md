@@ -9,6 +9,7 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 |---|---|---|---|---|---|
 | OlmoeForCausalLM (MoE, 64 experts, top-8) | allenai/OLMoE-1B-7B-0924-Instruct | passed parity, serving, answers | 2 | no (reused 2026-10-11) | run 11, 2026-10-13 |
 | GPT2LMHeadModel | openai-community/gpt2 | passed parity, serving | 1 | yes | run 13: 13 min total, agent 9.3 min, 109 turns, $3.85; ran its own checks 13 times |
+| BloomForCausalLM (ALiBi) | bigscience/bloomz-560m | failed parity after 3 attempts | 3 | yes | run 14: 24 min; logits close but off (rel_diff 0.30); attempt 3 lost to a Hub 429 |
 
 ## Findings
 
@@ -32,6 +33,20 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - Compile cache: the MODULAR_CACHE_DIR warning is gone, but MAX's engine cache (`share/max/.max_cache/mof/mef`,
   from the env's modular.cfg `cache_dir`) is still read-only in the sandbox. Open: find its override.
 
+### BLOOM (run 14)
+- A real numerical problem: ALiBi, which the skill lists as a wall (no first-class ALiBi in MAX 26.x). The agent
+  found a workaround (flash attention's `rel_logits` bias), and the logits came out close but wrong
+  (top-1 logprob -0.27 vs -0.21; first mismatch at prefix length 5).
+- Attempts 1 and 2 gave identical numbers: the second "fix" changed nothing that mattered. The agent was guessing,
+  because it can't compile or serve the model itself (check_port only binds weights) and was told not to start
+  `max serve`, so it never saw a logit and couldn't run the skill's layer-by-layer debugging (compare_layers needs
+  a server). It said so each time.
+- Attempt 3 rewrote ALiBi entirely (heads padded, ALiBi carried through the RoPE kernel), but the verify gate's
+  `checkpoint_meta` got HTTP 429 from huggingface.co (unauthenticated: the HF token is scrubbed), so the logit
+  gates were skipped and the attempt was wasted on an infrastructure error.
+- For the LoRA question: writing the port was mechanical; debugging numerics against a wall is the hard part,
+  and even Claude can't do it without seeing intermediate values.
+
 ## Harness and skill fixes found
 - [x] let the agent run the skill's checks in the form it actually uses (OLMoE; c2b329d)
 - [x] a writable, per-job MAX compile cache in the sandbox (OLMoE; c2b329d)
@@ -41,6 +56,11 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
       the overlap scheduler (logprobs need it off); normal serving uses it.
 - [ ] MAX engine compile cache (`.max_cache/mof/mef`) still read-only in the sandbox (GPT-2)
 - [ ] allow `ruff format`/`ruff check` on the port dir through the skill env (GPT-2)
+- [ ] let the agent compile, serve and run compare_layers itself (a harness-run server it can call), so numeric
+      bugs are debugged with data, not guessed (BLOOM). The biggest open item.
+- [ ] an infrastructure failure (Hub 429, network) retries the gate instead of using up an attempt; read
+      checkpoint metadata from the local weights where possible (BLOOM)
+- [ ] feed compare_layers' per-layer output into the retry prompt, not only the gate summary (BLOOM)
 - note: the OLMoE port still has `supports_overlap_scheduler=False` from run 11; it can be dropped now.
 
 ## Verdict
