@@ -18,6 +18,7 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 | Starcoder2ForCausalLM (GQA group 12, sliding window) | bigcode/starcoder2-3b | passed parity, serving | 2 | yes | run 17: 40 min total (12 GB download), agent 10.8 min over 2 attempts, $4.86 |
 | PhiForCausalLM (parallel attn+MLP, partial rotary) | microsoft/phi-2 | passed parity, serving | 1 | yes | run 18: 17.7 min total, agent 6.4 min, 82 turns, $3.29; rel_diff 0.003 |
 | ExaoneForCausalLM (remote code) | LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct | failed: max serve won't load it without `--trust-remote-code` | 3 | yes | run 19: 18 min, $3.75; never reached the logit gates |
+| SmolLM3ForCausalLM (NoPE layers) | HuggingFaceTB/SmolLM3-3B | failed: our bug (HF reference couldn't load) — port probably fine | 3 | yes | run 20: 17 min, $1.70; smoke fluent every attempt |
 
 ## Findings
 
@@ -84,6 +85,14 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - The agent also couldn't read the weights snapshot (outside its workspace) to confirm config field names.
 - Should have stopped after attempt 1: the error was the same each time and outside the port's reach.
 
+### SmolLM3 (run 20)
+- Our bug, not the port's: the weights download skipped `chat_template.jinja`, so the HF reference tried to fetch
+  it into the read-only cache and crashed ("HF side failed: Read-only file system"). The logit gates never ran.
+  Smoke output was fluent every attempt (" Paris. The Eiffel Tower is in Paris.").
+- The same gap affects normal `mxc pull`: repos with a separate chat template file got no chat template.
+- The agent correctly saw nothing to fix: attempts 2 and 3 cost $0.65 together and changed little.
+- An infrastructure failure on the HF side should never count as the port's failure (same as BLOOM's 429).
+
 ## Harness and skill fixes found
 - [x] let the agent run the skill's checks in the form it actually uses (OLMoE; c2b329d)
 - [x] a writable, per-job MAX compile cache in the sandbox (OLMoE; c2b329d)
@@ -103,6 +112,7 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
       package and report it as "close" rather than failed (StableLM)
 - [ ] confirm the logits_multi short-prefix false negative (send MAX token ids, or skip prefixes under ~4 tokens)
       and report it upstream to modular/skills (StableLM)
+- [x] download chat_template.jinja / chat_template.json with the weights (SmolLM3; also fixes plain pulls)
 - [ ] remote-code models (`auto_map` in config.json): detect up front and either park with a clear message or,
       if the person decides to allow it, serve with `--trust-remote-code` (sandboxed for parity at least) (EXAONE)
 - [ ] the same serve error twice in a row → stop, don't spend the third attempt (EXAONE)

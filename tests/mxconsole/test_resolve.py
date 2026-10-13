@@ -85,3 +85,14 @@ def test_catalog_is_cached_in_mst_home(mxc_home):
     assert (mxc_home / "max_catalog.json").exists()
     r.load_catalog(runner=runner, refresh=True)
     assert len(calls) == 2
+
+
+def test_snapshot_keeps_the_chat_template_files():
+    """Newer repos keep the chat template in its own file (SmolLM3: chat_template.jinja). Without it, chat requests
+    get no template, and the port's HF reference tried to fetch it into a read-only cache (run 20)."""
+    from mxconsole.resolve import snapshot_patterns
+    files = ["config.json", "model.safetensors", "tokenizer.json", "chat_template.jinja", "chat_template.json",
+             "README.md", "notebook.ipynb"]
+    keep = snapshot_patterns(files)
+    assert "chat_template.jinja" in keep and "chat_template.json" in keep
+    assert "README.md" not in keep and "notebook.ipynb" not in keep

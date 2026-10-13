@@ -36,6 +36,7 @@ TOKENIZER_FILES = {
     "tokenizer.json", "tokenizer.model", "tokenizer_config.json", "special_tokens_map.json",
     "added_tokens.json", "vocab.json", "vocab.txt", "merges.txt", "spiece.model",
     "sentencepiece.bpe.model", "generation_config.json",
+    "chat_template.jinja", "chat_template.json",  # newer repos keep the chat template in its own file
 }
 
 
