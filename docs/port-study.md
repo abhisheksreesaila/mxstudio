@@ -14,6 +14,7 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 | GPT2LMHeadModel | openai-community/gpt2 | passed parity, serving | 1 | yes | run 13: 13 min total, agent 9.3 min, 109 turns, $3.85; ran its own checks 13 times |
 | BloomForCausalLM (ALiBi) | bigscience/bloomz-560m | failed parity after 3 attempts | 3 | yes | run 14: 24 min; logits close but off (rel_diff 0.30); attempt 3 lost to a Hub 429 |
 | GPTNeoXForCausalLM (parallel residual, partial rotary) | EleutherAI/pythia-1.4b-deduped | passed parity, serving | 1 | yes | run 15: 17.5 min total, agent 5.9 min, 83 turns, $2.98 |
+| StableLmForCausalLM | stabilityai/stablelm-2-1_6b-chat | failed after 3 attempts (but attempt 1 was probably right) | 3 | yes | run 16: 22.5 min; agent 4-5 min and ~$2 per attempt, $5.68 total |
 
 ## Findings
 
@@ -52,6 +53,17 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - For the LoRA question: writing the port was mechanical; debugging numerics against a wall is the hard part,
   and even Claude can't do it without seeing intermediate values.
 
+### StableLM 2 (run 16)
+- Attempts 1 and 2 were very likely correct: fluent output ("The capital of France is" → " Paris, and it is one of
+  the most visited cities in the world."), logits_prefill passed (rel_diff 0.02, then 0.003). Only
+  logits_multi failed, and only at prefix length 1.
+- Suspected false negative in Modular's gate: compare_layers.py `probe_multi_position` gives HF the token ids
+  `ids[:pos]` but gives MAX the decoded *text*, which the server re-tokenizes. At one token, any difference in
+  BOS handling between the HF tokenizer call and the server changes the whole context. The skill already skips
+  BOS-only prefixes for this reason; a one-word prefix has the same problem. Not confirmed yet.
+- The agent, told to fix a bug that probably wasn't there, changed working code; attempt 3 produced empty
+  output (smoke failed). The harness threw away a probably-good port.
+
 ## Harness and skill fixes found
 - [x] let the agent run the skill's checks in the form it actually uses (OLMoE; c2b329d)
 - [x] a writable, per-job MAX compile cache in the sandbox (OLMoE; c2b329d)
@@ -67,6 +79,10 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
       checkpoint metadata from the local weights where possible (BLOOM)
 - [ ] stop early on a known wall (check_walls flags it): say what blocks it and park, instead of spending all
       attempts (BLOOM)
+- [ ] keep the best attempt: if a later attempt does worse (e.g. smoke fails where it passed), restore the better
+      package and report it as "close" rather than failed (StableLM)
+- [ ] confirm the logits_multi short-prefix false negative (send MAX token ids, or skip prefixes under ~4 tokens)
+      and report it upstream to modular/skills (StableLM)
 - [ ] feed compare_layers' per-layer output into the retry prompt, not only the gate summary (BLOOM)
 - note: the OLMoE port still has `supports_overlap_scheduler=False` from run 11; it can be dropped now.
 
