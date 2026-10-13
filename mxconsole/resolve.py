@@ -37,7 +37,10 @@ TOKENIZER_FILES = {
     "added_tokens.json", "vocab.json", "vocab.txt", "merges.txt", "spiece.model",
     "sentencepiece.bpe.model", "generation_config.json",
     "chat_template.jinja", "chat_template.json",  # newer repos keep the chat template in its own file
+    "tekken.json", "tokenizer.model.v3",  # Mistral-style tokenizers
+    "preprocessor_config.json", "processor_config.json", "video_preprocessor_config.json",  # vision processors
 }
+EXTRA_TEMPLATES_DIR = "additional_chat_templates/"  # transformers lists this folder on the Hub and fetches each file
 
 
 class ResolveError(Exception):
@@ -310,7 +313,7 @@ def snapshot_patterns(files: list[str], shards: set[str] | None = None) -> list[
     """
     keep = [f for f in files
             if f == "config.json" or f.endswith(".safetensors.index.json")
-            or Path(f).name in TOKENIZER_FILES
+            or f in TOKENIZER_FILES or f.startswith(EXTRA_TEMPLATES_DIR)
             or (f.endswith(".safetensors") and (shards is None or f in shards))]
     if not any(f.endswith(".safetensors") for f in keep):
         raise ValueError("no safetensors weights in this repo")

@@ -96,3 +96,16 @@ def test_snapshot_keeps_the_chat_template_files():
     keep = snapshot_patterns(files)
     assert "chat_template.jinja" in keep and "chat_template.json" in keep
     assert "README.md" not in keep and "notebook.ipynb" not in keep
+
+
+def test_snapshot_keeps_extra_chat_templates_processor_and_mistral_tokenizer_files():
+    """transformers lists and fetches `additional_chat_templates/*`; vision models load processor configs;
+    Mistral repos may only ship tekken.json / tokenizer.model.v3. Missing ones break a read-only reference."""
+    from mxconsole.resolve import snapshot_patterns
+    files = ["config.json", "model.safetensors", "additional_chat_templates/tool_use.jinja",
+             "preprocessor_config.json", "processor_config.json", "video_preprocessor_config.json",
+             "tekken.json", "tokenizer.model.v3", "docs/tool_use.jinja", "examples/processor_config.json"]
+    keep = snapshot_patterns(files)
+    for f in files[2:8]:
+        assert f in keep, f
+    assert "docs/tool_use.jinja" not in keep and "examples/processor_config.json" not in keep
