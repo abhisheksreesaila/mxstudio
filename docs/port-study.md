@@ -8,6 +8,7 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 | Architecture | Repo | Outcome | Attempts | Clean workspace | Notes |
 |---|---|---|---|---|---|
 | OlmoeForCausalLM (MoE, 64 experts, top-8) | allenai/OLMoE-1B-7B-0924-Instruct | passed parity, serving, answers | 2 | no (reused 2026-10-11) | run 11, 2026-10-13 |
+| GPT2LMHeadModel | openai-community/gpt2 | passed parity, serving | 1 | yes | run 13: 13 min total, agent 9.3 min, 109 turns, $3.85; ran its own checks 13 times |
 
 ## Findings
 
@@ -24,6 +25,13 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - MAX's compile cache isn't writable inside the sandbox, so every parity check compiles cold (minutes each).
 - Raw transcripts (F-032) weren't kept for this run: the daemon started before that change.
 
+### GPT-2 (run 13)
+- First attempt passed: the agent ran check_port.py itself this time (13 allowed skill-script calls).
+- 4 denials, all harmless: a shell `for` loop over scripts, `python -c` to grep MAX's source (Grep would do),
+  `ruff format` on the port (the skill uses ruff; worth allowing on the port dir), and a check piped to `tail`.
+- Compile cache: the MODULAR_CACHE_DIR warning is gone, but MAX's engine cache (`share/max/.max_cache/mof/mef`,
+  from the env's modular.cfg `cache_dir`) is still read-only in the sandbox. Open: find its override.
+
 ## Harness and skill fixes found
 - [x] let the agent run the skill's checks in the form it actually uses (OLMoE; c2b329d)
 - [x] a writable, per-job MAX compile cache in the sandbox (OLMoE; c2b329d)
@@ -31,6 +39,8 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
       ported models keep it for normal serving. `--force` also skips an architecture's required arguments, so
       the parity server turns prefix caching and chunked prefill off itself. Trade-off: parity never exercises
       the overlap scheduler (logprobs need it off); normal serving uses it.
+- [ ] MAX engine compile cache (`.max_cache/mof/mef`) still read-only in the sandbox (GPT-2)
+- [ ] allow `ruff format`/`ruff check` on the port dir through the skill env (GPT-2)
 - note: the OLMoE port still has `supports_overlap_scheduler=False` from run 11; it can be dropped now.
 
 ## Verdict
