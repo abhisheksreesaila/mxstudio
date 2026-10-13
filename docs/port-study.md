@@ -17,6 +17,7 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 | StableLmForCausalLM | stabilityai/stablelm-2-1_6b-chat | failed after 3 attempts (but attempt 1 was probably right) | 3 | yes | run 16: 22.5 min; agent 4-5 min and ~$2 per attempt, $5.68 total |
 | Starcoder2ForCausalLM (GQA group 12, sliding window) | bigcode/starcoder2-3b | passed parity, serving | 2 | yes | run 17: 40 min total (12 GB download), agent 10.8 min over 2 attempts, $4.86 |
 | PhiForCausalLM (parallel attn+MLP, partial rotary) | microsoft/phi-2 | passed parity, serving | 1 | yes | run 18: 17.7 min total, agent 6.4 min, 82 turns, $3.29; rel_diff 0.003 |
+| ExaoneForCausalLM (remote code) | LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct | failed: max serve won't load it without `--trust-remote-code` | 3 | yes | run 19: 18 min, $3.75; never reached the logit gates |
 
 ## Findings
 
@@ -73,6 +74,16 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - Attempt 2 fixed it from the compile error fed back, and parity passed. A hardware/kernel limit learned from
   an error message: the kind of thing the skill could list as a known constraint.
 
+### EXAONE 3.5 (run 19)
+- Not a port problem. EXAONE's config.json points AutoConfig at Python code on the Hub, and `max serve` loads the
+  config (with trust_remote_code=False) before it imports `--custom-architectures`, so the port's own config
+  class registers too late. check_port passed (272/272 tensors). The agent worked this out from MAX's source and
+  on attempt 3 changed nothing and said mxconsole must serve it with `--trust-remote-code`. Right call.
+- A product decision, not a harness bug: `--trust-remote-code` runs the model author's Python. In the parity server
+  that's inside the sandbox; in normal serving it would run unsandboxed in mxconsole's own process tree.
+- The agent also couldn't read the weights snapshot (outside its workspace) to confirm config field names.
+- Should have stopped after attempt 1: the error was the same each time and outside the port's reach.
+
 ## Harness and skill fixes found
 - [x] let the agent run the skill's checks in the form it actually uses (OLMoE; c2b329d)
 - [x] a writable, per-job MAX compile cache in the sandbox (OLMoE; c2b329d)
@@ -92,6 +103,9 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
       package and report it as "close" rather than failed (StableLM)
 - [ ] confirm the logits_multi short-prefix false negative (send MAX token ids, or skip prefixes under ~4 tokens)
       and report it upstream to modular/skills (StableLM)
+- [ ] remote-code models (`auto_map` in config.json): detect up front and either park with a clear message or,
+      if the person decides to allow it, serve with `--trust-remote-code` (sandboxed for parity at least) (EXAONE)
+- [ ] the same serve error twice in a row → stop, don't spend the third attempt (EXAONE)
 - [ ] feed compare_layers' per-layer output into the retry prompt, not only the gate summary (BLOOM)
 - note: the OLMoE port still has `supports_overlap_scheduler=False` from run 11; it can be dropped now.
 
