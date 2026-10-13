@@ -16,6 +16,7 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 | GPTNeoXForCausalLM (parallel residual, partial rotary) | EleutherAI/pythia-1.4b-deduped | passed parity, serving | 1 | yes | run 15: 17.5 min total, agent 5.9 min, 83 turns, $2.98 |
 | StableLmForCausalLM | stabilityai/stablelm-2-1_6b-chat | failed after 3 attempts (but attempt 1 was probably right) | 3 | yes | run 16: 22.5 min; agent 4-5 min and ~$2 per attempt, $5.68 total |
 | Starcoder2ForCausalLM (GQA group 12, sliding window) | bigcode/starcoder2-3b | passed parity, serving | 2 | yes | run 17: 40 min total (12 GB download), agent 10.8 min over 2 attempts, $4.86 |
+| PhiForCausalLM (parallel attn+MLP, partial rotary) | microsoft/phi-2 | passed parity, serving | 1 | yes | run 18: 17.7 min total, agent 6.4 min, 82 turns, $3.29; rel_diff 0.003 |
 
 ## Findings
 
