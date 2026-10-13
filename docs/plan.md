@@ -230,10 +230,16 @@ Superseded 2026-10-11 by Console 1.0 above (concept D chosen).
 Still mockup-only ideas, not built: `mxc set --gpu`, `mxc expose --deny`, the ask box.
 
 ## Standalone porting (goal set 2026-10-13)
-Goal: porting an unsupported architecture works on a machine with no Claude account, through a local model
-(possibly a LoRA fine-tuned for this). Fallback when that isn't good enough: Claude Code or Codex.
-Order: learn with Claude first (F-032, F-033); the brief for the local-model agent (clarify) comes after the
-study says whether the steps are easy enough for a small model.
+Goal: porting an unsupported architecture works without the person installing anything or having Claude.
+Agreed approach (2026-10-13):
+1. The agent is swappable, not shipped: Claude by default through the bundled `claude-agent-sdk` (no separate
+   install, only a sign-in or API key); later any endpoint, including a model mxconsole serves through its
+   LiteLLM gateway, so porting can run fully offline without us training anything.
+2. Measure before deciding: F-033 ports 5 to 10 architectures with Claude. Most pass → the skills are good
+   enough; most fail → the fix is in the skills and harness, since a small model would do worse.
+3. Fine-tuning comes later: the finished-ports catalog collects successful transcripts; a specialized (LoRA)
+   model is tested against the same measurement once there are enough and the MAX API settles.
+F-034 and F-035 need a brief (clarify) before building.
 
 ## F-032 Keep each attempt's raw agent transcript [review]
 Brief: this section · Needs: F-029
@@ -245,3 +251,11 @@ Brief: this section · Needs: F-032
 - [ ] `docs/port-study.md`: per architecture the outcome, attempts, time, which parity gate failed and why, the fixes Claude made, and which skill parts it used
 - [ ] the verdict: which steps are mechanical (a LoRA candidate) and which needed real reasoning; harness and skill fixes found along the way
 - Findings so far (OLMoE, run 11): the run reused the 2026-10-11 workspace (not a clean test); parity attempt 1 failed (output differs from HF); MAX's compile cache isn't writable in the sandbox, so every parity check compiles cold
+
+## F-034 Swappable porting agent [todo]
+Brief: needed (docs/briefs/porting-agent.md) · Needs: F-033's verdict
+- Claude via the bundled SDK by default, with a "Connect Claude" step in the console; then Codex and any OpenAI-compatible endpoint (incl. mxconsole's own gateway)
+
+## F-035 Finished-ports catalog [todo]
+Brief: needed (docs/briefs/ports-catalog.md) · Needs: F-033
+- a port that passes the checks is published once per architecture; `mxc pull` uses it with no agent; the catalog keeps the successful transcripts
