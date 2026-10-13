@@ -241,7 +241,7 @@ Agreed approach (2026-10-13):
    model is tested against the same measurement once there are enough and the MAX API settles.
 F-034 and F-035 need a brief (clarify) before building.
 
-## F-032 Keep each attempt's raw agent transcript [review]
+## F-032 Keep each attempt's raw agent transcript [done]
 Brief: this section · Needs: F-029
 - [x] every generate attempt writes the agent's raw stream-json to `ports/<id>/agent-<attempt>.jsonl` beside port.log (training data and study material)
 

@@ -15,7 +15,8 @@ result and registers it. Stages, in order:
 When build or parity fails, generate runs again with the error output appended ("fix this"), up to
 `max_attempts` times; each attempt is its own set of stage rows. The whole transcript of the agent and
 of every command goes to MXC_HOME/ports/<id>/port.log, and the agent's raw stream-json of each attempt to
-agent-<attempt>.jsonl beside it (what a port study or a fine-tune learns from). Cancel kills the process tree of whatever runs.
+agent-<attempt>.jsonl beside it (what a port study or a fine-tune learns from; whole tool results, so it can hold
+anything the agent printed, a secret included: scrub before sharing or training on it). Cancel kills the process tree of whatever runs.
 Everything outside this process (claude, the skill's checks, max) is injectable, so tests run fakes.
 
 Safety (config.json and the model card are untrusted, so assume prompt injection):
@@ -724,12 +725,22 @@ class PortManager:
         timer.daemon = True
         timer.start()
         captured: deque[str] = deque(maxlen=400)
-        raw_file = open(raw, "a", encoding="utf-8") if raw else None
+        raw_file = None
+        if raw:
+            try:
+                raw_file = open(raw, "w", encoding="utf-8")  # one file per attempt: never mixed with an old run's
+            except OSError as e:
+                job.say(f"-- could not keep the agent transcript at {raw}: {e}")
         try:
             for line in proc.stdout:
                 if raw_file:
-                    raw_file.write(line)
-                    raw_file.flush()
+                    try:
+                        raw_file.write(line)
+                        raw_file.flush()
+                    except OSError as e:  # the transcript is secondary: the port goes on without it
+                        job.say(f"-- could not keep the agent transcript at {raw}: {e}")
+                        raw_file.close()
+                        raw_file = None
                 line = line.rstrip("\n")
                 captured.append(line)
                 for out in (render(line) if render else [line]):

@@ -13,7 +13,7 @@ from fakes import CATALOG
 from test_port import Runner, fake_fetch
 from typer.testing import CliRunner
 
-from mxconsole import cli, port_auto
+from mxconsole import cli, port, port_auto
 from mxconsole.gateway import create_app
 from mxconsole.port_auto import PortManager, PortTools
 from mxconsole.pulls import BadPull
@@ -392,3 +392,32 @@ def test_each_attempt_keeps_the_agents_raw_transcript(tmp_path, fake_claude, mon
         events = [json.loads(line) for line in (folder / f"agent-{attempt}.jsonl").read_text().splitlines()]
         assert any(c.get("type") == "tool_use" for e in events for c in e.get("message", {}).get("content", []))
     assert not (folder / "agent-3.jsonl").exists()
+
+
+def test_a_timed_out_attempt_keeps_its_partial_transcript(tmp_path, fake_claude, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "hang")
+    job = run(make_manager(tmp_path, fake_claude, generate_timeout=1), max_attempts=1)
+    assert job["status"] == "failed"
+    text = (Path(job["log"]).parent / "agent-1.jsonl").read_text()
+    assert '"tool_use"' in text and text.endswith("\n")
+
+
+def test_a_rerun_with_a_reused_job_id_does_not_mix_transcripts(tmp_path, fake_claude):
+    stale = mxc_home() / "ports" / "1" / "agent-1.jsonl"
+    stale.parent.mkdir(parents=True)
+    stale.write_text('{"old": "run"}\n')
+    job = run(make_manager(tmp_path, fake_claude))
+    assert job["status"] == "done", job["message"]
+    assert '"old"' not in (Path(job["log"]).parent / "agent-1.jsonl").read_text()
+
+
+def test_a_transcript_that_cannot_be_written_does_not_fail_the_port(tmp_path, fake_claude):
+    (mxc_home() / "ports" / "1" / "agent-1.jsonl").mkdir(parents=True)   # a directory: open() fails
+    job = run(make_manager(tmp_path, fake_claude))
+    assert job["status"] == "done", job["message"]
+    assert "could not keep the agent transcript" in Path(job["log"]).read_text()
+
+
+def test_a_numeric_model_name_never_shares_a_job_folder():
+    """Job folders are ports/<id>; a workspace named like one would let the agent write a job's logs."""
+    assert not port._workspace_name("acme/12", "acme/12").isdigit()

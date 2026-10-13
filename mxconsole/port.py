@@ -172,7 +172,9 @@ class PortResult:
 
 
 def _workspace_name(ref: str, repo_id: str) -> str:
-    return resolve.model_name(ref, repo_id)
+    """The model's name, never all digits: job folders are ports/<id>, and the agent may write its workspace."""
+    name = resolve.model_name(ref, repo_id)
+    return f"model-{name}" if name.isdigit() else name
 
 
 def _link_skills(workspace: Path, skills_root: Path, names: list[str]) -> None:
