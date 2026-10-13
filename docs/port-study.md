@@ -15,6 +15,7 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 | BloomForCausalLM (ALiBi) | bigscience/bloomz-560m | failed parity after 3 attempts | 3 | yes | run 14: 24 min; logits close but off (rel_diff 0.30); attempt 3 lost to a Hub 429 |
 | GPTNeoXForCausalLM (parallel residual, partial rotary) | EleutherAI/pythia-1.4b-deduped | passed parity, serving | 1 | yes | run 15: 17.5 min total, agent 5.9 min, 83 turns, $2.98 |
 | StableLmForCausalLM | stabilityai/stablelm-2-1_6b-chat | failed after 3 attempts (but attempt 1 was probably right) | 3 | yes | run 16: 22.5 min; agent 4-5 min and ~$2 per attempt, $5.68 total |
+| Starcoder2ForCausalLM (GQA group 12, sliding window) | bigcode/starcoder2-3b | passed parity, serving | 2 | yes | run 17: 40 min total (12 GB download), agent 10.8 min over 2 attempts, $4.86 |
 
 ## Findings
 
@@ -63,6 +64,13 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
   BOS-only prefixes for this reason; a one-word prefix has the same problem. Not confirmed yet.
 - The agent, told to fix a bug that probably wasn't there, changed working code; attempt 3 produced empty
   output (smoke failed). The harness threw away a probably-good port.
+
+### StarCoder2 (run 17)
+- Attempt 1 built but failed to compile at serve time: MAX's NVIDIA attention kernel only supports GQA groups
+  of up to 8, and StarCoder2-3B has 24 query heads over 2 KV heads (group 12). Nothing the agent can run
+  (check_port) compiles the graph, so only the harness's serve revealed it, after a 2-minute compile.
+- Attempt 2 fixed it from the compile error fed back, and parity passed. A hardware/kernel limit learned from
+  an error message: the kind of thing the skill could list as a known constraint.
 
 ## Harness and skill fixes found
 - [x] let the agent run the skill's checks in the form it actually uses (OLMoE; c2b329d)
