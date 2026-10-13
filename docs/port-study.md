@@ -19,6 +19,7 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 | PhiForCausalLM (parallel attn+MLP, partial rotary) | microsoft/phi-2 | passed parity, serving | 1 | yes | run 18: 17.7 min total, agent 6.4 min, 82 turns, $3.29; rel_diff 0.003 |
 | ExaoneForCausalLM (remote code) | LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct | failed: max serve won't load it without `--trust-remote-code` | 3 | yes | run 19: 18 min, $3.75; never reached the logit gates |
 | SmolLM3ForCausalLM (NoPE layers) | HuggingFaceTB/SmolLM3-3B | failed: our bug (HF reference couldn't load) — port probably fine | 3 | yes | run 20: 17 min, $1.70; smoke fluent every attempt |
+| GraniteMoeForCausalLM (MoE, 32 experts) | ibm-granite/granite-3.1-1b-a400m-instruct | passed parity, serving | 3 | yes | run 21: 17.7 min, $3.19; prefill rel_diff 0.10 → 0.13 → 0.036 |
 
 ## Findings
 
@@ -93,6 +94,10 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - The agent correctly saw nothing to fix: attempts 2 and 3 cost $0.65 together and changed little.
 - An infrastructure failure on the HF side should never count as the port's failure (same as BLOOM's 429).
 
+### Granite MoE (run 21)
+- A genuine numeric bug fixed without seeing intermediate values: logits_prefill rel_diff 0.10, then 0.13 (worse),
+  then 0.036 (pass). The agent got there on the last attempt by reading code, not data. Lucky as much as good.
+
 ## Harness and skill fixes found
 - [x] let the agent run the skill's checks in the form it actually uses (OLMoE; c2b329d)
 - [x] a writable, per-job MAX compile cache in the sandbox (OLMoE; c2b329d)
@@ -119,5 +124,28 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - [ ] feed compare_layers' per-layer output into the retry prompt, not only the gate summary (BLOOM)
 - note: the OLMoE port still has `supports_overlap_scheduler=False` from run 11; it can be dropped now.
 
-## Verdict
-Pending (needs 5 to 10 clean runs).
+## Verdict (2026-10-13, 9 clean runs + OLMoE)
+
+**Score.** 5 of 9 clean runs ported and serve (GPT-2, Pythia, StarCoder2, Phi-2, Granite MoE), plus OLMoE. Of the 4
+failures only one was the port's fault (BLOOM, a known wall). StableLM 2 and SmolLM3 were very likely correct and
+lost to a gate false negative and our own download bug; EXAONE needs `--trust-remote-code`, a policy call. With the
+harness fixes below, expect 7 of 9. **The skills are good enough; the harness was the weak part.**
+
+**Cost.** $36.43 of agent time for the 9 runs (about $4 per model; $2-4 for a first-try pass), 13-40 min wall clock
+each, most of it weight download and MAX compile.
+
+**What the work is.** A first-try port is 40-110 turns, about 60% reading (Read/Grep/Glob over the skill, the
+donor architecture and MAX's own source) and a handful of writes. When the architecture is a close variant of a
+MAX donor (GPT-2, Pythia, Phi-2) it is close to mechanical. The hard parts all needed real reasoning over MAX's
+source: a numeric mismatch (BLOOM, Granite), a kernel limit surfacing as a compile error (StarCoder2), loader
+order (EXAONE), scheduler behaviour (OLMoE).
+
+**LoRA.** Not yet. Five successful transcripts is far too little training data, and the hard cases are exactly
+the ones a small model would fail. Next measurement instead: once the agent is swappable (F-034), run an open
+coding model served by mxconsole itself over these same 9 architectures, unchanged. If it passes the
+close-variant ones, local-first porting works for the common case and Claude stays the fallback for the rest;
+fine-tune only if that baseline falls short and the catalog (F-035) has collected enough transcripts.
+
+**Next, in order.** (1) let the agent compile, serve and run compare_layers itself; (2) infrastructure failures
+retry instead of using an attempt; (3) keep the best attempt; (4) stop early on a known wall, remote code, or the
+same error twice; (5) confirm and report the short-prefix logits_multi false negative upstream.

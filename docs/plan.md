@@ -245,11 +245,11 @@ F-034 and F-035 need a brief (clarify) before building.
 Brief: this section · Needs: F-029
 - [x] every generate attempt writes the agent's raw stream-json to `ports/<id>/agent-<attempt>.jsonl` beside port.log (training data and study material)
 
-## F-033 Port study with Claude [doing]
+## F-033 Port study with Claude [done]
 Brief: this section · Needs: F-032
-- [ ] port 5 to 10 unsupported architectures, each in a fresh workspace, through `mxc port <ref> --auto`
-- [ ] `docs/port-study.md`: per architecture the outcome, attempts, time, which parity gate failed and why, the fixes Claude made, and which skill parts it used
-- [ ] the verdict: which steps are mechanical (a LoRA candidate) and which needed real reasoning; harness and skill fixes found along the way
+- [x] port 5 to 10 unsupported architectures, each in a fresh workspace, through `mxc port <ref> --auto`
+- [x] `docs/port-study.md`: per architecture the outcome, attempts, time, which parity gate failed and why, the fixes Claude made, and which skill parts it used
+- [x] the verdict: which steps are mechanical (a LoRA candidate) and which needed real reasoning; harness and skill fixes found along the way
 - Findings so far (OLMoE, run 11): the run reused the 2026-10-11 workspace (not a clean test); parity attempt 1 failed (output differs from HF); MAX's compile cache isn't writable in the sandbox, so every parity check compiles cold
 
 ## F-034 Swappable porting agent [todo]
