@@ -175,12 +175,13 @@ def _pixi_run(c: Ctx, script: str, *args: str):
 
 
 def _skill_install(c: Ctx):
-    """Install the pristine skill's pixi env, outside any sandbox (its lockfile when it has one), so the
-    sandboxed processes find it ready and need no network or shared cache to run it."""
+    """Install the pristine skill's pixi env, outside any sandbox, so the sandboxed processes find it ready and
+    need no network or shared cache to run it. Not --locked: the manifest pins the serving MAX, and when that
+    changes the old lock must be re-solved (pixi keeps it as long as it still satisfies the manifest)."""
     d = c.skills_root / port.ENTRY_SKILL
     if not (d / "pixi.toml").is_file():
         return None
-    return (["pixi", "install", *(["--locked"] if (d / "pixi.lock").is_file() else [])], d)
+    return (["pixi", "install"], d)
 
 
 def _skill_build(c: Ctx):
@@ -262,9 +263,28 @@ SKILL_PATCHES = [
 PARITY_SERVE_FLAGS = ["--no-enable-overlap-scheduler"]
 
 
-def apply_skill_patches(skills_root: Path) -> list[str]:
-    """Apply SKILL_PATCHES where the buggy text is present; returns what was patched (idempotent)."""
+# The skill's manifest allows any MAX 26.x, so a fresh solve picks whatever nightly is newest. A port must be
+# built against the MAX that will serve it (a newer one's APIs fail to load in ours), so `max` is pinned to it.
+SKILL_MANIFEST = "import-model/pixi.toml"
+_MAX_DEP = re.compile(r'^max\s*=\s*"[^"]*"', re.M)
+
+
+def apply_skill_patches(skills_root: Path, *, serving_max: str | None = None) -> list[str]:
+    """Apply SKILL_PATCHES where the buggy text is present, and pin the skill env's MAX to `serving_max`
+    (default: mxconsole's own); returns what was changed (idempotent)."""
     done = []
+    if serving_max is None:
+        serving_max = port.mst_max_version() or ""
+    if serving_max:
+        f = skills_root / SKILL_MANIFEST
+        try:
+            text = f.read_text()
+        except OSError:
+            text = ""
+        pinned = _MAX_DEP.sub(f'max = "=={serving_max}"', text, count=1)
+        if pinned != text:
+            f.write_text(pinned)
+            done.append(f"{SKILL_MANIFEST}: MAX pinned to {serving_max}, the version that will serve the port")
     for rel, old, new, why in SKILL_PATCHES:
         f = skills_root / rel
         try:
@@ -275,6 +295,15 @@ def apply_skill_patches(skills_root: Path) -> list[str]:
             f.write_text(text.replace(old, new))
             done.append(f"{rel}: {why}")
     return done
+
+
+def skill_max_unpinned(skills_root: Path, serving_max: str) -> bool:
+    """The skill has a manifest, but its `max` is not pinned to `serving_max` (a format our pin can't rewrite)."""
+    try:
+        text = (skills_root / SKILL_MANIFEST).read_text()
+    except OSError:
+        return False
+    return f'max = "=={serving_max}"' not in text
 
 
 def gate_hash(skills_root: Path) -> str:
@@ -724,7 +753,7 @@ class PortManager:
         job.say("the skill's gate scripts were modified; restoring them from git")
         runner(["git", "checkout", "--", *GIT_PATHSPECS], cwd=ctx.skills_root)
         runner(["git", "clean", "-fd", "--", *GIT_PATHSPECS], cwd=ctx.skills_root)
-        apply_skill_patches(ctx.skills_root)
+        apply_skill_patches(ctx.skills_root, serving_max=ctx.serving_max)
         if gate_hash(ctx.skills_root) != ctx.gate_hash:
             raise _StageFailed(f"the skill's check scripts in {ctx.skills_root} were modified and could not be restored; "
                                f"the build and parity checks cannot be trusted")
@@ -785,12 +814,18 @@ class PortManager:
         skills_root = port.ensure_skills(runner=self.git_runner)
         if port.ENTRY_SKILL not in port.list_skills(skills_root):
             raise _StageFailed(f"Modular's skills in {skills_root} have no {port.ENTRY_SKILL} skill")
-        for note in apply_skill_patches(skills_root):
-            job.say(f"-- patched a known bug in Modular's skill: {note}")
+        serving_max = port.mst_max_version() or ""
+        for note in apply_skill_patches(skills_root, serving_max=serving_max):
+            job.say(f"-- patched Modular's skill: {note}")
+        if not serving_max:
+            job.say("-- warning: mxconsole's MAX version is unknown, so the skill's environment is not pinned to it")
+        elif skill_max_unpinned(skills_root, serving_max):
+            raise _StageFailed(f"could not pin the MAX in {skills_root / SKILL_MANIFEST} to {serving_max}, the version "
+                               f"that will serve the port; a port built against another MAX fails to load")
         skills = port.finish_workspace(job.ref, res, workspace, config, donor, skills_root)
         allowed = tuple(f"Bash(cp -r {d}/:*)" for d in (donor.source_dir, donor.v3_dir) if d)
         ctx = Ctx(job.ref, res.repo_id, name, workspace, workspace / "port" / package_slug(name), skills_root,
-                  gate_hash=gate_hash(skills_root), extra_allowed=allowed, serving_max=port.mst_max_version() or "")
+                  gate_hash=gate_hash(skills_root), extra_allowed=allowed, serving_max=serving_max)
         cmd = self.tools.install_cmd(ctx)
         if cmd is not None:
             self._detail(job, row, "installing the skill's environment (outside the sandbox; the first time takes a while)…")

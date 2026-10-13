@@ -191,7 +191,8 @@ def test_failed_skill_install_fails_the_skills_stage(tmp_path, fake_claude):
     assert calls(tmp_path) == []
 
 
-def test_default_install_uses_the_lockfile_when_there_is_one(tmp_path):
+def test_default_install_lets_the_lockfile_follow_the_pinned_manifest(tmp_path):
+    """Not --locked: when the pinned MAX changes, an old lock must be re-solved, not refused."""
     clone = tmp_path / "c"
     (clone / "import-model").mkdir(parents=True)
     ctx = port_auto.Ctx("r", "o/r", "r", tmp_path, tmp_path / "p", clone)
@@ -199,7 +200,7 @@ def test_default_install_uses_the_lockfile_when_there_is_one(tmp_path):
     (clone / "import-model" / "pixi.toml").write_text("")
     assert port_auto._skill_install(ctx) == (["pixi", "install"], clone / "import-model")
     (clone / "import-model" / "pixi.lock").write_text("")
-    assert port_auto._skill_install(ctx)[0] == ["pixi", "install", "--locked"]
+    assert port_auto._skill_install(ctx)[0] == ["pixi", "install"]
 
 
 def test_without_bwrap_auto_is_refused_unless_unsandboxed_is_given(tmp_path, fake_claude):
@@ -528,12 +529,82 @@ def test_known_skill_bugs_are_patched_in_the_clone_and_patching_is_idempotent(tm
     assert apply_skill_patches(tmp_path / "nope") == []  # no such file: nothing to do
 
 
+SKILL_MANIFEST = '''[dependencies]
+max = ">=26.3.0,<27"
+python = ">=3.12,<3.15"
+'''
+
+
+def test_the_skill_env_is_pinned_to_the_max_that_serves_the_port(tmp_path):
+    """A port built against a newer MAX than mxconsole serves passes the build check and fails to load (OLMoE,
+    2026-10-11). The skill's own range (>=26.3,<27) lets a fresh solve pick any nightly, so pin it exactly."""
+    from mxconsole.port_auto import apply_skill_patches
+    f = tmp_path / "import-model" / "pixi.toml"
+    f.parent.mkdir(parents=True)
+    f.write_text(SKILL_MANIFEST)
+    done = apply_skill_patches(tmp_path, serving_max="26.7.0.dev2026100905")
+    assert len(done) == 1 and "26.7.0.dev2026100905" in done[0]
+    assert 'max = "==26.7.0.dev2026100905"' in f.read_text() and 'python = ">=3.12,<3.15"' in f.read_text()
+    assert apply_skill_patches(tmp_path, serving_max="26.7.0.dev2026100905") == []   # already pinned
+    apply_skill_patches(tmp_path, serving_max="26.8.0")                               # mxconsole upgraded
+    assert 'max = "==26.8.0"' in f.read_text()
+    f.write_text(SKILL_MANIFEST)
+    assert apply_skill_patches(tmp_path, serving_max="") == []                        # unknown: left alone
+    assert f.read_text() == SKILL_MANIFEST
+
+
+class ManifestRunner(GateRunner):
+    """GateRunner whose clone also has the skill's manifest with upstream's MAX range; checkout restores it."""
+
+    def __init__(self, manifest=SKILL_MANIFEST):
+        super().__init__(restore=True)
+        self.manifest_text = manifest
+        self.manifest: Path | None = None
+
+    def __call__(self, cmd, cwd=None):
+        out = super().__call__(cmd, cwd)
+        if cmd[:2] == ["git", "clone"]:
+            self.manifest = Path(cmd[-1]) / "import-model" / "pixi.toml"
+        if cmd[:2] == ["git", "clone"] or (cmd[:2] == ["git", "checkout"] and self.manifest):
+            self.manifest.write_text(self.manifest_text)
+        return out
+
+
+def test_the_pipeline_pins_the_serving_max_and_the_pin_survives_a_restore(tmp_path, fake_claude, monkeypatch):
+    from mxconsole import port
+    monkeypatch.setattr(port, "mst_max_version", lambda: "26.7.0.test")
+    runner = ManifestRunner()
+    seen = []
+    tools = check_tools()
+    py, script = sys.executable, str(HERE / "fake_port_check.py")
+    tools.build = lambda c: (seen.append(runner.manifest.read_text()) or [py, script, "build", str(c.port_dir)], c.workspace)
+    tools.install = lambda c: None                                       # no real pixi in tests
+    monkeypatch.setenv("FAKE_CLAUDE_TAMPER", str(mxc_home() / "skills" / "modular" / "import-model" / "pixi.toml"))
+    job = run(make_manager(tmp_path, fake_claude, git_runner=runner, tools=tools))
+    assert job["status"] == "done", job["message"]
+    assert len(seen) == 1 and 'max = "==26.7.0.test"' in seen[0]       # restored from git, then re-pinned
+    assert "MAX pinned to 26.7.0.test" in Path(job["log"]).read_text()
+
+
+def test_a_manifest_whose_max_cannot_be_pinned_fails_the_skills_stage(tmp_path, fake_claude, monkeypatch):
+    """Unpinned, the skill env may solve a newer MAX: hours of porting that then fail to load. Stop early."""
+    from mxconsole import port
+    monkeypatch.setattr(port, "mst_max_version", lambda: "26.7.0.test")
+    tools = check_tools()
+    tools.install = lambda c: None
+    m = make_manager(tmp_path, fake_claude, tools=tools,
+                     git_runner=ManifestRunner('[dependencies]\nmax = { version = ">=26" }\n'))
+    job = run(m)
+    assert job["status"] == "failed" and "could not pin" in job["message"] and "26.7.0.test" in job["message"]
+    assert calls(tmp_path) == [] and m.store.models() == []
+
+
 def test_a_restored_clone_gets_its_patches_back_before_the_gate_hash_is_compared(tmp_path, fake_claude, monkeypatch):
     from mxconsole import port_auto
     clone = mxc_home() / "skills" / "modular"
     applied = []
     real = port_auto.apply_skill_patches
-    monkeypatch.setattr(port_auto, "apply_skill_patches", lambda root: applied.append(root) or real(root))
+    monkeypatch.setattr(port_auto, "apply_skill_patches", lambda root, **kw: applied.append(root) or real(root, **kw))
     runner = GateRunner(restore=True)
     monkeypatch.setenv("FAKE_CLAUDE_TAMPER", str(clone / "import-model" / "scripts" / "check_port.py"))
     job = run(make_manager(tmp_path, fake_claude, git_runner=runner))
