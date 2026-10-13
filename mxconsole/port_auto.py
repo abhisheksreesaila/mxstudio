@@ -248,7 +248,7 @@ Read PORT.md and config.json here first. Follow the `import-model` skill (.claud
 {serving}Package folder: {c.port_dir}
 That exact folder must end up holding arch.py and an __init__.py that exposes ARCHITECTURES. Scaffold with `--output-dir {c.port_dir.parent} --slug {c.port_dir.name}` (or create it by hand). Do not write outside the workspace, except by running the skill's own commands.
 
-Run the skill's scripts exactly in this form (allowed from here; other shell commands are refused, so use Read, Glob and Grep to look at files): `{skill_script_command(c.skills_root, "<script>.py")} …`.
+Run the skill's scripts exactly in this form (allowed from here; general shell commands such as ls, cat or grep are refused, so use Read, Glob and Grep to look at files): `{skill_script_command(c.skills_root, "<script>.py")} …`.
 
 You are done when `{skill_script_command(c.skills_root, "check_port.py")} {c.weights or c.repo_id} --port-dir {c.port_dir}` (the weights are already downloaded there, read-only — use that path, not the repo id, or the model is downloaded again) passes and the implementation-complete criteria in the skill are met. Do not start `max serve` yourself and do not install packages with pip; mxconsole serves and verifies the port afterwards, against the Hugging Face reference. Finish with a short summary of what you changed."""
     if attempt <= 1 and not feedback:
@@ -276,8 +276,10 @@ SKILL_PATCHES = [
 ]
 # The verify gate asks the parity server for log probabilities, which MAX refuses under its overlap scheduler.
 # `--force` makes the flag win over an architecture that turns the scheduler on (MAX 26.7, OLMoE), so a port can
-# keep the faster scheduler for normal serving.
-PARITY_SERVE_FLAGS = ["--no-enable-overlap-scheduler", "--force"]
+# keep the faster scheduler for normal serving. It also skips the architecture's required arguments (in MAX's own
+# architectures: prefix caching and chunked prefill off), so those are turned off here: the check runs the setup
+# that ships, or a more conservative one.
+PARITY_SERVE_FLAGS = ["--no-enable-overlap-scheduler", "--force", "--no-enable-prefix-caching", "--no-enable-chunked-prefill"]
 
 
 # The skill's manifest allows any MAX 26.x, so a fresh solve picks whatever nightly is newest. A port must be
@@ -630,11 +632,11 @@ class PortManager:
             return argv, env, "trusted install of the pristine skill env, not sandboxed"
         work = job.dir / "work"
         cache = work / "cache"
-        for d in (cache / "pixi", cache / "rattler", cache / "uv", cache / "xdg", cache / "modular", work / "hf" / "hub"):
+        for d in (cache / "pixi", cache / "rattler", cache / "uv", cache / "xdg", cache / "modular", cache / "modular" / "cache", work / "hf" / "hub"):
             d.mkdir(parents=True, exist_ok=True)
         env.update(PIXI_CACHE_DIR=str(cache / "pixi"), RATTLER_CACHE_DIR=str(cache / "rattler"),
                    UV_CACHE_DIR=str(cache / "uv"), XDG_CACHE_HOME=str(cache / "xdg"),
-                   MODULAR_DERIVED_PATH=str(cache / "modular"), MODULAR_CACHE_DIR=str(cache / "modular"), HF_HOME=str(work / "hf"),
+                   MODULAR_DERIVED_PATH=str(cache / "modular"), MODULAR_CACHE_DIR=str(cache / "modular" / "cache"), HF_HOME=str(work / "hf"),
                    HF_HUB_CACHE=str(work / "hf" / "hub"))
         # Not offline: the verify gate reads safetensors metadata from the Hub (no offline mode for that). The
         # model's own files are cache hits from the read-only bind below; the HF token is scrubbed.

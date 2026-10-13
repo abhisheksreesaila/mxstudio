@@ -25,9 +25,13 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - Raw transcripts (F-032) weren't kept for this run: the daemon started before that change.
 
 ## Harness and skill fixes found
-- [ ] let the agent run the skill's checks in the form it actually uses (OLMoE)
-- [ ] a writable, per-job MAX compile cache in the sandbox (OLMoE)
-- [ ] decide: parity flags vs the arch opt-out for the overlap scheduler (OLMoE)
+- [x] let the agent run the skill's checks in the form it actually uses (OLMoE; c2b329d)
+- [x] a writable, per-job MAX compile cache in the sandbox (OLMoE; c2b329d)
+- [x] overlap scheduler: the parity server forces it off (`--force`) instead of each port opting out, so
+      ported models keep it for normal serving. `--force` also skips an architecture's required arguments, so
+      the parity server turns prefix caching and chunked prefill off itself. Trade-off: parity never exercises
+      the overlap scheduler (logprobs need it off); normal serving uses it.
+- note: the OLMoE port still has `supports_overlap_scheduler=False` from run 11; it can be dropped now.
 
 ## Verdict
 Pending (needs 5 to 10 clean runs).

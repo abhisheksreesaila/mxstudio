@@ -620,6 +620,17 @@ def test_the_parity_server_can_return_logprobs():
     assert "--force" in PARITY_SERVE_FLAGS   # without it MAX 26.7 keeps an arch's overlap scheduler on (OLMoE)
 
 
+def test_the_parity_server_is_at_least_as_conservative_as_what_ships(tmp_path, fake_claude):
+    """`--force` also skips an architecture's required arguments (mostly prefix caching and chunked prefill
+    off), so the parity server turns those off itself: it checks the port in the setup that ships, or safer."""
+    job = run(make_manager(tmp_path, fake_claude))
+    assert job["status"] == "done", job["message"]
+    serve = next(line for line in Path(job["log"]).read_text().splitlines()
+                 if line.startswith("$ ") and " serve " in line and "--custom-architectures" in line)
+    for flag in ("--no-enable-overlap-scheduler", "--force", "--no-enable-prefix-caching", "--no-enable-chunked-prefill"):
+        assert f" {flag} " in serve, flag
+
+
 def test_the_agent_may_run_the_skills_checks_the_way_it_calls_them(tmp_path, fake_claude):
     """OLMoE: the agent ran `pixi run --manifest-path <skill>/pixi.toml python <skill>/scripts/check_port.py`
     from the workspace, which the allow list refused, so it never checked its own work. The prompt now gives
