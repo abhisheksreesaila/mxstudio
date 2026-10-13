@@ -134,3 +134,16 @@ def test_noise_is_dropped_from_what_the_agent_reads():
     lines = ["Warning: cache directory '/x' is not writable; compilation caching will be disabled",
              "12:00:00.000 INFO: Still compiling Foo (59.0s elapsed)", "error: real problem"]
     assert port_try.clean(lines) == ["error: real problem"]
+
+
+def test_the_skill_envs_manifest_warning_and_hub_notice_are_dropped_too():
+    """Seen on the first real run: pixi prints this block before every skill script."""
+    lines = [" WARN Encountered 1 warning while parsing the manifest:",
+             "  ⚠ the `[system-requirements]` table is deprecated in favor of virtual",
+             "  │ packages on `platforms`", "    ╭─[/x/pixi.toml:86:23]", " 85 │ platforms = [\"linux-64\"]",
+             "    ·                              ╰── declare these on the `platforms` entries instead",
+             "    ╰────", "  help: e.g. platforms = [{ name = \"my-linux-64\", platform = \"linux-64\", cuda",
+             "        = \"13\" }]",
+             "Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits",
+             "logits_prefill   PASS  top-1 logprob hf=-2.4699 max=-2.3600 rel_diff=0.0445"]
+    assert port_try.clean(lines) == [lines[-1]]

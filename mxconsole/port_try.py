@@ -36,7 +36,9 @@ from pathlib import Path
 DEFAULT_WAIT = 540.0      # under Claude Code's 10-minute Bash limit
 KEEP_LINES = 80           # of each step's output, after noise is dropped
 NOISE = re.compile(r"Warning: cache directory .* is not writable|INFO: Still compiling|^\s*$|"
-                   r"Ignored error while caching|Could not cache non-existence|Loading weights:|Parse safetensors")
+                   r"Ignored error while caching|Could not cache non-existence|Loading weights:|Parse safetensors|"
+                   r"WARN Encountered \d+ warning while parsing the manifest|^\s*[⚠│╭╰·]|^\s*\d+ │|"
+                   r"^\s*help: e\.g\. platforms|^\s*= \"\d+\" \}\]|unauthenticated requests to the HF Hub")
 
 
 # ---- state ------------------------------------------------------------------------------------
