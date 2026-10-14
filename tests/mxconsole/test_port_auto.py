@@ -566,3 +566,23 @@ def test_links_inside_the_package_are_copied_as_links(tmp_path, fake_claude):
 
 def test_any_auto_map_on_a_model_type_transformers_does_not_know_is_parked():
     assert port_auto.needs_remote_code({"model_type": "exaone", "auto_map": {"AutoModelForCausalLM": "m.M"}})
+
+
+def test_identical_parity_failures_match_despite_progress_bars_and_throughput():
+    """BLOOM attempts 1 and 2 failed identically, but the check's output carries tqdm bars and tok/s that change
+    every run; only the gate result lines decide."""
+    def parity(bar, tput):
+        return port_auto._StageFailed("parity check failed (exit 1)", retry=True, reached=3.04, output=(
+            f"Loading weights: 46%|####6     | 135/293 [00:00<00:00, {bar}it/s]\n"
+            f"Prompt Tput: {tput} tok/s\n"
+            "walls            PASS  no wall signals\n"
+            "logits_prefill   FAIL  top-1 logprob hf=-0.2062 max=-0.2681 rel_diff=0.2998\n"
+            "logits_multi     FAIL  first top-1 mismatch at prefix length 5\noverall: FAIL\n"))
+    assert port_auto.failure_signature(parity("1348.52", "27.6")) == port_auto.failure_signature(parity("977.10", "31.2"))
+    moved = parity("1348.52", "27.6")
+    moved.output = moved.output.replace("rel_diff=0.2998", "rel_diff=0.1310")
+    assert port_auto.failure_signature(moved) != port_auto.failure_signature(parity("1.0", "1.0"))
+    build = lambda bar: port_auto._StageFailed("build failed", retry=True, reached=1, output=(  # noqa: E731
+        f"Parse safetensors files: 100%|##########| 2/2 [00:01<00:00, {bar}it/s]\nmissing (compile raises KeyError): 1\n"
+        "    model.layers.0.attn.q.weight\n"))
+    assert port_auto.failure_signature(build("1.92")) == port_auto.failure_signature(build("2.07"))

@@ -231,12 +231,21 @@ def infra_error(output: str, *, server_alive: bool) -> str:
     return ""
 
 
+_PROGRESS = re.compile(r"\d+%\||it/s\]|s/it\]|tok/s|Tput")
+_GATE_LINE = re.compile(r"^\s*\w+\s+(?:PASS|FAIL|WARN|SKIP)\b|^overall:")
+
+
 def failure_signature(err: _StageFailed) -> str:
-    """A check's whole output (scrubbed), so the same counts with different weight names differ; for a serve
-    failure only its error lines, since the log tail around them changes every run."""
+    """What decides "the same failure": a comparison's gate result lines (its progress bars and throughput change
+    every run); a serve failure's error lines (the log tail around them changes too); a build check's whole
+    output minus progress bars (the same counts with different weight names must differ)."""
     lines = [_VOLATILE.sub("", ln).strip() for ln in err.output.splitlines()]
-    if 2 <= err.reached < 3:
+    if err.reached >= 3:
+        lines = [ln for ln in lines if _GATE_LINE.search(ln)]
+    elif err.reached >= 2:
         lines = [ln for ln in lines if re.search(r"FAIL|[Ee]rror", ln)]
+    else:
+        lines = [ln for ln in lines if not _PROGRESS.search(ln)]
     return _VOLATILE.sub("", str(err)) + "\n" + "\n".join(ln for ln in lines if ln)
 
 
@@ -1040,7 +1049,9 @@ class PortManager:
                 ctx.port_dir.rename(old)
             fresh.rename(ctx.port_dir)
         except (OSError, shutil.Error) as e:
-            return f" Attempt {best[1]} got furthest ({reached_text(best[0])}), but its package could not be restored: {str(e)[:120]}."
+            where = f" The last attempt's package is in {old}." if old.exists() and not ctx.port_dir.exists() else ""
+            return (f" Attempt {best[1]} got furthest ({reached_text(best[0])}), but its package could not be restored "
+                    f"(a copy is in {job.dir / 'best'}): {str(e)[:120]}.{where}")
         return (f" Note: attempt {best[1]} got furthest ({reached_text(best[0])}), so its package is restored in "
                 f"{ctx.port_dir} (the last attempt's is in {old.name}).")
 
