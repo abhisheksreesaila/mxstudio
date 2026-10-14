@@ -3,7 +3,7 @@
 **Local AI on Modular MAX, made easy.** One command gives you an OpenAI-compatible endpoint. Models load when
 they're called and unload when idle. If MAX can't run a model yet, mxconsole can port it for you.
 
-[![latest tag](https://img.shields.io/github/v/tag/abhisheksreesaila/mxstudio?label=latest&sort=semver)](https://github.com/abhisheksreesaila/mxstudio/tags)
+[![latest release](https://img.shields.io/github/v/release/abhisheksreesaila/mxstudio?label=latest)](https://github.com/abhisheksreesaila/mxstudio/releases/latest)
 ![platform](https://img.shields.io/badge/platform-Linux%20%C2%B7%20NVIDIA-555)
 ![MAX](https://img.shields.io/badge/Modular%20MAX-26.7%20nightly-0d7d70)
 
@@ -53,13 +53,13 @@ Open the console with `pixi run mxc console`. LAN access needs [Caddy](https://c
 
 ## Latest
 
-**Next release** (on `main`, not tagged yet)
+**0.2.0** (2026-10-14)
 - Jupyter runs inside the console's Notebook panel, and the notebook's "Try it" cells work with no setup.
 - `mxc port --auto` ports architectures MAX doesn't support. It has ported 8 of them so far, including OLMoE and Granite MoE.
 - `mxc bench` and the Benchmark panel compare models on the same workload.
 - A [command reference](docs/CLI.md) for every command and option.
 
-Released versions: [tags](https://github.com/abhisheksreesaila/mxstudio/tags).
+All versions: [releases](https://github.com/abhisheksreesaila/mxstudio/releases) · [changelog](CHANGELOG.md).
 
 ## Screens
 

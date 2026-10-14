@@ -3,7 +3,7 @@ authors = ["Abhishek Sreesaila <abhisheksreesaila@users.noreply.github.com>"]
 channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
 name = "mxstudio"
 platforms = ["linux-64", "osx-arm64"]
-version = "0.1.1"
+version = "0.2.0"
 
 [tasks]
 studio = "PYTHONPATH=notebooks python -m mxstudio.cli ui"

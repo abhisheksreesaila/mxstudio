@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0 — 2026-10-14
+
+mxconsole (`mxc`) replaces the MX Studio app: one OpenAI-compatible endpoint for every model on Modular MAX.
+
+- **Serve:** `mxc serve <model>` pulls, starts and prints a URL, a key and a `curl` line. Models start on first request and unload when idle; pin the ones you want kept loaded.
+- **Keys and LAN:** one revocable key per app; `mxc expose` puts the endpoint on your LAN over HTTPS (Caddy and LiteLLM).
+- **Porting:** `mxc port <repo> --auto` has Claude Code write a MAX version of an unsupported architecture in a sandbox, checks it against Hugging Face, then registers it. 8 architectures ported so far, including OLMoE and Granite MoE.
+- **Console:** live throughput, benchmarks (`mxc bench`), logs, and a notebook per model that runs in Jupyter inside the page.
+- **Docs:** a short README, an interactive [docs site](https://abhisheksreesaila.github.io/mxstudio/site/) (console tour, porting behind the scenes), a user guide and a CLI reference.
+
 ## 0.1.5 — 2026-08-04
 
 - **Never freeze the UI:** long work queues to SQLite `~/.mxstudio/jobs.db` and fh-saas `/api/jobs`
