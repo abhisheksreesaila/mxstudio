@@ -20,6 +20,9 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 | ExaoneForCausalLM (remote code) | LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct | failed: max serve won't load it without `--trust-remote-code` | 3 | yes | run 19: 18 min, $3.75; never reached the logit gates |
 | SmolLM3ForCausalLM (NoPE layers) | HuggingFaceTB/SmolLM3-3B | failed: our bug (HF reference couldn't load) — port probably fine | 3 | yes | run 20: 17 min, $1.70; smoke fluent every attempt |
 | GraniteMoeForCausalLM (MoE, 32 experts) | ibm-granite/granite-3.1-1b-a400m-instruct | passed parity, serving | 3 | yes | run 21: 17.7 min, $3.19; prefill rel_diff 0.10 → 0.13 → 0.036 |
+| GraniteMoeForCausalLM, with try-port | ibm-granite/granite-3.1-1b-a400m-instruct | passed parity, serving | 1 (3 tries) | yes | run 22: agent 10.1 min, $2.30; rel_diff 0.0055 |
+| StableLmForCausalLM, with all fixes | stabilityai/stablelm-2-1_6b-chat | correct; the gate was wrong; registered after the gate patch | 2 (stopped: same failure twice) | yes | run 23: $4.68; found the gate bug |
+| SmolLM3ForCausalLM, with all fixes | HuggingFaceTB/SmolLM3-3B | passed parity, serving | 1 | yes | run 24: 7 min total, agent 5.2 min, $1.51 |
 
 ## Findings
 
@@ -107,6 +110,20 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - Side observation: logits_prefill uses a *relative* threshold (0.05) on a logprob near zero (-0.096), so an
   absolute gap of 0.013 nats failed. Strict on confident tokens; here it pushed the port to a genuinely tighter match.
 
+### StableLM 2 again (run 23) — the gate bug, found by the agent
+- With try-port the agent saw the probe's table: every position matched except prefix length 1, where HF's
+  top-1 is token 222, a lone UTF-8 byte (0x80). HF decodes it to U+FFFD; MAX's server holds an incomplete
+  character back and returns "". compare_layers compares text, so '\ufffd' vs '' failed a port that picked the
+  same token. It checked the whole model, refused to game the gate by changing the server's detokenizer, and
+  said that "MAX picked the same id" is inferred (no tool shows the server's token id).
+- The same-failure rule stopped it after attempt 2 (saved a third).
+- Patched in our clone (SKILL_PATCHES, 7513fd4): U+FFFD vs "" counts as the same token. Re-verified with try-port
+  and no agent time: every position matches, RESULT: PASS. Registered with `mxc pull --port`.
+
+### SmolLM3 again (run 24)
+- Passed on the first attempt in 7 minutes once the chat template was downloaded (4c1486f): our bug was its only
+  problem.
+
 ## Harness and skill fixes found
 - [x] let the agent run the skill's checks in the form it actually uses (OLMoE; c2b329d)
 - [x] a writable, per-job MAX compile cache in the sandbox (OLMoE; c2b329d)
@@ -123,10 +140,8 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - [x] stop early on the same failure twice in a row (0228132). The gate's wall check didn't flag ALiBi for BLOOM
       (walls PASS), so "known wall" detection would need the skill's own wall list; the repeat rule covers it (BLOOM)
 - [x] keep the best attempt: the furthest attempt's package is restored and named in the message (0228132) (StableLM)
-- [ ] the logits_multi failure at prefix length 1 (StableLM): the HF-side tokenization is ruled out (2026-10-13:
-      "The" decodes and re-encodes to the same single id, no BOS, for StableLM, GPT-2 and Granite). Left: MAX's
-      server adding a BOS, or a near-tie on the flat distribution after one word. Re-run StableLM with try-port
-      to see; report upstream only once confirmed (StableLM)
+- [x] the logits_multi failure at prefix length 1 (StableLM): a lone-byte token compared as text (run 23); patched
+      locally (7513fd4). Upstream report to modular/skills: waiting on the person's OK (outward-facing).
 - [x] download chat_template.jinja / chat_template.json with the weights (SmolLM3; also fixes plain pulls)
 - [x] remote-code configs (auto_map for a model type transformers doesn't know) are parked before the agent runs
       (0228132) (EXAONE). Allowing `--trust-remote-code` stays the person's call.
@@ -136,7 +151,11 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 
 ## Verdict (2026-10-13, 9 clean runs + OLMoE)
 
-**Score.** 5 of 9 clean runs ported and serve (GPT-2, Pythia, StarCoder2, Phi-2, Granite MoE), plus OLMoE. Of the 4
+**Final score (after the fixes): 7 of 9**, as predicted — GPT-2, Pythia, StarCoder2, Phi-2, Granite MoE, SmolLM3,
+StableLM 2 — plus OLMoE: 8 ported models registered. The two left are by rule, not by failure: BLOOM (ALiBi, a
+known wall, parked) and EXAONE (remote code, parked until the person decides).
+
+**First-pass score.** 5 of 9 clean runs ported and serve (GPT-2, Pythia, StarCoder2, Phi-2, Granite MoE), plus OLMoE. Of the 4
 failures only one was the port's fault (BLOOM, a known wall). StableLM 2 and SmolLM3 were very likely correct and
 lost to a gate false negative and our own download bug; EXAONE needs `--trust-remote-code`, a policy call. With the
 harness fixes below, expect 7 of 9. **The skills are good enough; the harness was the weak part.**
