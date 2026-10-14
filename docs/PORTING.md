@@ -6,13 +6,19 @@ original Hugging Face model, and the model then works like any other.
 
 ## Three kinds of model
 
-| `mxc search` says | What it means | What you do |
+| `mxc search` says (console label) | What it means | What you do |
 |---|---|---|
-| `fits` / `tight` / `too big` | MAX supports the architecture | `mxc serve <model>` |
-| `needs porting` | MAX doesn't support it yet | `mxc port <model> --auto` |
+| `ok` / `tight` / `no` (fits / tight / too big) | MAX supports the architecture | `mxc serve <model>` |
+| `port` (needs porting) | MAX doesn't support it yet | `mxc port <model> --auto` |
 | parked (from `mxc port`) | needs remote code; nothing is spent | nothing, or ask us |
 
-`mxc pull` on an unsupported model stops before downloading the weights and names `mxc port` as the next step.
+## Why it's a separate step from pulling
+
+A pull downloads files: it's free and predictable, and it either works or tells you why. A port is a different
+kind of job. It spends your Claude usage (about $2–5), takes 7–40 minutes, needs Claude Code and Linux with bubblewrap,
+and can fail after spending it. So mxconsole never starts one on its own. `mxc pull` notices the problem early
+(it reads `config.json` before downloading the weights) and tells you to run `mxc port`. In the console, **Add a
+model** shows the model as "needs porting" with a **Port it** button.
 
 ## Porting
 

@@ -35,7 +35,7 @@ Architecture decision: [docs/adr/0001](docs/adr/0001-mst-core-architecture.md)
 | **Expose** | Writes and runs Caddy (`tls internal`, forward_auth) and LiteLLM (its own pixi env, master key, no Postgres) as your user. | `mxconsole/expose.py` |
 | **Learn** | A Jupyter notebook built only from the Hugging Face API: model card, config table, parameter breakdown, sample code, and a pointer to MAX's source. | `mxconsole/learn.py` |
 | **Console** | `http://127.0.0.1:11435/console`: a dark top bar (hardware chip, API keys, Gateway, Settings, theme) and blades that open side by side. **My models** (list or cards, live tok/s) opens a blade per model (Overview, Security, Benchmark, Logs, Notebook); **Add a model** searches the MAX catalog and Hugging Face and sets it up; `mxc app` opens it in its own window; `mxc console [page] [model]` deep-links. The API reference is at `/docs`. This machine only. | `mxconsole/console/` |
-| **Port** | For unsupported architectures: clones `modular/skills`, picks a donor architecture, and writes `PORT.md` plus the `claude '/import-model …'` command. | `mxconsole/port.py` |
+| **Port** | For unsupported architectures: picks the closest supported architecture as a starting point and has Claude Code write a MAX package for the model in a sandbox, using Modular's porting skills. Checks it against Hugging Face, then registers and serves it. `mxc port` without `--auto` only sets up the workspace. | `mxconsole/port.py`, `port_auto.py`, `port_try.py` |
 
 State lives in `~/.mxc/` (override with `MXC_HOME`; the old `HOTFIRE_HOME` and `MST_HOME` still work; an existing `~/.hotfire` or `~/.mst` is moved here once): `mst.db` (models, key hashes), `logs/`,
 `run/`, `notebooks/`, `ports/` and `expose/`. Weights stay in the Hugging Face cache.
@@ -43,6 +43,8 @@ State lives in `~/.mxc/` (override with `MXC_HOME`; the old `HOTFIRE_HOME` and `
 ---
 
 ## Commands
+
+The common ones are below. Every command and option: [docs/CLI.md](docs/CLI.md).
 
 ```bash
 pixi run mxc serve qwen2.5-0.5b              # pull if needed → start daemon → load → print URL, key, curl, Python
@@ -66,7 +68,7 @@ pixi run mxc bench --all [--runs 5]                          # same workload on 
 pixi run mxc metrics --range 1h | mxc requests --limit 50     # the console's numbers and activity log
 pixi run mxc logs qwen2.5-0.5b -f                            # follow a model's log
 pixi run mxc ps                                              # the crew: daemon, Caddy, LiteLLM, each max serve
-pixi run mxc console [page]                                  # open the web console (overview, models, metrics, benchmarks, pull, …)
+pixi run mxc console [page]                                  # open the web console (add, keys, gateway, settings, api, …)
 ```
 
 Every read command takes `--json` (JSON only on stdout). Errors are one `error:` line on stderr;
@@ -75,6 +77,30 @@ exit codes are 0 ok, 1 refused, 2 bad usage. `hotfire` and `mst` still work as a
 Short names: `qwen2.5-0.5b`, `qwen2.5-1.5b`, `qwen2.5-3b`, `smollm2-1.7b`, `all-minilm-l6`,
 and `llama3.2-1b` (gated: accept the license on HF and set `HF_TOKEN`). Any HF repo id
 works too.
+
+---
+
+## Models MAX can't run yet: porting
+
+MAX supports many architectures, but not all of them. `mxc search` marks the rest `port` (the console says
+"needs porting"), and `mxc pull` stops before downloading the weights and points to `mxc port`.
+
+```bash
+pixi run mxc port <hf-repo> --auto     # or "Port it" in the console's Add a model
+```
+
+Claude Code writes a small MAX package for the architecture in a sandbox, following Modular's own porting
+skill. It compiles and serves the package and compares the output with the original Hugging Face model, fixing
+what it finds. Then mxconsole runs the comparison again on its own and only registers the model if it matches.
+After that, the model works like any other: same endpoint, keys, idle unload and notebook.
+
+- **Needs:** Claude Code, signed in, and Linux with bubblewrap (elsewhere only with `--unsandboxed`).
+- **Cost:** about $2–5 of Claude usage and 7–40 minutes per model.
+- **Proven on:** GPT-2, Pythia, Phi-2, StarCoder2, StableLM 2, SmolLM3, Granite MoE and OLMoE (text models).
+- **When it can't:** models that need remote code are parked before anything is spent. A model that hits a
+  MAX limitation (BLOOM's ALiBi, for example) fails and says how far it got.
+
+Why it's a separate step from `pull`, the outcomes and the limits: [docs/PORTING.md](docs/PORTING.md).
 
 ---
 
