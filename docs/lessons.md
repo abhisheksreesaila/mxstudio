@@ -21,3 +21,4 @@ Claude reads this at the start of each session. -->
 - 2026-10-13 · Sandboxed agents: the harness (outside the sandbox) must never read, kill by PID from, or write into a folder the agent can write. Give the agent read-only inputs and a fresh dir, and let the sandbox (bwrap's PID namespace) clean up.
 - 2026-10-14 · Describe UI from a screenshot of the running app, not from what a mode is supposed to look like (Jupyter's /doc view still has menus and a file browser).
 - 2026-10-14 · A cross-origin iframe on loopback must use the same host name as the page (localhost vs 127.0.0.1 are different sites; the browser holds back cookies). Check both.
+- 2026-10-14 · In a classic script, never declare a global `const`/`let` named like a window property (`top`, `name`, `parent`): it throws and the whole script dies silently. Wrap page scripts or pick another name.
