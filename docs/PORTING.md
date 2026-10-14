@@ -10,7 +10,7 @@ original Hugging Face model, and the model then works like any other.
 |---|---|---|
 | `fits` / `tight` / `too big` | MAX supports the architecture | `mxc serve <model>` |
 | `needs porting` | MAX doesn't support it yet | `mxc port <model> --auto` |
-| parked (from `mxc port`) | not portable today; nothing is spent | nothing, or ask us |
+| parked (from `mxc port`) | needs remote code; nothing is spent | nothing, or ask us |
 
 `mxc pull` on an unsupported model stops before downloading the weights and names `mxc port` as the next step.
 
@@ -47,11 +47,11 @@ If an attempt fails, mxconsole feeds the error back and tries again. It makes 3 
 
 - **Ported and serving.** The model is in `mxc ls` with source `port`. It uses the same endpoint, keys and idle
   unload as any other model.
-- **Parked.** mxconsole won't port the model, and says why before spending anything:
-  - The model's config loads Python code from Hugging Face (remote code). mxconsole doesn't run it.
-  - The model hits a known MAX limitation (BLOOM's ALiBi positional bias, for example). Parked after 2 identical
-    failures.
-- **Failed.** The message says which attempt got furthest ("built but did not serve", "served; the comparison
+- **Parked.** The model's config loads Python code from Hugging Face (remote code), which mxconsole doesn't run.
+  It says so before spending anything.
+- **Failed.** A model that hits a MAX limitation (BLOOM's ALiBi positional bias, for example) usually stops
+  after 2 attempts with "the same failure twice in a row". In every failure, the message says which attempt got
+  furthest ("built but did not serve", "served; the comparison
   failed"). That attempt's package is kept in the workspace, and the message points to the full log. If Hugging
   Face itself was unreachable or rate-limiting, the message says so and doesn't blame the port.
 
@@ -77,7 +77,7 @@ Tested on Linux with 2× RTX 3090 and MAX 26.7, text LLMs only (details in [port
 
 | Ported and serving | Parked |
 |---|---|
-| GPT-2, Pythia (GPT-NeoX), Phi-2, StarCoder2, StableLM 2, SmolLM3, Granite MoE, OLMoE | BLOOM (ALiBi), EXAONE (remote code) |
+| GPT-2, Pythia (GPT-NeoX), Phi-2, StarCoder2, StableLM 2, SmolLM3, Granite MoE, OLMoE | BLOOM (ALiBi: fails; parked by us), EXAONE (remote code: parked automatically) |
 
 ## Limits
 
