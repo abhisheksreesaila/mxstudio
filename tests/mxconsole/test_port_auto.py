@@ -57,9 +57,9 @@ def make_manager(tmp_path, claude, store=None, **kw):
     kw.setdefault("sandbox", False)
     kw.setdefault("git_runner", Runner())
     kw.setdefault("claude_home", tmp_path / "claude-home")
+    kw.setdefault("fetch_config", fake_fetch)
     m = PortManager(store, hub_factory=lambda: SlowHub(weights_bytes=CHUNK), catalog_loader=lambda: CATALOG,
-                    claude=claude, max_command=(sys.executable, str(HERE / "fake_max.py")),
-                    fetch_config=fake_fetch, **kw)
+                    claude=claude, max_command=(sys.executable, str(HERE / "fake_max.py")), **kw)
     m.started = started
     return m
 
@@ -422,3 +422,66 @@ def test_a_transcript_that_cannot_be_written_does_not_fail_the_port(tmp_path, fa
 def test_a_numeric_model_name_never_shares_a_job_folder():
     """Job folders are ports/<id>; a workspace named like one would let the agent write a job's logs."""
     assert not port._workspace_name("acme/12", "acme/12").isdigit()
+
+
+# ---- spend attempts only where they can help (port study fixes 2-4) ---------------------------
+
+def test_a_hub_rate_limit_retries_the_check_without_using_an_attempt(tmp_path, fake_claude, monkeypatch):
+    """BLOOM's attempt 3 was lost to a Hub 429: that's not the port's fault."""
+    monkeypatch.setenv("FAKE_CHECK_INFRA", "1")
+    monkeypatch.setenv("FAKE_CHECK_INFRA_STATE", str(tmp_path / "infra"))
+    job = run(make_manager(tmp_path, fake_claude, infra_backoff=0))
+    assert job["status"] == "done", job["message"]
+    assert len(calls(tmp_path)) == 1                                          # no second agent attempt
+    assert "infrastructure error" in Path(job["log"]).read_text()
+
+
+def test_a_hub_that_keeps_failing_stops_the_job_and_says_it_is_not_the_port(tmp_path, fake_claude, monkeypatch):
+    monkeypatch.setenv("FAKE_CHECK_INFRA", "99")
+    monkeypatch.setenv("FAKE_CHECK_INFRA_STATE", str(tmp_path / "infra"))
+    job = run(make_manager(tmp_path, fake_claude, infra_backoff=0))
+    assert job["status"] == "failed" and "not the port" in job["message"] and "429" in job["message"]
+    assert len(calls(tmp_path)) == 1
+
+
+def test_the_same_failure_twice_stops_early(tmp_path, fake_claude, monkeypatch):
+    """EXAONE and BLOOM repeated the identical failure; the third attempt was wasted."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "broken")
+    job = run(make_manager(tmp_path, fake_claude), max_attempts=3)
+    assert job["status"] == "failed" and len(calls(tmp_path)) == 2
+    assert "same failure twice" in job["message"]
+
+
+def test_different_failures_still_use_every_attempt(tmp_path, fake_claude, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "broken_n")
+    job = run(make_manager(tmp_path, fake_claude), max_attempts=3)
+    assert job["status"] == "failed" and len(calls(tmp_path)) == 3
+
+
+def test_the_best_attempt_is_kept_when_a_later_one_does_worse(tmp_path, fake_claude, monkeypatch):
+    """StableLM: attempts 1-2 were probably right, attempt 3 broke the output and the harness kept attempt 3."""
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "regress")
+    job = run(make_manager(tmp_path, fake_claude), max_attempts=3)
+    assert job["status"] == "failed"
+    pkg = mxc_home() / "ports" / "weird" / "port" / "weird"
+    assert "PARITY_BAD" in (pkg / "arch.py").read_text()                      # attempt 1's package is back
+    assert "attempt 1 got furthest" in job["message"] and "restored" in job["message"]
+
+
+def test_a_model_whose_config_needs_remote_code_is_parked_before_the_agent_runs(tmp_path, fake_claude):
+    """EXAONE: max serve won't load a config that only exists as Hub Python code."""
+    cfg = {"architectures": ["ExaoneForCausalLM"], "model_type": "exaone",
+           "auto_map": {"AutoConfig": "configuration_exaone.ExaoneConfig"}}
+    def fetch(repo_id, revision):
+        p = tmp_path / "remote-config.json"
+        p.write_text(json.dumps(cfg))
+        return p
+    job = run(make_manager(tmp_path, fake_claude, fetch_config=fetch))
+    assert job["status"] == "failed" and "remote code" in job["message"]
+    assert calls(tmp_path) == []
+
+
+def test_auto_map_on_a_model_type_transformers_knows_is_fine():
+    assert not port_auto.needs_remote_code({"model_type": "llama", "auto_map": {"AutoConfig": "x.Y"}})
+    assert port_auto.needs_remote_code({"model_type": "exaone", "auto_map": {"AutoConfig": "x.Y"}})
+    assert not port_auto.needs_remote_code({"model_type": "exaone"})

@@ -1,4 +1,5 @@
-"""Stand-in for `claude -p`. Env: FAKE_CLAUDE_MODE = ok | fail_once | broken | parity_once | hang | crash,
+"""Stand-in for `claude -p`. Env: FAKE_CLAUDE_MODE = ok | fail_once | broken | broken_n | regress | parity_once |
+hang | crash (broken_n: a different build error each call; regress: call 1 gets to parity, later calls break the build),
 FAKE_CLAUDE_LOG (append argv, cwd and prompt as a JSON line), FAKE_CLAUDE_PIDS (hang: write own pid and a
 grandchild's). It finds the package folder in the prompt ("Package folder: <path>") and writes a minimal
 package there. fail_once / parity_once: the first call writes a bad package, later calls (which must carry
@@ -49,9 +50,11 @@ folder.mkdir(parents=True, exist_ok=True)
 if calls > 1:
     assert "Fix this" in prompt and "attempt" in prompt, "a retry must carry the error text"
 marker = "fine"
-if mode == "broken" or (mode == "fail_once" and calls == 1):
+if mode == "broken" or (mode == "fail_once" and calls == 1) or (mode == "regress" and calls > 1):
     marker = "BROKEN"
-elif mode == "parity_once" and calls == 1:
+elif mode == "broken_n":
+    marker = f"BROKEN variant {calls}"
+elif mode == "regress" or (mode == "parity_once" and calls == 1):
     marker = "PARITY_BAD"
 (folder / "arch.py").write_text(f"# {marker}\n")
 emit({"type": "result", "subtype": "success", "is_error": False, "result": "done"})

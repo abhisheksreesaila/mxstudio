@@ -136,9 +136,10 @@ class _StageFailed(Exception):
     """A stage failed. `retry` says whether another generate attempt could fix it; `output` is the
     error text fed back to the agent."""
 
-    def __init__(self, message: str, *, retry: bool = False, output: str = ""):
+    def __init__(self, message: str, *, retry: bool = False, output: str = "", reached: float = 0):
         super().__init__(message)
         self.retry, self.output = retry, output
+        self.reached = reached  # how far the attempt got: 1 build failed, 2 serve/smoke failed, 3 + passes/100 gates
 
 
 @dataclass
@@ -201,6 +202,42 @@ def _skill_verify(c: Ctx, port_: int):
     # by repo id: the gate loads the Hub config; the weights are found in the sandbox's offline HF cache
     return _pixi_run(c, "run_oss_gates.py", c.repo_id, "--port-dir", str(c.port_dir),
                      "--phase", "verify", "--port", str(port_), "--served-model-name", c.repo_id)
+
+
+# A failed check whose output says the reference side couldn't reach the Hub (or our own cache) isn't the port's
+# fault: retry the check, and if it keeps failing stop without spending agent attempts (BLOOM lost one to a 429).
+INFRA_RE = re.compile(r"429 Too Many Requests|HTTP(?:Error)? 5\d\d|\b50[234] (?:Server Error|Bad Gateway|Service)|"
+                      r"maximum queue size reached|Temporary failure in name resolution|Connection(?:Error| reset| refused)|"
+                      r"(?:Connect|Read)Timeout|HF side failed: \[Errno 30\] Read-only file system")
+INFRA_RETRIES = 2
+INFRA_BACKOFF = 30.0
+# What makes two failures "the same": the message and its error lines, minus timestamps, ports and request ids.
+_VOLATILE = re.compile(r"\b\d{2}:\d{2}:\d{2}(?:\.\d+)?\b|:\d{4,5}\b|Request ID: \S+|Root=\S+")
+
+
+def infra_error(output: str) -> str:
+    """The first line of `output` that shows an infrastructure failure, or ""."""
+    for line in output.splitlines():
+        if INFRA_RE.search(line):
+            return line.strip()[:200]
+    return ""
+
+
+def failure_signature(err: _StageFailed) -> str:
+    lines = [_VOLATILE.sub("", ln).strip() for ln in err.output.splitlines() if re.search(r"FAIL|[Ee]rror", ln)]
+    return _VOLATILE.sub("", str(err)) + "\n" + "\n".join(lines)
+
+
+def needs_remote_code(config: dict) -> bool:
+    """config.json names Python code on the Hub for its config class (`auto_map`), for a model type transformers
+    doesn't know: max serve loads the config before the port and won't run that code (EXAONE)."""
+    if "AutoConfig" not in (config.get("auto_map") or {}):
+        return False
+    try:
+        from transformers.models.auto.configuration_auto import CONFIG_MAPPING_NAMES
+    except ImportError:
+        return False
+    return config.get("model_type") not in CONFIG_MAPPING_NAMES
 
 
 TRY_MAX = 4            # try-port runs per attempt: each one compiles, so this bounds the agent's time on a hard port
@@ -509,7 +546,7 @@ class PortManager:
                  arch_dir: Path | None = None, generate_timeout: float = GENERATE_TIMEOUT,
                  check_timeout: float = CHECK_TIMEOUT, smoke_timeout: float = SMOKE_TIMEOUT,
                  sandbox: bool = True, bwrap: str = "bwrap", claude_home: Path | None = None,
-                 serve_timeout: float = SERVE_TIMEOUT):
+                 serve_timeout: float = SERVE_TIMEOUT, infra_backoff: float = INFRA_BACKOFF):
         self.store = store
         self.hub_factory = hub_factory or (lambda: resolve.HubClient())
         self.catalog_loader = catalog_loader or (lambda: resolve.load_catalog())
@@ -520,6 +557,7 @@ class PortManager:
         self.generate_timeout, self.check_timeout, self.smoke_timeout = generate_timeout, check_timeout, smoke_timeout
         self.sandbox, self.bwrap, self.serve_timeout = sandbox, bwrap, serve_timeout
         self.claude_home = claude_home
+        self.infra_backoff = infra_backoff
         self.db_lock = threading.Lock()
         self.live: dict[int, _Job] = {}
         self.live_lock = threading.Lock()
@@ -878,6 +916,11 @@ class PortManager:
         resolve.check_name_free(self.store, name, job.ref, res)
         workspace, config, donor = port.make_workspace(job.ref, res, catalog, fetch_config=self.fetch_config,
                                                        arch_dir=self.arch_dir)
+        if needs_remote_code(config):
+            raise _StageFailed(
+                f"{res.repo_id} loads its config from Python code on the Hugging Face Hub (auto_map; model type "
+                f"{config.get('model_type')!r} is unknown to transformers). max serve won't run remote code, so this "
+                f"port is parked before spending any agent time.")
         donor_note = (f"Closest supported architecture in MAX (donor): {donor.architecture}"
                       + (f" ({donor.slug})" if donor.slug else "") + f". {donor.reason}.")
         self._end(job, row, detail=f"{res.architecture}, donor {donor.architecture}, workspace {workspace}")
@@ -917,16 +960,24 @@ class PortManager:
                                    f"weights at {ctx.weights}")
 
         feedback: str | None = None
+        best: tuple[float, int] | None = None   # (how far it got, attempt): its package is kept in <job>/best
+        previous = None
         for attempt in range(1, job.max_attempts + 1):
             if attempt > 1:
                 self._add_attempt(job, attempt)
             err = self._attempt(job, ctx, attempt, feedback, donor_note, hub, res)
             if err is None:
                 break
+            if (best is None or err.reached > best[0]) and self._snapshot(job, ctx):
+                best = (err.reached, attempt)
+            signature = failure_signature(err)
+            same, previous = signature == previous, signature
             feedback = err.output[-FEEDBACK_CHARS:] or str(err)
-            if not err.retry or attempt == job.max_attempts:
+            if not err.retry or attempt == job.max_attempts or same:
                 tried = f" after {attempt} attempt{'s' if attempt != 1 else ''}" if err.retry else ""
-                raise _StageFailed(f"{err}{tried}. Full log: {job.log_path}")
+                why = " (the same failure twice in a row, so another attempt is unlikely to help)" if same and err.retry else ""
+                kept = self._restore_best(job, ctx, best, attempt, err.reached) if err.retry else ""
+                raise _StageFailed(f"{err}{tried}{why}.{kept} Full log: {job.log_path}")
             job.say(f"attempt {attempt} failed: {err}. Trying again with the error fed back.")
         # register
         row = self._begin(job, "register", detail=f"adding {name} (port {ctx.port_dir})…")
@@ -943,6 +994,25 @@ class PortManager:
                 raise _StageFailed(f"{model.name} is registered but did not start: {err[-500:]}")
             self._end(job, row, detail=f"{model.name} is up")
         self._finish(job, "done", f"Ported {model.name} ({model.repo_id}@{model.revision[:8]}) and serving it.")
+
+    def _snapshot(self, job: _Job, ctx: Ctx) -> bool:
+        """Copy the agent's package to <job>/best (links copied as links, never followed). False if there's none."""
+        src, dst = ctx.port_dir, job.dir / "best"
+        if src.is_symlink() or not src.is_dir():
+            return False
+        shutil.rmtree(dst, ignore_errors=True)
+        shutil.copytree(src, dst, symlinks=True, ignore=shutil.ignore_patterns("__pycache__"))
+        return True
+
+    def _restore_best(self, job: _Job, ctx: Ctx, best: tuple[float, int] | None, attempt: int, reached: float) -> str:
+        """If an earlier attempt got further than the last one, put its package back and say so."""
+        if not best or best[1] == attempt or best[0] <= reached or ctx.port_dir.is_symlink():
+            return ""
+        shutil.rmtree(ctx.port_dir, ignore_errors=True)
+        shutil.copytree(job.dir / "best", ctx.port_dir, symlinks=True)
+        got = ("it built" if best[0] < 2 else "it served" if best[0] < 3
+               else f"it served and passed {round((best[0] - 3) * 100)} of the checks")
+        return f" Note: attempt {best[1]} got furthest ({got}), so its package is restored in {ctx.port_dir}."
 
     def _serve(self, job: _Job, name: str) -> str | None:
         """Start the model on a helper thread, polling for cancel and a deadline. Returns an error or None."""
@@ -1009,11 +1079,13 @@ class PortManager:
             if code != 0:
                 msg = f"the build check failed (exit {code})"
                 self._end(job, row, "failed", msg)
-                return _StageFailed(f"build failed: {msg}", retry=True, output=f"{' '.join(cmd[0])}\n{out}")
+                return _StageFailed(f"build failed: {msg}", retry=True, output=f"{' '.join(cmd[0])}\n{out}", reached=1)
             self._end(job, row, detail="the package imports and every weight maps")
         # parity
         row = self._begin(job, "parity", attempt, detail="downloading weights…")
         failure = self._parity(job, ctx, row, hub, res)
+        if failure and not failure.reached:
+            failure.reached = 2
         if failure:
             self._end(job, row, "failed", failure.args[0][:300])
             return failure
@@ -1055,16 +1127,33 @@ class PortManager:
                 self._detail(job, row, "smoke generation passed (the skill has no verify gate to run)")
                 return None
             self._detail(job, row, "smoke passed; comparing with the Hugging Face reference…")
-            self._pristine(job, ctx)
-            code, out = self._exec(job, vc[0], vc[1], timeout=self.check_timeout, role="check", ctx=ctx)
+            for retry in range(INFRA_RETRIES + 1):
+                self._pristine(job, ctx)
+                code, out = self._exec(job, vc[0], vc[1], timeout=self.check_timeout, role="check", ctx=ctx)
+                infra = infra_error(out) if code != 0 else ""
+                if not infra or retry == INFRA_RETRIES:
+                    break
+                job.say(f"-- infrastructure error, not the port ({infra}); running the check again in "
+                        f"{self.infra_backoff:g}s")
+                self._pause(job, self.infra_backoff)
+            if infra:
+                return _StageFailed(f"the comparison with Hugging Face kept failing for a reason that is not the port "
+                                    f"({infra}); try again later", retry=False, output=out)
             if code != 0:
+                passes = len(re.findall(r"^\w+\s+PASS\b", out, re.MULTILINE))
                 return _StageFailed(f"parity check failed (exit {code}): the port's output does not match Hugging Face",
-                                    retry=True, output=f"{' '.join(vc[0])}\n{out}")
+                                    retry=True, output=f"{' '.join(vc[0])}\n{out}", reached=3 + passes / 100)
             self._detail(job, row, "matches the Hugging Face reference")
             return None
         finally:
             self._track(job, proc, run_argv[0], add=False)
             _kill_tree(proc)
+
+    def _pause(self, job: _Job, seconds: float) -> None:
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            self._check(job)
+            time.sleep(min(0.2, max(0.0, deadline - time.monotonic())))
 
     def _smoke(self, job: _Job, proc: subprocess.Popen, port_: int, ctx: Ctx, row: dict) -> _StageFailed | None:
         """Wait for max serve to be healthy, then ask for a few greedy tokens."""
