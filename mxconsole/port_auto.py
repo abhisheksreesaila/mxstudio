@@ -206,32 +206,49 @@ def _skill_verify(c: Ctx, port_: int):
 
 # A failed check whose output says the reference side couldn't reach the Hub (or our own cache) isn't the port's
 # fault: retry the check, and if it keeps failing stop without spending agent attempts (BLOOM lost one to a 429).
+# Only lines about the Hub or the HF reference count, and only while our own server is up: the gate reports a
+# crashed or erroring local MAX server as "MAX server unreachable", "Connection reset" or "HTTP 500", and that is
+# the port's problem, so it must reach the agent.
 INFRA_RE = re.compile(r"429 Too Many Requests|HTTP(?:Error)? 5\d\d|\b50[234] (?:Server Error|Bad Gateway|Service)|"
                       r"maximum queue size reached|Temporary failure in name resolution|Connection(?:Error| reset| refused)|"
                       r"(?:Connect|Read)Timeout|HF side failed: \[Errno 30\] Read-only file system")
 INFRA_RETRIES = 2
 INFRA_BACKOFF = 30.0
 # What makes two failures "the same": the message and its error lines, minus timestamps, ports and request ids.
-_VOLATILE = re.compile(r"\b\d{2}:\d{2}:\d{2}(?:\.\d+)?\b|:\d{4,5}\b|Request ID: \S+|Root=\S+")
+_VOLATILE = re.compile(r"\b\d{2}:\d{2}:\d{2}(?:\.\d+)?\b|:\d{4,5}\b|\b(?:on|port) \d{4,5}\b|Request ID: \S+|Root=\S+")
 
 
-def infra_error(output: str) -> str:
-    """The first line of `output` that shows an infrastructure failure, or ""."""
+_HUB_SIDE = re.compile(r"huggingface\.co|HF side failed:|^\s*(?:checkpoint_meta|hub_config)\b")
+
+
+def infra_error(output: str, *, server_alive: bool) -> str:
+    """The first line of `output` that shows the Hub or our HF cache failing, or "" (also when our server died)."""
+    if not server_alive:
+        return ""
     for line in output.splitlines():
-        if INFRA_RE.search(line):
+        if INFRA_RE.search(line) and _HUB_SIDE.search(line) and "MAX server" not in line:
             return line.strip()[:200]
     return ""
 
 
 def failure_signature(err: _StageFailed) -> str:
-    lines = [_VOLATILE.sub("", ln).strip() for ln in err.output.splitlines() if re.search(r"FAIL|[Ee]rror", ln)]
-    return _VOLATILE.sub("", str(err)) + "\n" + "\n".join(lines)
+    """A check's whole output (scrubbed), so the same counts with different weight names differ; for a serve
+    failure only its error lines, since the log tail around them changes every run."""
+    lines = [_VOLATILE.sub("", ln).strip() for ln in err.output.splitlines()]
+    if 2 <= err.reached < 3:
+        lines = [ln for ln in lines if re.search(r"FAIL|[Ee]rror", ln)]
+    return _VOLATILE.sub("", str(err)) + "\n" + "\n".join(ln for ln in lines if ln)
+
+
+def reached_text(reached: float) -> str:
+    return ("it got to the build check" if reached < 2 else "it built but did not serve" if reached < 3
+            else "it served; the comparison failed")
 
 
 def needs_remote_code(config: dict) -> bool:
     """config.json names Python code on the Hub for its config class (`auto_map`), for a model type transformers
     doesn't know: max serve loads the config before the port and won't run that code (EXAONE)."""
-    if "AutoConfig" not in (config.get("auto_map") or {}):
+    if not config.get("auto_map"):  # any auto_map: transformers can't load an unknown type without the Hub code
         return False
     try:
         from transformers.models.auto.configuration_auto import CONFIG_MAPPING_NAMES
@@ -1001,18 +1018,31 @@ class PortManager:
         if src.is_symlink() or not src.is_dir():
             return False
         shutil.rmtree(dst, ignore_errors=True)
-        shutil.copytree(src, dst, symlinks=True, ignore=shutil.ignore_patterns("__pycache__"))
+        try:
+            shutil.copytree(src, dst, symlinks=True, ignore=shutil.ignore_patterns("__pycache__"))
+        except (OSError, shutil.Error) as e:  # a pipe, socket or unreadable file the agent left: just not kept
+            job.say(f"-- could not keep a copy of this attempt's package: {str(e)[:200]}")
+            shutil.rmtree(dst, ignore_errors=True)
+            return False
         return True
 
     def _restore_best(self, job: _Job, ctx: Ctx, best: tuple[float, int] | None, attempt: int, reached: float) -> str:
         """If an earlier attempt got further than the last one, put its package back and say so."""
         if not best or best[1] == attempt or best[0] <= reached or ctx.port_dir.is_symlink():
             return ""
-        shutil.rmtree(ctx.port_dir, ignore_errors=True)
-        shutil.copytree(job.dir / "best", ctx.port_dir, symlinks=True)
-        got = ("it built" if best[0] < 2 else "it served" if best[0] < 3
-               else f"it served and passed {round((best[0] - 3) * 100)} of the checks")
-        return f" Note: attempt {best[1]} got furthest ({got}), so its package is restored in {ctx.port_dir}."
+        fresh = ctx.port_dir.with_name(ctx.port_dir.name + ".restoring")
+        old = ctx.port_dir.with_name(ctx.port_dir.name + ".last-attempt")
+        try:  # into a fresh sibling first, then swapped in: never a half-deleted package
+            shutil.rmtree(fresh, ignore_errors=True)
+            shutil.copytree(job.dir / "best", fresh, symlinks=True)
+            shutil.rmtree(old, ignore_errors=True)
+            if ctx.port_dir.exists():
+                ctx.port_dir.rename(old)
+            fresh.rename(ctx.port_dir)
+        except (OSError, shutil.Error) as e:
+            return f" Attempt {best[1]} got furthest ({reached_text(best[0])}), but its package could not be restored: {str(e)[:120]}."
+        return (f" Note: attempt {best[1]} got furthest ({reached_text(best[0])}), so its package is restored in "
+                f"{ctx.port_dir} (the last attempt's is in {old.name}).")
 
     def _serve(self, job: _Job, name: str) -> str | None:
         """Start the model on a helper thread, polling for cancel and a deadline. Returns an error or None."""
@@ -1130,7 +1160,7 @@ class PortManager:
             for retry in range(INFRA_RETRIES + 1):
                 self._pristine(job, ctx)
                 code, out = self._exec(job, vc[0], vc[1], timeout=self.check_timeout, role="check", ctx=ctx)
-                infra = infra_error(out) if code != 0 else ""
+                infra = infra_error(out, server_alive=proc.poll() is None) if code != 0 else ""
                 if not infra or retry == INFRA_RETRIES:
                     break
                 job.say(f"-- infrastructure error, not the port ({infra}); running the check again in "

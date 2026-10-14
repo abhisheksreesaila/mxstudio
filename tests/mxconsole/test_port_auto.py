@@ -485,3 +485,84 @@ def test_auto_map_on_a_model_type_transformers_knows_is_fine():
     assert not port_auto.needs_remote_code({"model_type": "llama", "auto_map": {"AutoConfig": "x.Y"}})
     assert port_auto.needs_remote_code({"model_type": "exaone", "auto_map": {"AutoConfig": "x.Y"}})
     assert not port_auto.needs_remote_code({"model_type": "exaone"})
+
+
+def test_errors_from_our_own_max_server_are_the_ports_problem_not_infrastructure():
+    """The verify gate reports a crashed or erroring local server in these forms (run_oss_gates / server_error):
+    they must reach the agent, not stop the job as "not the port"."""
+    for line in ("logits_multi     FAIL  MAX server unreachable on 41234: [Errno 111] Connection refused",
+                 "logits_prefill   FAIL  [Errno 104] Connection reset by peer",
+                 "logits_prefill   FAIL  HTTP 500 Internal Server Error",
+                 "logits_multi     FAIL  HTTP 500: shape mismatch in layer 3"):
+        assert port_auto.infra_error(line, server_alive=True) == "", line
+    hub = "429 Too Many Requests for url: https://huggingface.co/bigscience/bloomz-560m/resolve/main/model.safetensors"
+    assert port_auto.infra_error(hub, server_alive=True)
+    assert port_auto.infra_error("logits_prefill   FAIL  HF side failed: [Errno 30] Read-only file system: '/x'",
+                                 server_alive=True)
+    assert port_auto.infra_error(hub, server_alive=False) == ""            # our server died: that's the port
+
+
+def test_build_failures_with_the_same_counts_but_different_weights_are_different():
+    out1 = "missing (compile raises KeyError): 1\n    model.layers.0.attn.q.weight\n"
+    out2 = "missing (compile raises KeyError): 1\n    model.layers.0.attn.k.weight\n"
+    a = port_auto._StageFailed("build failed", retry=True, output=out1, reached=1)
+    b = port_auto._StageFailed("build failed", retry=True, output=out2, reached=1)
+    assert port_auto.failure_signature(a) != port_auto.failure_signature(b)
+    c = port_auto._StageFailed("max serve exited", retry=True, reached=2,
+                               output="12:38:59.893 ERROR: boom on 41234\n12:39:00.001 INFO: x")
+    d = port_auto._StageFailed("max serve exited", retry=True, reached=2,
+                               output="13:01:02.004 ERROR: boom on 52311\n13:01:03.111 INFO: y")
+    assert port_auto.failure_signature(c) == port_auto.failure_signature(d)
+
+
+def test_the_restore_message_says_how_far_the_kept_attempt_really_got():
+    assert port_auto.reached_text(1) == "it got to the build check"
+    assert port_auto.reached_text(2) == "it built but did not serve"
+    assert port_auto.reached_text(3.05) == "it served; the comparison failed"
+
+
+def test_a_package_with_a_pipe_in_it_does_not_crash_the_job(tmp_path, fake_claude, monkeypatch):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "regress")
+    real = port_auto.PortManager._attempt
+
+    def attempt(self, job, ctx, n, *a, **k):
+        err = real(self, job, ctx, n, *a, **k)
+        if ctx.port_dir.is_dir() and not (ctx.port_dir / "fifo").exists():
+            os.mkfifo(ctx.port_dir / "fifo")
+        return err
+    monkeypatch.setattr(port_auto.PortManager, "_attempt", attempt)
+    job = run(make_manager(tmp_path, fake_claude), max_attempts=3)
+    assert job["status"] == "failed" and "unexpected error" not in job["message"]
+
+
+def test_a_symlinked_package_dir_is_never_copied_or_restored(tmp_path, fake_claude):
+    m = make_manager(tmp_path, fake_claude)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "secret").write_text("x")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "pkg").symlink_to(elsewhere)
+    ctx = port_auto.Ctx("r", "o/r", "r", ws, ws / "pkg", tmp_path)
+    job = port_auto._Job(7, "r", "r", 3)
+    job.dir = tmp_path / "job"
+    assert m._snapshot(job, ctx) is False and not (job.dir / "best").exists()
+    assert m._restore_best(job, ctx, (3.0, 1), 3, 1.0) == ""
+    assert (elsewhere / "secret").exists()
+
+
+def test_links_inside_the_package_are_copied_as_links(tmp_path, fake_claude):
+    m = make_manager(tmp_path, fake_claude)
+    pkg = tmp_path / "ws" / "pkg"
+    pkg.mkdir(parents=True)
+    (pkg / "arch.py").write_text("x")
+    (pkg / "link").symlink_to("/etc/hostname")
+    ctx = port_auto.Ctx("r", "o/r", "r", tmp_path / "ws", pkg, tmp_path)
+    job = port_auto._Job(8, "r", "r", 3)
+    job.dir = tmp_path / "job"
+    assert m._snapshot(job, ctx)
+    assert (job.dir / "best" / "link").is_symlink()
+
+
+def test_any_auto_map_on_a_model_type_transformers_does_not_know_is_parked():
+    assert port_auto.needs_remote_code({"model_type": "exaone", "auto_map": {"AutoModelForCausalLM": "m.M"}})
