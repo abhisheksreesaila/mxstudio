@@ -141,10 +141,10 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
       (walls PASS), so "known wall" detection would need the skill's own wall list; the repeat rule covers it (BLOOM)
 - [x] keep the best attempt: the furthest attempt's package is restored and named in the message (0228132) (StableLM)
 - [x] the logits_multi failure at prefix length 1 (StableLM): a lone-byte token compared as text (run 23); patched
-      locally (7513fd4). Upstream report to modular/skills: waiting on the person's OK (outward-facing).
+      locally (7513fd4). Reported upstream with the NameError bug: https://github.com/modular/skills/issues/15
 - [x] download chat_template.jinja / chat_template.json with the weights (SmolLM3; also fixes plain pulls)
 - [x] remote-code configs (auto_map for a model type transformers doesn't know) are parked before the agent runs
-      (0228132) (EXAONE). Allowing `--trust-remote-code` stays the person's call.
+      (0228132) (EXAONE). Decided 2026-10-13 (the person): remote-code models stay parked.
 - [x] the same serve error twice in a row stops (0228132) (EXAONE)
 - [ ] feed compare_layers' per-layer output into the retry prompt, not only the gate summary (BLOOM)
 - note: the OLMoE port still has `supports_overlap_scheduler=False` from run 11; it can be dropped now.
@@ -153,7 +153,7 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 
 **Final score (after the fixes): 7 of 9**, as predicted — GPT-2, Pythia, StarCoder2, Phi-2, Granite MoE, SmolLM3,
 StableLM 2 — plus OLMoE: 8 ported models registered. The two left are by rule, not by failure: BLOOM (ALiBi, a
-known wall, parked) and EXAONE (remote code, parked until the person decides).
+known wall, parked) and EXAONE (remote code, parked by the person's decision).
 
 **First-pass score.** 5 of 9 clean runs ported and serve (GPT-2, Pythia, StarCoder2, Phi-2, Granite MoE), plus OLMoE. Of the 4
 failures only one was the port's fault (BLOOM, a known wall). StableLM 2 and SmolLM3 were very likely correct and
