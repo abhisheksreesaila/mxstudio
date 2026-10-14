@@ -118,18 +118,19 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - [ ] allow `ruff format`/`ruff check` on the port dir through the skill env (GPT-2)
 - [x] let the agent compile, serve and run compare_layers itself: try-port (d970700, 339e00f). Granite went from
       3 blind attempts to 1 attempt with 3 informed tries (run 22)
-- [ ] an infrastructure failure (Hub 429, network) retries the gate instead of using up an attempt; read
-      checkpoint metadata from the local weights where possible (BLOOM)
-- [ ] stop early on a known wall (check_walls flags it): say what blocks it and park, instead of spending all
-      attempts (BLOOM)
-- [ ] keep the best attempt: if a later attempt does worse (e.g. smoke fails where it passed), restore the better
-      package and report it as "close" rather than failed (StableLM)
-- [ ] confirm the logits_multi short-prefix false negative (send MAX token ids, or skip prefixes under ~4 tokens)
-      and report it upstream to modular/skills (StableLM)
+- [x] an infrastructure failure (Hub 429, 5xx, network, our read-only cache) retries the check instead of using
+      up an attempt, and stops saying it isn't the port if it persists (0228132) (BLOOM)
+- [x] stop early on the same failure twice in a row (0228132). The gate's wall check didn't flag ALiBi for BLOOM
+      (walls PASS), so "known wall" detection would need the skill's own wall list; the repeat rule covers it (BLOOM)
+- [x] keep the best attempt: the furthest attempt's package is restored and named in the message (0228132) (StableLM)
+- [ ] the logits_multi failure at prefix length 1 (StableLM): the HF-side tokenization is ruled out (2026-10-13:
+      "The" decodes and re-encodes to the same single id, no BOS, for StableLM, GPT-2 and Granite). Left: MAX's
+      server adding a BOS, or a near-tie on the flat distribution after one word. Re-run StableLM with try-port
+      to see; report upstream only once confirmed (StableLM)
 - [x] download chat_template.jinja / chat_template.json with the weights (SmolLM3; also fixes plain pulls)
-- [ ] remote-code models (`auto_map` in config.json): detect up front and either park with a clear message or,
-      if the person decides to allow it, serve with `--trust-remote-code` (sandboxed for parity at least) (EXAONE)
-- [ ] the same serve error twice in a row → stop, don't spend the third attempt (EXAONE)
+- [x] remote-code configs (auto_map for a model type transformers doesn't know) are parked before the agent runs
+      (0228132) (EXAONE). Allowing `--trust-remote-code` stays the person's call.
+- [x] the same serve error twice in a row stops (0228132) (EXAONE)
 - [ ] feed compare_layers' per-layer output into the retry prompt, not only the gate summary (BLOOM)
 - note: the OLMoE port still has `supports_overlap_scheduler=False` from run 11; it can be dropped now.
 
