@@ -240,8 +240,8 @@ def failure_signature(err: _StageFailed) -> str:
     every run); a serve failure's error lines (the log tail around them changes too); a build check's whole
     output minus progress bars (the same counts with different weight names must differ)."""
     lines = [_VOLATILE.sub("", ln).strip() for ln in err.output.splitlines()]
-    if err.reached >= 3:
-        lines = [ln for ln in lines if _GATE_LINE.search(ln)]
+    if err.reached >= 3:  # no gate lines (the check crashed first): its output, minus progress bars
+        lines = [ln for ln in lines if _GATE_LINE.search(ln)] or [ln for ln in lines if not _PROGRESS.search(ln)]
     elif err.reached >= 2:
         lines = [ln for ln in lines if re.search(r"FAIL|[Ee]rror", ln)]
     else:

@@ -586,3 +586,9 @@ def test_identical_parity_failures_match_despite_progress_bars_and_throughput():
         f"Parse safetensors files: 100%|##########| 2/2 [00:01<00:00, {bar}it/s]\nmissing (compile raises KeyError): 1\n"
         "    model.layers.0.attn.q.weight\n"))
     assert port_auto.failure_signature(build("1.92")) == port_auto.failure_signature(build("2.07"))
+
+
+def test_two_different_parity_crashes_without_gate_lines_differ():
+    a = port_auto._StageFailed("parity check failed (exit 1)", retry=True, reached=3, output="Traceback\nKeyError: 'a'")
+    b = port_auto._StageFailed("parity check failed (exit 1)", retry=True, reached=3, output="Traceback\nValueError: b")
+    assert port_auto.failure_signature(a) != port_auto.failure_signature(b)
