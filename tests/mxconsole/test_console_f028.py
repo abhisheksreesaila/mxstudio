@@ -198,6 +198,9 @@ def test_blades_follow_the_contract_and_the_csp():
         assert "blade.onClose" in src  # everything started in mount is torn down
     notebook = (CONSOLE_DIR / "blade-notebook.js").read_text()
     assert "wide: true" in notebook and "data:image" not in notebook and 'src:' not in notebook  # images are never loaded
+    # the one URL the blade loads is Jupyter's, and only after embedUrl() checked it (F-037)
+    assert notebook.count(".src =") == 1 and "frame.src = url;" in notebook
+    assert "const url = embedUrl(r.embed_url, location.hostname)" in notebook
 
 
 @needs_node
@@ -205,7 +208,7 @@ def test_a_link_label_can_hold_code_and_the_header_tools_are_one_node():
     kids = md("[`org/tiny`](https://huggingface.co/org/tiny)")[0]["children"]
     assert kids[0]["tag"] == "a" and kids[0]["children"] == [{"tag": "code", "children": [{"text": "org/tiny"}]}]
     for name in ("blade-notebook", "blade-gateway"):
-        assert re.search(r"tools: (\[chipEl, jupBtn\]|restartBtn),", (CONSOLE_DIR / f"{name}.js").read_text()), name
+        assert re.search(r"tools: (\[chipEl, modeBtn, tabLink\]|restartBtn),", (CONSOLE_DIR / f"{name}.js").read_text()), name
 
 
 @needs_node
@@ -230,3 +233,17 @@ def test_jupyter_opens_only_on_this_machine_and_the_chip_uses_the_local_endpoint
     for bad in ["https://127.0.0.1:1/", "http://evil.example/", "http://localhost:1/", "http://127.0.0.1.evil.example/", "javascript:alert(1)"]:
         assert node("blade-notebook", f"m.localUrl({json.dumps(bad)})") is None, bad
     assert "store.info.lan_endpoint" not in (CONSOLE_DIR / "blade-notebook.js").read_text()
+
+
+@needs_node
+def test_only_jupyters_single_notebook_view_on_this_machine_is_framed():
+    good = "http://127.0.0.1:8899/doc/tree/a.ipynb?token=t"
+    assert node("blade-notebook", f"m.embedUrl({json.dumps(good)})") == good
+    for bad in ["http://127.0.0.1:8899/lab/tree/a.ipynb?token=t", "http://127.0.0.1:8899/logout",
+                "http://evil.example/doc/tree/a.ipynb", "javascript:alert(1)", None]:
+        assert node("blade-notebook", f"m.embedUrl({json.dumps(bad)})") is None, bad
+    # a console opened at localhost frames Jupyter at localhost too: 127.0.0.1 would be another site, the browser
+    # would hold back Jupyter's cookies, and the kernel would never connect
+    assert node("blade-notebook", f'm.embedUrl({json.dumps(good)}, "localhost")') == good.replace("127.0.0.1", "localhost")
+    assert node("blade-notebook", f'm.embedUrl({json.dumps(good)}, "127.0.0.1")') == good
+    assert node("blade-notebook", f'm.embedUrl({json.dumps(good)}, "evil.example")') == good

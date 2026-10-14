@@ -332,7 +332,8 @@ def build_notebook(*, model_id: str, repo_id: str, source: HFSource, revision: s
 
     cells.append(new_markdown_cell(_max_cell(arch, max_finder)))
     cells += [
-        new_markdown_cell("## Try it\n\nThese cells talk to your local `mxc` endpoint. Set `MXC_API_KEY` "
+        new_markdown_cell("## Try it\n\nThese cells talk to your local `mxc` endpoint. Opened from the console's Notebook "
+                          "panel, they just work. Started yourself (`mxc learn`, `jupyter lab`), set `MXC_API_KEY` "
                           "(and optionally `MXC_BASE_URL`) in the environment before starting Jupyter."
                           + ("" if registered else f"\n\n**This model is not pulled yet:** run `mxc pull {model_id}` "
                              "first, or the endpoint will not know the name below.")),

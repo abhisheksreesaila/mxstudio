@@ -3,12 +3,17 @@
 One server (bound to 127.0.0.1, with a random token) serves the whole notebooks folder; a second
 "open" reuses it while it is alive. The server is started detached, like `mxc learn` does, so it
 outlives the daemon: stop it from Jupyter, or kill the process.
+
+The console's Notebook blade shows it in an iframe, so the server lets the console's own origins frame it
+(Jupyter refuses all framing by default) and nothing else. Its kernels get MXC_API_KEY and MXC_BASE_URL, so
+the notebook's "Try it" cells run: keys are stored hashed, so the key is a fresh internal one from `api_key`.
 """
 from __future__ import annotations
 
 import json
 import os
 import secrets
+import signal
 import socket
 import subprocess
 import threading
@@ -16,6 +21,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
+from mxconsole.settings import DAEMON_PORT
 from mxconsole.store import mxc_home
 
 
@@ -39,6 +45,15 @@ def _port_open(port: int) -> bool:
         return s.connect_ex(("127.0.0.1", port)) == 0
 
 
+def frame_ancestors(console_port: int) -> str:
+    return f"frame-ancestors 'self' http://127.0.0.1:{console_port} http://localhost:{console_port}"
+
+
+def embed_url(url: str) -> str:
+    """Jupyter's single-notebook view of the same notebook (one document, no tabs), for the iframe."""
+    return url.replace("/lab/tree/", "/doc/tree/", 1)
+
+
 def _is_jupyter(pid: int) -> bool:
     try:
         return b"jupyter" in Path(f"/proc/{pid}/cmdline").read_bytes()
@@ -51,9 +66,12 @@ class JupyterLauncher:
 
     def __init__(self, popen: Callable = subprocess.Popen, free_port: Callable[[], int] = _free_port,
                  port_open: Callable[[int], bool] = _port_open, wait_seconds: float = 20.0,
-                 is_jupyter: Callable[[int], bool] = _is_jupyter):
+                 is_jupyter: Callable[[int], bool] = _is_jupyter, console_port: int = DAEMON_PORT,
+                 api_key: Callable[[], str] | None = None, kill: Callable[[int, int], None] = os.kill):
         self.popen, self.free_port, self.port_open, self.wait_seconds = popen, free_port, port_open, wait_seconds
         self.is_jupyter = is_jupyter
+        self.frame_ancestors = frame_ancestors(console_port)
+        self.console_port, self.api_key, self.kill = console_port, api_key, kill
         self.lock = threading.Lock()  # two concurrent opens must start one server, not two
         self.proc = None
         self.port = 0
@@ -72,13 +90,24 @@ class JupyterLauncher:
         return f"http://127.0.0.1:{self.port}/lab/tree/{notebook.name}?token={self.token}"
 
     def _adopt(self, root: Path) -> bool:
-        """Reuse the server a previous daemon recorded, if it is still that Jupyter and still answers."""
+        """Reuse the server a previous daemon recorded, if it is still that Jupyter, still answers, and lets this
+        console frame it (an older daemon's server doesn't, and the blade would stay blank)."""
         try:
             rec = json.loads(self.record_path().read_text())
             pid, port, token = int(rec["pid"]), int(rec["port"]), str(rec["token"])
         except (OSError, ValueError, KeyError, TypeError):
             return False
-        if rec.get("root") != str(root) or not self.is_jupyter(pid) or not self.port_open(port):
+        if rec.get("root") != str(root):
+            return False
+        if not self.is_jupyter(pid):
+            return False
+        if rec.get("frame_ancestors") != self.frame_ancestors:
+            try:  # outdated (the console can't frame it, or its key is revoked): stop it rather than leave it running
+                self.kill(pid, signal.SIGTERM)
+            except OSError:
+                pass
+            return False
+        if not self.port_open(port):
             return False
         self.proc, self.port, self.token, self.root = _Adopted(pid), port, token, root
         return True
@@ -88,15 +117,20 @@ class JupyterLauncher:
         path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as f:
-            json.dump({"pid": pid, "port": self.port, "token": self.token, "root": str(self.root)}, f)
+            json.dump({"pid": pid, "port": self.port, "token": self.token, "root": str(self.root),
+                       "frame_ancestors": self.frame_ancestors}, f)
 
     def _start(self, root: Path) -> None:
         port, token = self.free_port(), secrets.token_urlsafe(24)
         cmd = ["jupyter", "lab", "--no-browser", "--ServerApp.ip=127.0.0.1", f"--ServerApp.port={port}",
-               "--ServerApp.port_retries=0", f"--ServerApp.root_dir={root}"]
+               "--ServerApp.port_retries=0", f"--ServerApp.root_dir={root}",
+               "--ServerApp.tornado_settings=" + repr({"headers": {"Content-Security-Policy": self.frame_ancestors}})]
+        env = {**os.environ, "JUPYTER_TOKEN": token, "MXC_BASE_URL": f"http://127.0.0.1:{self.console_port}/v1"}
+        if self.api_key:
+            env["MXC_API_KEY"] = self.api_key()
         try:
             proc = self.popen(cmd, start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                              stderr=subprocess.DEVNULL, env={**os.environ, "JUPYTER_TOKEN": token})
+                              stderr=subprocess.DEVNULL, env=env)
         except FileNotFoundError:
             raise JupyterMissing("jupyter was not found. Install it with `pixi add jupyterlab` "
                                  "or open the notebook yourself: pixi run jupyter lab") from None

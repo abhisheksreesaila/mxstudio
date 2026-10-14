@@ -81,7 +81,8 @@ async def test_open_starts_jupyter_through_the_launcher_and_returns_the_url(stor
         r = await http.post("/admin/learn/tiny/open", headers=ADMIN)
         assert r.status_code == 200, r.text
         assert r.json() == {"name": "tiny", "path": str(mxc_home / "notebooks" / "tiny.ipynb"),
-                            "url": "http://127.0.0.1:8899/lab/tree/tiny.ipynb?token=t"}
+                            "url": "http://127.0.0.1:8899/lab/tree/tiny.ipynb?token=t",
+                            "embed_url": "http://127.0.0.1:8899/doc/tree/tiny.ipynb?token=t"}
         assert launcher.opened == [mxc_home / "notebooks" / "tiny.ipynb"]  # generated first, then opened
 
 
@@ -140,6 +141,83 @@ def test_the_launcher_binds_loopback_with_a_token_and_reuses_its_server(tmp_path
     launcher.proc.alive = False
     launcher(nb)
     assert len(spawned) == 2  # the old server died: start a new one
+
+
+def test_only_the_console_may_frame_jupyter(tmp_path):
+    """F-037: the Notebook blade shows Jupyter in an iframe. Jupyter refuses framing by default; we allow the
+    console's own origins and nothing else."""
+    spawned = []
+    launcher = JupyterLauncher(popen=lambda cmd, **kw: spawned.append(cmd) or FakeProc(), free_port=lambda: 8906,
+                               port_open=lambda p: True, console_port=11999)
+    launcher(tmp_path / "tiny.ipynb")
+    [setting] = [a for a in spawned[0] if a.startswith("--ServerApp.tornado_settings=")]
+    assert "frame-ancestors 'self' http://127.0.0.1:11999 http://localhost:11999" in setting
+
+
+def test_jupyter_gets_its_own_key_so_the_try_it_cells_run(tmp_path):
+    """The notebook's cells read MXC_API_KEY and MXC_BASE_URL. Keys are stored hashed, so the daemon can't hand out
+    the person's key: Jupyter gets a fresh internal key each time it starts."""
+    spawned, issued = [], []
+
+    def new_key():
+        issued.append(f"mst-{len(issued)}")
+        return issued[-1]
+    launcher = JupyterLauncher(popen=lambda cmd, **kw: spawned.append(kw) or FakeProc(), free_port=lambda: 8910,
+                               port_open=lambda p: True, console_port=11999, api_key=new_key)
+    launcher(tmp_path / "tiny.ipynb")
+    launcher(tmp_path / "tiny.ipynb")
+    assert issued == ["mst-0"]  # reused server, same key
+    env = spawned[0]["env"]
+    assert env["MXC_API_KEY"] == "mst-0" and env["MXC_BASE_URL"] == "http://127.0.0.1:11999/v1"
+
+
+async def test_the_daemons_jupyter_key_is_an_internal_one(store, sup, mxc_home, monkeypatch):
+    from mxconsole import admin_api, keys
+    seen = {}
+
+    class Recording(JupyterLauncher):
+        def __init__(self, **kw):
+            seen.update(kw)
+    monkeypatch.setattr(admin_api.jupyter, "JupyterLauncher", Recording)
+    create_app(store, sup, api_deps={"learn_source": FakeHF()})
+    plaintext = seen["api_key"]()
+    [row] = [k for k in keys.list_keys(store) if k.app == "_notebook"]
+    assert plaintext.startswith("mst-") and row.revoked_at is None
+    assert keys.verify_key(store, plaintext) == "_notebook"
+    assert keys.verify_key(store, seen["api_key"]()) == "_notebook"  # a new server's key...
+    assert keys.verify_key(store, plaintext) is None                 # ...cuts off the old server
+
+
+def test_the_embed_url_is_the_single_notebook_view():
+    from mxconsole import jupyter
+    assert jupyter.embed_url("http://127.0.0.1:1/lab/tree/a.ipynb?token=t") == "http://127.0.0.1:1/doc/tree/a.ipynb?token=t"
+
+
+def test_a_server_that_does_not_allow_the_console_to_frame_it_is_not_reused(tmp_path, mxc_home):
+    """A server recorded by an older daemon (no framing setting), or for another console port, would show a blank
+    iframe: start a new one instead."""
+    first = JupyterLauncher(popen=lambda cmd, **kw: FakeProc(), free_port=lambda: 8907, port_open=lambda p: True,
+                            console_port=11999)
+    first(tmp_path / "tiny.ipynb")
+    record = mxc_home / "run" / "jupyter.json"
+    rec = json.loads(record.read_text())
+    stopped = []
+    other_port = JupyterLauncher(popen=lambda cmd, **kw: FakeProc(), free_port=lambda: 8908, port_open=lambda p: True,
+                                 is_jupyter=lambda pid: True, console_port=12000,
+                                 kill=lambda pid, sig: stopped.append(pid))
+    assert ":8908/" in other_port(tmp_path / "tiny.ipynb") and stopped == [rec["pid"]]
+    stopped.clear()
+    del rec["frame_ancestors"]
+    record.write_text(json.dumps(rec))
+    old = JupyterLauncher(popen=lambda cmd, **kw: FakeProc(), free_port=lambda: 8909, port_open=lambda p: True,
+                          is_jupyter=lambda pid: True, console_port=11999, kill=lambda pid, sig: stopped.append(pid))
+    assert ":8909/" in old(tmp_path / "tiny.ipynb")
+    assert stopped == [rec["pid"]]  # the outdated server is stopped, not left running forever
+    record.write_text(json.dumps({**rec, "frame_ancestors": None}))
+    other = JupyterLauncher(popen=lambda cmd, **kw: FakeProc(), free_port=lambda: 8911, port_open=lambda p: True,
+                            is_jupyter=lambda pid: False, console_port=11999, kill=lambda pid, sig: stopped.append(pid))
+    other(tmp_path / "tiny.ipynb")
+    assert stopped == [rec["pid"]]  # a pid that is no longer Jupyter is never signalled
 
 
 def test_the_launcher_names_the_fix_when_jupyter_is_missing_or_dies(tmp_path):

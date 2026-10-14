@@ -19,6 +19,8 @@ from mxconsole.supervisor import Supervisor
 
 log = logging.getLogger("mxconsole.admin_api")
 
+NOTEBOOK_APP = "_notebook"  # the reserved key Jupyter's kernels use to call the daemon
+
 
 def register(app, store: Store, supervisor: Supervisor, admin_only, *, refused, error,
              search_sources: search.Sources | None = None, learn_source=None, jupyter_launcher=None) -> None:
@@ -39,7 +41,9 @@ def register(app, store: Store, supervisor: Supervisor, admin_only, *, refused, 
         except resolve.ResolveError as e:
             return error(503, str(e), "search_unavailable", "server_error")
 
-    launch = jupyter_launcher or jupyter.JupyterLauncher()
+    # Jupyter's kernels call the endpoint with their own key (rotated on each start; an earlier server's key stops)
+    launch = jupyter_launcher or jupyter.JupyterLauncher(
+        api_key=lambda: keys.create_key(store, NOTEBOOK_APP, rotate=True, internal=True))
 
     async def notebook(name: str) -> dict:
         return await asyncio.to_thread(learn.notebook_payload, name, learn_source, store)
@@ -70,7 +74,7 @@ def register(app, store: Store, supervisor: Supervisor, admin_only, *, refused, 
             return error(502, str(e), "jupyter_failed", "server_error")
         except Exception as e:
             return error(502, f"could not build a notebook for {name}: {e}", "learn_failed", "server_error")
-        return JSONResponse({"name": name, "path": path, "url": url})
+        return JSONResponse({"name": name, "path": path, "url": url, "embed_url": jupyter.embed_url(url)})
 
     @app.post("/admin/keys/{app_name}/rotate")
     def admin_key_rotate(request: Request, app_name: str):

@@ -87,6 +87,7 @@ async def test_console_cannot_be_framed_and_loads_nothing_from_elsewhere(http):
         assert r.headers["x-frame-options"] == "DENY"
         csp = r.headers["content-security-policy"]
         assert "frame-ancestors 'none'" in csp and "default-src 'self'" in csp
+        assert "frame-src http://127.0.0.1:* http://localhost:*;" in csp  # F-037: the Notebook blade frames Jupyter on this machine only
     page = (await http.get("/console")).text
     assert "fonts.googleapis.com" not in page  # fonts ship with mst; no outside calls
 

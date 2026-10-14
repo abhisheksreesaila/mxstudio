@@ -1,6 +1,7 @@
 // mxconsole, the Notebook blade (wide): the generated notebook for a model, read-only. Chapters on the left,
 // the markdown and code cells with their saved outputs in the middle, the architecture on the right.
-// Data: GET /admin/learn/{name} and POST /admin/learn/{name}/open. Nothing here runs a cell.
+// Data: GET /admin/learn/{name} and POST /admin/learn/{name}/open. The saved view runs nothing; "Run in Jupyter"
+// shows Jupyter's single-notebook view in an iframe (Jupyter listens on 127.0.0.1 only and lets the console frame it).
 //
 // Safety: the notebook text comes from a model card on the internet. It is never parsed as HTML: markdown goes
 // through the tiny parser below into a node-description tree (pure, tested under node), and the tree is built
@@ -8,6 +9,18 @@
 // (the console's CSP is default-src 'self', which also blocks data: images, so an image output points to Jupyter).
 import { h, icon, api, store, onData, fmt, copyText, toast, reducedMotion } from "./core.js";
 import { register, setHead } from "./blades.js";
+
+/** Only Jupyter's single-notebook view, on this machine, goes in the iframe. On a console opened at localhost it
+ * is framed at localhost too: 127.0.0.1 would be another site, the browser would hold back Jupyter's cookies, and
+ * the kernel would never connect. */
+export function embedUrl(url, pageHost) {
+  const u = localUrl(url);
+  if (!u || !new URL(u).pathname.startsWith("/doc/tree/")) return null;
+  if (pageHost !== "localhost") return u;
+  const same = new URL(u);
+  same.hostname = "localhost";
+  return same.href;
+}
 
 // -- markdown, as data -------------------------------------------------------------------------------
 /** Only absolute http(s) URLs may become links. Anything else (javascript:, data:, relative) is not a link. */
@@ -158,7 +171,7 @@ export function kernelChip(model, endpoint) {
   return { on, text: on ? `model running · ${String(endpoint || "").replace(/^https?:\/\//, "")}` : "start it to run cells" };
 }
 
-/** What Open in Jupyter says when it fails, and the command that fixes it. */
+/** What Run in Jupyter says when it fails, and the command that fixes it. */
 export function jupyterProblem(err, path) {
   if (err.status === 501) return { text: err.message, fix: "pixi add jupyterlab" };
   return { text: err.message, fix: `jupyter lab ${path || "<notebook>.ipynb"}` };
@@ -170,10 +183,10 @@ const showValue = (v) => (typeof v === "object" && v !== null ? JSON.stringify(v
 
 // -- DOM ---------------------------------------------------------------------------------------------
 function outputEl(o) {
-  if (o.kind === "image") return h("div", { class: "nb-out note" }, icon("external-link", 13), `image output (${o.mime}): open in Jupyter to see it`);
-  if (o.kind === "other") return h("div", { class: "nb-out note" }, icon("external-link", 13), `${o.mime} output: open in Jupyter to see it`);
+  if (o.kind === "image") return h("div", { class: "nb-out note" }, icon("external-link", 13), `image output (${o.mime}): run it in Jupyter to see it`);
+  if (o.kind === "other") return h("div", { class: "nb-out note" }, icon("external-link", 13), `${o.mime} output: run it in Jupyter to see it`);
   const cut = o.text.length > MAX_OUTPUT;
-  return h("pre", { class: `nb-out ${o.kind === "error" ? "err" : o.stream === "stderr" ? "stderr" : ""}` }, cut ? `${o.text.slice(0, MAX_OUTPUT)}\n… (cut: open in Jupyter for the rest)` : o.text);
+  return h("pre", { class: `nb-out ${o.kind === "error" ? "err" : o.stream === "stderr" ? "stderr" : ""}` }, cut ? `${o.text.slice(0, MAX_OUTPUT)}\n… (cut: run it in Jupyter for the rest)` : o.text);
 }
 
 function cellEl(cell) {
@@ -212,8 +225,19 @@ register("notebook", (blade) => {
 
   const chipEl = h("span", { class: "kchip off" }, h("span", { class: "sd" }), h("span", { class: "kt" }, "start it to run cells"));
   const status = h("div", { class: "nb-status", role: "status", hidden: true });
-  const jupBtn = h("button", { class: "btn dark sm", type: "button", disabled: true }, icon("external-link", 13), "Open in Jupyter");
+  const modeBtn = h("button", { class: "btn dark sm", type: "button", disabled: true });
+  const tabLink = h("a", { class: "ib", target: "_blank", rel: "noopener noreferrer", "aria-label": "Open Jupyter in a new tab", title: "Open in a new tab", hidden: true }, icon("external-link", 14));
   const shell = h("div", { class: "nb" });
+  const saved = h("div", { class: "nb-saved" });
+  const frameWrap = h("div", { class: "nb-frame", hidden: true });
+  let frame = null; // kept while the blade is open, so switching views doesn't restart the kernel
+
+  function setMode(jupyter) {
+    saved.hidden = jupyter;
+    frameWrap.hidden = !jupyter;
+    modeBtn.replaceChildren(...(jupyter ? [icon("book-open", 13), "Saved view"] : [icon("play", 13), "Run in Jupyter"]));
+  }
+  setMode(false);
 
   function paintChip() {
     const v = kernelChip((store.models || []).find((m) => m.name === id), store.info && store.info.endpoint);
@@ -222,26 +246,32 @@ register("notebook", (blade) => {
   }
   function say(...content) { status.replaceChildren(...content); status.hidden = !content.length; }
 
-  async function openJupyter() {
-    jupBtn.disabled = true;
+  async function runInJupyter() {
+    if (frame) { setMode(saved.hidden === false); return; }
+    modeBtn.disabled = true;
     status.classList.remove("bad");
     say(icon("loader-circle", 13), "Starting Jupyter… the first start takes a few seconds.");
     try {
       const r = await api("POST", `/admin/learn/${enc}/open`);
       if (!blade.alive) return;
-      const url = localUrl(r.url);
-      if (!url) throw new Error("Jupyter returned a link that is not on this machine (http://127.0.0.1), so it was not opened");
-      window.open(url, "_blank", "noopener,noreferrer");
-      say(icon("check", 13), "Jupyter is running. ", h("a", { href: url, target: "_blank", rel: "noopener noreferrer" }, "Open it again"), icon("external-link", 12));
+      const url = embedUrl(r.embed_url, location.hostname), full = localUrl(r.url);
+      if (!url || !full) throw new Error("Jupyter returned a link that is not on this machine (http://127.0.0.1), so it was not opened");
+      frame = h("iframe", { title: `Jupyter: ${id}`, allow: "clipboard-read; clipboard-write" });
+      frame.src = url;
+      frameWrap.replaceChildren(frame);
+      tabLink.href = full;
+      tabLink.hidden = false;
+      say();
+      setMode(true);
     } catch (e) {
       if (!blade.alive) return;
       const p = jupyterProblem(e, nb && nb.path);
       status.classList.add("bad");
       say(icon("circle-alert", 14), h("span", {}, p.text, " Fix: "), h("code", { class: "mono" }, p.fix));
     }
-    jupBtn.disabled = false;
+    modeBtn.disabled = false;
   }
-  jupBtn.addEventListener("click", openJupyter);
+  modeBtn.addEventListener("click", runInJupyter);
 
   function notice(title, text, retry) {
     shell.replaceChildren(h("div", { class: "nb-notice" }, h("h4", {}, title), h("p", {}, text),
@@ -266,8 +296,9 @@ register("notebook", (blade) => {
       h("div", { class: "lbl nb-gap" }, "File"),
       h("div", { class: "nb-path mono" }, nb.path));
     side.append(twin);
-    shell.replaceChildren(status, h("div", { class: "nb-grid" }, toc, h("div", { class: "nb-main" }, h("div", { class: "nb-inner" }, cellEls)), side));
-    jupBtn.disabled = false;
+    saved.replaceChildren(h("div", { class: "nb-grid" }, toc, h("div", { class: "nb-main" }, h("div", { class: "nb-inner" }, cellEls)), side));
+    shell.replaceChildren(status, saved, frameWrap);
+    modeBtn.disabled = false;
   }
 
   async function load() {
@@ -287,7 +318,7 @@ register("notebook", (blade) => {
   return {
     title: "Notebook", crumb: "Notebook", sub: id,
     icon: "book-open", hue: "var(--hue-notebook)", wide: true, min: 900,
-    tools: [chipEl, jupBtn],
+    tools: [chipEl, modeBtn, tabLink],
     mount(body) {
       body.replaceChildren(shell);
       paintChip();

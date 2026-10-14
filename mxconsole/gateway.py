@@ -42,10 +42,11 @@ CONSOLE_ASSETS = CONSOLE_STYLES | CONSOLE_SCRIPTS | CONSOLE_FONTS | CONSOLE_IMAG
 LOG_TAIL_BYTES = 8000
 TRY_MAX_TOKENS = 1024  # the API page's "Try it" is for a quick look, not for load
 # no-cache: an upgraded mxconsole never shows a stale console. The rest: no other site can frame the
-# console (clickjacking Load/Stop) and the page loads nothing from anywhere but the daemon.
+# console (clickjacking Load/Stop) and the page loads nothing from anywhere but the daemon, except that the
+# Notebook blade may frame Jupyter, which only ever listens on 127.0.0.1 (framed as localhost when the console is).
 CONSOLE_HEADERS = {"Cache-Control": "no-cache", "X-Frame-Options": "DENY",
-                   "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; "
-                                              "form-action 'none'; object-src 'none'",
+                   "Content-Security-Policy": "default-src 'self'; frame-src http://127.0.0.1:* http://localhost:*; "
+                                              "frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'",
                    "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"}
 HOP_BY_HOP = {"content-length", "transfer-encoding", "connection", "content-encoding"}
 

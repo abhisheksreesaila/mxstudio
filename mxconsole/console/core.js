@@ -48,11 +48,12 @@ export const clear = (el) => el.replaceChildren();
 export { icon };
 
 /** An app name as shown in lists. Names starting with "_" or "console" are mxconsole's own traffic: the
- *  benchmark gets the gauge icon, muted. Both still count in the gauges, because the GPU really was busy. */
+ *  benchmark gets the gauge icon and the console's Jupyter the notebook icon, muted. Both still count in the gauges, because the GPU really was busy. */
 export function appLabel(name) {
   if (!name) return h("span", { class: "muted" }, "no key");
   if (name === "_bench") return h("span", { class: "muted app-internal" }, icon("gauge", 13, "currentColor", 1.8), " benchmark");
   if (name === "console") return h("span", { class: "muted app-internal" }, "console");
+  if (name === "_notebook") return h("span", { class: "muted app-internal" }, icon("book-open", 13, "currentColor", 1.8), " notebook");
   return name;
 }
 
