@@ -7,7 +7,7 @@ verified MAX endpoint. This guide contains the detailed usage previously in the
 README, including optional browser, notebook, and inference-engineering features.
 Those features remain available but are not prerequisites for the endpoint-first product.
 
-> **Project status:** early and experimental. Curated dense models are the easiest place to start. Architectures is a beta workflow: inspection and scaffolding are automated, while graph implementation and numerical validation remain engineering work. The OLMoE port is not a production guarantee; numerical parity validation is still pending.
+> **Project status:** early and experimental. Curated dense models are the easiest place to start. Architectures is a beta workflow: inspection and scaffolding are automated, while graph implementation and numerical validation remain engineering work. For porting unsupported architectures with mxconsole (`mxc port --auto`), including the OLMoE port, which now passes the numerical parity check, see [PORTING.md](PORTING.md).
 
 ## Start here
 

@@ -56,7 +56,8 @@ pixi run mxc pull <name-or-hf-repo> [--dry-run] [--name N] [--json]   # resolve 
 pixi run mxc keys new my-app | ls | revoke my-app            # one key per app (printed once)
 pixi run mxc learn qwen2.5-0.5b [--no-open]                  # notebook → Jupyter Lab
 pixi run mxc expose [--host box.local] [--no-litellm] | --stop
-pixi run mxc port <hf-repo>                                  # workspace for an unsupported architecture
+pixi run mxc port <hf-repo> --auto                           # port an unsupported architecture (docs/PORTING.md)
+pixi run mxc port <hf-repo>                                  # guided: workspace + the Claude command to run yourself
 pixi run mxc daemon                                          # the gateway in the foreground (mxc serve starts it for you)
 
 pixi run mxc status                                          # daemon, endpoints, models, keys, LAN, MAX version on one screen
@@ -150,10 +151,11 @@ a **second device**: copy `root.crt` there, run the line, and you get a reply. T
 ### 7. Learn and port
 ```bash
 pixi run mxc learn qwen2.5-0.5b          # opens Jupyter Lab; run the "Try it" cells with MXC_API_KEY set
-pixi run mxc port allenai/OLMoE-1B-7B-0125-Instruct   # prints the donor, workspace and Claude command
+pixi run mxc port openai-community/gpt2 --auto   # ports, checks against Hugging Face, registers and serves (~10 min)
 ```
 ✅ The notebook shows the model card, a config table, a parameter breakdown (estimate ≈ actual)
-and MAX's source folder for the architecture. `port` prints a workspace with `PORT.md`.
+and MAX's source folder for the architecture. `port --auto` ends with "Ported … and serving it"; see
+[docs/PORTING.md](docs/PORTING.md) for what it needs, what can come back, and the limits.
 
 ### When you're done
 ```bash
