@@ -789,3 +789,15 @@ def test_a_lone_byte_token_matches_the_servers_empty_text(tmp_path):
     assert same("�", "") and same(" Paris", " Paris") and same(" Paris", "Paris")
     assert not same(" Paris", "") and not same("�", " Paris")
     assert apply_skill_patches(tmp_path, serving_max="") == []          # idempotent
+
+
+def test_a_patch_whose_target_changed_upstream_is_reported_not_silently_skipped(tmp_path):
+    from mxconsole.port_auto import stale_skill_patches
+    f = tmp_path / "import-model" / "scripts" / "compare_layers.py"
+    f.parent.mkdir(parents=True)
+    f.write_text("def same_token_text(a, b):\n    return a == b  # rewritten upstream\n")
+    stale = stale_skill_patches(tmp_path)
+    assert len(stale) == 2 and all("no longer applies" in s for s in stale)   # both patches target this file
+    f.write_text(SAME_TOKEN_TEXT + BUGGY_COMPARE)
+    assert stale_skill_patches(tmp_path) == []
+    assert stale_skill_patches(tmp_path / "nope") == []                         # no file: nothing to say

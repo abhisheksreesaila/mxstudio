@@ -430,6 +430,20 @@ def skill_max_unpinned(skills_root: Path, serving_max: str) -> bool:
     return f'max = "=={serving_max}"' not in text
 
 
+def stale_skill_patches(skills_root: Path) -> list[str]:
+    """Patches whose file exists but has neither the buggy nor the fixed text: upstream changed it, so the patch
+    silently no longer applies and the bug it fixed may be back (or gone)."""
+    out = []
+    for rel, old, new, why in SKILL_PATCHES:
+        try:
+            text = (skills_root / rel).read_text()
+        except OSError:
+            continue
+        if old not in text and new not in text:
+            out.append(f"{rel}: the patch for \"{why[:80]}…\" no longer applies (the skill changed); check it by hand")
+    return out
+
+
 def gate_hash(skills_root: Path) -> str:
     """Hash of the files the gates run (the skill's scripts and manifest), so tampering is detectable."""
     h = hashlib.sha256()
@@ -966,6 +980,8 @@ class PortManager:
         serving_max = port.mst_max_version() or ""
         for note in apply_skill_patches(skills_root, serving_max=serving_max):
             job.say(f"-- patched Modular's skill: {note}")
+        for note in stale_skill_patches(skills_root):
+            job.say(f"-- warning: {note}")
         if not serving_max:
             job.say("-- warning: mxconsole's MAX version is unknown, so the skill's environment is not pinned to it")
         elif skill_max_unpinned(skills_root, serving_max):
