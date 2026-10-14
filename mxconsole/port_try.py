@@ -4,17 +4,22 @@ Without it the agent only ever ran check_port.py (does it import, does every wei
 run: compile errors, wrong numbers and broken output only showed up after it had finished, as one summary line
 (port study, docs/port-study.md). One fixed command, allowed to the agent and nothing broader:
 
-    python -m mxconsole.port_try --config <job>/work/try/config.json [--wait 540]
+    python -m mxconsole.port_try --config <job>/try-<attempt>.json [--wait 540]
 
 starts `max serve` on the package (the same flags as the final check), sends one prompt, runs the skill's
 compare_layers probe and the verify gates against it, prints a short report and shuts the server down. A cold
 compile can outlast the agent's 10-minute command limit, so the run is a detached worker: a call waits up to
 `--wait` seconds, says "still running" if it isn't done, and the next call picks up the same run. One run at a
-time, `max_tries` per attempt (the harness resets the state for each attempt). It runs inside the agent's
-sandbox, so nothing here widens what the agent can reach; the harness also calls stop() when the agent exits.
+time, at most `max_tries` runs and `budget_s` seconds of runs per attempt.
 
-The harness writes the config (commands as argv lists; "{port}" is replaced by the server's port). Exit codes:
-0 pass, 1 fail, 2 still running, 3 refused (no tries left, bad config).
+Trust: everything here runs inside the agent's sandbox, as the agent. The harness writes the config (outside the
+agent's writable dirs, bound read-only) and a fresh, empty state dir per attempt, and never reads or cleans up
+anything in it: the state, PIDs and reports are the agent's own. Only bubblewrap is trusted to clean up (the
+worker is in the sandbox's PID namespace, which dies with the agent), so the harness offers try-port only there.
+
+Config: commands as argv lists ("{port}" becomes the server's port), plus port_dir, repo_id, smoke_prompt,
+state_dir, max_tries, budget_s, health_timeout, step_timeout. Exit codes: 0 pass, 1 fail, 2 still running,
+3 refused (no tries or time left, unreadable config or state dir).
 """
 from __future__ import annotations
 
@@ -43,13 +48,9 @@ NOISE = re.compile(r"Warning: cache directory .* is not writable|INFO: Still com
 
 # ---- state ------------------------------------------------------------------------------------
 
-def write_config(state_dir: Path, cfg: dict) -> Path:
-    """Write a fresh config and clear the previous attempt's state. Returns the config path."""
-    stop(state_dir)
-    state_dir.mkdir(parents=True, exist_ok=True)
-    for f in ("state.json", "result.txt", "serve.log"):
-        (state_dir / f).unlink(missing_ok=True)
-    path = state_dir / "config.json"
+def write_config(path: Path, cfg: dict) -> Path:
+    """The harness writes the config for one attempt (somewhere the agent can only read). Returns the path."""
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(cfg, indent=1))
     return path
 
@@ -85,13 +86,17 @@ def package_hash(port_dir: Path) -> str:
 
 
 def _alive(pid: int | None) -> bool:
+    """Running, and not a zombie waiting to be reaped (a killed worker whose parent hasn't waited on it)."""
     if not pid:
         return False
     try:
         os.kill(pid, 0)
     except OSError:
         return False
-    return True
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] != "Z"
+    except (OSError, IndexError):
+        return True
 
 
 def _kill_group(pid: int | None) -> None:
@@ -131,7 +136,13 @@ def main(argv: list[str] | None = None, out: Callable[[str], None] = print) -> i
     except (OSError, ValueError) as e:
         out(f"try-port: cannot read {a.config}: {e}")
         return 3
-    state_dir = a.config.parent
+    state_dir = Path(cfg.get("state_dir") or a.config.parent)
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / "lock").touch()
+    except OSError as e:
+        out(f"try-port: cannot write its state dir {state_dir}: {e}")
+        return 3
     if a.worker:
         return _work(cfg, state_dir)
     with _locked(state_dir):
@@ -144,6 +155,10 @@ def main(argv: list[str] | None = None, out: Callable[[str], None] = print) -> i
                 out(f"try-port: you have used all {cfg.get('max_tries', 4)} tries for this attempt. Finish with what "
                     f"you have; mxconsole runs the final check when you stop.")
                 return 3
+            if state.get("spent", 0.0) >= cfg.get("budget_s", 5400):
+                out(f"try-port: this attempt's time budget for tries ({cfg.get('budget_s', 5400):g}s) is used up. "
+                    f"Finish with what you have; mxconsole runs the final check when you stop.")
+                return 3
             state = _start(cfg, a.config, state_dir, state)
             out(f"try-port: started try {state['tries']} of {cfg.get('max_tries', 4)} "
                 f"(package {state['package']}); compiling and serving…")
@@ -153,8 +168,14 @@ def main(argv: list[str] | None = None, out: Callable[[str], None] = print) -> i
         if state.get("status") != "running":
             break
         if not _alive(state.get("worker_pid")):
-            state.update(status="done", code=1)
-            (state_dir / "result.txt").write_text("try-port: the run stopped before it finished.\nRESULT: FAIL\n")
+            with _locked(state_dir):
+                state = read_state(state_dir)  # it may have finished just now: never overwrite a real result
+                if state.get("status") == "running":
+                    _kill_group(state.get("server_pid"))  # its own session: it would keep the GPU otherwise
+                    (state_dir / "result.txt").write_text("try-port: the run stopped before it finished.\nRESULT: FAIL\n")
+                    state.update(status="done", code=1, step="done", server_pid=None,
+                                 spent=state.get("spent", 0.0) + time.time() - state.get("started", time.time()))
+                    _write_state(state_dir, state)
             break
         if time.monotonic() > deadline:
             elapsed = time.time() - state.get("started", time.time())
@@ -177,6 +198,7 @@ def main(argv: list[str] | None = None, out: Callable[[str], None] = print) -> i
 
 def _start(cfg: dict, config: Path, state_dir: Path, state: dict) -> dict:
     state = {"status": "running", "tries": state.get("tries", 0) + 1, "started": time.time(),
+             "spent": state.get("spent", 0.0),
              "package": package_hash(Path(cfg["port_dir"])), "step": "starting", "delivered": False}
     (state_dir / "result.txt").unlink(missing_ok=True)
     _write_state(state_dir, state)
@@ -259,7 +281,8 @@ def _work(cfg: dict, state_dir: Path) -> int:
             (state_dir / "result.txt").write_text("\n".join(report) + "\n")
             state = read_state(state_dir)
             if state.get("status") == "running":
-                state.update(status="done", code=code, step="done", server_pid=None)
+                state.update(status="done", code=code, step="done", server_pid=None,
+                             spent=state.get("spent", 0.0) + time.time() - state.get("started", time.time()))
                 _write_state(state_dir, state)
 
 

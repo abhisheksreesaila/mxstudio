@@ -1,6 +1,7 @@
 """try-port: the agent compiles, serves and compares its own package, the way mxconsole's final check will.
 Runs real processes against the fakes (fake_max.py serves, fake_port_check.py stands in for the skill's probe
 and gates), so nothing needs a GPU."""
+import json
 import os
 import sys
 import time
@@ -17,15 +18,19 @@ def make(tmp_path, arch="ARCHITECTURES = []\n", **over) -> Path:
     pkg = tmp_path / "port" / "pkg"
     pkg.mkdir(parents=True)
     (pkg / "arch.py").write_text(arch)
-    state = tmp_path / "try"
     cfg = {
         "serve": [*FAKE_MAX, "serve", "--no-enable-overlap-scheduler", "--served-model-name", "acme/weird",
                   "--custom-architectures", str(pkg), "--model-path", str(tmp_path)],
         "probe": [*CHECK, "probe", str(pkg)], "gates": [*CHECK, "verify", str(pkg)], "cwd": str(tmp_path),
         "port_dir": str(pkg), "repo_id": "acme/weird", "smoke_prompt": "The capital of France is",
-        "max_tries": 4, "health_timeout": 30, "step_timeout": 30}
+        "state_dir": str(tmp_path / "work" / "try-1"), "max_tries": 4, "budget_s": 600, "health_timeout": 30,
+        "step_timeout": 30}
     cfg.update(over)
-    return port_try.write_config(state, cfg)
+    return port_try.write_config(tmp_path / "try-1.json", cfg)
+
+
+def state_dir(cfg: Path) -> Path:
+    return Path(json.loads(cfg.read_text())["state_dir"])
 
 
 def call(cfg, wait=30.0) -> tuple[int, str]:
@@ -92,7 +97,7 @@ def test_a_result_that_finished_between_calls_is_not_lost(tmp_path, monkeypatch)
     assert call(cfg, wait=0.1)[0] == 2
     time.sleep(3)                                           # it finishes while nobody is waiting
     code, out = call(cfg, wait=30)
-    assert code == 0 and "RESULT: PASS" in out and port_try.read_state(cfg.parent)["tries"] == 1
+    assert code == 0 and "RESULT: PASS" in out and port_try.read_state(state_dir(cfg))["tries"] == 1
 
 
 def test_tries_are_capped(tmp_path):
@@ -121,13 +126,13 @@ def test_stop_kills_a_running_try(tmp_path, monkeypatch):
         if pid_file.exists():
             break
         time.sleep(0.1)
-    port_try.stop(cfg.parent)
+    port_try.stop(state_dir(cfg))
     for _ in range(50):
         if not alive(int(pid_file.read_text())):
             break
         time.sleep(0.1)
     assert not alive(int(pid_file.read_text()))
-    assert port_try.read_state(cfg.parent)["status"] != "running"
+    assert port_try.read_state(state_dir(cfg))["status"] != "running"
 
 
 def test_noise_is_dropped_from_what_the_agent_reads():
@@ -147,3 +152,38 @@ def test_the_skill_envs_manifest_warning_and_hub_notice_are_dropped_too():
              "Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits",
              "logits_prefill   PASS  top-1 logprob hf=-2.4699 max=-2.3600 rel_diff=0.0445"]
     assert port_try.clean(lines) == [lines[-1]]
+
+
+def test_a_crashed_worker_takes_its_server_down_and_reports_a_failure(tmp_path, monkeypatch):
+    """The server is in its own session: if the worker dies, the next call must stop it, or it keeps the GPU."""
+    monkeypatch.setenv("FAKE_MAX_DELAY", "30")
+    pid_file = tmp_path / "max.pid"
+    monkeypatch.setenv("FAKE_MAX_PID_FILE", str(pid_file))
+    cfg = make(tmp_path)
+    assert call(cfg, wait=0.5)[0] == 2
+    for _ in range(50):
+        if pid_file.exists() and port_try.read_state(state_dir(cfg)).get("server_pid"):
+            break
+        time.sleep(0.1)
+    os.killpg(port_try.read_state(state_dir(cfg))["worker_pid"], 9)
+    code, out = call(cfg, wait=5)
+    assert code == 1 and "stopped before it finished" in out
+    for _ in range(80):
+        if not alive(int(pid_file.read_text())):
+            break
+        time.sleep(0.1)
+    assert not alive(int(pid_file.read_text()))
+    assert port_try.read_state(state_dir(cfg))["status"] == "done"
+
+
+def test_the_time_budget_stops_new_tries(tmp_path):
+    cfg = make(tmp_path, budget_s=0.01)
+    assert call(cfg)[0] == 0
+    code, out = call(cfg)
+    assert code == 3 and "time budget" in out
+
+
+def test_an_unwritable_state_dir_says_so_instead_of_a_traceback(tmp_path):
+    cfg = make(tmp_path, state_dir="/proc/nope/try")
+    code, out = call(cfg)
+    assert code == 3 and "cannot write" in out

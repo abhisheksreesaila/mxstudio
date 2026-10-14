@@ -50,6 +50,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import weakref
@@ -154,6 +155,7 @@ class Ctx:
     extra_allowed: tuple = ()     # per-model additions to the allow list (the donor copy commands)
     serving_max: str = ""         # the MAX that will serve the port (mxconsole's), which the skill env may not match
     try_command: str = ""         # try-port for this attempt: the agent compiles, serves and compares its package
+    try_config: Path | None = None  # its config, outside the agent's writable dirs, bound read-only for it
 
 
 @dataclass
@@ -201,7 +203,8 @@ def _skill_verify(c: Ctx, port_: int):
                      "--phase", "verify", "--port", str(port_), "--served-model-name", c.repo_id)
 
 
-TRY_MAX = 4  # try-port runs per attempt: each one compiles, so this bounds the agent's time on a hard port
+TRY_MAX = 4            # try-port runs per attempt: each one compiles, so this bounds the agent's time on a hard port
+TRY_BUDGET = 5400      # seconds of try-port runs per attempt, well inside GENERATE_TIMEOUT
 
 
 def _try_text(c: Ctx) -> str:
@@ -215,7 +218,7 @@ def _try_text(c: Ctx) -> str:
             f"you are done.\n\n")
 
 
-def try_config(c: Ctx, max_command: tuple[str, ...]) -> dict:
+def try_config(c: Ctx, max_command: tuple[str, ...], state_dir: Path) -> dict:
     """try-port's config for one attempt: the final check's server and gates, from the agent's workspace."""
     root = c.skills_root / port.ENTRY_SKILL
     def script(name: str, *a: str) -> list[str]:
@@ -228,7 +231,8 @@ def try_config(c: Ctx, max_command: tuple[str, ...]) -> dict:
         "gates": script("run_oss_gates.py", c.repo_id, "--port-dir", str(c.port_dir), "--phase", "verify",
                         "--port", "{port}", "--served-model-name", c.repo_id),
         "cwd": str(root), "port_dir": str(c.port_dir), "repo_id": c.repo_id, "smoke_prompt": SMOKE_PROMPT,
-        "max_tries": TRY_MAX, "health_timeout": 1500, "step_timeout": 900}
+        "state_dir": str(state_dir), "max_tries": TRY_MAX, "budget_s": TRY_BUDGET, "health_timeout": 1500,
+        "step_timeout": 900}
 
 
 def find_claude(explicit: str | None = None) -> str | None:
@@ -708,7 +712,8 @@ class PortManager:
                 ro_after.append(f)
             rw = [ws, work]
             ro += self._weights_roots(ctx)  # so the agent's own check_port.py runs use the local weights too
-            ro += [Path(sys.prefix), Path(mxconsole.__file__).parent]  # try-port: mxconsole's Python, max and package
+            if ctx and ctx.try_config:  # try-port: its config, and mxconsole's Python, max and package, read-only
+                ro += [ctx.try_config, Path(sys.prefix), Path(mxconsole.__file__).parent]
         else:
             ro.append(ws)
             ro += self._weights_roots(ctx)
@@ -968,14 +973,21 @@ class PortManager:
             self._end(job, row, "failed", msg)
             raise _StageFailed(msg)
         fallback = self.sandbox and port_sandbox.have_bwrap(self.bwrap) is None
-        try_dir = job.dir / "work" / "try"
-        cfg = port_try.write_config(try_dir, try_config(ctx, self.max_command))  # fresh tries for each attempt
-        ctx.try_command = f"{sys.executable} -m mxconsole.port_try --config {cfg}"
-        argv = claude_argv(claude, build_prompt(ctx, attempt, feedback, donor_note),
-                           (*ctx.extra_allowed, f"Bash({ctx.try_command}:*)"), fallback_sandbox=fallback)
+        allowed = ctx.extra_allowed
+        ctx.try_command, ctx.try_config = "", None
+        if self.sandbox and not job.unsandboxed and port_sandbox.have_bwrap(self.bwrap):
+            # try-port only under bubblewrap: its PID namespace takes a detached try down with the agent, so the
+            # harness never has to read or clean up the agent-writable state dir (a fresh one per attempt)
+            work = job.dir / "work"
+            work.mkdir(parents=True, exist_ok=True)
+            state_dir = Path(tempfile.mkdtemp(dir=work, prefix=f"try-{attempt}-"))
+            ctx.try_config = port_try.write_config(job.dir / f"try-{attempt}.json",
+                                                   try_config(ctx, self.max_command, state_dir))
+            ctx.try_command = f"{sys.executable} -m mxconsole.port_try --config {ctx.try_config}"
+            allowed = (*allowed, f"Bash({ctx.try_command}:*)")
+        argv = claude_argv(claude, build_prompt(ctx, attempt, feedback, donor_note), allowed, fallback_sandbox=fallback)
         code, out = self._exec(job, argv, ctx.workspace, timeout=self.generate_timeout, render=_render_event,
                                role="agent", ctx=ctx, raw=job.dir / f"agent-{attempt}.jsonl")
-        port_try.stop(try_dir)  # a try the agent left running (its sandbox normally takes it down with it)
         if code != 0:
             msg = f"claude exited with code {code}" + (" (timed out)" if code == 124 else "")
             self._end(job, row, "failed", msg)

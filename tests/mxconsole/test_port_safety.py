@@ -72,6 +72,49 @@ def test_real_bwrap_confines_the_command(tmp_path):
     assert not (other / "x").exists()    # everything else is a throwaway tmpfs
 
 
+def test_real_bwrap_takes_a_detached_process_down_when_the_command_exits(tmp_path):
+    """try-port's worker and server are detached (setsid) inside the agent's sandbox; the harness never cleans them
+    up (it must not trust PIDs the agent can write), so the sandbox has to: the PID namespace dies with the command."""
+    if not shutil.which("bwrap"):
+        pytest.skip("bubblewrap not installed")
+    rw = tmp_path / "rw"
+    rw.mkdir()
+    beat = rw / "beat"
+    script = f"setsid sh -c 'while true; do date +%s%N > {beat}; sleep 0.1; done' >/dev/null 2>&1 & sleep 0.5; exit 0"
+    argv = bwrap_argv(["sh", "-c", script], cwd=rw, home=Path.home(), mxc_home=mxc_home(), rw=[rw])
+    subprocess.run(argv, capture_output=True, text=True, check=False, timeout=30)
+    assert beat.exists()
+    time.sleep(0.5)
+    last = beat.read_text()
+    time.sleep(1.0)
+    assert beat.read_text() == last                      # nothing is writing any more
+
+
+def test_real_bwrap_runs_try_port_with_the_agents_read_only_binds(tmp_path):
+    """$HOME is a tmpfs in the sandbox: mxconsole's Python and package are only there through the read-only binds."""
+    if not shutil.which("bwrap"):
+        pytest.skip("bubblewrap not installed")
+    import mxconsole
+    from mxconsole import port_try
+    work = tmp_path / "work"
+    pkg = work / "port" / "pkg"
+    pkg.mkdir(parents=True)
+    (pkg / "arch.py").write_text("ARCHITECTURES = []\n")
+    for f in ("fake_max.py", "fake_port_check.py"):
+        shutil.copy(HERE / f, work / f)
+    cfg = port_try.write_config(tmp_path / "try-1.json", {
+        "serve": [sys.executable, str(work / "fake_max.py"), "serve", "--served-model-name", "acme/weird"],
+        "probe": [sys.executable, str(work / "fake_port_check.py"), "probe", str(pkg)],
+        "gates": [sys.executable, str(work / "fake_port_check.py"), "verify", str(pkg)],
+        "cwd": str(work), "port_dir": str(pkg), "repo_id": "acme/weird", "smoke_prompt": "Hi",
+        "state_dir": str(work / "try-1"), "max_tries": 2, "budget_s": 600, "health_timeout": 30, "step_timeout": 30})
+    argv = bwrap_argv([sys.executable, "-m", "mxconsole.port_try", "--config", str(cfg), "--wait", "60"], cwd=work,
+                      home=Path.home(), mxc_home=mxc_home(), rw=[work],
+                      ro=[Path(sys.prefix), Path(mxconsole.__file__).parent, cfg])
+    out = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=120)
+    assert "RESULT: PASS" in out.stdout, out.stdout + out.stderr
+
+
 # ---- the job uses them ------------------------------------------------------------------------
 
 def test_environment_is_scrubbed_and_claude_gets_a_private_config(tmp_path, fake_claude, monkeypatch):
@@ -645,25 +688,39 @@ def test_the_agent_may_run_the_skills_checks_the_way_it_calls_them(tmp_path, fak
     assert form in call["prompt"]
 
 
-def test_the_agent_gets_try_port_wired_to_the_same_server_and_checks_as_the_final_check(tmp_path, fake_claude):
-    """try-port: the agent compiles, serves and compares its own package (port study: it never saw the model run)."""
-    job = run(make_manager(tmp_path, fake_claude))
+def test_try_port_is_offered_under_bubblewrap_with_a_config_the_agent_can_only_read(tmp_path, fake_claude, fake_bwrap):
+    """try-port: the agent compiles, serves and compares its own package (port study: it never saw the model run).
+    The config is written outside anything the agent can write and bound read-only into its sandbox."""
+    if not sys.platform.startswith("linux"):
+        pytest.skip("bubblewrap is Linux only")
+    job = run(make_manager(tmp_path, fake_claude, sandbox=True, bwrap=fake_bwrap))
     assert job["status"] == "done", job["message"]
     (call,) = calls(tmp_path)
-    cfg_path = Path(job["log"]).parent / "work" / "try" / "config.json"
+    cfg_path = Path(job["log"]).parent / "try-1.json"
     command = f"{sys.executable} -m mxconsole.port_try --config {cfg_path}"
     assert f"Bash({command}:*)" in call["argv"]
     assert command in call["prompt"] and "600000" in call["prompt"]       # the Bash timeout it must ask for
     assert "Do not start `max serve` yourself" not in call["prompt"]
+    runs = [json.loads(line) for line in (tmp_path / "bwrap.log").read_text().splitlines()]
+    agent = next(r for r in runs if r["cmd"][0] == fake_claude)
+    assert str(cfg_path) in [src for src, _ in bind_pairs(agent["bwrap"], "--ro-bind-try")]
+    assert str(cfg_path) not in [src for src, _ in bind_pairs(agent["bwrap"], "--bind-try")]
 
 
-def test_try_port_config_matches_the_final_check(tmp_path, fake_claude, monkeypatch):
-    seen = []
-    real = port_auto.port_try.write_config
-    monkeypatch.setattr(port_auto.port_try, "write_config", lambda d, cfg: seen.append(cfg) or real(d, cfg))
-    job = run(make_manager(tmp_path, fake_claude))
+def test_without_bubblewrap_try_port_is_not_offered(tmp_path, fake_claude):
+    """Only the sandbox's PID namespace reliably takes a detached try down with the agent."""
+    job = run(make_manager(tmp_path, fake_claude))                       # sandbox off
     assert job["status"] == "done", job["message"]
-    cfg = seen[0]
+    (call,) = calls(tmp_path)
+    assert not any("mxconsole.port_try" in a for a in call["argv"]) and "port_try" not in call["prompt"]
+
+
+def test_try_port_config_matches_the_final_check(tmp_path, fake_claude, fake_bwrap):
+    if not sys.platform.startswith("linux"):
+        pytest.skip("bubblewrap is Linux only")
+    job = run(make_manager(tmp_path, fake_claude, sandbox=True, bwrap=fake_bwrap))
+    assert job["status"] == "done", job["message"]
+    cfg = json.loads((Path(job["log"]).parent / "try-1.json").read_text())
     for flag in port_auto.PARITY_SERVE_FLAGS:
         assert flag in cfg["serve"]
     ws = mxc_home() / "ports" / "weird"
@@ -673,18 +730,24 @@ def test_try_port_config_matches_the_final_check(tmp_path, fake_claude, monkeypa
     assert " ".join(cfg["gates"]).startswith(f"pixi run --manifest-path {root}/pixi.toml python {root}/scripts/run_oss_gates.py")
     assert "{port}" in cfg["gates"] and "{port}" in cfg["probe"]
     assert cfg["port_dir"] == str(ws / "port" / "weird") and cfg["max_tries"] >= 1
+    assert cfg["budget_s"] < port_auto.GENERATE_TIMEOUT                    # tries can't eat the whole agent run
+    work = Path(job["log"]).parent / "work"
+    assert Path(cfg["state_dir"]).parent == work and Path(cfg["state_dir"]).name.startswith("try-1-")
 
 
-def test_each_attempt_resets_try_port_and_a_leftover_run_is_stopped(tmp_path, fake_claude, monkeypatch):
+def test_the_harness_never_reads_or_cleans_the_agents_try_state(tmp_path, fake_claude, fake_bwrap, monkeypatch):
+    """The try state dir is agent-writable: PIDs or symlinks planted there must never reach the harness."""
+    if not sys.platform.startswith("linux"):
+        pytest.skip("bubblewrap is Linux only")
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "fail_once")
-    configs, stopped = [], []
-    real = port_auto.port_try.write_config
-    monkeypatch.setattr(port_auto.port_try, "write_config", lambda d, cfg: configs.append(d) or real(d, cfg))
-    monkeypatch.setattr(port_auto.port_try, "stop", lambda d: stopped.append(d))
-    job = run(make_manager(tmp_path, fake_claude))
+    touched = []
+    for name in ("stop", "read_state"):
+        monkeypatch.setattr(port_auto.port_try, name, lambda *a, _n=name, **k: touched.append(_n))
+    job = run(make_manager(tmp_path, fake_claude, sandbox=True, bwrap=fake_bwrap))
     assert job["status"] == "done", job["message"]
-    assert len(configs) == 2                                                # a fresh config (and try count) per attempt
-    assert len(stopped) >= 2                                                # after each agent run
+    assert touched == []
+    folder = Path(job["log"]).parent
+    assert (folder / "try-1.json").exists() and (folder / "try-2.json").exists()   # a fresh config per attempt
 
 
 def test_the_agent_sandbox_can_run_try_port_read_only(tmp_path, fake_claude, fake_bwrap):
