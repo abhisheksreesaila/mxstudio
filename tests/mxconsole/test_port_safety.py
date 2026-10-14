@@ -765,3 +765,27 @@ def test_the_agent_sandbox_can_run_try_port_read_only(tmp_path, fake_claude, fak
     pkg = str(Path(mxconsole.__file__).parent)
     assert sys.prefix in ro and pkg in ro
     assert sys.prefix not in rw and pkg not in rw
+
+
+SAME_TOKEN_TEXT = '''def same_token_text(hf_text: str, mx_text: str) -> bool:
+    """Whether a decoded HF token and the server's completion text agree."""
+    return hf_text == mx_text or bool(
+        hf_text.strip() and hf_text.strip() == mx_text.strip()
+    )
+'''
+
+
+def test_a_lone_byte_token_matches_the_servers_empty_text(tmp_path):
+    """StableLM (run 23): HF's top-1 after "The" is a lone UTF-8 byte; HF decodes it to U+FFFD, MAX's server holds
+    the incomplete character back and returns "", so the gate failed a port that picked the same token."""
+    from mxconsole.port_auto import apply_skill_patches
+    f = tmp_path / "import-model" / "scripts" / "compare_layers.py"
+    f.parent.mkdir(parents=True)
+    f.write_text(SAME_TOKEN_TEXT)
+    assert any("lone UTF-8 byte" in d for d in apply_skill_patches(tmp_path, serving_max=""))
+    ns: dict = {}
+    exec(f.read_text(), ns)
+    same = ns["same_token_text"]
+    assert same("�", "") and same(" Paris", " Paris") and same(" Paris", "Paris")
+    assert not same(" Paris", "") and not same("�", " Paris")
+    assert apply_skill_patches(tmp_path, serving_max="") == []          # idempotent

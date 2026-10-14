@@ -373,6 +373,11 @@ SKILL_PATCHES = [
      "            input_ids[0, :pos].tolist(), skip_special_tokens=True",
      "            ids[0, :pos].tolist(), skip_special_tokens=True",
      "the multi-position probe reads `input_ids` where it stored `ids` (NameError in logits_multi)"),
+    ("import-model/scripts/compare_layers.py",
+     "    return hf_text == mx_text or bool(\n",
+     "    return hf_text == mx_text or (hf_text == \"\\ufffd\" and mx_text == \"\") or bool(\n",
+     "a lone UTF-8 byte token decodes to U+FFFD in HF but to \"\" from the server, which holds the incomplete "
+     "character back, so the multi-position probe failed ports that picked the same token (StableLM, run 23)"),
 ]
 # The verify gate asks the parity server for log probabilities, which MAX refuses under its overlap scheduler.
 # `--force` makes the flag win over an architecture that turns the scheduler on (MAX 26.7, OLMoE), so a port can
