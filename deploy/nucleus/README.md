@@ -1,6 +1,6 @@
 # Deploying MX Studio Nucleus
 
-**Try [the localhost quickstart](../../docs/USER_GUIDE.md#optional-nucleus-appliance-profile)
+**Try [the localhost quickstart](../../docs/LEGACY_NUCLEUS.md#optional-nucleus-appliance-profile)
 before installing services.** The backend is FastAPI, not FastHTML. Local jobs
 already use SQLite; no PostgreSQL server is needed for the core controller.
 

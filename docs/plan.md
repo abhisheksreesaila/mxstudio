@@ -263,3 +263,16 @@ Brief: needed (docs/briefs/ports-catalog.md) · Needs: F-033
 ## F-036 Embeddings pooling check [todo]
 Brief: docs/brief.md · Needs: none
 - [ ] one live `/v1/embeddings` call against a pulled `all-minilm-l6`: does MAX read the pooling mode from `modules.json` / `1_Pooling/config.json` (never downloaded), or hard-code mean pooling? Download them if it reads them (found in review of 2ea97c4)
+
+## F-037 Jupyter inside the Notebook blade [done]
+Brief: docs/brief.md (small change to the approved notebook blade, F-028) · Needs: none
+- [x] "Run in Jupyter" shows the notebook in Jupyter's single-document view inside the blade, not a new tab; "Saved view" goes back; a new-tab link stays
+- [x] Jupyter lets only the console (http://127.0.0.1 or localhost on the daemon port) frame it; the console's CSP allows framing only http://127.0.0.1 on any port
+- [x] a Jupyter server recorded by an older daemon, started without that framing permission, is not reused
+- [x] checked in the running console (at 127.0.0.1 and at localhost): the iframe loads; restart-and-run-all ran the 3 Try-it cells, 200s from app `_notebook`
+- [x] the console's Jupyter gets its own internal `_notebook` key and endpoint, so the Try-it cells need no setup; an outdated recorded server is stopped
+
+## F-038 User guide for mxconsole [done]
+Brief: docs/brief.md · Needs: none
+- [x] `docs/USER_GUIDE.md` is the mxconsole guide: install, first ten minutes (console and CLI), the console tour, calling the endpoint from apps, securing it on the LAN, notebooks, porting (links PORTING.md), troubleshooting; commands link to docs/CLI.md
+- [x] the old MX Studio / Nucleus material moves to `docs/LEGACY_NUCLEUS.md`, nothing deleted; README links the guide

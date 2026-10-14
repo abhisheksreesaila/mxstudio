@@ -257,7 +257,7 @@ existing file. This manifest does not install or replace deployment templates.
 
 ## Connect an app and verify a real response
 
-Use the [copy-paste streaming client in the user guide](USER_GUIDE.md#2-make-a-real-streaming-request).
+Use the [copy-paste streaming client in the user guide](LEGACY_NUCLEUS.md#2-make-a-real-streaming-request).
 For an OpenAI-compatible app, configure:
 
 - **Base URL:** `http://127.0.0.1:8080/v1` on the appliance, or

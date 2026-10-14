@@ -12,7 +12,7 @@ Modular's own skills.
 - **Not a black box:** `mxc learn` shows the architecture, a parameter breakdown, and where
   MAX's Python implementation of the model lives so you can read and change it.
 
-Brief: [docs/brief.md](docs/brief.md) · Tickets: [docs/plan.md](docs/plan.md) ·
+User guide: [docs/USER_GUIDE.md](docs/USER_GUIDE.md) · Brief: [docs/brief.md](docs/brief.md) · Tickets: [docs/plan.md](docs/plan.md) ·
 Architecture decision: [docs/adr/0001](docs/adr/0001-mst-core-architecture.md)
 
 ---
