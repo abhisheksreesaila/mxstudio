@@ -1,0 +1,82 @@
+/* mxconsole docs pages. The same tokens, fonts and top bar as the console (mxconsole/console/blades.css), so the
+   docs look like the product. Light by default; dark follows the system or the toggle (html.dark / html.light). */
+@font-face { font-family: "Geist"; src: url("fonts/geist-variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("fonts/geist-mono-variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
+:root {
+  --chrome: #1f1f23; --chrome-line: #36363c; --chrome-text: #ededef; --chrome-muted: #a1a1aa; --chrome-hover: #2c2c31;
+  --canvas: #f5f5f7; --card: #fff; --card-line: #e4e4e7; --card-line-2: #f1f1f3; --sunk: #f4f4f5; --hover: #fafafa; --sel: #eef5fc;
+  --text: #0a0a0b; --text-2: #3f3f46; --muted: #71717a; --faint: #a1a1aa;
+  --ok: #16a34a; --warn: #d97706; --bad: #dc2626; --accent: #0078d4;
+  --ok-fg: #15803d; --bad-fg: #b91c1c; --warn-fg: #b45309; --port-fg: #7e22ce; --max-fg: #0d7d70; --hf-fg: #9a6a00;
+  --code: #0d0d10; --code-text: #e4e4e7;
+  --hue-models: #8e4ec6; --hue-add: #12a594; --hue-network: #00a2c7; --hue-keys: #e09d00; --hue-bench: #e5484d;
+  --hue-logs: #697177; --hue-gateway: #f76b15; --hue-notebook: #3e63dd; --hue-settings: #697177;
+  --sans: Geist, ui-sans-serif, system-ui, sans-serif; --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}
+@media (prefers-color-scheme: dark) { html:not(.light) {
+  --chrome: #0c0c0e; --chrome-line: #26262b; --chrome-hover: #232328;
+  --card: #1a1a1e; --card-line: #2c2c33; --card-line-2: #24242a; --text: #ededef; --text-2: #c2c2ca; --muted: #8c8c96; --sunk: #232328; --canvas: #111113;
+  --hover: #212126; --sel: #15253a; --faint: #5c5c66;
+  --ok-fg: #4ade80; --bad-fg: #f87171; --warn-fg: #fbbf24; --port-fg: #c084fc; --max-fg: #2dd4bf; --hf-fg: #f5c451; color-scheme: dark;
+} }
+html.dark {
+  --chrome: #0c0c0e; --chrome-line: #26262b; --chrome-hover: #232328;
+  --card: #1a1a1e; --card-line: #2c2c33; --card-line-2: #24242a; --text: #ededef; --text-2: #c2c2ca; --muted: #8c8c96; --sunk: #232328; --canvas: #111113;
+  --hover: #212126; --sel: #15253a; --faint: #5c5c66;
+  --ok-fg: #4ade80; --bad-fg: #f87171; --warn-fg: #fbbf24; --port-fg: #c084fc; --max-fg: #2dd4bf; --hf-fg: #f5c451; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font: 15px/1.6 var(--sans); color: var(--text); background: var(--canvas); -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, kbd, pre { font-family: var(--mono); font-size: .9em; }
+:not(pre) > code { background: var(--sunk); border: 1px solid var(--card-line); border-radius: 4px; padding: 1px 5px; }
+pre { background: var(--code); color: var(--code-text); border-radius: 8px; padding: 14px 16px; overflow-x: auto; line-height: 1.55; margin: 12px 0; }
+h1, h2, h3 { letter-spacing: -.015em; line-height: 1.2; }
+h1 { font-size: 34px; margin: 0 0 10px; font-weight: 650; }
+h2 { font-size: 22px; margin: 44px 0 10px; font-weight: 620; }
+h3 { font-size: 16px; margin: 24px 0 6px; font-weight: 600; }
+p { margin: 8px 0; color: var(--text-2); }
+.lab { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+/* the top bar, as in the console */
+.top { position: sticky; top: 0; z-index: 10; height: 48px; display: flex; align-items: center; gap: 18px; padding: 0 18px;
+  background: var(--chrome); color: var(--chrome-text); border-bottom: 1px solid var(--chrome-line); }
+.top .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--chrome-text); }
+.top .brand::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+.top .brand small { font: 10px var(--mono); color: var(--chrome-muted); }
+.top nav { display: flex; gap: 2px; flex: 1; flex-wrap: wrap; }
+.top nav a { color: var(--chrome-muted); padding: 5px 10px; border-radius: 6px; font-size: 13.5px; }
+.top nav a:hover { background: var(--chrome-hover); color: var(--chrome-text); text-decoration: none; }
+.top nav a[aria-current="page"] { color: var(--chrome-text); background: var(--chrome-hover); }
+.top .theme { background: none; border: 0; color: var(--chrome-muted); cursor: pointer; font-size: 20px; line-height: 1; width: 34px; height: 34px; border-radius: 6px; }
+.top .theme:hover { background: var(--chrome-hover); color: var(--chrome-text); }
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 36px 24px 80px; }
+.card { background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; padding: 18px 20px; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.lede { font-size: 18px; color: var(--text-2); max-width: 720px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; font: 500 11px var(--mono); padding: 2px 8px; border-radius: 999px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 40%, transparent); }
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill.ok { color: var(--ok-fg); } .pill.warn { color: var(--warn-fg); } .pill.bad { color: var(--bad-fg); } .pill.port { color: var(--port-fg); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; overflow: hidden; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--card-line-2); vertical-align: top; }
+th { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--hover); }
+tr:last-child td { border-bottom: 0; }
+.foot { margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--card-line); font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+.card > h3:first-child { margin-top: 0; }
+a.card { color: inherit; display: block; transition: border-color .15s; }
+a.card:hover { text-decoration: none; border-color: var(--faint); }
+a.card h3 { color: var(--accent); }
+@media (max-width: 640px) {
+  .top { position: static; height: auto; flex-wrap: wrap; padding: 6px 12px; gap: 2px 12px; }
+  .top .brand { flex: 1; }
+  .top nav { order: 3; flex: 0 0 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .top nav a { padding: 4px 8px; white-space: nowrap; }
+}

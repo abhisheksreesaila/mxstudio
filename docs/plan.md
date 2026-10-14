@@ -276,3 +276,18 @@ Brief: docs/brief.md (small change to the approved notebook blade, F-028) · Nee
 Brief: docs/brief.md · Needs: none
 - [x] `docs/USER_GUIDE.md` is the mxconsole guide: install, first ten minutes (console and CLI), the console tour, calling the endpoint from apps, securing it on the LAN, notebooks, porting (links PORTING.md), troubleshooting; commands link to docs/CLI.md
 - [x] the old MX Studio / Nucleus material moves to `docs/LEGACY_NUCLEUS.md`, nothing deleted; README links the guide
+
+## F-039 Docs site: a short README and interactive HTML pages [done]
+Brief: the person's request of 2026-10-14 (README says why, setup, latest release, screenshots, API table; HTML for the console screens and porting) · Needs: F-038
+- [x] README is short: why mxconsole (a convenience wrapper over MAX: local AI made easy, porting made fast), setup in three commands, latest release, screenshots, an HTTP API table, links to CLI.md, USER_GUIDE.md and the pages below
+- [x] `docs/site/console.html`: every console screen from a real screenshot, with numbered hotspots that explain each part
+- [x] `docs/site/porting.html`: behind the scenes of `mxc port --auto`, step by step, with what each step checks and what can come back
+- [x] `docs/site/index.html`: the docs home, and how a request travels (local and LAN)
+- [x] the pages work as plain files and on GitHub Pages; a test keeps the README's API table in step with the routes
+- [x] the long morning checklist moves out of README to docs/VERIFY.md
+
+## F-040 Port: refuse a repo with no safetensors before installing anything [todo]
+Brief: docs/brief.md · Needs: none
+- [ ] `mxc port --auto` on a repo with only .bin/GGUF weights fails in the workspace stage, before cloning skills or installing the env, with the same one-line message `mxc pull` gives (today: late, as "unexpected error: ValueError…"; found while writing docs/site/porting.html)
+- [ ] the parity stage no longer says "downloading weights…" when they're already downloaded
+- [ ] a remote-code model ends as "parked" in the CLI and console, not as a failed workspace stage

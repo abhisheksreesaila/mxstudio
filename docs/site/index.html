@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mxconsole docs: local AI on Modular MAX</title>
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="site.css">
+<script>try { const t = localStorage.getItem("mxc-docs-theme"); if (t) document.documentElement.classList.add(t); } catch (_) {}</script>
+<style>
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 32px; align-items: center; }
+  .hero img { width: 100%; border-radius: 10px; border: 1px solid var(--card-line); box-shadow: 0 12px 40px rgba(0, 0, 0, .12); }
+  .cmds { margin-top: 18px; }
+  .links { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 7px; font-size: 14px; font-weight: 500;
+    border: 1px solid var(--card-line); background: var(--card); color: var(--text); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:hover { text-decoration: none; filter: brightness(1.05); }
+  .why .card h3 { margin-top: 0; display: flex; align-items: center; gap: 8px; }
+  .why .card h3 i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .why .card p { margin: 0; font-size: 14px; }
+
+  /* how a request travels */
+  .flow-ctl { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 14px 0; }
+  .seg { display: flex; gap: 2px; background: var(--sunk); padding: 2px; border-radius: 7px; }
+  .seg button { border: 0; background: none; padding: 5px 12px; border-radius: 5px; font: 13px var(--sans); color: var(--muted); cursor: pointer; }
+  .seg button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
+  .play { height: 32px; padding: 0 14px; border-radius: 7px; border: 0; background: var(--text); color: var(--canvas); font: 500 13px var(--sans); cursor: pointer; }
+  .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; align-items: stretch; position: relative; }
+  .hop { position: relative; padding: 0 6px; }
+  .hop .box { background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; padding: 12px; height: 100%; transition: border-color .25s, box-shadow .25s, opacity .25s; }
+  .hop .box b { display: block; font: 600 13px var(--mono); }
+  .hop .box small { display: block; font: 11px var(--mono); color: var(--muted); margin-bottom: 6px; }
+  .hop .box span { font-size: 12.5px; color: var(--text-2); line-height: 1.45; display: block; }
+  .hop:not(:last-child)::after { content: "▶"; position: absolute; right: -7px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--faint); z-index: 1; }
+  .hop.off .box { opacity: .35; }
+  .hop.on .box { border-color: var(--hue-c, var(--accent)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--hue-c, var(--accent)) 20%, transparent); }
+  .log { margin-top: 14px; background: var(--code); color: var(--code-text); border-radius: 8px; padding: 12px 14px; font: 12.5px/1.7 var(--mono); min-height: 128px; }
+  .log .t { color: #8c8c96; margin-right: 8px; }
+  .log .ok { color: #4ade80; } .log .warn { color: #fbbf24; } /* the dark-theme --ok-fg / --warn-fg: the log is always dark */
+  .note { font-size: 13px; color: var(--muted); }
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: minmax(0, 1fr); }
+    .flow { grid-template-columns: 1fr; gap: 10px; }
+    .hop:not(:last-child)::after { content: "▼"; right: auto; left: 50%; top: auto; bottom: -12px; transform: translateX(-50%); }
+  }
+</style>
+</head>
+<body>
+<header class="top" data-page="index.html"></header>
+<main class="wrap">
+
+<section class="hero">
+  <div>
+    <div class="lab">mxconsole · docs</div>
+    <h1>Local AI on Modular MAX, made easy.</h1>
+    <p class="lede">A convenience wrapper around MAX. One command gives you an OpenAI-compatible endpoint. Models load
+      when they're called and unload when idle. If MAX can't run a model yet, mxconsole can port it.</p>
+<pre class="cmds">git clone https://github.com/abhisheksreesaila/mxstudio.git
+cd mxstudio
+pixi install
+pixi run mxc serve qwen2.5-0.5b</pre>
+    <div class="links">
+      <a class="btn primary" href="console.html">Tour the console</a>
+      <a class="btn" href="porting.html">How porting works</a>
+      <a class="btn" href="https://github.com/abhisheksreesaila/mxstudio/blob/main/docs/USER_GUIDE.md">User guide ↗</a>
+    </div>
+  </div>
+  <img src="../assets/screens/home.png" alt="The mxconsole console: My models, with live throughput and GPU memory">
+</section>
+
+<h2>Why</h2>
+<div class="grid why">
+  <div class="card"><h3><i style="background:var(--hue-add)"></i>Local AI, easy</h3>
+    <p><code>mxc serve</code> downloads, starts and prints a URL, a key and a <code>curl</code> line. Any OpenAI client works.</p></div>
+  <div class="card"><h3><i style="background:var(--hue-models)"></i>Many models, one endpoint</h3>
+    <p>Each model starts on its first request and unloads when idle. GPU memory goes only to the models in use. Pin the ones you need kept loaded.</p></div>
+  <div class="card"><h3><i style="background:var(--hue-keys)"></i>Safe to share</h3>
+    <p>One revocable key per app. <code>mxc expose</code> serves it over HTTPS on your LAN.</p></div>
+  <div class="card"><h3><i style="background:var(--port-fg)"></i>Porting, fast</h3>
+    <p>For an architecture MAX can't run yet, Claude Code writes a MAX version in a sandbox, and mxconsole checks it against the original. <a href="porting.html">Behind the scenes</a>.</p></div>
+</div>
+
+<h2 id="request">How a request travels</h2>
+<p>Pick where the call comes from and whether the model is already loaded, then press Play.</p>
+<div class="flow-ctl">
+  <div class="seg" role="group" aria-label="Where the call comes from">
+    <button type="button" class="on" aria-pressed="true" data-from="local">This machine</button>
+    <button type="button" aria-pressed="false" data-from="lan">Another device on the LAN</button>
+  </div>
+  <div class="seg" role="group" aria-label="Model state">
+    <button type="button" class="on" aria-pressed="true" data-state="cold">Model idle (cold)</button>
+    <button type="button" aria-pressed="false" data-state="warm">Model loaded</button>
+  </div>
+  <button type="button" class="play" id="play">▶ Play</button>
+</div>
+<div class="flow" id="flow">
+  <div class="hop" data-hop="app" style="--hue-c:var(--hue-network)"><div class="box"><small>your app</small><b>OpenAI client</b>
+    <span>Any SDK with <code>base_url</code> and a key from <code>mxc keys new</code>.</span></div></div>
+  <div class="hop" data-hop="caddy" style="--hue-c:var(--ok)"><div class="box"><small>:8443 · LAN path only</small><b>Caddy</b>
+    <span>HTTPS with its own certificate authority. Asks the daemon whether the key is valid. Forwards only the <code>/v1</code> routes.</span></div></div>
+  <div class="hop" data-hop="litellm" style="--hue-c:var(--hue-gateway)"><div class="box"><small>:4000 · LAN path only</small><b>LiteLLM</b>
+    <span>Routes by model name to the daemon, calling it with its own internal key. Its admin API never reaches the LAN.</span></div></div>
+  <div class="hop" data-hop="daemon" style="--hue-c:var(--hue-models)"><div class="box"><small>:11435</small><b>mxc daemon</b>
+    <span>Checks the key, starts the model if it's cold, counts tokens and latency for the console, and keeps the model up while the request runs.</span></div></div>
+  <div class="hop" data-hop="max" style="--hue-c:var(--max-fg)"><div class="box"><small>loopback port</small><b>max serve</b>
+    <span>One MAX server per model. Stopped after <code>keep_alive</code> idle (default 5 minutes) unless pinned.</span></div></div>
+</div>
+<div class="log" id="log" aria-live="polite"><span class="t">—</span>press Play</div>
+<p class="note">The console at <code>/console</code> and the <code>/admin</code> routes only answer on this machine. From the LAN, only
+<code>/v1/models</code>, <code>/v1/chat/completions</code>, <code>/v1/completions</code> and <code>/v1/embeddings</code> get through.</p>
+
+<h2>More</h2>
+<div class="grid">
+  <a class="card" href="console.html"><h3>Console tour →</h3><p>Every screen, from real screenshots, with what each part means and the matching command.</p></a>
+  <a class="card" href="porting.html"><h3>Porting, behind the scenes →</h3><p>What <code>mxc port --auto</code> does step by step, what it checks, and what can come back.</p></a>
+  <a class="card" href="https://github.com/abhisheksreesaila/mxstudio/blob/main/docs/CLI.md"><h3>CLI reference ↗</h3><p>Every <code>mxc</code> command and option.</p></a>
+  <a class="card" href="https://github.com/abhisheksreesaila/mxstudio#http-api"><h3>HTTP API ↗</h3><p>The OpenAI-compatible endpoints, in one table.</p></a>
+</div>
+
+<div class="foot">mxconsole · <a href="https://github.com/abhisheksreesaila/mxstudio">github.com/abhisheksreesaila/mxstudio</a></div>
+</main>
+<script src="site.js"></script>
+<script>
+// How a request travels: the hops a request takes for the chosen source and model state, played one at a time.
+const opts = { from: "local", state: "cold" };
+const hops = [...document.querySelectorAll("#flow .hop")];
+const log = document.getElementById("log");
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function script() {
+  const lan = opts.from === "lan", cold = opts.state === "cold";
+  const s = [["app", lan ? "POST https://box.local:8443/v1/chat/completions  (Bearer mst-…)" : "POST http://127.0.0.1:11435/v1/chat/completions  (Bearer mst-…)"]];
+  if (lan) s.push(["caddy", "TLS ok · forward_auth → GET /auth/check → <span class=ok>200, X-Mst-App: my-app</span>"],
+                  ["litellm", "model qwen2.5-0.5b → http://127.0.0.1:11435/v1, with LiteLLM's own internal key"]);
+  s.push(["daemon", (lan ? "key ok (app _litellm)" : "key ok (app my-app)") + " · model qwen2.5-0.5b is " + (cold ? "<span class=warn>cold</span>" : "<span class=ok>ready</span>")]);
+  if (cold) s.push(["max", "<span class=warn>starting max serve on a free loopback port … ready in seconds to a minute</span>"]);
+  s.push(["max", "streaming tokens back"], ["daemon", "<span class=ok>200</span> · first token and tok/s recorded · idle timer restarts"]);
+  return s;
+}
+
+function paint() {
+  const lan = opts.from === "lan";
+  hops.forEach(h => { h.classList.remove("on"); h.classList.toggle("off", !lan && (h.dataset.hop === "caddy" || h.dataset.hop === "litellm")); });
+}
+
+let timer = null;
+function play() {
+  clearTimeout(timer); paint();
+  const steps = script(); log.innerHTML = "";
+  let i = 0;
+  const next = () => {
+    if (i >= steps.length) { hops.forEach(h => h.classList.remove("on")); return; }
+    const [hop, text] = steps[i++];
+    hops.forEach(h => h.classList.toggle("on", h.dataset.hop === hop));
+    log.insertAdjacentHTML("beforeend", `<div><span class="t">${hop.padEnd(8, " ")}</span>${text}</div>`);
+    timer = setTimeout(next, reduce ? 0 : 900);
+  };
+  next();
+}
+
+document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+  const key = b.dataset.from ? "from" : "state";
+  b.parentElement.querySelectorAll("button").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
+  opts[key] = b.dataset[key];
+  paint();
+  log.innerHTML = '<span class="t">—</span>press Play';
+}));
+document.getElementById("play").addEventListener("click", play);
+paint();
+</script>
+</body>
+</html>

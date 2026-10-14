@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Console tour · mxconsole</title>
+<meta name="description" content="Every screen of the mxconsole web console, with numbered notes on what each part does and the mxc command behind it.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="site.css">
+<script>try { const t = localStorage.getItem("mxc-docs-theme"); if (t) document.documentElement.classList.add(t); } catch (_) {}</script>
+<style>
+  .wrap.tourwrap { max-width: 1280px; }
+  .intro { max-width: 760px; }
+  .intro .open { margin-top: 14px; font-size: 14.5px; }
+
+  .tour { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 28px; margin-top: 28px; align-items: start; }
+
+  /* the screen list */
+  .screens { position: sticky; top: 64px; }
+  .screens .grp { margin: 16px 0 6px; }
+  .screens > div:first-child .grp { margin-top: 0; }
+  .screens ul { list-style: none; margin: 0; padding: 0; }
+  .screens button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font: 14px var(--sans); color: var(--text-2);
+    background: none; border: 0; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  .screens button::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--hue, var(--faint)); flex: none; }
+  .screens button:hover { background: var(--hover); color: var(--text); }
+  .screens button[aria-current="true"] { background: var(--sel); color: var(--text); font-weight: 560; }
+  .screens button:focus-visible, .pager button:focus-visible, .spot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .screens .keys { margin-top: 18px; font-size: 12.5px; color: var(--muted); }
+  .screens kbd { border: 1px solid var(--card-line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--card); font-size: 11px; }
+
+  /* the stage */
+  .stagehead { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 12px; }
+  .stagehead .t { flex: 1; min-width: 0; }
+  .stagehead h2 { margin: 2px 0 4px; }
+  .stagehead p { margin: 0; }
+  .pager { display: flex; gap: 6px; flex: none; }
+  .pager button { font: 13px var(--sans); color: var(--text-2); background: var(--card); border: 1px solid var(--card-line); border-radius: 6px; padding: 5px 11px; cursor: pointer; }
+  .pager button:hover { background: var(--hover); color: var(--text); }
+
+  .shot { position: relative; margin: 0; contain: paint; clip-path: inset(0 round 10px); border: 1px solid var(--card-line); border-radius: 10px; overflow: hidden; background: var(--card);
+    box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06); }
+  .shot img { display: block; width: 100%; height: auto; }
+  .hl { position: absolute; border-radius: 6px; pointer-events: none; opacity: 0;
+    box-shadow: 0 0 0 2px var(--accent), 0 0 0 9999px rgb(10 10 12 / .38); transition: opacity .15s var(--ease); }
+  .hl.on { opacity: 1; }
+  .spot { position: absolute; transform: translate(-50%, -50%); width: 24px; height: 24px; border-radius: 50%; padding: 0;
+    display: grid; place-items: center; font: 600 12px var(--mono); color: #fff; background: var(--accent); cursor: pointer;
+    border: 2px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .35); transition: transform .12s var(--ease), background .12s; z-index: 1; }
+  .spot:hover, .spot.on { transform: translate(-50%, -50%) scale(1.18); background: var(--hue-gateway); z-index: 2; }
+
+  /* the notes */
+  .notes { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
+  .notes li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 11px 14px; background: var(--card);
+    border: 1px solid var(--card-line); border-radius: 10px; transition: border-color .12s, background .12s; }
+  .notes li.on { border-color: var(--accent); background: var(--sel); }
+  .notes .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 600 11.5px var(--mono); color: #fff; background: var(--accent); margin-top: 1px; }
+  .notes li.on .n { background: var(--hue-gateway); }
+  .notes h3 { margin: 0; font-size: 15px; }
+  .notes p { margin: 3px 0 0; font-size: 14px; }
+  .notes .cli { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .notes .cli code { font-size: 12.5px; }
+  .notes .cli code::before { content: "$ "; color: var(--muted); }
+  .noscript { margin-top: 24px; }
+
+  @media (max-width: 900px) {
+    .tour { grid-template-columns: 1fr; gap: 18px; }
+    .screens { position: static; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+    .screens > div { min-width: 0; }
+    .screens .grp { margin: 6px 0 2px; width: 100%; }
+    .screens ul { display: flex; flex-wrap: wrap; gap: 4px; }
+    .screens button { width: auto; border: 1px solid var(--card-line); background: var(--card); padding: 4px 10px; font-size: 13px; }
+    .screens .keys { display: none; }
+    .stagehead { flex-wrap: wrap; }
+    .spot { width: 18px; height: 18px; font-size: 10px; border-width: 1.5px; }
+  }
+</style>
+</head>
+<body>
+<header class="top" data-page="console.html"></header>
+
+<main class="wrap tourwrap">
+  <section class="intro">
+    <p class="lab">Console tour</p>
+    <h1>Every screen of the console</h1>
+    <p class="lede">The console is the web page mxconsole serves at <code>http://127.0.0.1:11435/console</code>, only on the machine that runs it.
+      Each screen is a blade. Blades open side by side from left to right, and older ones fold into a narrow rail so the newest one has room.
+      Pick a screen below. The numbered markers sit on the real controls; hover or tap one to see what it does and the <code>mxc</code> command that does the same thing.</p>
+    <p class="open">Open it yourself: <code>pixi run mxc console</code></p>
+  </section>
+
+  <div class="tour">
+    <nav class="screens" id="screens" aria-label="Console screens"></nav>
+    <section class="stage" aria-live="polite">
+      <div class="stagehead">
+        <div class="t"><p class="lab" id="grp"></p><h2 id="title"></h2><p id="sum"></p></div>
+        <div class="pager"><button type="button" id="prev" aria-label="Previous screen">← Prev</button><button type="button" id="next" aria-label="Next screen">Next →</button></div>
+      </div>
+      <figure class="shot" id="shot"><img id="img" width="1280" height="800" alt=""><div class="hl" id="hl"></div></figure>
+      <ol class="notes" id="notes"></ol>
+      <noscript><p class="noscript">This tour needs JavaScript. The screenshots are in <code>docs/assets/screens/</code> and the console is described in <code>docs/USER_GUIDE.md</code>.</p></noscript>
+    </section>
+  </div>
+
+  <p class="foot">Screenshots are from a machine with an RTX 3090 (24 GB) named <code>ablearn</code>. Your models, numbers and host name will differ.</p>
+</main>
+
+<script src="site.js"></script>
+<script>
+// Console tour. Each hotspot: b = the box it points at, in pixels of the 1280x800 screenshot; m = where the marker sits
+// (defaults: left of a small box, top-left corner of a large one). Positions become % of the image, so they scale with it.
+const W = 1280, H = 800;
+const SCREENS = [
+  { id: "home", group: "My models", name: "My models", hue: "var(--hue-models)", img: "home.png", dark: "home-dark.png",
+    sum: "The home blade: every model this machine serves, behind one OpenAI-compatible endpoint.",
+    spots: [
+      { b: [789, 9, 214, 24], t: "Hardware chip", d: "The GPU and how much of its memory is in use. Each loaded model gets its own colored segment. Click it for a breakdown per model.", cli: ["mxc status"] },
+      { b: [1014, 8, 262, 26], t: "Shared blades", d: "API keys, Gateway and Settings (the sliders icon) apply to every model, so they live in the top bar. The moon switches to dark mode. The dot on the far right is green while the daemon answers." },
+      { b: [1153, 56, 113, 30], m: [1160, 56], t: "Add a model", d: "Opens the Add a model blade: search the MAX catalog and Hugging Face. The hint beside it is the command that does it in one go.", cli: ["mxc serve <model>"] },
+      { b: [20, 116, 1240, 84], t: "Summary tiles", d: "How many models are loaded right now, total tokens per second, requests in the last 5 minutes, and GPU memory. \"Secured for your LAN\" means the machine is exposed over HTTPS.", cli: ["mxc metrics"] },
+      { b: [20, 509, 1240, 46], t: "A model row", d: "Click a row to open that model. Tokens/s, first token, requests and VRAM fill in while it runs. Use the filter box to narrow the list, and List or Cards (top right) to change the layout. The browser remembers your choice.", cli: ["mxc ls"] },
+      { b: [372, 509, 160, 134], m: [360, 580], t: "State", d: "Running or Idle. Idle models use no GPU memory; they load on the first request. Under Running, a note says how long the model has been idle against its unload time (\"idle 18s of 1m\": no request for 1 minute and it unloads), or \"pinned\" if it never unloads.", cli: ["mxc set <model> --pin", "mxc set <model> --keep-alive 10m"] },
+      { b: [508, 288, 104, 484], t: "Access", d: "Secure means the machine serves HTTPS on your LAN and every request needs a key. Before that, this column says Local: localhost only.", cli: ["mxc expose"] },
+    ] },
+  { id: "model", group: "A model", name: "Overview", hue: "var(--hue-notebook)", img: "model.png",
+    sum: "Click a model and its blade opens to the right. My models shrinks to a compact list.",
+    spots: [
+      { b: [0, 100, 266, 568], t: "My models, compact", d: "The home blade stays open as a short list. Running models show their live tokens per second. Click another model to switch." },
+      { b: [274, 108, 156, 214], t: "Model menu", d: "Overview is this page. Security, Benchmark, Logs and Notebook each open their own blade next to this one. Under \"Command line\" are the commands for this model's buttons.", cli: ["mxc stop qwen2.5-0.5b", "mxc rm qwen2.5-0.5b"] },
+      { b: [440, 106, 632, 26], m: [1086, 119], t: "Command bar", d: "Stop and Restart while it runs (Start when it is idle), Run benchmark, Open notebook, Logs, Copy endpoint, and Remove. Remove asks for a second click; it unregisters the model and deletes its compiled graphs, not the weights.", cli: ["mxc serve <model>", "mxc stop <model>", "mxc rm <model>"] },
+      { b: [446, 152, 820, 132], t: "Essentials", d: "Where the model comes from, its architecture, the endpoint, when it unloads and its state. Here it unloads after 1 minute idle.", cli: ["mxc set <model> --keep-alive 10m"] },
+      { b: [446, 297, 820, 174], t: "Tokens, live", d: "Decode speed, time to first token and requests in the last 5 minutes, with a small chart of recent throughput.", cli: ["mxc metrics"] },
+      { b: [446, 484, 404, 282], t: "Call it", d: "The URL to call, with a copy button, and a ready-made curl. The key is read from $MXC_API_KEY; the console never shows a key here. Make one key per app.", cli: ["mxc keys new <app>"] },
+      { b: [862, 484, 404, 282], t: "Security and hardware fit", d: "Whether the model is reachable from your network (View security opens the Security blade), and how much GPU memory this model uses next to the others and what is still free." },
+    ] },
+  { id: "security", group: "A model", name: "Security", hue: "var(--hue-keys)", img: "security.png",
+    sum: "HTTPS on your LAN, with a key. It is machine-wide: one switch covers every model.",
+    spots: [
+      { b: [0, 44, 46, 520], t: "The rail", d: "With three blades open, My models folds into a rail of colored dots, one per model. Click a dot to open that model, the + to add one, or anywhere else on the rail to bring the full list back." },
+      { b: [650, 114, 614, 104], t: "Secure on your network", d: "The current state. Manage API keys opens the API keys blade. Stop exposing turns LAN access off (click it twice to confirm); localhost keeps working. On a machine that is not exposed yet, this card has a \"Make it secure\" button instead.", cli: ["mxc expose --stop"] },
+      { b: [649, 230, 615, 85], t: "What \"Make it secure\" does", d: "Three steps: a local certificate authority signs a certificate for this machine's name, the gateway gets its own key and refuses requests without a valid app key (401), and Caddy plus LiteLLM listen on your LAN.", cli: ["mxc expose"] },
+      { b: [650, 327, 614, 38], t: "The LAN address", d: "What other devices call: https://<host>.local:8443/v1. Copy it with the button on the right." },
+      { b: [649, 385, 615, 235], t: "Trust the certificate", d: "Other devices must trust the mxconsole CA once, or HTTPS calls fail with a certificate error. The path of root.crt is shown, with the steps for Linux, macOS, Windows and phones." },
+      { b: [650, 654, 614, 124], t: "From another device", d: "A curl to try from a laptop or phone on the same Wi-Fi. It points at the CA file and reads the key from $MXC_API_KEY." },
+    ] },
+  { id: "bench", group: "A model", name: "Benchmark", hue: "var(--hue-bench)", img: "bench.png",
+    sum: "The same streamed workload on each model, so you can compare them on this machine.",
+    spots: [
+      { b: [170, 8, 256, 24], m: [438, 20], t: "Breadcrumb", d: "My models › qwen2.5-0.5b › Benchmark. Click a crumb to close the blades to its right. Esc closes the newest blade." },
+      { b: [1144, 59, 87, 24], t: "Run again", d: "Runs the benchmark again for this model in the background, with progress. Run benchmark in the model's command bar opens this blade and starts a run.", cli: ["mxc bench qwen2.5-0.5b"] },
+      { b: [650, 115, 614, 95], t: "Decode speed", d: "Tokens per second while generating. Higher is better. The model you came from is in bold and outlined." },
+      { b: [650, 226, 614, 95], t: "Time to first token", d: "The median wait before the first token arrives. Lower is better." },
+      { b: [650, 337, 614, 112], t: "This run", d: "The workload: prompt tokens, tokens out, batch size and runs per model. Rows with a date under the name come from an earlier run; Run all models refreshes every model.", cli: ["mxc bench --all"] },
+      { b: [650, 460, 614, 126], t: "History", d: "Earlier runs, newest first: when, how many models, and the top result." },
+    ] },
+  { id: "logs", group: "A model", name: "Logs", hue: "var(--hue-logs)", img: "logs.png",
+    sum: "The model's own server log: what MAX printed while compiling and serving.",
+    spots: [
+      { b: [54, 198, 148, 28], m: [212, 212], t: "Logs in the menu", d: "The model menu marks which blade is open. The Logs button in the command bar opens the same blade." },
+      { b: [1092, 58, 140, 26], t: "Pause and Copy", d: "Pause stops following new lines (it then reads Follow). Copy puts the lines you see, after the filter, on the clipboard." },
+      { b: [648, 110, 284, 28], t: "Filter lines", d: "Shows only lines that contain your text. The count on the right says how many lines match." },
+      { b: [633, 147, 647, 624], m: [645, 300], t: "The log", d: "Raw output of max serve: building and compiling the graph, the KV cache, \"Server ready\" on an internal port, then one line per batch of requests." },
+      { b: [633, 772, 647, 28], t: "Footer", d: "The command that tails the same log in a terminal. The blade shows the last 8 KB and refreshes every 2 seconds.", cli: ["mxc logs qwen2.5-0.5b -f"] },
+    ] },
+  { id: "notebook", group: "A model", name: "Notebook", hue: "var(--hue-notebook)", img: "notebook.png",
+    sum: "A notebook that explains the model, built from its Hugging Face metadata. This is the saved view: it runs nothing.",
+    spots: [
+      { b: [141, 74, 390, 14], m: [556, 81], t: "Where it lives", d: "The notebook is a normal .ipynb file under ~/.mxc/notebooks. You can open it in any Jupyter." },
+      { b: [875, 62, 239, 18], t: "Kernel chip", d: "The notebook's \"Try it\" cells call the model's endpoint, so they need the model running. Green means it is; otherwise it says \"start it to run cells\"." },
+      { b: [1121, 59, 110, 24], m: [1176, 94], t: "Run in Jupyter", d: "Swaps the saved view for a live Jupyter, inside the console. See the next screen." },
+      { b: [100, 110, 170, 470], t: "Chapters", d: "Every heading in the notebook: what the model is, its model card, the architecture, where the parameters live, MAX's implementation, and Try it. Click one to jump there." },
+      { b: [315, 122, 662, 272], t: "The notebook", d: "Markdown and code cells with their saved outputs. The facts come from the Hugging Face API: pipeline, license, parameters, downloads and the exact revision." },
+      { b: [1014, 110, 266, 520], t: "Architecture", d: "Layers, parameters, embeddings and parameters per layer, then the raw config fields. Hover a field to see what it means." },
+      { b: [1014, 640, 266, 115], t: "From the terminal", d: "The command that builds the notebook and opens it in Jupyter Lab. It also works for a repo you have not pulled.", cli: ["mxc learn qwen2.5-0.5b"] },
+    ] },
+  { id: "jupyter", group: "A model", name: "Run in Jupyter", hue: "var(--hue-notebook)", img: "jupyter.png",
+    sum: "The same notebook, live in JupyterLab, embedded in the Notebook blade.",
+    spots: [
+      { b: [938, 62, 159, 18], t: "Kernel chip", d: "Here the model is idle, so the chip says \"start it to run cells\". Start the model first if you want the Try it cells to answer. Opened from the console, they need no key: its Jupyter has its own." },
+      { b: [1103, 59, 94, 24], m: [1150, 94], t: "Saved view", d: "Back to the read-only view from the previous screen." },
+      { b: [1206, 60, 24, 22], m: [1218, 94], t: "Open in a new tab", d: "Opens the same Jupyter page in its own browser tab." },
+      { b: [93, 100, 1187, 678], m: [104, 112], t: "JupyterLab", d: "A real Jupyter, running on this machine and listening on 127.0.0.1 only. Edit and run cells as usual, with a Python 3 kernel." },
+      { b: [122, 218, 255, 64], m: [110, 262], t: "Other notebooks", d: "The file browser shows the folder with every notebook mxconsole has built, one per model." },
+      { b: [983, 695, 282, 72], t: "Jupyter's own prompt", d: "This news popup comes from JupyterLab, not from mxconsole. Answer it or close it." },
+    ] },
+  { id: "add", group: "Add a model", name: "Search", hue: "var(--hue-add)", img: "add.png",
+    sum: "One search over the MAX catalog and Hugging Face. Every result is checked against this machine's memory.",
+    spots: [
+      { b: [249, 120, 828, 38], t: "Search", d: "Type a short name like qwen, or a full Hugging Face repo id.", cli: ["mxc search qwen"] },
+      { b: [250, 171, 158, 22], t: "Filters", d: "All, Fits (including tight fits), or Needs porting." },
+      { b: [658, 175, 420, 14], t: "Checked against", d: "The GPU the fit check uses and how much of its memory is free right now." },
+      { b: [250, 232, 826, 50], t: "A result", d: "MAX means it is in Modular's catalog; HF means it comes from Hugging Face. Click a result to add it: the blade checks the hardware, downloads the weights, compiles the graph, serves it on localhost and runs a short test, with a live log.", cli: ["mxc pull qwen2.5-0.5b"] },
+      { b: [990, 240, 74, 34], t: "fits", d: "The estimated GPU memory it needs (~2.2 GB here) fits in what is free." },
+      { b: [984, 598, 80, 34], t: "tight fit", d: "It should fit, with little room to spare. Other loaded models may have to unload first." },
+      { b: [996, 444, 68, 34], t: "too big", d: "It will not fit on this GPU. Clicking it shows the numbers and suggests smaller models that do." },
+    ] },
+  { id: "port", group: "Add a model", name: "Port offer", hue: "var(--hue-add)", img: "port-offer.png",
+    sum: "A model whose architecture MAX cannot run yet. mxconsole offers to port it.",
+    spots: [
+      { b: [249, 120, 828, 38], t: "Search by repo id", d: "Here a Hugging Face repo id: EleutherAI/gpt-neo-125m." },
+      { b: [249, 208, 828, 242], t: "Architecture check", d: "mxconsole reads the model's config before downloading anything. GPTNeoForCausalLM is not an architecture MAX supports, so it stops here instead of fetching weights." },
+      { b: [264, 268, 800, 54], t: "What Port it does", d: "Claude Code, with Modular's import-model skill, writes the model as a MAX graph in a sandbox, checks it against the original and fixes what fails. It runs unattended, uses your Claude Code session, and can take many minutes. You see every stage and the full log, and you can cancel." },
+      { b: [264, 330, 220, 62], m: [252, 361], t: "The details", d: "The architecture, its size (parameters and GB) and the skill that will do the port." },
+      { b: [264, 405, 350, 30], t: "Port it", d: "Starts the port. The command beside it does the same from a terminal. It needs Claude Code, and Linux with bubblewrap for the sandbox.", cli: ["mxc port EleutherAI/gpt-neo-125m --auto"] },
+      { b: [250, 486, 826, 50], t: "needs porting", d: "The result itself, marked needs porting, with its estimated GPU memory." },
+    ] },
+  { id: "keys", group: "Shared", name: "API keys", hue: "var(--hue-keys)", img: "keys.png",
+    sum: "One key per app, shared by every model. Requests without a valid key get 401.",
+    spots: [
+      { b: [1151, 59, 80, 24], t: "New key", d: "Creates a key for an app. The secret is shown once, so save it then. mxconsole only keeps a hash.", cli: ["mxc keys new <app>"] },
+      { b: [316, 74, 290, 14], m: [620, 81], t: "Shared by every model", d: "A key is not tied to a model. Any valid key can call any model on this machine." },
+      { b: [284, 148, 166, 206], t: "App", d: "The name you gave the key. Give each app its own, so you can revoke one without breaking the others." },
+      { b: [450, 148, 180, 206], t: "Key prefix", d: "Only the first few characters, so you can tell keys apart. The full key is never shown again.", cli: ["mxc keys ls"] },
+      { b: [628, 148, 330, 206], t: "Created, last used, status", d: "When the key was made and when an app last used it." },
+      { b: [1100, 150, 156, 200], t: "Rotate and Revoke", d: "Rotate issues a new key and stops the old one. Revoke disables the key right away. Both ask for a second click.", cli: ["mxc keys rotate <app>", "mxc keys revoke <app>"] },
+    ] },
+  { id: "gateway", group: "Shared", name: "Gateway", hue: "var(--hue-gateway)", img: "gateway.png",
+    sum: "LiteLLM, the router behind the LAN endpoint: one endpoint routes to every model.",
+    spots: [
+      { b: [1100, 7, 85, 28], m: [1098, 46], t: "Open from the top bar", d: "The shared blades open from the top bar. Click Gateway again to close it." },
+      { b: [1157, 59, 74, 24], t: "Restart", d: "Restarts Caddy and LiteLLM and rotates their internal key. It can take up to a minute." },
+      { b: [282, 115, 984, 132], t: "Status", d: "Whether LiteLLM (port 4000) and Caddy (HTTPS) are running, and both endpoints: local HTTP and HTTPS on the LAN.", cli: ["mxc ps"] },
+      { b: [282, 262, 984, 420], t: "Routes", d: "One route per model. Every route goes to the daemon's /v1. MAX SERVE is idle, or the internal port when the model is loaded. REQ · 1 MIN counts recent calls." },
+      { b: [282, 696, 984, 104], t: "Recent requests", d: "Time, app, model, status, tokens in and out, first-token time and duration. Newest first, kept for 7 days.", cli: ["mxc requests"] },
+    ] },
+  { id: "settings", group: "Shared", name: "Settings", hue: "var(--hue-settings)", img: "settings.png",
+    sum: "This browser's look, and facts about the daemon. Most of it is read-only.",
+    spots: [
+      { b: [1187, 7, 28, 28], m: [1201, 44], t: "Settings button", d: "The sliders icon in the top bar opens this blade." },
+      { b: [282, 115, 984, 120], t: "Appearance", d: "Light or Dark, kept in this browser. The sun and moon button in the top bar does the same. Until you pick one, the console follows your system." },
+      { b: [282, 248, 984, 400], t: "Idle unload", d: "How long each model stays loaded after its last request. The default is 5 minutes; pinned models never unload. This blade only shows it. There is no single setting for all models." },
+      { b: [290, 580, 970, 56], t: "Change it from the CLI", d: "Copy a command, put in a model name and run it.", cli: ["mxc set <model> --keep-alive 10m", "mxc set <model> --pin"] },
+      { b: [282, 662, 984, 138], t: "Daemon", d: "Host name, both endpoints, MAX version and uptime. Further down (not in this shot): Stop daemon, and every port and process mxconsole owns.", cli: ["mxc status", "mxc ps"] },
+    ] },
+];
+
+const $ = (id) => document.getElementById(id);
+const pct = (v, of) => `${(v / of * 100).toFixed(2)}%`;
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+  }
+  for (const k of kids) if (k) n.append(k);
+  return n;
+};
+const isDark = () => document.documentElement.classList.contains("dark") ||
+  (!document.documentElement.classList.contains("light") && matchMedia("(prefers-color-scheme: dark)").matches);
+
+let cur = 0, active = -1, pinned = -1;
+
+// the screen list, grouped
+const nav = $("screens");
+const groups = [...new Set(SCREENS.map((s) => s.group))];
+for (const g of groups) {
+  const ul = el("ul");
+  SCREENS.forEach((s, i) => {
+    if (s.group !== g) return;
+    const b = el("button", { type: "button", "data-i": i, style: `--hue:${s.hue}`, onclick: () => show(i, true) }, s.name);
+    ul.append(el("li", {}, b));
+  });
+  nav.append(el("div", {}, el("p", { class: "lab grp", text: g }), ul));
+}
+nav.append(el("p", { class: "keys" }, "Keys: ", el("kbd", { text: "←" }), " ", el("kbd", { text: "→" }), " change screen."));
+const navBtns = [...nav.querySelectorAll("button")];
+nav.addEventListener("keydown", (e) => {
+  const i = navBtns.indexOf(document.activeElement);
+  if (i < 0 || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
+  e.preventDefault();
+  const j = clamp(i + (e.key === "ArrowDown" ? 1 : -1), 0, navBtns.length - 1);
+  show(j, true); navBtns[j].focus();
+});
+
+function setActive(i) {
+  active = i;
+  const s = SCREENS[cur];
+  document.querySelectorAll(".spot").forEach((m, k) => { m.classList.toggle("on", k === i); m.setAttribute("aria-pressed", String(k === pinned)); });
+  document.querySelectorAll(".notes li").forEach((li, k) => li.classList.toggle("on", k === i));
+  const hl = $("hl");
+  if (i < 0) { hl.classList.remove("on"); return; }
+  const [x, y, w, h] = s.spots[i].b;
+  Object.assign(hl.style, { left: pct(x, W), top: pct(y, H), width: pct(w, W), height: pct(h, H) });
+  hl.classList.add("on");
+}
+const hover = (i) => setActive(i);
+const unhover = () => setActive(pinned);
+
+function paintImage() {
+  const s = SCREENS[cur];
+  const file = s.dark && isDark() ? s.dark : s.img;
+  const img = $("img");
+  if (!img.src.endsWith(file)) img.src = `../assets/screens/${file}`;
+  img.alt = `Screenshot of the mxconsole ${s.name} screen${file === s.dark ? " in dark mode" : ""}`;
+}
+
+function show(i, push) {
+  cur = (i + SCREENS.length) % SCREENS.length;
+  active = pinned = -1;
+  const s = SCREENS[cur];
+  if (push && location.hash !== `#${s.id}`) history.replaceState(null, "", `#${s.id}`);
+  navBtns.forEach((b, k) => b.setAttribute("aria-current", String(k === cur)));
+  $("grp").textContent = s.group;
+  $("title").textContent = s.name;
+  $("sum").textContent = s.sum;
+  document.title = `${s.name} · Console tour · mxconsole`;
+  paintImage();
+
+  const shot = $("shot");
+  shot.querySelectorAll(".spot").forEach((m) => m.remove());
+  const notes = $("notes");
+  notes.replaceChildren();
+  s.spots.forEach((p, k) => {
+    // default marker: left of a small box (so it covers no text), top-left corner of a large one
+    const [bx, by, , bh] = p.b;
+    const [mx, my] = p.m || (bh <= 60 ? [bx - 18, by + bh / 2] : [bx, by]);
+    const n = k + 1;
+    const marker = el("button", { type: "button", class: "spot", "aria-label": `${n}: ${p.t}`, "aria-controls": `note-${n}`, "aria-pressed": "false",
+      style: `left:${pct(clamp(mx, 14, W - 14), W)};top:${pct(clamp(my, 14, H - 14), H)}`,
+      onmouseenter: () => hover(k), onmouseleave: unhover, onfocus: () => hover(k), onblur: unhover,
+      onclick: () => { pinned = pinned === k ? -1 : k; setActive(pinned === -1 ? k : pinned); } }, String(n));
+    shot.append(marker);
+    const cli = p.cli ? el("div", { class: "cli" }, ...p.cli.map((c) => el("code", { text: c }))) : null;
+    notes.append(el("li", { id: `note-${n}`, onmouseenter: () => hover(k), onmouseleave: unhover, onclick: () => { pinned = pinned === k ? -1 : k; setActive(pinned === -1 ? -1 : k); } },
+      el("span", { class: "n", text: String(n), "aria-hidden": "true" }),
+      el("div", {}, el("h3", { text: p.t }), el("p", { text: p.d }), cli)));
+  });
+  setActive(-1);
+}
+
+$("prev").addEventListener("click", () => show(cur - 1, true));
+$("next").addEventListener("click", () => show(cur + 1, true));
+document.addEventListener("keydown", (e) => {
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+  if (e.key === "ArrowRight") { e.preventDefault(); show(cur + 1, true); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); show(cur - 1, true); }
+  else if (e.key === "Escape" && pinned >= 0) { pinned = -1; setActive(-1); }
+});
+
+const fromHash = () => { const i = SCREENS.findIndex((s) => `#${s.id}` === location.hash); return i < 0 ? 0 : i; };
+addEventListener("hashchange", () => show(fromHash(), false));
+// the home screen has a dark screenshot: follow the page theme (toggle or system)
+new MutationObserver(paintImage).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", paintImage);
+show(fromHash(), false);
+</script>
+</body>
+</html>

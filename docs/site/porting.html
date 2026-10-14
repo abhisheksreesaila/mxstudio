@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Porting, behind the scenes · mxconsole docs</title>
+<meta name="description" content="What happens when you run mxc port <repo> --auto: what runs, where, what is checked, what it costs and what can come back.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="site.css">
+<script>try { const t = localStorage.getItem("mxc-docs-theme"); if (t) document.documentElement.classList.add(t); } catch (_) {}</script>
+<style>
+  .eyebrow { color: var(--port-fg); }
+  h2[id], h3[id] { scroll-margin-top: 64px; }
+  /* the shared top bar has a fixed height; on a phone its links wrap, so let it grow here */
+  .note { border-left: 3px solid var(--port-fg); }
+  .note h3 { margin-top: 0; }
+  figure { margin: 20px 0 0; }
+  figure img { width: 100%; height: auto; display: block; border: 1px solid var(--card-line); border-radius: 10px; }
+  figcaption { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+  /* controls */
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 14px 0 16px; }
+  .btn { font: 500 13.5px var(--sans); color: var(--text); background: var(--card); border: 1px solid var(--card-line);
+    border-radius: 7px; padding: 6px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover { background: var(--hover); }
+  .btn.primary { background: var(--port-fg); border-color: var(--port-fg); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn:focus-visible, .node:focus-visible, .seg input:focus-visible + span { outline: 2px solid var(--port-fg); outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--card-line); border-radius: 8px; overflow: hidden; background: var(--card); margin: 0; padding: 0; }
+  .seg legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .seg label { position: relative; cursor: pointer; }
+  .seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .seg span { display: block; padding: 6px 12px; font: 500 13px var(--mono); color: var(--muted); border-right: 1px solid var(--card-line); }
+  .seg label:last-child span { border-right: 0; }
+  .seg input:checked + span { color: var(--oc); background: color-mix(in srgb, var(--oc) 12%, transparent); }
+  .seg .o-ported { --oc: var(--ok-fg); } .seg .o-parked { --oc: var(--warn-fg); } .seg .o-failed { --oc: var(--bad-fg); }
+  .status { font: 12.5px var(--mono); color: var(--muted); }
+
+  /* stepper layout */
+  .stepper { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .side { position: sticky; top: 64px; scroll-margin-top: 60px; display: grid; gap: 14px; }
+  @media (max-width: 900px) { .stepper { grid-template-columns: 1fr; } .side { position: static; } }
+
+  /* the flow */
+  .flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .flow ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .loop { border: 1px dashed color-mix(in srgb, var(--port-fg) 55%, transparent); border-radius: 10px; padding: 22px 8px 8px; position: relative; }
+  .loop > .loop-lab { position: absolute; top: 4px; left: 10px; font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--port-fg); }
+  .loop.inner { border-style: dotted; background: color-mix(in srgb, var(--port-fg) 4%, transparent); }
+  .node { width: 100%; text-align: left; display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center;
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 9px; padding: 8px 10px; cursor: pointer;
+    font: inherit; color: var(--text); transition: opacity .25s var(--ease), border-color .2s, box-shadow .2s; }
+  .node:hover { background: var(--hover); }
+  .node .num { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--mono);
+    background: var(--sunk); color: var(--muted); border: 1px solid var(--card-line); transition: background .2s, color .2s; }
+  .node .t { font-size: 14px; font-weight: 550; line-height: 1.3; }
+  .node .who { display: block; font: 11px var(--mono); color: var(--muted); margin-top: 2px; }
+  .node .who.agent { color: var(--port-fg); } .node .who.check { color: var(--max-fg); }
+  .node .exit { font: 500 10.5px var(--mono); padding: 1px 7px; border-radius: 999px; visibility: hidden; white-space: nowrap; }
+  .node[aria-pressed="true"] { border-color: var(--port-fg); box-shadow: 0 0 0 1px var(--port-fg); background: var(--sel); }
+  .flow.sim .node.off { opacity: .38; }
+  .node.seen .num { background: color-mix(in srgb, var(--port-fg) 14%, transparent); color: var(--port-fg); border-color: transparent; }
+  .node.now .num { background: var(--port-fg); color: #fff; animation: pulse 1.2s var(--ease) infinite; }
+  .node.exit-here .exit { visibility: visible; color: var(--oc); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--oc) 45%, transparent); }
+  .flow[data-outcome="ported"] { --oc: var(--ok-fg); } .flow[data-outcome="parked"] { --oc: var(--warn-fg); } .flow[data-outcome="failed"] { --oc: var(--bad-fg); }
+  .node.exit-here.seen .num, .node.exit-here.now .num { background: var(--oc); color: #fff; }
+  @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--port-fg) 45%, transparent); } 50% { box-shadow: 0 0 0 6px transparent; } }
+
+  /* detail */
+  .detail { scroll-margin-top: 60px; }
+  .detail h3 { margin: 2px 0 6px; font-size: 19px; }
+  .detail dl { margin: 12px 0 0; display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px 14px; }
+  .detail dt { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+  .detail dd { margin: 0; color: var(--text-2); font-size: 14px; }
+  .detail dd ul { margin: 0; padding-left: 18px; } .detail dd li { margin: 2px 0; }
+  .detail .files code { white-space: nowrap; }
+  @media (max-width: 560px) { .detail dl { grid-template-columns: 1fr; gap: 2px; } .detail dd { margin-bottom: 8px; } }
+
+  /* terminal */
+  .term { background: var(--code); color: var(--code-text); border-radius: 10px; padding: 12px 14px; font: 12.5px/1.55 var(--mono);
+    min-height: 140px; max-height: 340px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+  .term .log { color: #8b8b94; } .term .ok { color: #4ade80; } .term .bad { color: #f87171; } .term .warn { color: #fbbf24; }
+  .term .empty { color: #8b8b94; }
+  .term-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+
+  /* where things live */
+  .where { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 900px) { .where { grid-template-columns: 1fr; } }
+  .where h3 { margin-top: 0; }
+  .where ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); font-size: 14px; }
+  .where li { margin: 4px 0; }
+  .card.in { border-top: 3px solid var(--port-fg); } .card.out { border-top: 3px solid var(--max-fg); }
+  .tree { list-style: none; margin: 14px 0 0; padding: 0; font-size: 14px; }
+  .tree li { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 4px 14px; padding: 7px 12px; border-bottom: 1px solid var(--card-line-2); }
+  .tree li:last-child { border-bottom: 0; }
+  .tree code { background: none; border: 0; padding: 0; }
+  .tree .d1 .p { padding-left: 16px; } .tree .d2 .p { padding-left: 32px; }
+  .tree .what { color: var(--text-2); }
+  .tag { font: 500 10.5px var(--mono); padding: 1px 6px; border-radius: 999px; margin-right: 6px; white-space: nowrap;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 40%, transparent); }
+  .tag.rw { color: var(--port-fg); } .tag.ro { color: var(--hf-fg); } .tag.out { color: var(--max-fg); } .tag.gone { color: var(--muted); }
+  @media (max-width: 640px) { .tree li { grid-template-columns: 1fr; } .tree .d1 .p { padding-left: 10px; } .tree .d2 .p { padding-left: 20px; } }
+
+  .tablewrap { overflow-x: auto; border-radius: 10px; }
+  .tablewrap table { min-width: 620px; }
+  td.oc { font: 600 13px var(--mono); white-space: nowrap; }
+  td.oc.ported { color: var(--ok-fg); } td.oc.parked { color: var(--warn-fg); } td.oc.failed { color: var(--bad-fg); }
+  .num-col { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin: 12px 0; }
+  .fact .big { font: 600 24px var(--mono); color: var(--text); }
+  .limits li { margin: 6px 0; color: var(--text-2); }
+</style>
+</head>
+<body>
+<header class="top" data-page="porting.html"></header>
+
+<main class="wrap">
+  <p class="lab eyebrow">mxc port &lt;hf-repo&gt; --auto</p>
+  <h1>Porting, behind the scenes</h1>
+  <p class="lede">mxconsole runs any model whose architecture MAX already supports. For one it doesn't, <code>mxc port &lt;hf-repo&gt; --auto</code> (or <strong>Port it</strong> in the console's Add a model) has Claude Code write a small MAX package for that architecture in a sandbox, following Modular's own porting skill. mxconsole then compiles and serves the package itself, compares its output with the original Hugging Face model, and registers the model only if it matches. After that it works like any other model: same endpoint, keys, idle unload and notebook.</p>
+
+  <div class="card note" style="margin-top:22px">
+    <h3>Why it's a separate step from pull</h3>
+    <p>A pull downloads files: it's free and predictable, and it either works or tells you why. A port spends your Claude usage (about $2–5), takes 7–40 minutes, needs Claude Code and Linux with bubblewrap, and can fail after spending that. So mxconsole never starts one on its own. <code>mxc pull</code> reads <code>config.json</code> before downloading any weights; if MAX doesn't support the architecture it stops and points to <code>mxc port</code>. In the console, Add a model shows the model as "needs porting" with a <strong>Port it</strong> button.</p>
+    <figure>
+      <img src="../assets/screens/port-offer.png" alt="The console's Add a model page for EleutherAI/gpt-neo-125m: an architecture check card says GPTNeoForCausalLM is not something MAX can run yet, explains what Port it does, and shows the Port it button next to the CLI equivalent mxc port EleutherAI/gpt-neo-125m --auto." loading="lazy" width="1280" height="800">
+      <figcaption>The console's offer. The search result is marked "needs porting"; the CLI twin is shown next to the button.</figcaption>
+    </figure>
+  </div>
+
+  <!-- ===================================================================== pipeline -->
+  <h2 id="pipeline">The pipeline</h2>
+  <p>Ten steps, from the job's start to a served model. Pick a step to see what runs it, what it checks and what you see. Pick an outcome and press Play to walk the path it takes and where it leaves.</p>
+
+  <div class="controls">
+    <button class="btn primary" id="play" type="button" aria-pressed="false">▶ Play</button>
+    <button class="btn" id="prev" type="button" aria-label="Previous step">◀</button>
+    <button class="btn" id="next" type="button" aria-label="Next step">▶</button>
+    <button class="btn" id="reset" type="button">Reset</button>
+    <fieldset class="seg" id="outcome">
+      <legend>Outcome to simulate</legend>
+      <label class="o-ported"><input type="radio" name="oc" value="ported" checked><span>ported</span></label>
+      <label class="o-parked"><input type="radio" name="oc" value="parked"><span>parked</span></label>
+      <label class="o-failed"><input type="radio" name="oc" value="failed"><span>failed</span></label>
+    </fieldset>
+    <span class="status" id="status" aria-live="polite"></span>
+  </div>
+
+  <div class="stepper">
+    <ol class="flow" id="flow" aria-label="Port pipeline steps"></ol>
+    <div class="side">
+      <section class="card detail" id="detail" aria-live="polite" aria-atomic="true"></section>
+      <section>
+        <div class="term-head"><span class="lab">What you'd see (simulated)</span><span class="lab" style="text-transform:none;letter-spacing:0">CLI on stderr · <span style="color:var(--muted)">grey = port.log</span></span></div>
+        <div class="term" id="term" role="log" aria-label="Simulated output"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ===================================================================== where -->
+  <h2 id="where">Where things live</h2>
+  <p>The model's <code>config.json</code> and model card are untrusted input (assume prompt injection), so the agent, the checks and the test server all run under bubblewrap with a scrubbed environment. mxconsole keeps its own records outside.</p>
+  <div class="where">
+    <div class="card in">
+      <p class="lab" style="color:var(--port-fg)">Inside the sandbox</p>
+      <h3>What the agent can touch</h3>
+      <ul>
+        <li><strong>Writes:</strong> its workspace (<code>~/.mxc/ports/&lt;model&gt;/</code>) and the job's private <code>work/</code> folder. Nothing else.</li>
+        <li><strong>Reads:</strong> the system, read-only. Your home folder and <code>~/.mxc</code> are empty there (no <code>~/.ssh</code>, no database, no API keys, no other models). Bound back read-only: the Claude, pixi and git installs, Modular's skills, this model's weights, and for try-port mxconsole's own Python.</li>
+        <li><strong>Runs:</strong> Read, Write, Edit, Glob, Grep; WebFetch on huggingface.co; the skill's own scripts through its pixi env; copying the donor's folders; the try-port command. Anything else would prompt, and prompts are denied. No <code>ls</code>, <code>cat</code>, <code>pip</code>.</li>
+        <li><strong>Environment:</strong> anything named like a key, token, secret, password or cookie is removed, plus <code>HF_TOKEN</code>, <code>MXC_API_KEY</code> and agent sockets. Claude keeps only its own login. Private <code>/tmp</code>, own PID namespace.</li>
+        <li><strong>Can't change its own rules:</strong> <code>.claude/settings.json</code> in the workspace is bound read-only on top.</li>
+      </ul>
+    </div>
+    <div class="card out">
+      <p class="lab" style="color:var(--max-fg)">Outside, kept by mxconsole</p>
+      <h3>What the harness keeps to itself</h3>
+      <ul>
+        <li>The log, the transcripts and the copy of the best attempt, in the job folder <code>~/.mxc/ports/&lt;job id&gt;/</code>.</li>
+        <li>Installing the skill's pixi env and downloading the weights: done once, outside, from the pristine clone. Inside they are read-only.</li>
+        <li>The gate scripts. They are hashed after the clone is updated and checked before every gate; if touched, they are restored from git, and if that fails the job fails.</li>
+        <li>Registering and serving. Only mxconsole writes the model database.</li>
+      </ul>
+      <p style="margin-top:10px"><strong>Accepted risks</strong> (documented in <code>port_auto.py</code>): the agent can read the Claude login and has network access, which bubblewrap can't prevent. And the checks import and run the generated code, so a pass means "an agent that did not cheat produced matching output"; the sandbox limits damage, it doesn't vouch for the port.</p>
+    </div>
+  </div>
+
+  <ul class="tree card" style="padding:0" aria-label="Files a port creates">
+    <li><span class="p"><code>~/.mxc/skills/modular/</code></span><span class="what"><span class="tag ro">read-only in every sandbox</span>Modular's skills, cloned from github.com/modular/skills and fast-forwarded each run. Two known bugs patched locally (<a href="https://github.com/modular/skills/issues/15">modular/skills#15</a>), and the env's MAX pinned to the one mxconsole serves with.</span></li>
+    <li class="d1"><span class="p"><code>ports/&lt;model&gt;/</code></span><span class="what"><span class="tag rw">agent writes</span>The workspace. Named after the model, never all digits, so it can't collide with a job folder.</span></li>
+    <li class="d2"><span class="p"><code>config.json</code>, <code>PORT.md</code></span><span class="what">The model's config at the pinned revision; the donor, the lane, the scaffold command and the loop.</span></li>
+    <li class="d2"><span class="p"><code>.claude/skills/</code></span><span class="what"><span class="tag ro">read-only</span>Links to Modular's skills. <code>.claude/settings.json</code> is read-only too.</span></li>
+    <li class="d2"><span class="p"><code>port/&lt;slug&gt;/</code></span><span class="what">The package: <code>arch.py</code> and an <code>__init__.py</code> that exposes <code>ARCHITECTURES</code>. This folder is what gets registered and served.</span></li>
+    <li class="d2"><span class="p"><code>port/&lt;slug&gt;.last-attempt/</code></span><span class="what">Only when an earlier attempt got further and its package was put back.</span></li>
+    <li class="d1"><span class="p"><code>ports/&lt;job id&gt;/</code></span><span class="what"><span class="tag out">outside the sandbox</span>The job.</span></li>
+    <li class="d2"><span class="p"><code>port.log</code></span><span class="what">Everything the job did, readable: each stage, each command, the agent's steps, the test server's output.</span></li>
+    <li class="d2"><span class="p"><code>agent-&lt;n&gt;.jsonl</code></span><span class="what">The agent's raw transcript for attempt <em>n</em>, whole tool results included. It can hold anything the agent printed; don't share it unreviewed.</span></li>
+    <li class="d2"><span class="p"><code>try-&lt;n&gt;.json</code></span><span class="what"><span class="tag ro">read-only for the agent</span>try-port's settings for attempt <em>n</em>.</span></li>
+    <li class="d2"><span class="p"><code>best/</code></span><span class="what">A copy of the package from the attempt that got furthest.</span></li>
+    <li class="d2"><span class="p"><code>work/</code></span><span class="what"><span class="tag rw">agent writes</span><span class="tag gone">deleted when the job ends</span>Private caches (pixi, uv, Hugging Face, MAX compile), the agent's private Claude config, try-port's state. The model's weights are bound in read-only.</span></li>
+  </ul>
+  <p style="font-size:13px;color:var(--muted)">The tree starts at <code>~/.mxc</code>, mxconsole's home (it moves if you configure another).</p>
+
+  <!-- ===================================================================== outcomes -->
+  <h2 id="outcomes">What can come back</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Outcome</th><th>When</th><th>What you get</th><th>What to do next</th></tr></thead>
+    <tbody>
+      <tr><td class="oc ported">ported</td>
+        <td>mxconsole's own build check and comparison with Hugging Face pass.</td>
+        <td>The model in <code>mxc ls</code> with source <code>port</code>, at a pinned revision, started. Same endpoint, keys, idle unload and notebook as any other. CLI exits 0.</td>
+        <td>Use it. Review the package code if that matters to you (it runs in normal serving). After a MAX upgrade it may need redoing.</td></tr>
+      <tr><td class="oc parked">parked</td>
+        <td>The config loads Python code from the Hub (<code>auto_map</code> for a model type transformers doesn't know).</td>
+        <td>A message that says so, before anything is spent: no skills, no weights, no agent. The job is recorded as failed (CLI exits 1).</td>
+        <td>Nothing. mxconsole doesn't run remote code, so these stay parked (EXAONE is one).</td></tr>
+      <tr><td class="oc failed">failed</td>
+        <td>Attempts used up, the same failure twice in a row, or something another attempt can't fix (no Claude Code, Hugging Face down).</td>
+        <td>A message saying which attempt got furthest ("built but did not serve", "served; the comparison failed"), that attempt's package in the workspace, and the path to the full log. If Hugging Face was unreachable or rate-limiting, it says so and doesn't blame the port. CLI exits 1.</td>
+        <td>Read <code>port.log</code>. If it was Hugging Face, run it again later. Otherwise the workspace is still there to continue by hand (guided mode, below). Some walls are MAX's: BLOOM's ALiBi fails this way.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p style="font-size:14px">You can also cancel at any time: Ctrl-C in the CLI (exit 130) or Cancel in the console. The agent and its commands are stopped; the workspace is kept.</p>
+
+  <!-- ===================================================================== cost -->
+  <h2 id="cost">Cost and time</h2>
+  <div class="facts">
+    <div class="card fact"><div class="lab">Claude usage</div><div class="big">$2–5</div><p>per model in our tests, on your Claude account.</p></div>
+    <div class="card fact"><div class="lab">Wall clock</div><div class="big">7–40 min</div><p>mostly downloading weights and compiling (a cold MAX compile is 5–25 min).</p></div>
+    <div class="card fact"><div class="lab">Attempts</div><div class="big">3 × 4</div><p>3 attempts by default (<code>--max-attempts</code>, 1–10), each with up to 4 try-port runs.</p></div>
+  </div>
+  <p>Measured runs from the <a href="https://github.com/abhisheksreesaila/mxstudio/blob/main/docs/port-study.md">port study</a> (Linux, 2× RTX 3090, MAX 26.7, Claude Code). The first nine clean runs, mostly before the harness fixes, cost $36.43 in total.</p>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Model</th><th>Result</th><th>Attempts</th><th>Time</th><th>Cost</th></tr></thead>
+    <tbody>
+      <tr><td>SmolLM3-3B</td><td>ported</td><td class="num-col">1</td><td class="num-col">7 min</td><td class="num-col">$1.51</td></tr>
+      <tr><td>GPT-2</td><td>ported</td><td class="num-col">1</td><td class="num-col">13 min</td><td class="num-col">$3.85</td></tr>
+      <tr><td>Pythia 1.4B</td><td>ported</td><td class="num-col">1</td><td class="num-col">17.5 min</td><td class="num-col">$2.98</td></tr>
+      <tr><td>Phi-2</td><td>ported</td><td class="num-col">1</td><td class="num-col">17.7 min</td><td class="num-col">$3.29</td></tr>
+      <tr><td>Granite MoE 1B (with try-port)</td><td>ported</td><td class="num-col">1 (3 tries)</td><td class="num-col">agent 10.1 min</td><td class="num-col">$2.30</td></tr>
+      <tr><td>StarCoder2-3B (12 GB download)</td><td>ported</td><td class="num-col">2</td><td class="num-col">40 min</td><td class="num-col">$4.86</td></tr>
+      <tr><td>StableLM 2 1.6B</td><td>correct; stopped on a checker bug, registered after the fix</td><td class="num-col">2</td><td class="num-col">–</td><td class="num-col">$4.68</td></tr>
+      <tr><td>BLOOMZ-560m (ALiBi)</td><td>failed</td><td class="num-col">3</td><td class="num-col">24 min</td><td class="num-col">–</td></tr>
+      <tr><td>EXAONE 3.5 (remote code)</td><td>failed then; parked now, before spending</td><td class="num-col">3</td><td class="num-col">18 min</td><td class="num-col">$3.75 then, $0 now</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p style="font-size:14px">Proven, ported and serving: GPT-2, Pythia, Phi-2, StarCoder2, StableLM 2, SmolLM3, Granite MoE, OLMoE.</p>
+
+  <h3 id="needs">What you need</h3>
+  <ul class="limits">
+    <li><strong>Claude Code</strong>, installed and signed in (<code>claude</code> on the PATH, or <code>MXC_CLAUDE=/path/to/claude</code>).</li>
+    <li><strong>Linux with bubblewrap</strong> (<code>bwrap</code>). Elsewhere only with <code>--unsandboxed</code>, which isn't recommended: the agent then runs with your permissions and gets no try-port. The console doesn't offer Port it without a sandbox; it shows the terminal command instead.</li>
+  </ul>
+
+  <h3 id="limits">Limits</h3>
+  <ul class="limits">
+    <li><strong>Text LLMs only so far.</strong> Vision and embedding architectures haven't been tried.</li>
+    <li><strong>Safetensors weights only.</strong> Repos with only <code>.bin</code> or GGUF files are refused.</li>
+    <li><strong>It must fit one GPU</strong> at the precision the weights are stored in.</li>
+    <li><strong>A port is tied to a MAX version.</strong> It's built against the MAX mxconsole serves with; after a MAX upgrade it may need redoing.</li>
+    <li><strong>Ported code runs inside mxconsole's serving.</strong> It's sandboxed while it's written and checked, not when it serves. Review it if that matters to you.</li>
+    <li><strong>The checks compare with the original model</strong> (first-token score and top token at several prefix lengths). They don't evaluate quality on your workload.</li>
+  </ul>
+
+  <!-- ===================================================================== guided -->
+  <h2 id="guided">Guided mode: <code>mxc port &lt;repo&gt;</code> without --auto</h2>
+  <p>Without <code>--auto</code>, mxconsole only sets things up and hands you the command. It updates Modular's skills, makes the same workspace (<code>config.json</code>, a <code>PORT.md</code> naming the donor, the scaffold command and the loop, and the skills linked under <code>.claude/skills</code>), and prints:</p>
+<pre>Modular skills: …
+Closest supported donor: &lt;Donor&gt;
+Workspace: ~/.mxc/ports/&lt;model&gt; (config.json, PORT.md, .claude/skills)
+Start the port with:
+  cd ~/.mxc/ports/&lt;model&gt; &amp;&amp; claude '/import-model &lt;repo&gt;'
+When it works: mxc pull &lt;repo&gt; --port &lt;port dir&gt;</pre>
+  <p>You run Claude Code yourself, interactively, with no sandbox, park check or attempt loop. <code>mxc pull &lt;repo&gt; --port &lt;port dir&gt;</code> registers the result: it checks the folder (a valid Python name, <code>arch.py</code>, an <code>__init__.py</code> with <code>ARCHITECTURES</code>) and downloads the weights at a pinned revision. It doesn't run the comparison with Hugging Face, so test the port before you rely on it.</p>
+
+  <p class="foot">Source: <a href="https://github.com/abhisheksreesaila/mxstudio/blob/main/docs/PORTING.md">docs/PORTING.md on GitHub</a> · code in <code>mxconsole/port_auto.py</code>, <code>port.py</code>, <code>port_try.py</code>, <code>port_sandbox.py</code>, <code>admin_port.py</code>.</p>
+</main>
+
+<script src="site.js"></script>
+<script>
+(() => {
+  "use strict";
+  // Each step: who runs it, the code behind it, what it checks, what you see. Content is static and ours (innerHTML is safe here).
+  const STEPS = [
+    { title: "Read the config", who: "mxconsole", whoCls: "",
+      what: `<p>Before the job starts, mxconsole refuses to run without bubblewrap (unless <code>--unsandboxed</code>), refuses a second port of the same repo or name, and takes 1 to 10 attempts. Then it resolves the name to a Hugging Face repo at a pinned revision, reads <code>architectures</code> from its <code>config.json</code> and looks it up in MAX's catalog. It checks the model name is free and copies <code>config.json</code> into a new workspace.</p>`,
+      code: [["port_auto.py", "PortManager.start, _pipeline (workspace)"], ["resolve.py", "resolve, HubClient.inspect"], ["port.py", "make_workspace"]],
+      checks: `<ul><li>The architecture isn't supported already (if it is: "run <code>mxc pull</code> instead").</li><li>The repo exists and isn't gated.</li><li>The name isn't taken.</li></ul>`,
+      console: "Prepare workspace", cli: "workspace  ..  looking up &lt;repo&gt;…" },
+    { title: "Park check", who: "mxconsole", whoCls: "",
+      what: `<p>If <code>config.json</code> has an <code>auto_map</code> for a model type transformers doesn't know, the config class is Python code on the Hub. <code>max serve</code> won't run remote code, so the job stops here, with only <code>config.json</code> fetched: no skills, no weights, no agent.</p>`,
+      code: [["port_auto.py", "needs_remote_code"]],
+      checks: `<ul><li><code>auto_map</code> present and <code>model_type</code> not in transformers' config mapping.</li></ul>`,
+      console: "Prepare workspace → failed", cli: "error: &lt;repo&gt; loads its config from Python code on the Hugging Face Hub … parked before spending any agent time." },
+    { title: "Pick the closest supported architecture", who: "mxconsole", whoCls: "",
+      what: `<p>The donor is the architecture in MAX's catalog whose name best matches the target's architecture and <code>model_type</code>: the longest shared name prefix (at least 3 characters), with extra weight when the target's name starts with the donor's (the same family at a newer version), and shorter names winning ties. If nothing matches, it falls back to <code>LlamaForCausalLM</code>, the most common decoder-only starting point. It also finds the donor's source folder in the installed MAX and a ModuleV3 twin if there is one.</p><p>This is a name match, a starting point for the agent, not a guarantee the structures match.</p>`,
+      code: [["port.py", "pick_donor, _source_dir, _v3_twin"]],
+      checks: `<p>Nothing is checked here.</p>`,
+      console: "Prepare workspace → done", cli: "workspace  ok  &lt;Arch&gt;, donor &lt;Donor&gt;, workspace ~/.mxc/ports/&lt;model&gt;" },
+    { title: "Prepare skills, sandbox and weights", who: "mxconsole, outside the sandbox", whoCls: "",
+      what: `<p>Clones or fast-forwards Modular's skills into <code>~/.mxc/skills/modular</code>, applies two local bug fixes and pins the skill env's MAX to the version mxconsole serves with. Writes <code>PORT.md</code> and links the skills into the workspace. Then, outside any sandbox and from the pristine clone, it installs the skill's pixi env and downloads the weights once (safetensors only). The gate scripts are hashed so tampering shows later.</p>`,
+      code: [["port_auto.py", "_pipeline (skills), apply_skill_patches, gate_hash, _skill_install"], ["port.py", "ensure_skills, finish_workspace"], ["resolve.py", "download_snapshot"]],
+      checks: `<ul><li>The skill has <code>import-model</code>.</li><li>MAX could be pinned (else the job fails: a port built on another MAX won't load).</li><li>A patch that no longer applies is logged as a warning.</li></ul>`,
+      console: "Load Modular skills", cli: "skills  ok  &lt;n&gt; skills in ~/.mxc/skills/modular, read-only for the agent and the gates; weights at …" },
+    { title: "Claude writes the MAX package", who: "agent · sandbox", whoCls: "agent",
+      what: `<p>Runs <code>claude -p</code> headless in the workspace, under bubblewrap: edits allowed in the workspace only, a fixed allow list, permission prompts denied, no MCP servers, no saved session. The prompt says it's unattended, to read <code>PORT.md</code> and <code>config.json</code>, follow the <code>import-model</code> skill, start from the donor, use only APIs of the serving MAX, and write the package to <code>port/&lt;slug&gt;</code>. It's done when the skill's <code>check_port.py</code> passes. On attempt 2 and later the prompt adds "fix it, do not start over" and the last failure's output.</p>`,
+      code: [["port_auto.py", "_attempt (generate), build_prompt, claude_argv, ALLOWED_TOOLS"], ["port_sandbox.py", "bwrap_argv, scrub_env"]],
+      checks: `<ul><li>Claude exits 0 within 3 hours. A non-zero exit is a failed attempt (retried, unless <code>claude</code> couldn't run).</li></ul><p>Transcript: <code>agent-&lt;n&gt;.jsonl</code>; readable steps in <code>port.log</code>.</p>`,
+      console: "Generate the model (· attempt n)", cli: "generate (attempt 1)  ..  running Claude Code headless…" },
+    { title: "Compile and serve (try-port)", who: "agent · sandbox", whoCls: "agent",
+      what: `<p>The agent's one way to see its package run. <code>python -m mxconsole.port_try --config &lt;job&gt;/try-&lt;n&gt;.json</code> starts <code>max serve</code> on the package with the same flags as mxconsole's final check, waits for it to be healthy and sends "The capital of France is" for 16 greedy tokens. A cold compile can take 5–25 minutes, so a call waits up to 9 minutes, says "still running", and the next call picks the same run up.</p><p>Only offered under bubblewrap: its PID namespace takes a stray run down with the agent.</p>`,
+      code: [["port_try.py", "main, _start, _work"], ["port_auto.py", "try_config, _try_text"]],
+      checks: `<ul><li>The server becomes healthy; the prompt gets text back.</li><li>Up to 4 runs and 90 minutes of runs per attempt.</li></ul>`,
+      console: "still Generate the model", cli: "claude&gt; Bash … -m mxconsole.port_try --config ~/.mxc/ports/&lt;id&gt;/try-1.json" },
+    { title: "Compare with Hugging Face (try-port)", who: "agent · sandbox", whoCls: "agent",
+      what: `<p>On the running server, try-port runs the skill's <code>compare_layers</code> probe (for information) and the skill's verify gates (they decide), then stops the server and prints a short report ending in <code>RESULT: PASS</code> or <code>FAIL</code>. The agent fixes what the report shows and tries again. If it edited the package during a run, the report says the result is for the earlier version.</p>`,
+      code: [["port_try.py", "_work"], ["skill", "compare_layers.py, run_oss_gates.py --phase verify"]],
+      checks: `<ul><li>First-token score and top token at several prefix lengths, against the Hugging Face model.</li></ul>`,
+      console: "still Generate the model", cli: "RESULT: PASS" },
+    { title: "mxconsole's own check", who: "mxconsole · sandbox", whoCls: "check",
+      what: `<p>When the agent stops, mxconsole checks for itself, whatever the agent said. <strong>Build:</strong> the package folder has <code>arch.py</code> and an <code>__init__.py</code> exposing <code>ARCHITECTURES</code>; the gate scripts match their hash (restored from git if not); <code>check_port.py</code> from the pristine clone imports the package like <code>max serve</code> does and maps every weight. <strong>Parity:</strong> its own <code>max serve</code> on the package (workspace read-only), a smoke prompt, then the verify gates against Hugging Face.</p><p>If Hugging Face itself fails (429, 5xx, network) while the server is up, the check is run again up to twice, 30 s apart; if it keeps failing, the job stops without counting it against the port.</p>`,
+      code: [["port_auto.py", "_attempt (build, parity), _pristine, _skill_build, _parity, _smoke, _skill_verify, infra_error"]],
+      checks: `<ul><li>Every weight maps.</li><li>The server is healthy within 40 min and answers with text.</li><li>The verify gates pass against Hugging Face.</li></ul>`,
+      console: "Build the graph, Parity check", cli: "build (attempt 1)  ok  the package imports and every weight maps" },
+    { title: "Next attempt, with the failure fed back", who: "mxconsole", whoCls: "",
+      what: `<p>If the check fails in a way another attempt could fix, the last 6000 characters of its output go into the next prompt and a new attempt starts (back to step 5). It stops when the attempts are used up (<code>--max-attempts</code>, 3 by default), when the same failure happens twice in a row, or when the failure isn't the port's to fix.</p><p>Each failed attempt's package is copied if it got further than the ones before. If an earlier attempt got furthest, its package is put back in the workspace and the message names it.</p>`,
+      code: [["port_auto.py", "_pipeline (attempt loop), failure_signature, reached_text, _snapshot, _restore_best"]],
+      checks: `<ul><li>How far it got: the build check, built but did not serve, or served but the comparison failed.</li><li>Same failure: gate result lines, or error lines, with timestamps and ports removed.</li></ul>`,
+      console: "Generate the model · attempt 2 …", cli: "attempt 1 failed: … Trying again with the error fed back." },
+    { title: "Register and serve", who: "mxconsole", whoCls: "",
+      what: `<p>The model is added like a <code>mxc pull --port</code>: the package folder is checked again, the weights are taken at the pinned revision, and the model is recorded with source <code>port</code> and the package as its custom architecture. Then mxconsole starts it (MAX gets <code>--custom-architectures &lt;package&gt;</code>). From here it's a normal model: same endpoint, keys, idle unload, notebook. The job's private <code>work/</code> folder is deleted.</p>`,
+      code: [["port.py", "register, check_port_dir"], ["port_auto.py", "_pipeline (register, serve)"], ["admin_port.py", "serve → supervisor.ensure_running"]],
+      checks: `<ul><li>The model starts within 40 minutes (else: "registered but did not start").</li></ul>`,
+      console: "Register the model, Serve on localhost", cli: "Ported &lt;name&gt; (&lt;repo&gt;@&lt;rev&gt;) and serving it." },
+  ];
+  // Loops in the flow: [first, last, label, inner?]
+  const GROUPS = [[4, 8, "attempt n of 3 (--max-attempts)", false], [5, 6, "agent's own tries, up to 4", true]];
+
+  // Simulated runs. Each frame: step index, attempt, lines [kind, text]. kinds: "" cli, log, ok, bad, warn.
+  const L = (k, t) => [k, t];
+  const ws = [
+    { s: 0, lines: [L("", "port &lt;id&gt;: &lt;repo&gt; (log ~/.mxc/ports/&lt;id&gt;/port.log)"), L("", "workspace              ..  looking up &lt;repo&gt;…")] },
+  ];
+  const head = (a) => [
+    { s: 4, a, lines: [L("", `generate (attempt ${a})   ..  ${a === 1 ? "running Claude Code headless…" : "fixing…"}`), L("log", "[agent] sandboxed with bubblewrap (read-only system and skills, empty $HOME and MXC_HOME, private /tmp and caches, writable: …)")] },
+    { s: 5, a, lines: [L("log", "claude&gt; Bash … -m mxconsole.port_try --config ~/.mxc/ports/&lt;id&gt;/try-" + a + ".json"), L("log", "  try-port: started try 1 of 4 (package &lt;hash&gt;); compiling and serving…")] },
+  ];
+  const RUNS = {
+    ported: [...ws,
+      { s: 1, lines: [] },
+      { s: 2, lines: [L("ok", "workspace              ok  &lt;Arch&gt;, donor &lt;Donor&gt;, workspace ~/.mxc/ports/&lt;model&gt;")] },
+      { s: 3, lines: [L("", "skills                 ..  installing Modular's skills…"), L("ok", "skills                 ok  &lt;n&gt; skills in ~/.mxc/skills/modular, read-only for the agent and the gates; weights at …")] },
+      ...head(1),
+      { s: 6, a: 1, lines: [L("log", "  serve      ok on :&lt;port&gt;"), L("log", "  smoke      'The capital of France is' -&gt; '…'"), L("log", "  gates      exit 0"), L("log", "  RESULT: PASS"), L("ok", "generate (attempt 1)   ok  claude finished; package at ~/.mxc/ports/&lt;model&gt;/port/&lt;slug&gt;")] },
+      { s: 7, a: 1, lines: [L("ok", "build (attempt 1)      ok  the package imports and every weight maps"), L("", "parity (attempt 1)     ..  downloading weights…"), L("ok", "parity (attempt 1)     ok  matches the Hugging Face reference")] },
+      { s: 9, lines: [L("ok", "register               ok  registered &lt;name&gt; with custom architecture …/port/&lt;slug&gt;"), L("ok", "serve                  ok  &lt;name&gt; is up"), L("ok", "Ported &lt;name&gt; (&lt;repo&gt;@&lt;rev&gt;) and serving it."), L("", "Try it: mxc ps   (log ~/.mxc/ports/&lt;id&gt;/port.log)")] },
+    ],
+    parked: [...ws,
+      { s: 1, lines: [L("bad", "workspace              FAILED  &lt;repo&gt; loads its config from Python code on the Hugging Face Hub (auto_map; model type '&lt;type&gt;' is unknown to transformers). …"), L("bad", "error: … max serve won't run remote code, so this port is parked before spending any agent time.")] },
+    ],
+    failed: [...ws,
+      { s: 1, lines: [] },
+      { s: 2, lines: [L("ok", "workspace              ok  &lt;Arch&gt;, donor &lt;Donor&gt;, workspace ~/.mxc/ports/&lt;model&gt;")] },
+      { s: 3, lines: [L("", "skills                 ..  installing Modular's skills…"), L("ok", "skills                 ok  &lt;n&gt; skills in ~/.mxc/skills/modular, read-only for the agent and the gates; weights at …")] },
+      ...head(1),
+      { s: 6, a: 1, lines: [L("log", "  gates      exit 1"), L("log", "  RESULT: FAIL"), L("log", "  (the agent fixes and tries again, up to 4 tries)"), L("ok", "generate (attempt 1)   ok  claude finished; package at ~/.mxc/ports/&lt;model&gt;/port/&lt;slug&gt;")] },
+      { s: 7, a: 1, lines: [L("ok", "build (attempt 1)      ok  the package imports and every weight maps"), L("", "parity (attempt 1)     ..  downloading weights…"), L("bad", "parity (attempt 1)     FAILED  parity check failed (exit 1): the port's output does not match Hugging Face")] },
+      { s: 8, a: 1, lines: [L("log", "attempt 1 failed: parity check failed (exit 1): the port's output does not match Hugging Face. Trying again with the error fed back.")] },
+      ...head(2),
+      { s: 6, a: 2, lines: [L("log", "  RESULT: FAIL"), L("ok", "generate (attempt 2)   ok  claude finished; package at ~/.mxc/ports/&lt;model&gt;/port/&lt;slug&gt;")] },
+      { s: 7, a: 2, lines: [L("ok", "build (attempt 2)      ok  the package imports and every weight maps"), L("", "parity (attempt 2)     ..  downloading weights…"), L("bad", "parity (attempt 2)     FAILED  parity check failed (exit 1): the port's output does not match Hugging Face")] },
+      { s: 8, a: 2, lines: [L("bad", "error: parity check failed (exit 1): the port's output does not match Hugging Face after 2 attempts (the same failure twice in a row, so another attempt is unlikely to help). Full log: ~/.mxc/ports/&lt;id&gt;/port.log"), L("", "--- last of the log ---"), L("log", "…")] },
+    ],
+  };
+  const EXIT = { ported: 9, parked: 1, failed: 8 };
+  const EXIT_TEXT = { ported: "ported", parked: "parked here", failed: "fails here" };
+
+  const $ = (id) => document.getElementById(id);
+  const flow = $("flow"), detail = $("detail"), term = $("term"), status = $("status"), playBtn = $("play");
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  const narrow = matchMedia("(max-width: 900px)");
+  let outcome = "ported", pos = -1, selected = 0, timer = null;
+
+  // build the flow, with the two loop boxes
+  const nodes = [];
+  function nodeEl(i) {
+    const s = STEPS[i];
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "node"; b.dataset.i = i; b.setAttribute("aria-pressed", "false");
+    b.innerHTML = `<span class="num" aria-hidden="true">${i + 1}</span><span><span class="t">${s.title}</span><span class="who ${s.whoCls}">${s.who}</span></span><span class="exit"></span>`;
+    b.addEventListener("click", () => {
+      stop(); select(i, true);
+      if (narrow.matches) detail.scrollIntoView({ block: "start", behavior: reduced.matches ? "auto" : "smooth" });
+    });
+    nodes[i] = b; li.append(b); return li;
+  }
+  function build(parent, from, to, inside) {
+    for (let i = from; i <= to; i++) {
+      const gi = GROUPS.findIndex((g, k) => g[0] === i && k > inside);
+      if (gi < 0) { parent.append(nodeEl(i)); continue; }
+      const [, last, label, inner] = GROUPS[gi];
+      const li = document.createElement("li");
+      li.className = "loop" + (inner ? " inner" : "");
+      li.innerHTML = `<span class="loop-lab">↻ ${label}</span>`;
+      const ol = document.createElement("ol");
+      build(ol, i, last, gi);
+      li.append(ol); parent.append(li);
+      i = last;
+    }
+  }
+  build(flow, 0, STEPS.length - 1, -1);
+
+  function select(i, fromUser) {
+    selected = i;
+    nodes.forEach((n, k) => n.setAttribute("aria-pressed", String(k === i)));
+    const s = STEPS[i];
+    detail.innerHTML = `<p class="lab">Step ${i + 1} of ${STEPS.length} · ${s.who}</p><h3>${s.title}</h3>${s.what}
+      <dl><dt>Code</dt><dd class="files"><ul>${s.code.map(([f, fn]) => `<li><code>${f === "skill" ? "import-model skill" : "mxconsole/" + f}</code> · ${fn}</li>`).join("")}</ul></dd>
+      <dt>Checked</dt><dd>${s.checks}</dd>
+      <dt>Console</dt><dd>${s.console}</dd>
+      <dt>Output</dt><dd><code>${s.cli}</code></dd></dl>`;
+    if (fromUser) {  // move the simulation to this step if the chosen outcome passes through it
+      const k = RUNS[outcome].findIndex((f) => f.s === i);
+      if (k >= 0) { pos = k; paint(); }
+    }
+  }
+
+  function paint() {
+    const run = RUNS[outcome];
+    const path = new Set(run.map((f) => f.s));
+    const seen = new Set(run.slice(0, pos + 1).map((f) => f.s));
+    const cur = pos >= 0 ? run[pos].s : -1;
+    flow.dataset.outcome = outcome;
+    flow.classList.toggle("sim", true);
+    nodes.forEach((n, i) => {
+      n.classList.toggle("off", !path.has(i));
+      n.classList.toggle("seen", seen.has(i) && i !== cur);
+      n.classList.toggle("now", i === cur);
+      const isExit = i === EXIT[outcome];
+      n.classList.toggle("exit-here", isExit);
+      n.querySelector(".exit").textContent = isExit ? EXIT_TEXT[outcome] : "";
+    });
+    const lines = run.slice(0, pos + 1).flatMap((f) => f.lines);
+    term.innerHTML = lines.length ? lines.map(([k, t]) => `<div${k ? ` class="${k}"` : ""}>${t}</div>`).join("")
+      : `<div class="empty">$ mxc port &lt;repo&gt; --auto   (press Play, or Next)</div>`;
+    term.scrollTop = term.scrollHeight;
+    const f = pos >= 0 ? run[pos] : null;
+    status.textContent = f ? `${outcome}: frame ${pos + 1} of ${run.length}, step ${f.s + 1}${f.a ? `, attempt ${f.a}` : ""}${pos === run.length - 1 ? " (end)" : ""}` : `${outcome}: not started`;
+  }
+
+  function go(k) {
+    const run = RUNS[outcome];
+    pos = Math.max(-1, Math.min(run.length - 1, k));
+    paint();
+    if (pos >= 0) select(run[pos].s, false);
+  }
+  function tick() {
+    if (pos >= RUNS[outcome].length - 1) { stop(); return; }
+    go(pos + 1);
+  }
+  function stop() {
+    clearInterval(timer); timer = null;
+    playBtn.textContent = "▶ Play"; playBtn.setAttribute("aria-pressed", "false");
+  }
+  function play() {
+    if (pos >= RUNS[outcome].length - 1) pos = -1;
+    playBtn.textContent = "❚❚ Pause"; playBtn.setAttribute("aria-pressed", "true");
+    tick();
+    timer = setInterval(tick, reduced.matches ? 2200 : 1500);
+  }
+
+  playBtn.addEventListener("click", () => (timer ? stop() : play()));
+  $("next").addEventListener("click", () => { stop(); go(pos + 1); });
+  $("prev").addEventListener("click", () => { stop(); go(pos - 1); });
+  $("reset").addEventListener("click", () => { stop(); go(-1); select(0, false); });
+  $("outcome").addEventListener("change", (e) => { stop(); outcome = e.target.value; go(-1); select(selected, false); });
+
+  // arrow keys move between steps in the flow
+  flow.addEventListener("keydown", (e) => {
+    const i = Number(e.target.dataset && e.target.dataset.i);
+    if (Number.isNaN(i)) return;
+    const to = { ArrowDown: i + 1, ArrowRight: i + 1, ArrowUp: i - 1, ArrowLeft: i - 1, Home: 0, End: STEPS.length - 1 }[e.key];
+    if (to === undefined || to < 0 || to >= STEPS.length) return;
+    e.preventDefault(); stop(); nodes[to].focus(); select(to, true);
+  });
+
+  select(0, false);
+  paint();
+})();
+</script>
+</body>
+</html>

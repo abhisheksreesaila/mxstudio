@@ -1,200 +1,139 @@
-# mxconsole (`mxc`)
+# mxconsole
 
-Local models on **Modular MAX** that you can see into and reshape.
+**Local AI on Modular MAX, made easy.** One command gives you an OpenAI-compatible endpoint. Models load when
+they're called and unload when idle. If MAX can't run a model yet, mxconsole can port it for you.
 
-`mxc` serves small models behind **one secure, OpenAI-compatible endpoint**. It loads each
-model on its first request, unloads it when idle, and writes a notebook that explains the
-model. If a model's architecture isn't supported yet, it sets up a workspace to port it with
-Modular's own skills.
+[![latest tag](https://img.shields.io/github/v/tag/abhisheksreesaila/mxstudio?label=latest&sort=semver)](https://github.com/abhisheksreesaila/mxstudio/tags)
+![platform](https://img.shields.io/badge/platform-Linux%20%C2%B7%20NVIDIA-555)
+![MAX](https://img.shields.io/badge/Modular%20MAX-26.7%20nightly-0d7d70)
 
-- **As easy as Ollama:** `mxc serve qwen2.5-0.5b` gives you a working endpoint.
-- **Safe on your network:** HTTPS through Caddy, one revocable key per app, LiteLLM for routing.
-- **Not a black box:** `mxc learn` shows the architecture, a parameter breakdown, and where
-  MAX's Python implementation of the model lives so you can read and change it.
+**Docs:** [Overview](https://abhisheksreesaila.github.io/mxstudio/site/) ·
+[Console tour](https://abhisheksreesaila.github.io/mxstudio/site/console.html) (every screen, explained) ·
+[Porting, behind the scenes](https://abhisheksreesaila.github.io/mxstudio/site/porting.html) ·
+[User guide](docs/USER_GUIDE.md) · [CLI reference](docs/CLI.md)
 
-User guide: [docs/USER_GUIDE.md](docs/USER_GUIDE.md) · Brief: [docs/brief.md](docs/brief.md) · Tickets: [docs/plan.md](docs/plan.md) ·
-Architecture decision: [docs/adr/0001](docs/adr/0001-mst-core-architecture.md)
+![The mxconsole web console: My models](docs/assets/screens/home.png)
 
----
+## Why
 
-## How it works
+[Modular MAX](https://www.modular.com/max) is a fast inference engine. mxconsole is a convenience wrapper
+around it, for running models on your own machine.
 
+- **Local AI, easy.** `mxc serve qwen2.5-0.5b` downloads the model, starts it and prints a URL, a key and a
+  `curl` line. Any OpenAI client works with it.
+- **Many models, one endpoint.** Each model starts on its first request and stops after it has been idle for a while,
+  so you can register a dozen and only pay GPU memory for the ones in use. Pin the ones you want kept loaded.
+- **Safe to share.** One revocable key per app. `mxc expose` puts it on your LAN over HTTPS.
+- **Porting, fast.** When MAX doesn't support an architecture yet, `mxc port <repo> --auto` has Claude Code
+  write a MAX version in a sandbox. mxconsole then checks that it matches the Hugging Face original and serves
+  it. That takes about 7–40 minutes and $2–5 of Claude usage. [How it works](https://abhisheksreesaila.github.io/mxstudio/site/porting.html).
+- **Not a black box.** A web console with live throughput, benchmarks, logs, and a notebook for each model
+  that shows how it's built and runs in Jupyter right in the page.
+
+## Set up
+
+You need Linux with an NVIDIA GPU, and [pixi](https://pixi.sh). pixi installs MAX, Jupyter and everything
+else into the project; your system Python isn't touched.
+
+```bash
+git clone https://github.com/abhisheksreesaila/mxstudio.git && cd mxstudio
+pixi install                       # MAX and its dependencies
+pixi run mxc serve qwen2.5-0.5b    # downloads, starts, prints the URL, a key and a curl line
 ```
- your apps ──HTTPS──▶ Caddy :8443 ──▶ LiteLLM :4000 ──▶ mxc daemon :11435 ──▶ max serve (one per model)
- (LAN or local)        │  TLS (own CA)     routing by        on-demand start,     loopback ports,
-                       │  key check ───────▶ /auth/check      idle unload, pin     served by mxc name
-                       └ only /v1/models, /v1/chat/completions, /v1/completions, /v1/embeddings
+
+Then call it like OpenAI:
+
+```bash
+curl http://127.0.0.1:11435/v1/chat/completions -H "Authorization: Bearer $MXC_API_KEY" \
+  -H "Content-Type: application/json" -d '{"model": "qwen2.5-0.5b", "messages": [{"role": "user", "content": "hi"}]}'
 ```
 
-| Piece | What it does | Code |
+Open the console with `pixi run mxc console`. LAN access needs [Caddy](https://caddyserver.com/) and
+`pixi install -e gateway`; porting needs Claude Code and bubblewrap. Details are in the [user guide](docs/USER_GUIDE.md).
+
+## Latest
+
+**Next release** (on `main`, not tagged yet)
+- Jupyter runs inside the console's Notebook panel, and the notebook's "Try it" cells work with no setup.
+- `mxc port --auto` ports architectures MAX doesn't support. It has ported 8 of them so far, including OLMoE and Granite MoE.
+- `mxc bench` and the Benchmark panel compare models on the same workload.
+- A [command reference](docs/CLI.md) for every command and option.
+
+Released versions: [tags](https://github.com/abhisheksreesaila/mxstudio/tags).
+
+## Screens
+
+| | |
+|---|---|
+| ![A model's overview: live throughput, endpoint, a ready-to-paste curl](docs/assets/screens/model.png) | ![Add a model: search MAX and Hugging Face, checked against your GPU memory](docs/assets/screens/add.png) |
+| **A model:** live numbers, its endpoint and a `curl` to paste | **Add a model:** search MAX's catalog and Hugging Face; every result is checked against your GPU memory |
+| ![The notebook, running in Jupyter inside the console](docs/assets/screens/jupyter.png) | ![A model MAX can't run yet, with Port it](docs/assets/screens/port-offer.png) |
+| **Notebook:** how the model is built; runs in Jupyter in the page | **Needs porting:** one click hands it to the porting agent |
+
+Every screen, with what each part means: [console tour](https://abhisheksreesaila.github.io/mxstudio/site/console.html).
+
+## HTTP API
+
+OpenAI-compatible, on `http://127.0.0.1:11435` (or `https://<host>.local:8443` after `mxc expose`). Send
+`Authorization: Bearer <key>`; make a key with `mxc keys new <app>`.
+
+| Endpoint | Key | What it does |
 |---|---|---|
-| **Resolver** | `qwen2.5-0.5b` → HF repo → architecture → is it in MAX's catalog (`max list --json`)? Downloads safetensors at a pinned commit. | `mxconsole/resolve.py` |
-| **Supervisor** (the "hypervisor") | One `max serve` child per model on a free loopback port. Starts it on demand (concurrent callers share one start), stops it after `keep_alive` idle (default 5m) unless pinned, never mid-request. Cleans up orphans after a crash. | `mxconsole/supervisor.py` |
-| **Gateway** (`mxc daemon`) | OpenAI-compatible `/v1/*` on `127.0.0.1:11435`. Checks the Bearer key, routes by `model`, streams through, and serves the console at `/console` and the API reference at `/docs`. Admin routes are for the CLI and the console only. | `mxconsole/gateway.py` |
-| **Keys** | `mst-…` keys, one per app, stored only as SHA-256 hashes. Shown once. | `mxconsole/keys.py` |
-| **Expose** | Writes and runs Caddy (`tls internal`, forward_auth) and LiteLLM (its own pixi env, master key, no Postgres) as your user. | `mxconsole/expose.py` |
-| **Learn** | A Jupyter notebook built only from the Hugging Face API: model card, config table, parameter breakdown, sample code, and a pointer to MAX's source. | `mxconsole/learn.py` |
-| **Console** | `http://127.0.0.1:11435/console`: a dark top bar (hardware chip, API keys, Gateway, Settings, theme) and blades that open side by side. **My models** (list or cards, live tok/s) opens a blade per model (Overview, Security, Benchmark, Logs, Notebook); **Add a model** searches the MAX catalog and Hugging Face and sets it up; `mxc app` opens it in its own window; `mxc console [page] [model]` deep-links. The API reference is at `/docs`. This machine only. | `mxconsole/console/` |
-| **Port** | For unsupported architectures: picks the closest supported architecture as a starting point and has Claude Code write a MAX package for the model in a sandbox, using Modular's porting skills. Checks it against Hugging Face, then registers and serves it. `mxc port` without `--auto` only sets up the workspace. | `mxconsole/port.py`, `port_auto.py`, `port_try.py` |
+| `GET /v1/models` | yes | Registered models, each with its state (`cold`, `starting`, `ready`, `crashed`) in an `mxconsole` field. |
+| `POST /v1/chat/completions` | yes | Chat. `stream: true` streams server-sent events. A cold model starts first. |
+| `POST /v1/completions` | yes | Plain text completion. |
+| `POST /v1/embeddings` | yes | Embeddings, from an embedding model such as `all-minilm-l6`. |
+| `GET /health` | no | Liveness: `{"status": "ok", "service": "mst"}`. |
+| `GET /auth/check` | yes | 200 with the app's name in `X-Mst-App` for a valid key, else 401. Used by Caddy. |
 
-State lives in `~/.mxc/` (override with `MXC_HOME`; the old `HOTFIRE_HOME` and `MST_HOME` still work; an existing `~/.hotfire` or `~/.mst` is moved here once): `mst.db` (models, key hashes), `logs/`,
-`run/`, `notebooks/`, `ports/` and `expose/`. Weights stay in the Hugging Face cache.
-
----
+Errors use OpenAI's shape. `404 model_not_found` means the model isn't registered: run `mxc pull <name>`. `503 model_unavailable`
+means it failed to start, and the message includes the end of its log.
+The interactive reference is at `http://127.0.0.1:11435/docs`. The console and the CLI also use `/admin/*` routes,
+which only answer on this machine.
 
 ## Commands
 
-The common ones are below. Every command and option: [docs/CLI.md](docs/CLI.md).
-
 ```bash
-pixi run mxc serve qwen2.5-0.5b              # pull if needed → start daemon → load → print URL, key, curl, Python
-pixi run mxc serve smollm2-1.7b --pin        # never unloads
-pixi run mxc serve qwen2.5-1.5b --keep-alive 10m
-pixi run mxc ls                              # registered models + live state (cold/starting/ready/crashed)
-pixi run mxc stop qwen2.5-0.5b               # unload one now
-pixi run mxc stop --all                      # unload everything, stop the daemon
-
-pixi run mxc pull <name-or-hf-repo> [--dry-run] [--name N] [--json]   # resolve + download, live progress bar (Ctrl-C cancels, exit 130); --json = one event per line
-pixi run mxc keys new my-app | ls | revoke my-app            # one key per app (printed once)
-pixi run mxc learn qwen2.5-0.5b [--no-open]                  # notebook → Jupyter Lab
-pixi run mxc expose [--host box.local] [--no-litellm] | --stop
-pixi run mxc port <hf-repo> --auto                           # port an unsupported architecture (docs/PORTING.md)
-pixi run mxc port <hf-repo>                                  # guided: workspace + the Claude command to run yourself
-pixi run mxc daemon                                          # the gateway in the foreground (mxc serve starts it for you)
-
-pixi run mxc status                                          # daemon, endpoints, models, keys, LAN, MAX version on one screen
-pixi run mxc set qwen2.5-0.5b --pin | --unpin | --keep-alive 10m   # any console setting, from the terminal
-pixi run mxc bench --all [--runs 5]                          # same workload on every model: decode, prefill, TTFT
-pixi run mxc metrics --range 1h | mxc requests --limit 50     # the console's numbers and activity log
-pixi run mxc logs qwen2.5-0.5b -f                            # follow a model's log
-pixi run mxc ps                                              # the crew: daemon, Caddy, LiteLLM, each max serve
-pixi run mxc console [page]                                  # open the web console (add, keys, gateway, settings, api, …)
+mxc serve <model> [--pin | --keep-alive 10m]   # pull if needed, start, print URL, key and curl
+mxc search <text>                              # MAX catalog + Hugging Face, with a fit check
+mxc pull <model-or-hf-repo>                    # download and register
+mxc port <hf-repo> --auto                      # port an architecture MAX can't run yet
+mxc ls | stop <model> | rm <model>             # list, unload, remove
+mxc keys new <app> | ls | revoke <app>         # one key per app
+mxc expose [--stop]                            # HTTPS on your LAN
+mxc learn <model>                              # a notebook that explains the model
+mxc bench --all                                # compare speed on the same workload
+mxc status | ps | logs <model> -f | console    # see what's going on
 ```
 
-Every read command takes `--json` (JSON only on stdout). Errors are one `error:` line on stderr;
-exit codes are 0 ok, 1 refused, 2 bad usage. `hotfire` and `mst` still work as aliases.
+Run them as `pixi run mxc …`. Every command and option: [docs/CLI.md](docs/CLI.md).
 
-Short names: `qwen2.5-0.5b`, `qwen2.5-1.5b`, `qwen2.5-3b`, `smollm2-1.7b`, `all-minilm-l6`,
-and `llama3.2-1b` (gated: accept the license on HF and set `HF_TOKEN`). Any HF repo id
-works too.
+## Behind the scenes
 
----
-
-## Models MAX can't run yet: porting
-
-MAX supports many architectures, but not all of them. `mxc search` marks the rest `port` (the console says
-"needs porting"), and `mxc pull` stops before downloading the weights and points to `mxc port`.
-
-```bash
-pixi run mxc port <hf-repo> --auto     # or "Port it" in the console's Add a model
+```
+ your apps ──HTTPS──▶ Caddy :8443 ──▶ LiteLLM :4000 ──▶ mxc daemon :11435 ──▶ max serve (one per model)
+ (LAN, after expose)   TLS, key check     routing          start on demand,     loopback ports
+                                                            unload when idle
+ local apps ─────────────────────────────────────────────▶ (same daemon, http://127.0.0.1:11435)
 ```
 
-Claude Code writes a small MAX package for the architecture in a sandbox, following Modular's own porting
-skill. It compiles and serves the package and compares the output with the original Hugging Face model, fixing
-what it finds. Then mxconsole runs the comparison again on its own and only registers the model if it matches.
-After that, the model works like any other: same endpoint, keys, idle unload and notebook.
-
-- **Needs:** Claude Code, signed in, and Linux with bubblewrap (elsewhere only with `--unsandboxed`).
-- **Cost:** about $2–5 of Claude usage and 7–40 minutes per model.
-- **Proven on:** GPT-2, Pythia, Phi-2, StarCoder2, StableLM 2, SmolLM3, Granite MoE and OLMoE (text models).
-- **When it can't:** models that need remote code are parked before anything is spent. A model that hits a
-  MAX limitation (BLOOM's ALiBi, for example) fails and says how far it got.
-
-Why it's a separate step from `pull`, the outcomes and the limits: [docs/PORTING.md](docs/PORTING.md).
-
----
-
-## Morning checklist: verify it for real
-
-Everything below has been built and reviewed, and 175 tests pass against a **fake** `max`. Steps 3 to 6
-are the first runs on real MAX and real hardware. Tick them off in order; each says what you
-should see.
-
-### 0. Free memory
-Stop the other agents. Three small models need about 8 GB of GPU memory in total (you have
-2× RTX 3090), plus some system RAM while they load.
-
-### 1. Retire the old Nucleus services (needs your password)
-The legacy `mxs` stack still runs as two systemd services on ports 443 and 8080:
-
-```bash
-sudo systemctl disable --now mxstudio-nucleus-caddy.service mxstudio-nucleus.service
-sudo rm /etc/systemd/system/mxstudio-nucleus.service /etc/systemd/system/mxstudio-nucleus-caddy.service
-sudo systemctl daemon-reload
-sudo rm -r /etc/mxstudio        # old deployment env files, Caddyfile, install manifests
-```
-✅ `systemctl status mxstudio-nucleus` says *could not be found*, and `ss -ltn | grep ':443 '` is empty.
-
-### 2. Tests (no GPU)
-```bash
-pixi run pytest tests/mxconsole -q
-```
-✅ `175 passed`.
-
-### 3. One model, local endpoint
-```bash
-pixi run mxc serve qwen2.5-0.5b
-```
-✅ You see `pulled …`, `started the mxconsole daemon`, `loading …`, `qwen2.5-0.5b is ready (Ns)`, then the
-endpoint `http://127.0.0.1:11435/v1`, a key `mst-…` (**save it**: `export MXC_API_KEY=mst-…`), and
-a curl and a Python snippet. Paste the curl and expect a JSON reply.
-✅ Open http://127.0.0.1:11435/docs and you should land on the console's API reference.
-✅ Open http://127.0.0.1:11435/console: the console lists your models. Click one to open its
-side sheet: Overview, Settings (keep loaded, unload after idle; Apply saves), Logs and Requests. ⌘K runs any action.
-❌ If loading fails: the error includes the tail of `~/.mxc/logs/qwen2.5-0.5b.log`.
-
-### 4. Several models, on demand
-```bash
-pixi run mxc serve smollm2-1.7b --pin
-pixi run mxc serve qwen2.5-1.5b --keep-alive 2m
-pixi run mxc ls
-```
-✅ `ls` shows all three as `ready`. Wait 2–3 minutes, run `mxc ls` again, and `qwen2.5-1.5b`
-is `cold`, the others aren't. Call it again (curl with `"model": "qwen2.5-1.5b"`) and it comes
-back after a cold start.
-
-### 5. Secure LAN endpoint
-```bash
-pixi run mxc expose
-```
-✅ It prints `https://<your-host>.local:8443/v1` and the path to Caddy's `root.crt`. Then:
-```bash
-curl --cacert ~/.local/share/caddy/pki/authorities/local/root.crt \
-  https://$(hostname).local:8443/v1/models -H "Authorization: Bearer $MXC_API_KEY"
-```
-✅ This lists your models. With a wrong key you get `401`, and
-`https://…:8443/model/info` gives `404`, because LiteLLM's admin API is never exposed.
-✅ LiteLLM's own UI is at http://127.0.0.1:4000/ui (this machine only).
-
-### 6. The whole acceptance run in one script
-```bash
-pixi run python scripts/mxc_acceptance.py
-```
-✅ It ends with `N/N checks passed`. That covers chat and streaming on all three models over HTTPS, all three at
-once, a bad key refused, idle unload and reload, and a pinned model staying up. It prints a curl line for
-a **second device**: copy `root.crt` there, run the line, and you get a reply. That proves the LAN path.
-
-### 7. Learn and port
-```bash
-pixi run mxc learn qwen2.5-0.5b          # opens Jupyter Lab; run the "Try it" cells with MXC_API_KEY set
-pixi run mxc port openai-community/gpt2 --auto   # ports, checks against Hugging Face, registers and serves (~10 min)
-```
-✅ The notebook shows the model card, a config table, a parameter breakdown (estimate ≈ actual)
-and MAX's source folder for the architecture. `port --auto` ends with "Ported … and serving it"; see
-[docs/PORTING.md](docs/PORTING.md) for what it needs, what can come back, and the limits.
-
-### When you're done
-```bash
-pixi run mxc expose --stop && pixi run mxc stop --all
-```
-
----
+- **Daemon** (`mxconsole/gateway.py`, `supervisor.py`): checks the key, starts the model if it's cold (concurrent
+  callers share one start), streams the answer back, and stops idle models, never in the middle of a request.
+- **Keys** (`keys.py`): `mst-…`, stored only as SHA-256 hashes, shown once.
+- **Expose** (`expose.py`): runs Caddy (its own certificate authority) and LiteLLM as your user. Only the four `/v1`
+  routes reach the daemon from the LAN.
+- **Port** (`port.py`, `port_auto.py`, `port_try.py`): a sandboxed Claude Code run, then mxconsole's own check
+  against Hugging Face before anything is registered. [Step by step](https://abhisheksreesaila.github.io/mxstudio/site/porting.html) ·
+  [PORTING.md](docs/PORTING.md).
+- **State** lives in `~/.mxc/` (or `MXC_HOME`). Weights stay in the Hugging Face cache.
 
 ## Development
 
-- New code is in `mxconsole/`; tests are in `tests/mxconsole/` and use a fake `max` (`tests/mxconsole/fake_max.py`), so they
-  need no GPU. Run them with `pixi run pytest tests/mxconsole -q`.
-- LiteLLM lives in its own pixi environment: `pixi install -e gateway`.
-- The legacy core (`notebooks/mxstudio`, `mxs` command, old docs) is still in the repo until
-  `mxc` has passed the live checks above. It will be removed after that, with your OK.
-- Ports: daemon `MXC_PORT` (11435), LiteLLM `MXC_LITELLM_PORT` (4000), HTTPS `MXC_EXPOSE_PORT` (8443). The old `HOTFIRE_*` and `MST_*` names are still read as a fallback.
+```bash
+pixi run pytest tests/mxconsole -q      # uses a fake `max`, so it needs no GPU
+```
+
+Checking it on real hardware, step by step: [docs/VERIFY.md](docs/VERIFY.md). Plans and decisions:
+[brief](docs/brief.md) · [tickets](docs/plan.md) · [architecture](docs/adr/0001-mst-core-architecture.md). The
+older MX Studio (`mxs`) code is still in `notebooks/` until mxconsole replaces it; its guide is
+[LEGACY_NUCLEUS.md](docs/LEGACY_NUCLEUS.md).
