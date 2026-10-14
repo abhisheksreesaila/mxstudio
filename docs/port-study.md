@@ -98,6 +98,15 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
 - A genuine numeric bug fixed without seeing intermediate values: logits_prefill rel_diff 0.10, then 0.13 (worse),
   then 0.036 (pass). The agent got there on the last attempt by reading code, not data. Lucky as much as good.
 
+### Granite MoE again, with try-port (run 22)
+- Same model as run 21, fresh workspace, after fix 1 (try-port). Passed on the first harness attempt:
+  agent 10.1 min, 63 turns, $2.30 (run 21: 3 attempts, $3.19). Final rel_diff 0.0055 (run 21: 0.036).
+- The agent debugged with data: try 1 showed rel_diff 0.131; it kept bf16 matmuls but moved the residual stream
+  and expert combine to fp32; try 2 showed 0.057 ("precision was the issue"); try 3 passed at 0.0055.
+- No "cache not writable" warnings any more (MODULAR_MAX_CACHE_DIR).
+- Side observation: logits_prefill uses a *relative* threshold (0.05) on a logprob near zero (-0.096), so an
+  absolute gap of 0.013 nats failed. Strict on confident tokens; here it pushed the port to a genuinely tighter match.
+
 ## Harness and skill fixes found
 - [x] let the agent run the skill's checks in the form it actually uses (OLMoE; c2b329d)
 - [x] a writable, per-job MAX compile cache in the sandbox (OLMoE; c2b329d)
@@ -105,10 +114,10 @@ for a small local model (LoRA) to do? Each run: `mxc port <ref> --auto`, Claude 
       ported models keep it for normal serving. `--force` also skips an architecture's required arguments, so
       the parity server turns prefix caching and chunked prefill off itself. Trade-off: parity never exercises
       the overlap scheduler (logprobs need it off); normal serving uses it.
-- [ ] MAX engine compile cache (`.max_cache/mof/mef`) still read-only in the sandbox (GPT-2)
+- [x] MAX engine compile cache: MODULAR_MAX_CACHE_DIR (d970700; no warnings in run 22)
 - [ ] allow `ruff format`/`ruff check` on the port dir through the skill env (GPT-2)
-- [ ] let the agent compile, serve and run compare_layers itself (a harness-run server it can call), so numeric
-      bugs are debugged with data, not guessed (BLOOM). The biggest open item.
+- [x] let the agent compile, serve and run compare_layers itself: try-port (d970700, 339e00f). Granite went from
+      3 blind attempts to 1 attempt with 3 informed tries (run 22)
 - [ ] an infrastructure failure (Hub 429, network) retries the gate instead of using up an attempt; read
       checkpoint metadata from the local weights where possible (BLOOM)
 - [ ] stop early on a known wall (check_walls flags it): say what blocks it and park, instead of spending all
