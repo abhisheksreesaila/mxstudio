@@ -30,7 +30,7 @@ CONSOLE_DIR = Path(__file__).parent / "console"
 # An explicit list: the console is never a directory server. Add a file here when you add one to console/.
 CONSOLE_SCRIPTS = {"theme.js", "main.js", "core.js", "icons.js", "routes.js",
                    # the blades console: engine, shell and one file per blade, each with its own CSS
-                   "blades.js", "blade-layout.js", "blade-stack.js", "keyed.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "blade-home.js",
+                   "blades.js", "blade-layout.js", "blade-stack.js", "keyed.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "beacon.js", "blade-home.js",
                    "blade-model.js", "blade-add.js", "blade-security.js", "blade-keys.js", "blade-bench.js", "blade-logs.js",
                    "blade-notebook.js", "blade-gateway.js", "blade-settings.js"}
 CONSOLE_STYLES = {"blades.css", "topbar.css", "docs.css", "blade-home.css", "blade-model.css", "blade-add.css",
