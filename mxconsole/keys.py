@@ -38,7 +38,7 @@ def create_key(store: Store, app: str, *, rotate: bool = False, internal: bool =
     if not APP_NAME.fullmatch(app):
         raise ValueError(f"app name {app!r} must be letters, digits, '.', '_' or '-'")
     if app.startswith("_") and not internal:
-        raise ValueError(f"app names starting with '_' are reserved for mxconsole")
+        raise ValueError(f"app names starting with '_' are reserved for omxconsole")
     plaintext = "mst-" + secrets.token_urlsafe(32)
     # Check and write in one write transaction, so two racing `mxc serve` runs can't both
     # "create" a key and leave the first one printed but already overwritten.

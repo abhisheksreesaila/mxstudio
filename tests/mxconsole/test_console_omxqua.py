@@ -66,3 +66,14 @@ async def test_the_console_uses_omxquas_fonts_not_its_own_copies(http):
     assert page.index("/console/omxqua/src/fonts.css") < page.index("/console/blades.css")
     assert "@font-face" not in (await http.get("/console/blades.css")).text
     assert (await http.get("/console/geist-variable.woff2")).status_code == 404
+
+
+async def test_people_read_omxconsole_but_the_wire_keeps_its_names(http):
+    """ADR 0004: a name-only rename. What people read says omxconsole; command, package and wire fields stay."""
+    page = (await http.get("/docs")).text
+    assert "<title>omxconsole API reference</title>" in page and ">omxconsole</a>" in page
+    assert (await http.get("/openapi.json")).json()["info"]["title"] == "omxconsole API"
+    from mxconsole.cli import app
+    assert app.info.help.startswith("omxconsole:")
+    import inspect, mxconsole.window as window
+    assert 'create_window("omxconsole"' in inspect.getsource(window)

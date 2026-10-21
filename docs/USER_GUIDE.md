@@ -1,19 +1,19 @@
-# mxconsole user guide
+# omxconsole user guide
 
 [README](../README.md) · [Command reference](CLI.md) · [Porting](PORTING.md)
 
 ## What it is
 
-mxconsole (`mxc`) serves small models on Modular MAX behind one OpenAI-compatible endpoint on your machine.
+omxconsole (`mxc`) serves small models on Modular MAX behind one OpenAI-compatible endpoint on your machine.
 It loads a model on its first request, unloads it when idle, and can put the endpoint on your LAN over HTTPS with one key per app.
 It also writes a notebook for each model, so you can see how it's built.
 
-This guide covers the mxconsole setup. The older MX Studio / Nucleus guide (`mxs` commands) is in [LEGACY_NUCLEUS.md](LEGACY_NUCLEUS.md).
+This guide covers the omxconsole setup. The older MX Studio / Nucleus guide (`mxs` commands) is in [LEGACY_NUCLEUS.md](LEGACY_NUCLEUS.md).
 
 ## Requirements
 
 - Linux x86-64. That's the only platform it's tested on.
-- An NVIDIA GPU with a working driver: `nvidia-smi` should work. mxconsole reads GPU memory from it.
+- An NVIDIA GPU with a working driver: `nvidia-smi` should work. omxconsole reads GPU memory from it.
 - [Pixi](https://pixi.sh/). MAX, Jupyter Lab and the rest go into the project's own environment; your system Python isn't touched.
 - Git, and internet access for the first install and model downloads.
 
@@ -57,7 +57,7 @@ Model weights aren't bundled. Start with `qwen2.5-0.5b` (Qwen2.5 0.5B Instruct):
 pixi run mxc serve qwen2.5-0.5b
 ```
 
-This downloads the model if needed, starts the mxconsole daemon in the background, loads the model and prints:
+This downloads the model if needed, starts the omxconsole daemon in the background, loads the model and prints:
 
 - the endpoint, `http://127.0.0.1:11435/v1`;
 - the first time only, a key `mst-…` for the app `default`. It's shown once. Save it:
@@ -96,7 +96,7 @@ The console works only on this machine. It isn't exposed on the LAN, even after 
 
 ## 🧭 A tour of the console
 
-Panels open side by side from left to right. The breadcrumb in the top bar shows where you are; click **mxconsole** to go back to My models.
+Panels open side by side from left to right. The breadcrumb in the top bar shows where you are; click **omxconsole** to go back to My models.
 
 ### My models
 
@@ -152,7 +152,7 @@ The filter above the results shows All, Fits or Needs porting. The same labels i
 - **Hardware chip:** your GPUs and memory use. Click it for details.
 - **API keys:** every app key (prefix only), with **New key**, **Rotate** and **Revoke**. A new key is shown once.
 - **Gateway:** LiteLLM's status, the route for each model, the LiteLLM log, safeguard counts for today, recent requests (kept 7 days) and a link to the API reference at `/docs`. **Restart** restarts Caddy and LiteLLM and rotates their internal key.
-- **Settings:** the theme, when each model unloads, the daemon's info with **Stop daemon**, and every port and process mxconsole owns.
+- **Settings:** the theme, when each model unloads, the daemon's info with **Stop daemon**, and every port and process omxconsole owns.
 - **Theme:** the sun and moon button switches light and dark. Until you pick one, the console follows your system.
 
 ## 🔌 Calling the endpoint from your apps
@@ -282,7 +282,7 @@ With `mxc learn` in a terminal, Jupyter starts in your shell, so export `MXC_API
 
 ## 🛠️ Models MAX can't run yet
 
-MAX doesn't support every architecture. Search marks those "needs porting", and `mxc pull` stops before downloading the weights and points you to `mxc port`. **Port it** in Add a model, or `pixi run mxc port <hf-repo> --auto`, has Claude Code write a small MAX package for the model in a sandbox. mxconsole checks it against the Hugging Face model, then registers and serves it. It costs about $2–5 of Claude usage and takes 7–40 minutes per model. What it needs, what can come back and the limits: [PORTING.md](PORTING.md).
+MAX doesn't support every architecture. Search marks those "needs porting", and `mxc pull` stops before downloading the weights and points you to `mxc port`. **Port it** in Add a model, or `pixi run mxc port <hf-repo> --auto`, has Claude Code write a small MAX package for the model in a sandbox. omxconsole checks it against the Hugging Face model, then registers and serves it. It costs about $2–5 of Claude usage and takes 7–40 minutes per model. What it needs, what can come back and the limits: [PORTING.md](PORTING.md).
 
 ## 📁 Where things live
 
@@ -307,12 +307,12 @@ Start with:
 
 ```bash
 pixi run mxc status   # is the daemon up, which models, LAN on or off
-pixi run mxc ps       # every process mxconsole runs: daemon, Caddy, LiteLLM, each max serve
+pixi run mxc ps       # every process omxconsole runs: daemon, Caddy, LiteLLM, each max serve
 ```
 
-**The daemon isn't running.** The console says "mxconsole cannot reach the daemon", and CLI calls say "could not reach the mxconsole daemon". `mxc serve`, `mxc pull`, `mxc console` and `mxc app` start it for you. To run it in the foreground with logs on screen, use `pixi run mxc daemon`. If it won't start, the error shows the end of `~/.mxc/logs/daemon.log`.
+**The daemon isn't running.** The console says "omxconsole cannot reach the daemon", and CLI calls say "could not reach the omxconsole daemon". `mxc serve`, `mxc pull`, `mxc console` and `mxc app` start it for you. To run it in the foreground with logs on screen, use `pixi run mxc daemon`. If it won't start, the error shows the end of `~/.mxc/logs/daemon.log`.
 
-**A model is stuck starting, or crashed.** The first load compiles the graph, which can take minutes; the state shows "compiling" and the time so far. mxconsole gives up after 10 minutes. If it crashed or failed, read its log:
+**A model is stuck starting, or crashed.** The first load compiles the graph, which can take minutes; the state shows "compiling" and the time so far. omxconsole gives up after 10 minutes. If it crashed or failed, read its log:
 
 ```bash
 pixi run mxc logs qwen2.5-0.5b -n 100

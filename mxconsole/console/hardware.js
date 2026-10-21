@@ -1,4 +1,4 @@
-// mxconsole, the top-bar hardware chip's numbers. Pure.
+// mxconsole, the numbers for GPU memory (the Beacon's idle view and a model's hardware fit). Pure.
 const GB = 1024;
 const round1 = (v) => Math.round(v * 10) / 10;
 
