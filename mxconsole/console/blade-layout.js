@@ -5,6 +5,11 @@
 //   hidden not shown at all (phones show only the newest blade)
 export const RAIL_W = 52;
 export const PHONE_W = 860;
+// Blades float: the journey has 14px side margins and 12px between blades (blades.css). The widths below are for blade
+// surfaces, so what the layout may spend is the journey minus those, and the phone cut-off moves by the same amount.
+export const JOURNEY_PAD = 28;
+export const BLADE_GAP = 12;
+export const spendable = (width, count) => width - JOURNEY_PAD - BLADE_GAP * Math.max(0, count - 1);
 const DEFAULTS = { side: 600, narrow: 0, min: 520 };
 
 export function planLayout(specs, width, phone = PHONE_W) {
