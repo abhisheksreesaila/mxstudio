@@ -64,14 +64,16 @@ export function workloadLine(run) {
 const winner = (run) => (run.results || []).find((r) => r.status === "done" && r.decode_tps);
 
 // -- pieces ----------------------------------------------------------------------------------------
-function barBlock(title, hint, rows, unit, digits) {
-  return h("section", { class: "bn-sec" },
-    h("div", { class: "h3" }, title, h("span", { class: "r mono" }, hint)),
-    h("div", { class: "bn-bars" }, rows.map((r) => h("div", { class: `bn-row${r.me ? " me" : ""}${r.best ? " best" : ""}` },
-      h("span", { class: "bn-nm" }, h("span", { class: "mdot", style: { "--mc": colorOf(r.model) } }), h("span", { class: "bn-who" }, h("span", { class: "trunc" }, r.model),
+const card = (title, badge, body, ...src) => h("section", { class: "card" },
+  h("div", { class: "card-h" }, h("h3", {}, title), h("span", { class: "sp" }), badge ? h("span", { class: "badge" }, badge) : null), h("div", { class: "card-b" }, body), ...src);
+const dot = (name) => h("span", { class: "bn-dot", style: { "--mc": colorOf(name) } });
+function barBlock(title, hint, rows, unit, digits, source) {
+  return card(title, hint, h("div", { class: "bn-bars" }, rows.map((r) => h("div", { class: `bn-row${r.me ? " me" : ""}${r.best ? " best" : ""}` },
+      h("span", { class: "bn-nm" }, dot(r.model), h("span", { class: "bn-who" }, h("span", { class: "trunc" }, r.model),
         r.older ? h("span", { class: "bn-old trunc", title: "from an earlier run" }, dateTime(r.at)) : null)),
-      h("span", { class: "bn-tr" }, h("span", { class: "bn-fill", "data-w": (r.fraction * 100).toFixed(1), style: { "--mc": colorOf(r.model) } })),
-      h("span", { class: "bn-v mono" }, `${r.estimated ? "~" : ""}${fmt(r.value, digits)} ${unit}`)))));
+      h("span", { class: "prog bn-tr" }, h("i", { class: "bn-fill", "data-w": (r.fraction * 100).toFixed(1), style: { "--mc": colorOf(r.model) } })),
+      h("span", { class: "bn-v mono" }, `${r.estimated ? "~" : ""}${fmt(r.value, digits)} ${unit}`)))),
+    h("div", { class: "src note" }, source));
 }
 function setWidths(root, instant) {
   const fills = [...root.querySelectorAll(".bn-fill")];
@@ -85,12 +87,12 @@ register("bench", (blade) => {
   let state = null, hist = [], failed = null, shownId = null, picked = false, starting = false, histLoaded = false, lastLatest = null, chartKey = "", histKey = "", progressKey = "";
   const rowEls = new Map();
 
-  const runBtn = h("button", { class: "btn ghost sm", type: "button" });
+  const runBtn = h("button", { class: "btn fill sm", type: "button" });
   const progressHost = h("div", {});
   const chartsHost = h("div", { class: "bn-charts" });
-  const loadNote = h("div", { class: "bn-note", role: "status", hidden: true });
+  const loadNote = h("div", { class: "ox-fail", role: "status", hidden: true });
   const histHost = h("div", {});
-  const allBtn = h("button", { class: "btn ghost sm bn-all", type: "button" }, "Run all models");
+  const allBtn = h("button", { class: "btn tonal sm bn-all", type: "button" }, "Run all models");
   allBtn.addEventListener("click", () => start(true));
   const running = () => !!(state && state.running);
 
@@ -100,7 +102,7 @@ register("bench", (blade) => {
     return (picked && all.find((r) => r.id === shownId)) || state.latest;
   };
   const cmd = (all) => (all || !id ? "mxc bench --all" : `mxc bench ${id}`);
-  const cli = (text) => h("div", { class: "cli mono bn-cli" }, text);
+  const cli = (text) => h("div", { class: "src" }, text);
 
   const drawButton = () => {
     const label = running() || starting ? "Running…" : state && state.latest ? "Run again" : "Run benchmark";
@@ -116,13 +118,12 @@ register("bench", (blade) => {
     if (key !== progressKey) { // the set of models changed: build the rows once, then update them in place
       progressKey = key; rowEls.clear();
       const rows = p.models.map((m) => {
-        const fill = h("span", { class: "bn-pfill", style: { "--mc": colorOf(m.name) } });
+        const fill = h("i", { class: "bn-pfill", style: { "--mc": colorOf(m.name) } });
         const word = h("span", { class: "bn-pword mono" });
         rowEls.set(m.name, { fill, word });
-        return h("div", { class: "bn-prow" }, h("span", { class: "bn-nm" }, h("span", { class: "mdot", style: { "--mc": colorOf(m.name) } }), h("span", { class: "trunc" }, m.name)), h("span", { class: "bn-ptr" }, fill), word);
+        return h("div", { class: "bn-prow" }, h("span", { class: "bn-nm" }, dot(m.name), h("span", { class: "trunc" }, m.name)), h("span", { class: "prog bn-ptr" }, fill), word);
       });
-      progressHost.replaceChildren(h("section", { class: "bn-progress", role: "status" },
-        h("div", { class: "h3" }, icon("loader-circle", 14, "currentColor", 2), "Benchmark running", h("span", { class: "r mono" }, `one model at a time · ${p.runs} timed runs each`)), rows));
+      progressHost.replaceChildren(h("div", { role: "status" }, card("Benchmark running", "one model at a time", h("div", { class: "bn-bars" }, rows), h("div", { class: "src note" }, `${p.runs} timed runs each, after one warm-up that is not counted`))));
     }
     for (const m of p.models) {
       const el = rowEls.get(m.name);
@@ -135,15 +136,16 @@ register("bench", (blade) => {
     }
   };
 
-  const emptyState = () => h("section", { class: "bn-empty" },
-    icon("gauge", 22, "var(--hue-bench)", 1.6),
-    h("h4", {}, "No benchmark has run yet"),
-    h("p", {}, `A run loads ${id ? "the model" : "each model"} if it is not running, sends one warm-up request that is not counted, then ${RUNS} timed ones. It records decode tokens per second and time to first token.`),
-    h("p", {}, "Press Run benchmark above, or from a terminal:"), cli(cmd()));
+  const emptyState = () => h("section", { class: "card" },
+    h("div", { class: "empty" }, h("div", { class: "ring" }, icon("gauge", 20)),
+      h("b", {}, "No benchmark has run yet"),
+      `A run loads ${id ? "the model" : "each model"} if it is not running, sends one warm-up request that is not counted, then ${RUNS} timed ones. It records decode tokens per second and time to first token.`,
+      h("div", {}, h("button", { class: "btn fill sm", type: "button", disabled: !state || running() || starting, onClick: () => start(false) }, icon("gauge", 13), "Run benchmark"))),
+    cli(cmd()));
 
   const drawCharts = () => {
-    if (failed && !state) { chartsHost.replaceChildren(h("div", { class: "bn-empty" }, h("h4", {}, "Could not load benchmarks"), h("p", {}, failed))); chartKey = ""; return; }
-    if (!state) { chartsHost.replaceChildren(h("div", { class: "bn-empty" }, "Loading…")); return; }
+    if (failed && !state) { chartsHost.replaceChildren(h("div", { class: "ox-fail", role: "alert" }, icon("triangle-alert", 15), `Could not load benchmarks: ${failed}`)); chartKey = ""; return; }
+    if (!state) { chartsHost.replaceChildren(h("div", { class: "skel bn-skel" })); return; }
     const run = shownRun();
     const onLatest = !!run && !!state.latest && run.id === state.latest.id;
     const results = !run ? [] : onLatest ? mergeLatest([state.latest, ...hist.filter((r) => r.status === "done" || r.status === "failed")], store.models ? store.models.map((m) => m.name) : null) : run.results;
@@ -158,14 +160,13 @@ register("bench", (blade) => {
     const mixed = results.some((r) => r.older);
     chartsHost.replaceChildren(...[
       missing ? h("div", { class: "bn-note" }, `${id} has no finished result here. Run it with: ${cmd()}`) : null,
-      decode.length ? barBlock("Decode speed · tokens/s", "higher is better", decode, "tok/s", 1) : h("div", { class: "bn-note" }, "No model finished this run, so there is nothing to chart."),
-      ttft.length ? barBlock("Time to first token · p50", "lower is better", ttft, "ms", 0) : null,
+      decode.length ? barBlock("Decode speed · tokens/s", "higher is better", decode, "tok/s", 1, `${run.runs} timed runs per model, after one warm-up`) : h("div", { class: "bn-note" }, "No model finished this run, so there is nothing to chart."),
+      ttft.length ? barBlock("Time to first token · p50", "lower is better", ttft, "ms", 0, `the median of ${run.runs} timed runs`) : null,
       only ? h("div", { class: "bn-note" }, "Only this model has a result. To compare it with the others, run all of them.", " ", allBtn) : null,
-      failedRows.length ? h("div", { class: "bn-fails" }, failedRows.map((r) => h("div", { class: "bn-fail" }, icon("circle-alert", 13, "currentColor", 2), h("span", { class: "mono" }, r.model), `failed: ${r.error || "no result"}`))) : null,
-      h("section", { class: "bn-sec" }, h("div", { class: "h3" }, run.id === (state.latest && state.latest.id) ? "This run" : "An earlier run"), h("div", { class: "bn-work mono" }, workloadLine(run)),
-        mixed ? h("div", { class: "small muted bn-est" }, "Rows with a date come from an earlier run (each model's newest result). Run all models to refresh everyone.", " ", allBtn) : null,
-        decode.some((r) => r.estimated) ? h("div", { class: "small muted bn-est" }, "~ means MAX returned no token counts, so they are estimated at four characters per token.") : null),
-      cli(cmd())].filter(Boolean));
+      failedRows.length ? h("div", { class: "bn-fails" }, failedRows.map((r) => h("div", { class: "ox-fail" }, icon("circle-alert", 14, "currentColor", 2), h("span", { class: "mono" }, r.model), `failed: ${r.error || "no result"}`))) : null,
+      card(run.id === (state.latest && state.latest.id) ? "This run" : "An earlier run", "", [h("div", { class: "bn-work mono" }, workloadLine(run)),
+        mixed ? h("div", { class: "ox-note" }, "Rows with a date come from an earlier run (each model's newest result). Run all models to refresh everyone.", " ", allBtn) : null,
+        decode.some((r) => r.estimated) ? h("div", { class: "ox-note" }, "~ means MAX returned no token counts, so they are estimated at four characters per token.") : null], cli(cmd()))].filter(Boolean));
     setWidths(chartsHost, false);
     setHead(blade, { sub: `${id || "all models"} · ${run.id === (state.latest && state.latest.id) ? "latest run" : "an earlier run"} · ${dateTime(run.started_at)}` });
   };
@@ -177,7 +178,7 @@ register("bench", (blade) => {
     histKey = key;
     if (!rows.length) { histHost.replaceChildren(); return; }
     const shown = shownRun();
-    histHost.replaceChildren(h("section", { class: "bn-sec" }, h("div", { class: "h3" }, "History", h("span", { class: "r mono" }, `${rows.length} run${rows.length === 1 ? "" : "s"}`)),
+    histHost.replaceChildren(h("section", { class: "card" }, h("div", { class: "card-h" }, h("h3", {}, "History"), h("span", { class: "sp" }), h("span", { class: "badge" }, `${rows.length} run${rows.length === 1 ? "" : "s"}`)),
       h("div", { class: "bn-hist" }, rows.map((r) => {
         const w = winner(r), ok = r.status === "done" || r.status === "failed";
         const btn = h("button", { class: `bn-hrow${shown && shown.id === r.id ? " on" : ""}`, type: "button", disabled: !ok },
@@ -188,7 +189,7 @@ register("bench", (blade) => {
           picked = !(state.latest && state.latest.id === r.id); shownId = r.id; chartKey = ""; histKey = ""; draw();
         });
         return btn;
-      }))));
+      })), h("div", { class: "src note" }, "pick a run to chart it; newest first")));
   };
 
   const draw = () => {
@@ -242,7 +243,8 @@ register("bench", (blade) => {
     icon: "gauge", hue: "var(--hue-bench)", side: 600, min: 520,
     tools: runBtn,
     mount(body) {
-      body.replaceChildren(h("div", { class: "bn" }, progressHost, loadNote, chartsHost, histHost));
+      blade.el.classList.add("oq-flat");
+      body.replaceChildren(h("div", { class: "bn ox-pad" }, progressHost, loadNote, chartsHost, histHost));
       blade.onClose = () => poller.stop();
       poller.start();
       if (blade.opts.run) startWhenLoaded();

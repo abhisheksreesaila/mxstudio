@@ -1,31 +1,47 @@
-/* mxconsole, the Settings blade (F-028). Styles for this blade only; shared pieces live in blades.css. */
-.b-settings .bb { background: var(--canvas); }
-.st { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-.st-sec { background: var(--card); border: 1px solid var(--card-line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
-.st-sec .h3 { margin-bottom: 10px; }
-.st-note { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); max-width: 64ch; }
-.st-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 7px 18px; margin: 10px 0 0; font-size: 13px; }
-.st-kv dt { color: var(--muted); }
-.st-kv dd { margin: 0; overflow-wrap: anywhere; }
-.st-twin { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
-.st-twin .cli { flex: 1; }
+/* omxconsole, the Settings blade (F-028, omxqua since F-045), and the small pieces the other seven blades of F-045
+   share. Shared pieces are prefixed ox- so they cannot clash with the blade frame's own classes in blades.css. */
 
-.st-seg { display: inline-flex; border: 1px solid var(--card-line); border-radius: 8px; padding: 2px; background: var(--card); }
-.st-seg button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border: 0; border-radius: 6px; background: none; font-size: 13px; color: var(--muted); }
-.st-seg button[aria-pressed="true"] { background: var(--sunk); color: var(--text); font-weight: 500; }
+/* ---------- shared by the F-045 blades ---------- */
+.ox-pad { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.ox-pad > * { flex-shrink: 0; }
+.ox-note { margin: 10px 0 0; font-size: 12.5px; color: var(--oq-ink-2); max-width: 64ch; line-height: 1.5; }
+.ox-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ox-flush { padding: 0; }
+.ox-scroll { overflow-x: auto; }
+.ox-scroll .tbl td { white-space: nowrap; }
+.ox-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 9px 18px; margin: 0; font-size: 13.5px; }
+.ox-dl dt { color: var(--oq-ink-2); }
+.ox-dl dd { margin: 0; font: 13px var(--oq-font-mono); overflow-wrap: anywhere; min-width: 0; display: flex; align-items: center; gap: 8px; }
+/* state is always a dot and a word */
+.ox-st { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--oq-ink-2); white-space: nowrap; }
+.ox-st i { width: 7px; height: 7px; border-radius: 50%; background: var(--oq-ink-faint); flex: none; }
+.ox-st.run { color: var(--oq-ok); }
+.ox-st.run i { background: var(--oq-ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--oq-ok) 22%, transparent); }
+.ox-st.warn { color: var(--oq-warn); }
+.ox-st.warn i { background: var(--oq-warn); }
+.ox-st.bad { color: var(--oq-bad); }
+.ox-st.bad i { background: var(--oq-bad); }
+/* a tinted tile that carries the card's icon, as in the mock's Security card */
+.ox-tile { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--c, var(--oq-ink-2)) 14%, transparent); color: var(--c, var(--oq-ink-2)); flex: none; }
+.ox-warnbox { border-radius: 12px; padding: 12px 14px; background: color-mix(in srgb, var(--oq-bad) 8%, transparent); }
+.ox-warnbox p { margin: 0 0 10px; font-size: 13px; color: var(--oq-ink-2); }
+.ox-warnbox code { background: var(--code); color: var(--code-text); border-radius: 5px; padding: 1px 7px; }
+.ox-fail { display: flex; align-items: center; gap: 8px; border-radius: 12px; padding: 10px 12px; font-size: 13px; background: color-mix(in srgb, var(--oq-bad) 8%, transparent); color: var(--oq-bad); }
+/* the dark code panel keeps its look in both themes, like a terminal */
+.ox-code { position: relative; background: var(--code); color: var(--code-text); border-radius: 12px; padding: 14px 16px; }
+.ox-code pre { margin: 0; font: 12px/1.65 var(--oq-font-mono); white-space: pre; overflow: auto; padding-right: 76px; }
+.ox-code .btn { position: absolute; top: 8px; right: 8px; background: rgb(255 255 255 / .1); color: inherit; }
+/* an endpoint or a file: tag, value, copy */
+.ox-ep { display: flex; align-items: center; gap: 10px; border: 1px solid var(--oq-line); border-radius: 12px; padding: 0 6px 0 12px; min-height: 44px; font: 13px var(--oq-font-mono); min-width: 0; }
+.ox-ep .k { font-size: 11px; color: var(--oq-ink-2); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.ox-ep .u { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.src .tail { margin-left: auto; }
 
-.st-stop { margin-top: 14px; }
-.st-stop .btn.danger { color: var(--bad-fg); background: var(--card); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
-.st-stop .btn.danger:hover { background: color-mix(in srgb, var(--bad) 8%, var(--card)); }
-.st-confirm { border: 1px solid color-mix(in srgb, var(--bad) 45%, transparent); background: color-mix(in srgb, var(--bad) 4%, var(--card)); border-radius: 10px; padding: 12px 14px; }
-.st-confirm p { margin: 0 0 10px; font-size: 13px; color: var(--text-2); }
-.st-confirm code { background: var(--code); color: var(--code-text); border-radius: 5px; padding: 1px 7px; }
-.st-row { display: flex; gap: 8px; }
+/* inside a blade buttons sit on the surface (omxqua's .oq-flat, set on the blade in each mount); the header tools
+   sit in the blade frame, which is not under a card */
+.blade.oq-flat .bh .btn.fill, .blade.oq-flat .bh .btn.tonal { box-shadow: none; }
 
-.st-table { overflow-x: auto; margin: 0 -16px; }
-.st-table table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.st-table th { text-align: left; font: 500 10.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 6px 16px; border-bottom: 1px solid var(--card-line); white-space: nowrap; }
-.st-table td { padding: 9px 16px; border-bottom: 1px solid var(--card-line-2); white-space: nowrap; }
-.st-table tr:last-child td { border-bottom: 0; }
-.st-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); margin-right: 7px; }
-.st-dot.on { background: var(--ok); }
+/* ---------- Settings ---------- */
+.ox-stop { margin-top: 16px; }
+.b-settings .seg2 button { display: inline-flex; align-items: center; gap: 6px; }
+.ox-pnote { padding: 0 16px 12px; margin: 0; }

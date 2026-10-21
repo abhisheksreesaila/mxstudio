@@ -31,39 +31,46 @@ register("keys", (blade) => ({
     const timers = new Map();  // app -> revoke-confirm timeout
 
     // -- skeleton ------------------------------------------------------------------------------
-    const nameInput = h("input", { class: "txt mono", placeholder: "app name, e.g. my-app", "aria-label": "App name", maxlength: "64", autocomplete: "off", spellcheck: "false" });
-    const formErr = h("div", { class: "ferr", role: "alert", hidden: true });
-    const create = h("button", { class: "btn dark", type: "submit" }, icon("plus", 14, "currentColor", 2), "Create key");
-    const form = h("form", { class: "box newkey", hidden: true, onSubmit: (e) => { e.preventDefault(); newKey(); } },
-      h("div", { class: "h3" }, "New key"), h("div", { class: "frow" }, nameInput, create, h("button", { class: "btn ghost", type: "button", onClick: () => toggleForm(false) }, "Cancel")),
-      formErr, h("div", { class: "cli mono" }, "mxc keys new <app>"));
-    const revealTitle = h("b", {}), revealNote = h("span", {}), revealKey = h("code", { class: "secret mono" });
-    const revealCopy = h("span", {});
-    const reveal = h("div", { class: "box reveal", role: "status", hidden: true },
-      h("div", { class: "hd" }, h("span", { class: "sq", style: { "--h": "var(--ok)", width: "28px", height: "28px" } }, icon("key-round", 16, "currentColor", 1.75)), h("div", { class: "tx" }, revealTitle, revealNote),
-        h("button", { class: "ib", type: "button", "aria-label": "Done", title: "Done", onClick: clearSecret }, icon("x", 14))),
-      h("div", { class: "keyline" }, revealKey, revealCopy), h("div", { class: "cli mono revcli" }));
+    const nameInput = h("input", { class: "mono", placeholder: " ", "aria-label": "App name", maxlength: "64", autocomplete: "off", spellcheck: "false" });
+    const nameField = h("label", { class: "mo" }, nameInput, h("span", { class: "fl" }, "App name, e.g. my-app"));
+    const formErr = h("div", { class: "mf-help err", role: "alert", hidden: true });
+    const create = h("button", { class: "btn fill sm", type: "submit" }, icon("plus", 13, "currentColor", 2), "Create key");
+    const form = h("form", { class: "card", hidden: true, onSubmit: (e) => { e.preventDefault(); newKey(); } },
+      h("div", { class: "card-h" }, h("h3", {}, "New key")),
+      h("div", { class: "card-b" }, nameField, formErr, h("div", { class: "ox-row kn-acts" }, create, h("button", { class: "btn text sm", type: "button", onClick: () => toggleForm(false) }, "Cancel"))),
+      h("div", { class: "src" }, "mxc keys new <app>"));
+    const revealTitle = h("h3", {}), revealNote = h("div", { class: "ox-note" }), revealKey = h("code", { class: "secret mono" });
+    const revealCopy = h("span", {}), revealSrc = h("div", { class: "src" });
+    const reveal = h("section", { class: "card kn-reveal", role: "status", hidden: true },
+      h("div", { class: "card-h" }, h("span", { class: "ox-tile", style: { "--c": "var(--oq-ok)" } }, icon("key-round", 18, "currentColor", 1.75)), revealTitle, h("span", { class: "sp" }),
+        h("button", { class: "xbtn", type: "button", "aria-label": "Done", title: "Done", onClick: clearSecret }, icon("x", 16))),
+      h("div", { class: "card-b" }, revealNote, h("div", { class: "keyline" }, revealKey, revealCopy)), revealSrc);
     const tbody = h("tbody", {});
-    const empty = h("div", { class: "empty", hidden: true }, "No keys yet. Create one for each app that calls your models.");
-    const note = h("div", { class: "empty err", hidden: true, role: "alert" });
-    const table = h("div", { class: "box tablebox" }, h("table", { class: "keys" },
-      h("thead", {}, h("tr", {}, ["App", "Key", "Created", "Last used", "Status", ""].map((t) => h("th", {}, t)))), tbody), empty, note);
-    body.replaceChildren(h("div", { class: "pad" }, form, reveal, table, h("div", { class: "foot" }, h("span", { class: "cli mono" }, "mxc keys ls"))));
-    const newBtn = h("button", { class: "btn dark sm", type: "button", "data-act": "new", onClick: () => toggleForm(!formOpen) }, icon("plus", 13, "currentColor", 2), "New key");
+    const empty = h("div", { class: "empty", hidden: true }, h("div", { class: "ring" }, icon("key-round", 20)), h("b", {}, "No keys yet"), "Create one for each app that calls your models.",
+      h("div", {}, h("button", { class: "btn fill sm", type: "button", onClick: () => toggleForm(true) }, icon("plus", 13, "currentColor", 2), "New key")));
+    const note = h("div", { class: "ox-fail", role: "alert", hidden: true });
+    const table = h("section", { class: "card" }, h("div", { class: "card-h" }, h("h3", {}, "Keys"), h("span", { class: "sp" }), h("span", { class: "badge" }, "prefix only")),
+      h("div", { class: "card-b ox-flush ox-scroll" }, h("table", { class: "tbl keys" },
+        h("thead", {}, h("tr", {}, ["App", "Key", "Created", "Last used", "Status", ""].map((t) => h("th", {}, t)))), tbody), empty, note),
+      h("div", { class: "src" }, "mxc keys ls"));
+    blade.el.classList.add("oq-flat");
+    body.replaceChildren(h("div", { class: "ox-pad" }, form, reveal, table));
+    const newBtn = h("button", { class: "btn fill sm", type: "button", "data-act": "new", onClick: () => toggleForm(!formOpen) }, icon("plus", 13, "currentColor", 2), "New key");
     blade.toolsEl.replaceChildren(newBtn);
 
     function toggleForm(open) {
-      formOpen = open; form.hidden = !open; formErr.hidden = true;
+      formOpen = open; form.hidden = !open; formErr.hidden = true; nameField.classList.remove("err");
       if (open) { nameInput.value = ""; nameInput.focus(); }
     }
     function clearSecret() { reveal.hidden = true; revealKey.textContent = ""; revealCopy.replaceChildren(); }
+    const formError = (message) => { formErr.hidden = !message; formErr.textContent = message; nameField.classList.toggle("err", !!message); };
     function showSecret(app, key, title, text, twin) {
-      formErr.hidden = true;
+      formError("");
       revealTitle.textContent = title;
       revealNote.textContent = text;
       revealKey.textContent = key;
-      revealCopy.replaceChildren(copyButton(() => key, "Copy", "btn ghost sm"));
-      reveal.querySelector(".revcli").textContent = twin;
+      revealCopy.replaceChildren(copyButton(() => key, "Copy", "btn tonal sm"));
+      revealSrc.textContent = twin;
       reveal.hidden = false;
     }
 
@@ -75,15 +82,15 @@ register("keys", (blade) => ({
     }
     async function newKey() {
       const app = nameInput.value.trim();
-      formErr.hidden = true; formErr.textContent = "";
-      if (!validAppName(app)) { formErr.hidden = false; formErr.textContent = "Use letters, digits, '.', '_' or '-', starting with a letter or digit."; return; }
+      formError("");
+      if (!validAppName(app)) { formError("Use letters, digits, '.', '_' or '-', starting with a letter or digit."); return; }
       create.disabled = true;
       try {
         const out = await api("POST", "/admin/keys", { app });
         toggleForm(false);
         showSecret(app, out.key, `Key for ${app}`, "Copy it now. It is shown once and cannot be recovered; rotate it if you lose it.", keyTwin("new", app));
         toast(`Created ${app} · $ ${keyTwin("new", app)}`);
-      } catch (e) { formErr.hidden = false; formErr.textContent = e.status === 409 ? `There is already a key for ${app}. Rotate it instead.` : e.message; }
+      } catch (e) { formError(e.status === 409 ? `There is already a key for ${app}. Rotate it instead.` : e.message); }
       create.disabled = false;
       load();
     }
@@ -104,8 +111,8 @@ register("keys", (blade) => ({
     function makeRow(r) {
       const cells = Array.from({ length: 6 }, () => h("td", {}));
       const tr = h("tr", { class: "krow", "data-id": r.name }, ...cells);
-      const rot = h("button", { class: "btn ghost sm", type: "button", onClick: () => confirmAct(r.name, rot, "Rotate", "Click again to rotate: the old key stops working now", rotate) }, icon("rotate-cw", 12, "currentColor", 1.75), h("span", {}, "Rotate"));
-      const rev = h("button", { class: "btn ghost sm danger", type: "button", onClick: () => confirmAct(r.name, rev, "Revoke", "Click again to revoke", revoke) }, icon("trash-2", 12, "currentColor", 1.75), h("span", {}, "Revoke"));
+      const rot = h("button", { class: "btn tonal sm", type: "button", onClick: () => confirmAct(r.name, rot, "Rotate", "Click again to rotate: the old key stops working now", rotate) }, icon("rotate-cw", 12, "currentColor", 1.75), h("span", {}, "Rotate"));
+      const rev = h("button", { class: "btn danger sm", type: "button", onClick: () => confirmAct(r.name, rev, "Revoke", "Click again to revoke", revoke) }, icon("trash-2", 12, "currentColor", 1.75), h("span", {}, "Revoke"));
       cells[5].append(h("div", { class: "acts" }, rot, rev));
       Object.assign(tr, { _cells: cells, _rot: rot, _rev: rev });
       return tr;
@@ -124,10 +131,10 @@ register("keys", (blade) => ({
     function updateRow(tr, r) {
       const [app, prefix, created, used, status] = tr._cells;
       app.className = "nm mono"; app.textContent = r.name;
-      prefix.className = "mono muted"; prefix.textContent = `${r.prefix}…`;
-      created.className = "muted"; created.textContent = r.created;
-      used.className = "muted"; used.textContent = r.lastUsed;
-      status.replaceChildren(h("span", { class: `kst ${r.status}` }, h("span", { class: "sd" }), r.status));
+      prefix.className = "mono ink2"; prefix.textContent = `${r.prefix}…`;
+      created.className = "ink2"; created.textContent = r.created;
+      used.className = "ink2"; used.textContent = r.lastUsed;
+      status.replaceChildren(h("span", { class: `ox-st ${r.active ? "run" : ""}` }, h("i"), r.status));
       tr._rot.title = r.active ? `$ ${keyTwin("rotate", r.name)}` : `$ ${keyTwin("rotate", r.name)} (brings it back)`;
       tr._rev.title = `$ ${keyTwin("revoke", r.name)}`;
       tr._rev.disabled = !r.active;
@@ -135,7 +142,7 @@ register("keys", (blade) => ({
     function draw() {
       if (!blade.alive) return;
       note.hidden = !error || rows !== null && rows.length > 0;
-      note.textContent = error ? `Could not load keys: ${error}` : "";
+      note.replaceChildren(...(error ? [icon("triangle-alert", 15), `Could not load keys: ${error}`] : []));
       table.querySelector("table").hidden = !rows || rows.length === 0;
       empty.hidden = !(rows && rows.length === 0 && !error);
       if (rows) syncKeyed(tbody, cache, rows, makeRow, updateRow);

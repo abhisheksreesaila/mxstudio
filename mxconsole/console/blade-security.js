@@ -47,19 +47,26 @@ register("security", (blade) => ({
     let network = null, phase = "idle", error = "", token = 0, shape = "", stopBusy = false, stopArmed = false, stopTimer = 0;
     const idx = () => stack.indexOf(blade);
 
-    const statusIcon = h("span", { class: "sq", style: { width: "28px", height: "28px" } });
-    const statusTitle = h("b", {}), statusText = h("span", {});
-    const actions = h("div", { class: "secact" });
+    const statusIcon = h("span", { class: "ox-tile" });
+    const statusTitle = h("h3", {}), statusText = h("div", { class: "sc-sub" });
+    const statusWord = h("span", { class: "ox-st" }, h("i"), "");
+    const actions = h("div", { class: "ox-row" });
+    const progress = h("div", { class: "prog indet", hidden: true }, h("i"));
     const steps = h("ul", { class: "secsteps" });
-    const errBox = h("div", { class: "attn", role: "alert", hidden: true });
-    const box = h("div", { class: "secbox" }, h("div", { class: "hd" }, statusIcon, h("div", { class: "tx" }, statusTitle, statusText)), actions, steps, errBox);
-    const after = h("div", { class: "after" });
-    const how = h("div", {}, h("div", { class: "h3" }, "What “Make it secure” does"),
-      h("dl", { class: "ess" },
-        h("dt", {}, "Certificate"), h("dd", {}, "a local CA, “mxconsole local”, signs a certificate for this machine's name"),
-        h("dt", {}, "API key"), h("dd", {}, "the gateway has its own key; requests without a valid app key get 401"),
-        h("dt", {}, "HTTPS"), h("dd", {}, "Caddy and LiteLLM listen on your LAN; localhost keeps working over HTTP")));
-    body.replaceChildren(h("div", { class: "pad" }, box, how, after));
+    const errBox = h("div", { class: "ox-fail", role: "alert", hidden: true });
+    const srcLine = h("div", { class: "src" });
+    const box = h("section", { class: "card" },
+      h("div", { class: "card-h" }, statusIcon, h("div", {}, statusTitle, statusText), h("span", { class: "sp" }), statusWord),
+      h("div", { class: "card-b sc-body" }, progress, steps, errBox, actions), srcLine);
+    const after = h("div", { class: "sc-after" });
+    const how = h("section", { class: "card" }, h("div", { class: "card-h" }, h("h3", {}, "What “Make it secure” does")),
+      h("div", { class: "card-b" }, h("dl", { class: "ox-dl" },
+        h("dt", {}, "Certificate"), h("dd", { class: "sc-text" }, "a local CA, “mxconsole local”, signs a certificate for this machine's name"),
+        h("dt", {}, "API key"), h("dd", { class: "sc-text" }, "the gateway has its own key; requests without a valid app key get 401"),
+        h("dt", {}, "HTTPS"), h("dd", { class: "sc-text" }, "Caddy and LiteLLM listen on your LAN; localhost keeps working over HTTP"))),
+      h("div", { class: "src note" }, "all three happen in one request"));
+    blade.el.classList.add("oq-flat");
+    body.replaceChildren(h("div", { class: "ox-pad" }, box, how, after));
 
     async function reloadInfo() {  // core.js only re-reads /admin/info every 15 s: the LAN endpoint just changed
       try { store.info = await api("GET", "/admin/info"); store.infoAt = Date.now(); } catch (_) { /* the poll catches up */ }
@@ -112,31 +119,38 @@ register("security", (blade) => ({
       const v = securityView(store.info, network);
       const running = phase === "run" || phase === "done";
       const sig = `${v.secure}|${phase}|${v.url}|${v.caPath}|${v.caExists}`;
-      statusIcon.style.setProperty("--h", v.secure ? "var(--ok)" : "var(--hue-keys)");
-      statusIcon.replaceChildren(icon(v.secure ? "lock" : "unlock", 16, "currentColor", 1.75));
-      box.classList.toggle("done", v.secure && phase !== "run");
+      statusIcon.style.setProperty("--c", v.secure ? "var(--oq-ok)" : "var(--oq-warn)");
+      statusIcon.replaceChildren(icon(v.secure ? "lock" : "unlock", 18, "currentColor", 1.75));
       statusTitle.textContent = phase === "run" ? "Making it secure…" : v.secure ? "Secure on your network" : "Localhost only";
-      statusText.textContent = phase === "run" ? "$ mxc expose" : v.secure ? "HTTPS with a key. Other devices on your Wi-Fi can call it." : "Only this machine can call it. One click adds a certificate, a key and HTTPS.";
+      statusText.textContent = phase === "run" ? "adding a certificate, a key and HTTPS" : v.secure ? "HTTPS with a key. Other devices on your Wi-Fi can call it." : "Only this machine can call it. One click adds a certificate, a key and HTTPS.";
+      statusWord.className = `ox-st ${phase === "run" ? "warn" : v.secure ? "run" : ""}`;
+      statusWord.lastChild.textContent = phase === "run" ? "working" : v.secure ? "secure" : "localhost only";
       // the steps are not focusable: rebuilt every draw while they run
       steps.hidden = !running;
+      progress.hidden = phase !== "run";
       if (running) steps.replaceChildren(...stepRows(stepStates(phase), v));
       errBox.hidden = phase !== "fail";
       errBox.replaceChildren(...(phase === "fail" ? [icon("triangle-alert", 15), h("span", {}, `Could not make it secure: ${error}`)] : []));
+      srcLine.textContent = v.secure ? "mxc expose --stop" : "mxc expose";
       if (sig === shape) return;  // buttons and the after-panel are focusable: rebuild only when they change
       shape = sig;
       actions.replaceChildren(...(v.secure
-        ? [h("button", { class: "btn ghost", type: "button", onClick: () => push("keys", {}, idx()) }, icon("key-round", 14, "currentColor", 1.75), "Manage API keys"),
-          h("button", { class: "btn ghost danger", type: "button", onClick: stopExposing }, icon("unlock", 14, "currentColor", 1.75), "Stop exposing")]
-        : [h("button", { class: "btn dark", type: "button", disabled: phase === "run", onClick: secure }, icon("lock", 14, "currentColor", 1.75), phase === "fail" ? "Try again" : "Make it secure")]),
-      h("div", { class: "cli mono" }, v.secure ? "mxc expose --stop" : "mxc expose"));
+        ? [h("button", { class: "btn tonal sm", type: "button", onClick: () => push("keys", {}, idx()) }, icon("key-round", 14, "currentColor", 1.75), "Manage API keys"),
+          h("button", { class: "btn danger sm", type: "button", onClick: stopExposing }, icon("unlock", 14, "currentColor", 1.75), "Stop exposing")]
+        : [h("button", { class: "btn fill sm", type: "button", disabled: phase === "run", onClick: secure }, icon("lock", 14, "currentColor", 1.75), phase === "fail" ? "Try again" : "Make it secure")]));
       after.replaceChildren(...(v.secure ? [
-        h("div", { class: "urlrow secure" }, h("span", { class: "tag" }, "https · lan"), h("span", { class: "u" }, v.url), copyButton(() => v.url, "", "ib")),
-        h("div", { class: "h3 gap" }, "Trust the certificate"),
-        h("p", { class: "note" }, v.caExists ? "Other devices need to trust the mxconsole CA once, or HTTPS calls fail with a certificate error. This machine already knows it." : "The CA file is created the first time Caddy starts; it is not there yet."),
-        h("div", { class: "urlrow" }, h("span", { class: "tag" }, "ca"), h("span", { class: "u" }, v.caPath || "—"), v.caPath ? copyButton(() => v.caPath, "", "ib") : null),
-        h("ul", { class: "trust" }, trustSteps(v.caPath).map(([os, how]) => h("li", {}, h("b", {}, os), h("span", { class: "mono" }, how)))),
-        h("div", { class: "h3 gap" }, "From another device on your Wi-Fi"),
-        h("div", { class: "code" }, copyButton(() => v.curl, "copy", "cp"), h("pre", { class: "curl mono" }, v.curl)),
+        h("section", { class: "card" }, h("div", { class: "card-h" }, h("h3", {}, "Endpoint")),
+          h("div", { class: "card-b" }, h("div", { class: "ox-ep" }, h("span", { class: "k" }, "https · lan"), h("span", { class: "u" }, v.url), copyButton(() => v.url, "Copy", "btn text sm"))),
+          h("div", { class: "src" }, "mxc status")),
+        h("section", { class: "card" }, h("div", { class: "card-h" }, h("h3", {}, "Trust the certificate")),
+          h("div", { class: "card-b" },
+            h("p", { class: "ox-note" }, v.caExists ? "Other devices need to trust the mxconsole CA once, or HTTPS calls fail with a certificate error. This machine already knows it." : "The CA file is created the first time Caddy starts; it is not there yet."),
+            h("div", { class: "ox-ep sc-ca" }, h("span", { class: "k" }, "ca"), h("span", { class: "u" }, v.caPath || "—"), v.caPath ? copyButton(() => v.caPath, "Copy", "btn text sm") : null),
+            h("ul", { class: "trust" }, trustSteps(v.caPath).map(([os, how]) => h("li", {}, h("b", {}, os), h("span", { class: "mono" }, how))))),
+          h("div", { class: "src note" }, "trust it once on each device")),
+        h("section", { class: "card" }, h("div", { class: "card-h" }, h("h3", {}, "From another device on your Wi-Fi")),
+          h("div", { class: "card-b" }, h("div", { class: "ox-code" }, copyButton(() => v.curl, "copy", "btn text sm"), h("pre", { class: "curl mono" }, v.curl))),
+          h("div", { class: "src note" }, "replace <model> with a model name")),
       ] : []));
     }
     blade.redraw = draw;

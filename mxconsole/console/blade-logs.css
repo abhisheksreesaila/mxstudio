@@ -1,17 +1,16 @@
-/* mxconsole, the Logs blade (F-027). Styles for this blade only; shared pieces live in blades.css. */
-.b-logs .bb { background: var(--card); overflow: hidden; }
-.lg { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.lg-bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--card-line); flex: none; }
-.lg-search { display: flex; align-items: center; gap: 8px; height: 32px; border: 1px solid var(--card-line); border-radius: 7px; padding: 0 10px; color: var(--muted); background: var(--card); flex: 1; max-width: 320px; min-width: 0; }
-.lg-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
-.lg-filter { border: 0; outline: 0; font: 13px var(--sans); flex: 1; min-width: 0; color: var(--text); background: none; }
-.lg-count { font-size: 11.5px; color: var(--muted); white-space: nowrap; margin-left: auto; }
-.lg-note { padding: 8px 16px; font-size: 12.5px; color: var(--warn-fg); background: color-mix(in srgb, var(--warn) 7%, var(--card)); border-bottom: 1px solid var(--card-line); flex: none; }
-.lg-note.bad { color: var(--bad-fg); background: color-mix(in srgb, var(--bad) 6%, var(--card)); }
+/* omxconsole, the Logs blade (F-027, omxqua since F-045). The filter is an omxqua .mo field; the log sits in one card that ends in its mxc line. */
+.b-logs .bb { overflow: hidden; }
+.lg { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; padding: 16px; }
+.lg-bar { display: flex; align-items: center; gap: 12px; flex: none; }
+.lg-bar .mo { max-width: 340px; }
+.lg-count { font-size: 11.5px; color: var(--oq-ink-2); white-space: nowrap; margin-left: auto; }
+.lg-note { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--oq-warn); flex: none; }
+.lg-note i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.lg-note.bad { color: var(--oq-bad); }
+.lg-card { flex: 1; min-height: 0; overflow: hidden; }
 /* the dark pane stays dark in every theme, like a terminal */
-.lg-pane { flex: 1; min-height: 0; overflow: auto; background: var(--code); color: var(--code-text); font: 11.5px/1.6 var(--mono); padding: 10px 16px; }
+.lg-pane { flex: 1; min-height: 0; overflow: auto; background: var(--code); color: var(--code-text); font: 11.5px/1.6 var(--oq-font-mono); padding: 10px 16px; }
 .lg-line { white-space: pre-wrap; word-break: break-word; }
-.lg-line.err { color: #f87171; }
-.lg-line.warn { color: #fbbf24; }
-.lg-empty { color: #71717a; font: 12.5px var(--mono); padding: 6px 0; }
-.lg-foot { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-top: 1px solid var(--card-line); flex: none; }
+.lg-line.err { color: color-mix(in srgb, var(--oq-bad) 70%, white); }
+.lg-line.warn { color: color-mix(in srgb, var(--oq-warn) 75%, white); }
+.lg-empty { color: color-mix(in srgb, var(--code-text) 50%, var(--code)); font: 12.5px var(--oq-font-mono); padding: 6px 0; }

@@ -190,9 +190,9 @@ function outputEl(o) {
 }
 
 function cellEl(cell) {
-  if (cell.type !== "code") return h("section", { class: "nb-cell" }, h("div", { class: "nb-md" }, ...buildNodes(parseMarkdown(cell.source))));
+  if (cell.type !== "code") return h("section", { class: "card nb-cell" }, h("div", { class: "nb-md" }, ...buildNodes(parseMarkdown(cell.source))));
   const n = execCount(cell), outs = outputsView(cell.outputs);
-  return h("section", { class: "nb-cell" },
+  return h("section", { class: "card nb-cell" },
     h("div", { class: "nb-in" },
       h("div", { class: "nb-n mono", title: n === null ? "not run" : `run ${n}` }, n === null ? "[ ]" : `[${n}]`),
       h("pre", { class: "nb-code mono" }, h("code", {}, cell.source))),
@@ -209,13 +209,16 @@ function archPanel(nb) {
     if (a.safetensors_total) kv.push(["Weights", `${compact(a.safetensors_total)} (safetensors)`]);
   }
   return h("aside", { class: "nb-side", "aria-label": "Architecture" },
-    h("div", { class: "lbl" }, "Architecture"),
-    a ? h("div", { class: "nb-arch mono" }, a.architecture || "unknown architecture") : h("p", { class: "nb-none" }, "This notebook has no architecture summary."),
-    kv.length ? h("dl", { class: "nb-kv" }, kv.map(([k, v]) => [h("dt", {}, k), h("dd", { class: "mono" }, v)])) : null,
-    a && a.rows.length ? h("table", { class: "nb-rows" }, h("tbody", {}, a.rows.map((r) =>
-      h("tr", { title: r.meaning || null }, h("th", { class: "mono" }, r.field), h("td", { class: "mono" }, showValue(r.value)))))) : null,
-    h("div", { class: "lbl nb-gap" }, "Kernel"),
-    h("p", { class: "nb-none" }, nb.kernelspec && (nb.kernelspec.display_name || nb.kernelspec.name) ? `${nb.kernelspec.display_name || nb.kernelspec.name} · saved outputs only, nothing runs here` : "saved outputs only, nothing runs here"));
+    h("section", { class: "card" }, h("div", { class: "card-h" }, h("h3", {}, "Architecture")),
+      h("div", { class: "card-b" },
+        a ? h("div", { class: "nb-arch mono" }, a.architecture || "unknown architecture") : h("p", { class: "nb-none" }, "This notebook has no architecture summary."),
+        kv.length ? h("dl", { class: "ox-dl nb-kv" }, kv.map(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])) : null,
+        a && a.rows.length ? h("table", { class: "nb-rows" }, h("tbody", {}, a.rows.map((r) =>
+          h("tr", { title: r.meaning || null }, h("th", { class: "mono" }, r.field), h("td", { class: "mono" }, showValue(r.value)))))) : null),
+      h("div", { class: "src note" }, "read from the model's config")),
+    h("section", { class: "card" }, h("div", { class: "card-h" }, h("h3", {}, "Kernel")),
+      h("div", { class: "card-b" }, h("p", { class: "nb-none" }, nb.kernelspec && (nb.kernelspec.display_name || nb.kernelspec.name) ? `${nb.kernelspec.display_name || nb.kernelspec.name} · saved outputs only, nothing runs here` : "saved outputs only, nothing runs here")),
+      h("div", { class: "src note" }, "Run in Jupyter above to execute cells")));
 }
 
 register("notebook", (blade) => {
@@ -223,10 +226,10 @@ register("notebook", (blade) => {
   const enc = encodeURIComponent(id);
   let nb = null;
 
-  const chipEl = h("span", { class: "kchip off" }, h("span", { class: "sd" }), h("span", { class: "kt" }, "start it to run cells"));
+  const chipEl = h("span", { class: "badge kchip" }, h("i"), h("span", { class: "kt" }, "start it to run cells"));
   const status = h("div", { class: "nb-status", role: "status", hidden: true });
-  const modeBtn = h("button", { class: "btn dark sm", type: "button", disabled: true });
-  const tabLink = h("a", { class: "ib", target: "_blank", rel: "noopener noreferrer", "aria-label": "Open Jupyter in a new tab", title: "Open in a new tab", hidden: true }, icon("external-link", 14));
+  const modeBtn = h("button", { class: "btn tonal sm", type: "button", disabled: true });
+  const tabLink = h("a", { class: "btn text icon sm", target: "_blank", rel: "noopener noreferrer", "aria-label": "Open Jupyter in a new tab", title: "Open in a new tab", hidden: true }, icon("external-link", 14));
   const shell = h("div", { class: "nb" });
   const saved = h("div", { class: "nb-saved" });
   const frameWrap = h("div", { class: "nb-frame", hidden: true });
@@ -241,7 +244,7 @@ register("notebook", (blade) => {
 
   function paintChip() {
     const v = kernelChip((store.models || []).find((m) => m.name === id), store.info && store.info.endpoint);
-    chipEl.classList.toggle("off", !v.on);
+    chipEl.classList.toggle("ok", v.on);
     chipEl.lastChild.textContent = v.text;
   }
   function say(...content) { status.replaceChildren(...content); status.hidden = !content.length; }
@@ -274,27 +277,26 @@ register("notebook", (blade) => {
   modeBtn.addEventListener("click", runInJupyter);
 
   function notice(title, text, retry) {
-    shell.replaceChildren(h("div", { class: "nb-notice" }, h("h4", {}, title), h("p", {}, text),
-      retry ? h("button", { class: "btn ghost", type: "button", onClick: retry }, icon("rotate-cw", 14), "Try again") : null,
-      h("div", { class: "cli" }, `mxc learn ${id}`)));
+    shell.replaceChildren(h("div", { class: "nb-notice" }, h("section", { class: "card" },
+      h("div", { class: "empty" }, h("div", { class: "ring" }, icon(retry ? "triangle-alert" : "book-open", 20)), h("b", {}, title), text,
+        retry ? h("div", {}, h("button", { class: "btn fill sm", type: "button", onClick: retry }, icon("rotate-cw", 13), "Try again")) : h("div", { class: "prog indet nb-wait" }, h("i"))),
+      h("div", { class: "src" }, `mxc learn ${id}`))));
   }
 
   function draw() {
     const cells = nb.cells, chs = chapters(cells);
     const cellEls = cells.map(cellEl);
-    const toc = h("nav", { class: "nb-toc", "aria-label": "Chapters" }, h("div", { class: "lbl" }, "Chapters"),
+    const toc = h("nav", { class: "nb-toc", "aria-label": "Chapters" }, h("div", { class: "nb-lab" }, "Chapters"),
       chs.length ? chs.map((c, i) => h("button", { type: "button", class: `lv${c.level}`, onClick: (e) => {
         toc.querySelectorAll("button").forEach((b) => b.removeAttribute("aria-current"));
         e.currentTarget.setAttribute("aria-current", "true");
         cellEls[c.cell].scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
       } }, h("span", { class: "num mono" }, String(i + 1)), h("span", {}, c.title))) : h("p", { class: "nb-none" }, "No headings in this notebook."));
     const side = archPanel(nb);
-    const twin = h("div", { class: "nb-twin" },
-      h("div", { class: "lbl nb-gap" }, "From the terminal"),
-      h("div", { class: "nb-cmd" }, h("span", { class: "cli" }, `mxc learn ${id}`),
-        h("button", { class: "ib", type: "button", "aria-label": "Copy command", title: "Copy", onClick: async () => toast((await copyText(`mxc learn ${id}`)) ? "Copied" : "Could not reach the clipboard") }, icon("copy", 14))),
-      h("div", { class: "lbl nb-gap" }, "File"),
-      h("div", { class: "nb-path mono" }, nb.path));
+    const twin = h("section", { class: "card" }, h("div", { class: "card-h" }, h("h3", {}, "File")),
+      h("div", { class: "card-b" }, h("div", { class: "nb-path mono" }, nb.path)),
+      h("div", { class: "src" }, `mxc learn ${id}`,
+        h("button", { class: "cp", type: "button", "aria-label": "Copy command", onClick: async () => toast((await copyText(`mxc learn ${id}`)) ? "Copied" : "Could not reach the clipboard") }, "copy")));
     side.append(twin);
     saved.replaceChildren(h("div", { class: "nb-grid" }, toc, h("div", { class: "nb-main" }, h("div", { class: "nb-inner" }, cellEls)), side));
     shell.replaceChildren(status, saved, frameWrap);
@@ -320,6 +322,7 @@ register("notebook", (blade) => {
     icon: "book-open", hue: "var(--hue-notebook)", wide: true, min: 900,
     tools: [chipEl, modeBtn, tabLink],
     mount(body) {
+      blade.el.classList.add("oq-flat");
       body.replaceChildren(shell);
       paintChip();
       blade.onClose = onData(paintChip);

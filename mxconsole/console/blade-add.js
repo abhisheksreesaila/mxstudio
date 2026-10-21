@@ -254,6 +254,7 @@ register("add", (blade) => ({
 }));
 
 function mountAdd(blade, body) {
+  blade.el.classList.add("oq-flat");
   const ui = { q: "", resp: null, loading: true, error: null, filter: "all", seq: 0, flow: 0, run: null, logOpen: true };
   const scope = timerScope(), guard = searchGuard();
   let debounce = 0;
@@ -263,18 +264,22 @@ function mountAdd(blade, body) {
   blade.onClose = () => { ui.flow++; scope.closeAll(); };
 
   // ---- find view ----
-  const input = h("input", { type: "search", placeholder: "Search the MAX catalog, or paste a Hugging Face repo id (owner/name)", "aria-label": "Search models", autocomplete: "off", spellcheck: "false" });
-  const memEl = h("div", { class: "memline mono" });
-  const seg = h("div", { class: "fseg", role: "group", "aria-label": "Show" });
+  const input = h("input", { type: "search", placeholder: " ", "aria-label": "Search models", autocomplete: "off", spellcheck: "false" });
+  const memEl = h("span", { class: "tail" });
+  const seg = h("div", { class: "ox-row", role: "group", "aria-label": "Show" });
   const slot = h("div", { class: "slot" });
-  const resHead = h("div", { class: "h3" });
+  const resHead = h("h3", {});
   const list = h("div", { class: "reslist", "aria-live": "polite" });
+  const resSrc = h("div", { class: "src" }, h("span", {}), memEl);
   const findWrap = h("div", { class: "findwrap" }, h("div", { class: "find" },
-    h("label", { class: "search" }, icon("search", 16, "currentColor", 1.75), input), h("div", { class: "frow" }, seg, memEl), slot, resHead, list));
+    h("label", { class: "mo has-lead" }, h("span", { class: "lead" }, icon("search", 16, "currentColor", 1.75)), input, h("span", { class: "fl" }, "Search models")),
+    h("div", { class: "mf-help ad-hint" }, "Search the MAX catalog, or paste a Hugging Face repo id (owner/name)"),
+    seg, slot,
+    h("section", { class: "card" }, h("div", { class: "card-h" }, resHead), list, resSrc)));
 
   function drawFilter() {
     seg.replaceChildren(...FILTERS.map(([key, label]) => {
-      const b = h("button", { type: "button", class: ui.filter === key ? "on" : "", "aria-pressed": String(ui.filter === key) }, label);
+      const b = h("button", { type: "button", class: ui.filter === key ? "chip on" : "chip", "aria-pressed": String(ui.filter === key) }, label);
       b.addEventListener("click", () => { ui.filter = key; drawFilter(); drawResults(); });
       return b;
     }));
@@ -282,18 +287,29 @@ function mountAdd(blade, body) {
   function drawResults() {
     const v = searchView(ui);
     memEl.textContent = v.memory ? `fit checked against ${v.memory}` : "";
+    resSrc.firstChild.textContent = ui.q.trim() ? twin("search", ui.q.trim()) : "mxc search <query>";
     list.classList.toggle("busy", ui.loading && !!ui.resp);
-    resHead.replaceChildren(v.title);
-    if (v.kind === "loading") { list.replaceChildren(h("div", { class: "empty" }, "Searching…")); return; }
-    if (v.kind === "error") { list.replaceChildren(h("div", { class: "empty err" }, `Search failed: ${v.message}`)); return; }
+    resHead.replaceChildren(v.title || "Results");
+    if (v.kind === "loading") { list.replaceChildren(h("div", { class: "ad-skel" }, [0, 1, 2, 3].map(() => h("div", { class: "skel" })))); return; }
+    if (v.kind === "error") { list.replaceChildren(emptyState("triangle-alert", "Search failed", v.message, "Try again", runSearch)); return; }
     const rows = filterResults(v.rows, ui.filter);
-    if (v.kind === "empty" || !rows.length) { list.replaceChildren(h("div", { class: "empty" }, v.message || "Nothing in this filter.")); return; }
+    if (v.kind === "empty" || !rows.length) {
+      const text = v.message || "Nothing in this filter.";
+      list.replaceChildren(ui.q.trim() ? emptyState("search", "No results", text, "Clear search", () => { input.value = ""; ui.q = ""; runSearch(); })
+        : ui.filter !== "all" ? emptyState("search", "Nothing in this filter", text, "Show all", () => { ui.filter = "all"; drawFilter(); drawResults(); }) : emptyState("search", "No models listed", text));
+      return;
+    }
     list.replaceChildren(...rows.map((r) => resultRow(r)));
+  }
+  /** An omxqua empty state: a ring icon, one line, and the one action that fills it. */
+  function emptyState(ic, title, text, label, run) {
+    return h("div", { class: "empty" }, h("div", { class: "ring" }, icon(ic, 20)), h("b", {}, title), text,
+      label ? h("div", {}, h("button", { class: "btn fill sm", type: "button", onClick: run }, label)) : null);
   }
   function resultRow(r) {
     const v = resultView(r);
     const btn = h("button", { type: "button", class: "res", "data-id": r.id },
-      h("span", { class: `src ${v.sourceKey}` }, v.sourceLabel),
+      h("span", { class: `badge ${v.sourceKey}` }, v.sourceLabel),
       h("span", { class: "nm" }, r.id),
       h("span", { class: "fits" }, h("span", { class: `fit ${v.chip.key}` }, v.chip.label), v.vram ? h("span", { class: "sz" }, v.vram) : null),
       h("span", { class: "mt" }, [v.repo !== r.id ? v.repo : "", v.meta].filter(Boolean).join(" · ")));
@@ -333,54 +349,56 @@ function mountAdd(blade, body) {
   function meter(label, pct, bad, text) {
     const bar = h("i");
     bar.style.width = `${pct}%`;
-    bar.style.background = bad ? "var(--bad)" : "var(--hue-add)";
-    return h("div", { class: "meter" }, h("span", {}, label), h("span", { class: "tr" }, bar), h("span", { class: "num" }, text));
+    bar.style.background = bad ? "var(--oq-bad)" : "var(--oq-data-3)";
+    return h("div", { class: "meter" }, h("span", {}, label), h("span", { class: "prog" }, bar), h("span", { class: "num" }, text));
   }
   function showWarn(r) {
     const w = warnView(r, ui.resp && ui.resp.memory);
     const picks = w.suggestions.map((s) => {
       const b = h("button", { type: "button", class: "sg", "data-id": s.id },
-        h("span", { class: "t" }, s.repo), h("span", { class: "fit ok" }, s.label), h("span", { class: "d" }, s.detail), h("span", { class: "cli mono" }, twin("pull", s.id)));
+        h("span", { class: "t" }, s.repo), h("span", { class: "fit ok" }, s.label), h("span", { class: "d" }, s.detail), h("span", { class: "cmd mono" }, twin("pull", s.id)));
       b.addEventListener("click", () => {
         const full = (r.suggestions || []).find((x) => x.id === s.id) || {};
         startPull({ ...full, fit: "ok", supported: true, source: "max" });
       });
       return b;
     });
-    const notice = h("div", { class: "notice warn", role: "alert" },
-      h("div", { class: "lab" }, icon("triangle-alert", 15, "currentColor", 1.9), "HARDWARE CHECK · nothing downloaded"),
-      h("h4", {}, w.heading),
-      h("p", {}, "mxconsole checks before downloading weights you cannot use. Pick a smaller model that fits, or free memory by stopping a running one."),
-      meter("needs", 100, true, w.need ? `~${trim(w.need)} GB` : "?"),
-      meter(w.gpu, w.freePct, false, `${trim(w.free)} GB`),
-      picks.length ? h("div", { class: "sugg" }, picks) : h("p", { class: "muted" }, "Nothing smaller in the catalog fits either."));
+    const notice = h("section", { class: "card ad-up", role: "alert" },
+      h("div", { class: "card-h" }, h("span", { class: "ox-tile", style: { "--c": "var(--oq-warn)" } }, icon("triangle-alert", 18, "currentColor", 1.9)), h("h3", {}, w.heading), h("span", { class: "sp" }),
+        h("span", { class: "badge warn" }, h("i"), "nothing downloaded")),
+      h("div", { class: "card-b" },
+        h("p", { class: "ox-note ad-lead" }, "mxconsole checks before downloading weights you cannot use. Pick a smaller model that fits, or free memory by stopping a running one."),
+        meter("needs", 100, true, w.need ? `~${trim(w.need)} GB` : "?"),
+        meter(w.gpu, w.freePct, false, `${trim(w.free)} GB`),
+        picks.length ? h("div", { class: "sugg" }, picks) : h("p", { class: "ox-note" }, "Nothing smaller in the catalog fits either.")),
+      h("div", { class: "src note" }, `hardware check against ${w.gpu}`));
     slot.replaceChildren(notice);
     notice.scrollIntoView({ block: "nearest" });
   }
   function showPortOffer(r, opts = {}) {
     const ref = r.repo_id || r.id;
-    const row = h("div", { class: "cmd-row" });
+    const row = h("div", { class: "ox-row ad-acts" });
     if (opts.guided) {
-      row.append(h("code", { class: "cmd mono" }, twin("guided", ref)), copyButton(() => twin("guided", ref), "Copy"));
-    } else if (opts.refused) {
-      row.append(h("span", { class: "cli mono" }, twin("guided", ref)));
-    } else {
-      const go = h("button", { type: "button", class: "btn port" }, icon("hammer", 15, "currentColor", 1.9), "Port it");
+      row.append(copyButton(() => twin("guided", ref), "Copy the command", "btn tonal sm"));
+    } else if (!opts.refused) {
+      const go = h("button", { type: "button", class: "btn fill sm" }, icon("hammer", 14, "currentColor", 1.9), "Port it");
       go.addEventListener("click", () => startPort(r));
-      row.append(go, h("span", { class: "cli mono" }, twin("port", ref)));
+      row.append(go);
     }
-    const notice = h("div", { class: "notice port" },
-      h("div", { class: "lab" }, icon("hammer", 15, "currentColor", 1.9), "ARCHITECTURE CHECK"),
-      h("h4", {}, `${ref.split("/").pop()} uses ${r.architecture || "an architecture"}, which MAX cannot run yet.`),
-      h("p", {}, "“Port it” runs Claude Code with Modular’s import-model skill, unattended and in a sandbox: it reads the config, writes the model as a MAX graph, checks it against the reference and fixes what fails. It may take a while, often several minutes and sometimes much longer, and it uses your Claude Code session. You will see every stage and the full log, and you can cancel."),
-      opts.guided ? h("p", { class: "warn-text" }, "Automatic porting is not in this daemon yet. Run the guided port from a terminal instead:") : null,
-      opts.note ? h("p", { class: "warn-text" }, opts.note) : null,
-      opts.refused ? h("p", { class: "warn-text" }, opts.refused) : null,
-      opts.sandbox ? h("p", { class: "muted small" }, "Without a sandbox the agent would run with your full permissions, so it is not offered here. If you accept that, the terminal can: ", h("span", { class: "mono" }, `${twin("port", ref)} --unsandboxed`)) : null,
-      h("dl", { class: "kv" }, h("dt", {}, "architecture"), h("dd", {}, r.architecture || "unknown"),
-        h("dt", {}, "size"), h("dd", {}, [paramsText(r.params), sizeText(r.size_gb)].filter(Boolean).join(" · ") || "unknown"),
-        h("dt", {}, "skill"), h("dd", {}, "import-model")),
-      row);
+    const notice = h("section", { class: "card ad-up" },
+      h("div", { class: "card-h" }, h("span", { class: "ox-tile", style: { "--c": "var(--oq-data-1)" } }, icon("hammer", 18, "currentColor", 1.9)),
+        h("h3", {}, `${ref.split("/").pop()} uses ${r.architecture || "an architecture"}, which MAX cannot run yet.`), h("span", { class: "sp" }), h("span", { class: "badge" }, "architecture check")),
+      h("div", { class: "card-b" },
+        h("p", { class: "ox-note ad-lead" }, "“Port it” runs Claude Code with Modular’s import-model skill, unattended and in a sandbox: it reads the config, writes the model as a MAX graph, checks it against the reference and fixes what fails. It may take a while, often several minutes and sometimes much longer, and it uses your Claude Code session. You will see every stage and the full log, and you can cancel."),
+        opts.guided ? h("p", { class: "ox-note warn-text" }, "Automatic porting is not in this daemon yet. Run the guided port from a terminal instead:") : null,
+        opts.note ? h("p", { class: "ox-note warn-text" }, opts.note) : null,
+        opts.refused ? h("p", { class: "ox-note warn-text" }, opts.refused) : null,
+        opts.sandbox ? h("p", { class: "ox-note" }, "Without a sandbox the agent would run with your full permissions, so it is not offered here. If you accept that, the terminal can: ", h("span", { class: "mono" }, `${twin("port", ref)} --unsandboxed`)) : null,
+        h("dl", { class: "ox-dl ad-kv" }, h("dt", {}, "architecture"), h("dd", {}, r.architecture || "unknown"),
+          h("dt", {}, "size"), h("dd", {}, [paramsText(r.params), sizeText(r.size_gb)].filter(Boolean).join(" · ") || "unknown"),
+          h("dt", {}, "skill"), h("dd", {}, "import-model")),
+        row),
+      h("div", { class: "src" }, opts.guided || opts.refused ? twin("guided", ref) : twin("port", ref)));
     slot.replaceChildren(notice);
     notice.scrollIntoView({ block: "nearest" });
   }
@@ -394,10 +412,11 @@ function mountAdd(blade, body) {
   const stageList = h("ol", { class: "stages" });
   const rowEls = new Map();
   const after = h("div", { class: "after" });
-  const actions = h("div", { class: "runacts" });
+  const actions = h("div", { class: "ox-row runacts" });
+  const stagesSrc = h("div", { class: "src" });
   const setupEl = h("div", { class: "setup" },
-    h("div", { class: "sl" }, stageList, actions, after),
-    h("div", { class: "sr" }, h("div", { class: "lbl" }, icon("terminal", 13, "currentColor", 1.8), "LIVE LOG", h("span", { class: "grow" }), logToggle), logEl));
+    h("div", { class: "sl" }, h("section", { class: "card" }, h("div", { class: "card-b ad-stages" }, stageList), stagesSrc), actions, after),
+    h("section", { class: "sr" }, h("div", { class: "srh" }, icon("terminal", 13, "currentColor", 1.8), "LIVE LOG", h("span", { class: "grow" }), logToggle), logEl));
   logToggle.addEventListener("click", () => {
     ui.logOpen = !ui.logOpen;
     setupEl.classList.toggle("nolog", !ui.logOpen);
@@ -437,8 +456,8 @@ function mountAdd(blade, body) {
     rows.forEach((r, i) => {
       let el = rowEls.get(r.id);
       if (!el) {
-        el = { status: null, ring: h("span", { class: "ring" }), n: h("span", { class: "n" }), el: h("span", { class: "el" }), d: h("span", { class: "d" }), tw: h("span", { class: "cli mono tw" }), bar: h("i") };
-        el.barWrap = h("div", { class: "bar" }, el.bar);
+        el = { status: null, ring: h("span", { class: "ring" }), n: h("span", { class: "n" }), el: h("span", { class: "el" }), d: h("span", { class: "d" }), tw: h("span", { class: "tw mono" }), bar: h("i") };
+        el.barWrap = h("div", { class: "prog bar" }, el.bar);
         el.li = h("li", { class: "stg pending", "data-id": r.id }, el.ring, el.n, h("span", { class: "meta" }, el.el), el.d, el.barWrap, el.tw);
         rowEls.set(r.id, el);
       }
@@ -472,6 +491,7 @@ function mountAdd(blade, body) {
     rowEls.clear();
     preEl.replaceChildren(); postEl.replaceChildren(); tailEl.replaceChildren(); tailKey = "";
     after.replaceChildren(); actions.replaceChildren();
+    stagesSrc.textContent = twinText;
     body.replaceChildren(setupEl);
     setHead(blade, { title, crumb: ref, sub: twinText });
     ui.tick = every(paint, TICK_MS);
@@ -506,18 +526,18 @@ function mountAdd(blade, body) {
     backActions("Try again", () => (run.kind === "port" ? startPort : startPull)(run.source));
   }
   function backActions(retryLabel, retry) {
-    const back = h("button", { type: "button", class: "btn ghost" }, icon("search", 14, "currentColor", 1.8), "Back to search");
+    const back = h("button", { type: "button", class: "btn tonal sm" }, icon("search", 14, "currentColor", 1.8), "Back to search");
     back.addEventListener("click", showFind);
     const row = [back];
     if (retry) {
-      const again = h("button", { type: "button", class: "btn dark" }, icon("refresh-cw", 14, "currentColor", 1.8), retryLabel);
+      const again = h("button", { type: "button", class: "btn fill sm" }, icon("refresh-cw", 14, "currentColor", 1.8), retryLabel);
       again.addEventListener("click", retry);
       row.unshift(again);
     }
     actions.replaceChildren(...row);
   }
   function cancelButton(flow) {
-    const b = h("button", { type: "button", class: "btn ghost" }, icon("x", 14, "currentColor", 1.8), "Cancel");
+    const b = h("button", { type: "button", class: "btn tonal sm" }, icon("x", 14, "currentColor", 1.8), "Cancel");
     b.addEventListener("click", async () => {
       if (!flow.ok()) return;
       flow.aborted = true;
@@ -704,20 +724,20 @@ function mountAdd(blade, body) {
   function showReady(name, endpoint) {
     setHead(blade, { title: `${name} is ready`, crumb: name, sub: `${endpoint} · model “${name}”` });
     const curl = curlFor(endpoint, name);
-    const secure = h("button", { type: "button", class: "btn dark" }, icon("lock", 14, "currentColor", 1.9), "Make it secure");
+    const secure = h("button", { type: "button", class: "btn tonal sm" }, icon("lock", 14, "currentColor", 1.9), "Make it secure");
     secure.addEventListener("click", () => push("security", { id: name }, stack.indexOf(blade)));
-    const open = h("button", { type: "button", class: "btn primary" }, "Open", h("span", { class: "nm-in" }, name), icon("chevron-right", 14, "currentColor", 2));
+    const open = h("button", { type: "button", class: "btn fill sm" }, "Open", h("span", { class: "nm-in" }, name), icon("chevron-right", 14, "currentColor", 2));
     open.addEventListener("click", () => push("model", { id: name }, 0));
-    const another = h("button", { type: "button", class: "btn ghost" }, icon("plus", 14, "currentColor", 1.8), "Add another");
+    const another = h("button", { type: "button", class: "btn text sm" }, icon("plus", 14, "currentColor", 1.8), "Add another");
     another.addEventListener("click", showFind);
-    const card = h("div", { class: "ready", role: "status" },
-      h("span", { class: "pill" }, "READY · LOCALHOST"),
-      h("h4", {}, `${name} is serving.`),
-      h("div", { class: "urlrow" }, h("span", { class: "tag" }, "local"), h("span", { class: "u mono" }, endpoint), copyButton(() => endpoint, "Copy", "btn ghost sm")),
-      h("pre", { class: "curl mono" }, curl),
-      h("div", { class: "cmd-row" }, copyButton(() => curl, "Copy curl", "btn ghost sm"), h("span", { class: "cli mono" }, twin("serve", name))),
-      h("p", { class: "muted small" }, "It is on localhost only. Make it secure to reach it from your phone or another machine with HTTPS and an API key."),
-      h("div", { class: "acts" }, open, secure, another));
+    const card = h("section", { class: "card ready", role: "status" },
+      h("div", { class: "card-h" }, h("h3", {}, `${name} is serving.`), h("span", { class: "sp" }), h("span", { class: "badge ok" }, h("i"), "ready · localhost")),
+      h("div", { class: "card-b ad-ready" },
+        h("div", { class: "ox-ep" }, h("span", { class: "k" }, "local"), h("span", { class: "u" }, endpoint), copyButton(() => endpoint, "Copy", "btn text sm")),
+        h("div", { class: "ox-code" }, copyButton(() => curl, "Copy curl", "btn text sm"), h("pre", { class: "curl mono" }, curl)),
+        h("p", { class: "ox-note" }, "It is on localhost only. Make it secure to reach it from your phone or another machine with HTTPS and an API key."),
+        h("div", { class: "ox-row" }, open, secure, another)),
+      h("div", { class: "src" }, twin("serve", name)));
     actions.replaceChildren();
     after.replaceChildren(card);
     card.scrollIntoView({ block: "nearest" });

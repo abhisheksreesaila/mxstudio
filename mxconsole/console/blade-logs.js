@@ -49,11 +49,11 @@ register("logs", (blade) => {
   const running = () => { const m = modelState(); return !!m && (m.state === "ready" || m.state === "starting"); };
 
   const pane = h("div", { class: "lg-pane mono", role: "log", tabindex: "0", "aria-label": `${id} log` });
-  const filter = h("input", { class: "lg-filter", type: "search", placeholder: "Filter lines", "aria-label": "Filter lines", spellcheck: "false", autocomplete: "off" });
+  const filter = h("input", { type: "search", placeholder: " ", "aria-label": "Filter lines", spellcheck: "false", autocomplete: "off" });
   const count = h("span", { class: "lg-count mono" });
   const note = h("div", { class: "lg-note", role: "status", hidden: true });
-  const followBtn = h("button", { class: "btn ghost sm", type: "button", "aria-pressed": "true" });
-  const copy = copyButton(() => visibleLines(text, filter.value, truncated).lines.join("\n"), "Copy", "btn ghost sm");
+  const followBtn = h("button", { class: "btn tonal sm", type: "button", "aria-pressed": "true" });
+  const copy = copyButton(() => visibleLines(text, filter.value, truncated).lines.join("\n"), "Copy", "btn tonal sm");
 
   const setFollowLabel = () => {
     followBtn.replaceChildren(icon(follow ? "pause" : "play", 13), follow ? "Pause" : "Follow");
@@ -92,7 +92,7 @@ register("logs", (blade) => {
     else if (m && !running()) msg = m.state === "crashed" ? `${id} crashed. This is the end of its log, from before it stopped.` : `${id} is not running, so this log is not growing. Start it with: mxc serve ${id}`;
     note.hidden = !msg;
     note.classList.toggle("bad", !!m && m.state === "crashed");
-    if (note.textContent !== msg) note.textContent = msg;
+    if (note.lastChild?.textContent !== msg) note.replaceChildren(h("i"), msg);
   };
 
   const fetchLog = async () => {
@@ -132,12 +132,13 @@ register("logs", (blade) => {
     icon: "scroll-text", hue: "var(--hue-logs)", side: 620, min: 520,
     tools: [followBtn, copy],
     mount(body) {
+      blade.el.classList.add("oq-flat");
       body.replaceChildren(h("div", { class: "lg" },
         h("div", { class: "lg-bar" },
-          h("label", { class: "lg-search" }, icon("search", 14), filter), count),
-        note, pane,
-        h("div", { class: "lg-foot" }, h("span", { class: "cli mono" }, `mxc logs ${id} -f`), h("span", { class: "grow" }),
-          h("span", { class: "small muted" }, `the last 8 KB · refreshes every ${POLL_MS / 1000} s`))));
+          h("label", { class: "mo has-lead" }, h("span", { class: "lead" }, icon("search", 16)), filter, h("span", { class: "fl" }, "Filter lines")), count),
+        note,
+        h("section", { class: "card lg-card" }, pane,
+          h("div", { class: "src" }, `mxc logs ${id} -f`, h("span", { class: "tail" }, `the last 8 KB · refreshes every ${POLL_MS / 1000} s`)))));
       pane.replaceChildren(h("div", { class: "lg-empty" }, "Loading…"));
       poller.start();
       // the model's state (running or not) comes from the console's shared poll

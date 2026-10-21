@@ -1,29 +1,10 @@
-/* mxconsole, the API keys blade (F-025). Shared pieces (box, h3, cli) come from blades.css and blade-model.css. */
-.b-keys .tablebox { padding: 0; overflow-x: auto; }
-.b-keys table.keys { width: 100%; border-collapse: collapse; min-width: 560px; }
-.b-keys table.keys th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--card-line); background: var(--hover); white-space: nowrap; }
-.b-keys table.keys td { padding: 9px 12px; border-bottom: 1px solid var(--card-line-2); font-size: 13px; vertical-align: middle; white-space: nowrap; }
-.b-keys table.keys tr:last-child td { border-bottom: 0; }
-.b-keys table.keys tr.krow:hover { background: var(--hover); }
-.b-keys table.keys td.nm { font-weight: 600; }
+/* omxconsole, the API keys blade (F-025, omxqua since F-045). Cards, the .mo field, .tbl and .empty come from omxqua; ox- pieces from blade-settings.css. */
+.b-keys .kn-acts { margin-top: 12px; }
+.b-keys .keys td.nm { font-weight: 600; }
 .b-keys .acts { display: flex; gap: 6px; justify-content: flex-end; }
-.b-keys .btn.danger.armed { background: color-mix(in srgb, var(--bad) 10%, var(--card)); border-color: color-mix(in srgb, var(--bad) 50%, transparent); }
-.b-keys .kst { font: 500 12px var(--mono); display: inline-flex; align-items: center; gap: 6px; }
-.b-keys .kst.active { color: var(--ok-fg); }
-.b-keys .kst.active .sd { background: var(--ok); }
-.b-keys .kst.revoked { color: var(--muted); }
-.b-keys .newkey .frow { display: flex; gap: 8px; flex-wrap: wrap; }
-.b-keys .txt { flex: 1; min-width: 160px; height: 34px; border: 1px solid var(--card-line); border-radius: 7px; padding: 0 10px; background: var(--card); color: var(--text); font-size: 13px; }
-.b-keys .txt:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
-.b-keys .ferr { color: var(--bad-fg); font-size: 12.5px; margin-top: 8px; }
-.b-keys .box > .cli { margin-top: 10px; }
-.b-keys .reveal { border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 4%, var(--card)); }
-.b-keys .reveal .hd { display: flex; align-items: center; gap: 12px; }
-.b-keys .reveal .hd .tx { flex: 1; min-width: 0; }
-.b-keys .reveal .hd b { display: block; font-weight: 600; }
-.b-keys .reveal .hd span { font-size: 12.5px; color: var(--muted); }
+.b-keys .btn.danger.armed { background: color-mix(in srgb, var(--oq-bad) 14%, transparent); font-weight: 650; }
+.b-keys .kn-reveal { background: color-mix(in srgb, var(--oq-ok) 6%, var(--oq-surface-1)); }
 .b-keys .keyline { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
-.b-keys .secret { flex: 1; min-width: 0; background: var(--code); color: var(--code-text); border-radius: 7px; padding: 8px 10px; font-size: 12.5px; overflow-wrap: anywhere; }
-.b-keys .foot { padding: 0 2px; }
-.b-keys .empty.err { color: var(--bad-fg); }
-.b-keys.side .pad, .b-keys.narrow .pad { padding: 12px; }
+.b-keys .secret { flex: 1; min-width: 0; background: var(--code); color: var(--code-text); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; overflow-wrap: anywhere; }
+.b-keys .ox-fail { margin: 12px 16px; }
+.b-keys .mf-help { margin-left: 0; }
