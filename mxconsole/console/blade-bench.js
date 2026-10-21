@@ -10,6 +10,9 @@ const RUNS = 5;
 // -- pure helpers (tested under node) ------------------------------------------------------------
 /** Bars for one metric. Only finished models with a number get a bar. The length is always value / largest value
  * (an honest zero baseline); `lowerIsBetter` only changes the sort (smallest first) and which row is the best. */
+/** The header's Run button shows once there are results (Run again) or a run is going; an empty blade's one action is in its empty state. */
+export function headerRunShown(latest, running) { return Boolean(latest) || Boolean(running); }
+
 export function barRows(results, key, lowerIsBetter, me) {
   const rows = (results || []).filter((r) => r.status === "done" && r[key] > 0).map((r) => ({ model: r.model, value: r[key], estimated: !!r.estimated, older: !!r.older, at: r.at }));
   rows.sort((a, b) => (lowerIsBetter ? a.value - b.value : b.value - a.value) || a.model.localeCompare(b.model));
@@ -108,6 +111,7 @@ register("bench", (blade) => {
     const label = running() || starting ? "Running…" : state && state.latest ? "Run again" : "Run benchmark";
     runBtn.replaceChildren(icon(running() || starting ? "loader-circle" : "rotate-cw", 13), label);
     runBtn.disabled = running() || starting || !state;
+    runBtn.hidden = !headerRunShown(state && state.latest, running() || starting);
     runBtn.title = id ? `Benchmark ${id} again in the background (${cmd()})` : "Benchmark every model in the background";
   };
 

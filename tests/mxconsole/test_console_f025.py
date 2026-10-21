@@ -42,6 +42,11 @@ def commands(state, secure=False):
 
 
 # -- command bar ---------------------------------------------------------------------------------
+def test_logs_stay_one_click_away_in_the_model_menu():
+    from mxconsole.gateway import CONSOLE_DIR
+    assert '["logs", "Logs", "scroll-text", "logs"]' in (CONSOLE_DIR / "blade-model.js").read_text()
+
+
 def test_commands_by_state():
     def keys(state, secure=False):
         return [c["key"] for c in commands(state, secure)]
@@ -51,7 +56,8 @@ def test_commands_by_state():
     assert keys("starting")[0] == "stop"
     for state in ("ready", "cold", "crashed", "starting"):
         k = keys(state)
-        assert "secure" in k and "bench" in k and "notebook" in k and "logs" in k and "copy" in k
+        assert "secure" in k and "bench" in k and "notebook" in k and "copy" in k
+        assert "logs" not in k  # since the omxconsole finish (D-04): Logs is in the left menu, so the bar fits one line
         assert k[-1] == "rm"
     assert "secure" not in keys("ready", True)
 

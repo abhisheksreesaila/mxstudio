@@ -31,8 +31,15 @@ export function commandsFor(state, secure) {
   power[0].primary = true;  // one filled verb per command bar: the power one
   return [...power,
     ...(secure ? [] : [c("secure", "Make it secure", "lock", HUE.security)]),
-    c("bench", "Run benchmark", "gauge", HUE.bench), c("notebook", "Open notebook", "book-open", HUE.notebook), c("logs", "Logs", "scroll-text", HUE.logs),
+    c("bench", "Run benchmark", "gauge", HUE.bench), c("notebook", "Open notebook", "book-open", HUE.notebook),  // Logs: in the left menu, so the bar fits one line
     c("copy", "Copy endpoint", "copy", HUE.copy), c("rm", "Remove", "trash-2", null, true)];
+}
+
+/** What the Tokens card says when there is nothing to chart: never "no traffic" beside a request count. */
+export function quietNote(state, requests) {
+  if (requests > 0 && state !== "running")
+    return { title: "Not loaded right now", text: `${requests} requests in the last 5 min; it loads again on the next one.` };
+  return { title: "No traffic yet", text: "Start it, or call it: it starts on the first request." };
 }
 
 /** The curl that calls this model. The key is read from $MXC_API_KEY, never shown. */
@@ -240,7 +247,7 @@ register("model", (blade) => {
         mTtft.replaceChildren(...(v.tokens.ttft === null ? ["—"] : [fmt(v.tokens.ttft), h("small", {}, " ms")]));
         mReq.textContent = v.state === "running" || v.tokens.requests ? fmt(v.tokens.requests) : "0";
         chart.replaceChildren(v.tokens.points.length > 1 ? areaChart(v.tokens.points, colorOf(name))
-          : h("div", { class: "nodata" }, h("b", {}, "No traffic yet"), "Start it, or call it: it starts on the first request."));
+          : ((q) => h("div", { class: "nodata" }, h("b", {}, q.title), q.text))(quietNote(v.state, v.tokens.requests || 0)));
         // call it
         currentSecure = v.secure;
         urlRow.classList.toggle("secure", v.secure);
