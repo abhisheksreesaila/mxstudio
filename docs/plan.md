@@ -311,29 +311,33 @@ Brief: docs/briefs/omxconsole.md · Needs: F-041
 - [x] a test checks every omxqua asset is served with the console headers and that nothing outside the list is
 - [x] reviewer: PASS; follow-ups done (omxqua fonts.css gets `font-display: swap`, re-synced; encoded-path test)
 
-## F-043 Top islands and the Beacon [todo]
+## F-043 Top islands and the Beacon [done]
 Brief: docs/briefs/omxconsole.md · Needs: F-042 · Files: topbar.js, topbar.css, hardware.js
-- [ ] the dark top bar becomes islands: brand (`.mark` "omx" that writes itself, "omxconsole", "local"), breadcrumb in the middle, API keys · Gateway · Settings · theme on the right, then the Beacon
-- [ ] the Beacon replaces the hardware chip and shows one thing, in order: a pull or port in progress (with %), a crashed model, running models with live tok/s, else GPU memory in use; tapping opens it (details, up to 3 actions), × or outside closes it
-- [ ] the priority is a pure function with unit tests over the admin data (pull, port, crash, running, idle)
-- [ ] at ≤ 760 px the tools fold into one ••• menu and the breadcrumb hides; no overlap at 390 px
-- [ ] checked in the running console in both themes, desktop and 390 px
+- [x] the dark top bar becomes islands: brand (`.mark` "omx" that writes itself, "omxconsole", "local"), breadcrumb in the middle, API keys · Gateway · Settings · theme on the right, then the Beacon
+- [x] the Beacon replaces the hardware chip and shows one thing, in order: a pull or port in progress (with %), a crashed model, running models with live tok/s, else GPU memory in use; tapping opens it (details, up to 3 actions), × or outside closes it
+- [x] the priority is a pure function with unit tests over the admin data (pull, port, crash, running, idle)
+- [x] at ≤ 760 px the tools fold into one ••• menu and the breadcrumb hides; no overlap at 390 px
+- [x] checked in the running console in both themes, desktop and 390 px
+- [x] reviewer: PASS (after: polling one at a time and paused when hidden, last value kept on error, Cancel takes a second tap, loop reschedules in finally). Checked in the running console with a real running model (Beacon "1 running · 324 tok/s"), both themes, 1280 and 390 px. Crash and port states are unit-tested only. The breadcrumb shows parent and current only (it truncated at three levels).
 
-## F-044 Blades in omxqua: My models and a model's blade [todo]
+## F-044 Blades in omxqua: My models and a model's blade [done]
 Brief: docs/briefs/omxconsole.md · Needs: F-042 · Files: blades.css, blade-home.*, blade-model.*
-- [ ] blades are omxqua surfaces (surface-1, card radius, shadow-1) that settle in (fade + 12 px, no bounce); older ones still fold to rails
-- [ ] My models: stats card, filter (floating label), list/cards toggle (`.seg2`), table (`.tbl`), state as dot + word, a laptop "Local" badge; the compact list beside an open model and on phones
-- [ ] a model's blade: menu, command bar of flat buttons (one filled verb), cards (Essentials, Tokens · live, Call it, Security, Hardware fit), each ending in its `mxc` source line; `.xbtn` close
-- [ ] every console test still passes; checked in the running console, both themes, desktop and 390 px, against the mock
+- [x] blades are omxqua surfaces (surface-1, card radius, shadow-1) that settle in (fade + 12 px, no bounce); older ones still fold to rails
+- [x] My models: stats card, filter (floating label), list/cards toggle (`.seg2`), table (`.tbl`), state as dot + word, a laptop "Local" badge; the compact list beside an open model and on phones
+- [x] a model's blade: menu, command bar of flat buttons (one filled verb), cards (Essentials, Tokens · live, Call it, Security, Hardware fit), each ending in its `mxc` source line; `.xbtn` close
+- [x] every console test still passes; checked in the running console, both themes, desktop and 390 px, against the mock
+- [x] reviewer: PASS. Checked in the running console against the mock, both themes, desktop and 390 px, with a model running.
 
-## F-045 The other blades in omxqua [todo]
+## F-045 The other blades in omxqua [review]
 Brief: docs/briefs/omxconsole.md · Needs: F-044 · Files: blade-add.*, blade-security.*, blade-keys.*, blade-bench.*, blade-logs.*, blade-notebook.*, blade-gateway.*, blade-settings.*
 - [ ] Add a model, Security, API keys, Benchmark, Logs, Notebook, Gateway and Settings use omxqua parts (fields, chips, menus, toasts, progress, empty states) and flat buttons; no blade keeps the old look
 - [ ] the old Graphite CSS that no blade uses any more is deleted; the brace-balance test still passes
 - [ ] checked each blade in the running console, both themes
+- [ ] reviewer: no code objections; waiting on a look at three states nobody has seen render: Security while it sets up, Add a model's port and Ready cards, and Bench/Keys/Gateway/Logs/Notebook/Add in both themes (seen: Keys armed + rows light and dark, Gateway dark, Logs dark, Notebook dark, Add light and dark, Bench bars and history light, Settings light). Needs a real pull or port to see the rest.
 
-## F-046 Name on screen: omxconsole [todo]
+## F-046 Name on screen: omxconsole [done]
 Brief: docs/briefs/omxconsole.md · ADR: docs/adr/0004-name-omxconsole.md · Needs: none
-- [ ] page and window titles, the wordmark, the API reference header, CLI messages and `/v1/models`' `owned_by` say omxconsole; the `mxc` command, the `mxconsole` package, `~/.mxc` and `MXC_*` stay
-- [ ] README, USER_GUIDE, CLI.md and docs/site say omxconsole; lessons.md's naming line is updated
-- [ ] a test checks `/v1/models` `owned_by` and the console title
+- [x] page and window titles, the wordmark, the API reference header, CLI messages and `/v1/models`' `owned_by` say omxconsole; the `mxc` command, the `mxconsole` package, `~/.mxc` and `MXC_*` stay
+- [x] README, USER_GUIDE, CLI.md and docs/site say omxconsole; lessons.md's naming line is updated
+- [x] a test checks `/v1/models` `owned_by` and the console title
+- [x] reviewer: PASS. Command, package, ~/.mxc, MXC_* and wire names (the `mxconsole` JSON field, the CA "mxconsole local") unchanged.
