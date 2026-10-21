@@ -227,7 +227,7 @@ register("home", (blade) => ({
     function downPanel() {
       return h("div", { class: "hbody" }, h("div", { class: "notice down", role: "alert" },
         h("div", { class: "lab mono" }, icon("triangle-alert", 14), "the daemon is not answering"),
-        h("h4", {}, "mxconsole cannot reach the daemon"),
+        h("h4", {}, "omxconsole cannot reach the daemon"),
         h("p", {}, "Start it in a terminal, then this page fills in on its own. Nothing here is lost."),
         h("div", { class: "cmd-row" }, h("code", { class: "mono cmd" }, "mxc daemon"), copyButton(() => "mxc daemon", "Copy", "btn tonal sm"),
           h("button", { class: "btn fill sm", type: "button", onClick: () => refresh() }, icon("refresh-cw", 13), "Try again"))));

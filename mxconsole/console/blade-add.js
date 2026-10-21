@@ -367,7 +367,7 @@ function mountAdd(blade, body) {
       h("div", { class: "card-h" }, h("span", { class: "ox-tile", style: { "--c": "var(--oq-warn)" } }, icon("triangle-alert", 18, "currentColor", 1.9)), h("h3", {}, w.heading), h("span", { class: "sp" }),
         h("span", { class: "badge warn" }, h("i"), "nothing downloaded")),
       h("div", { class: "card-b" },
-        h("p", { class: "ox-note ad-lead" }, "mxconsole checks before downloading weights you cannot use. Pick a smaller model that fits, or free memory by stopping a running one."),
+        h("p", { class: "ox-note ad-lead" }, "omxconsole checks before downloading weights you cannot use. Pick a smaller model that fits, or free memory by stopping a running one."),
         meter("needs", 100, true, w.need ? `~${trim(w.need)} GB` : "?"),
         meter(w.gpu, w.freePct, false, `${trim(w.free)} GB`),
         picks.length ? h("div", { class: "sugg" }, picks) : h("p", { class: "ox-note" }, "Nothing smaller in the catalog fits either.")),
