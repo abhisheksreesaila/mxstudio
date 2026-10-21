@@ -96,7 +96,7 @@ The console works only on this machine. It isn't exposed on the LAN, even after 
 
 ## 🧭 A tour of the console
 
-Panels open side by side from left to right. The breadcrumb in the top bar shows where you are; click **omxconsole** to go back to My models.
+Panels (blades) open side by side from left to right; older ones fold into rails on the left. The breadcrumb island at the top shows the parent and the open blade; click the **omx** logo to go back to My models.
 
 ### My models
 
@@ -147,13 +147,13 @@ The filter above the results shows All, Fits or Needs porting. The same labels i
 
 **Port it** runs `mxc port <repo> --auto`. See [Models MAX can't run yet](#-models-max-cant-run-yet).
 
-### The top bar
+### The top islands
 
-- **Hardware chip:** your GPUs and memory use. Click it for details.
+- **The Beacon** (top right): what is happening now, in one pill: a pull or port in progress, a crashed model, a model starting, or the running models with live tokens per second. With nothing running it shows the GPU and memory in use. Tap it for the details and a shortcut; cancelling a pull or port from it takes a second tap.
 - **API keys:** every app key (prefix only), with **New key**, **Rotate** and **Revoke**. A new key is shown once.
 - **Gateway:** LiteLLM's status, the route for each model, the LiteLLM log, safeguard counts for today, recent requests (kept 7 days) and a link to the API reference at `/docs`. **Restart** restarts Caddy and LiteLLM and rotates their internal key.
 - **Settings:** the theme, when each model unloads, the daemon's info with **Stop daemon**, and every port and process omxconsole owns.
-- **Theme:** the sun and moon button switches light and dark. Until you pick one, the console follows your system.
+- **Theme:** the moon (or sun) button switches light and dark. Until you pick one, the console follows your system.
 
 ## 🔌 Calling the endpoint from your apps
 
