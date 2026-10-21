@@ -291,3 +291,48 @@ Brief: docs/brief.md · Needs: none
 - [ ] `mxc port --auto` on a repo with only .bin/GGUF weights fails in the workspace stage, before cloning skills or installing the env, with the same one-line message `mxc pull` gives (today: late, as "unexpected error: ValueError…"; found while writing docs/site/porting.html)
 - [ ] the parity stage no longer says "downloading weights…" when they're already downloaded
 - [ ] a remote-code model ends as "parked" in the CLI and console, not as a failed workspace stage
+
+## omxconsole (brief: docs/briefs/omxconsole.md)
+Design: the omxqua language, Developer family; mock `docs/design/omxconsole/mock.html` (approved 2026-10-20, with flat buttons inside blades).
+A skin over the 1.0 console: no behaviour changes except the Beacon. Order: F-041 first (an omxqua release), then F-042; F-043 and F-044 in parallel (topbar files vs blade files); F-045 after F-044; F-046 any time.
+
+## F-041 omxqua 0.1.5: CSP-safe and flat panel buttons [todo]
+Brief: docs/briefs/omxconsole.md · Needs: none · Repo: ~/Projects/omxqua
+- [ ] `omxqua.js` no longer injects a `<style>` element; that CSS lives in `components.css` (works under `default-src 'self'`)
+- [ ] buttons inside a panel are flat: `.oq-flat` (or a blade/panel container class) removes shadow and hover lift, tonal gets a state tint; documented in AGENTS.md and LANGUAGE.md
+- [ ] `Omxqua.settle` rises 12 px as the docs say (today 6 px)
+- [ ] tagged v0.1.5 with a changelog entry; the showcase still renders the same (spot-check three families)
+
+## F-042 Vendor omxqua into the console [todo]
+Brief: docs/briefs/omxconsole.md · Needs: F-041
+- [ ] `omxqua-sync mxconsole/console --ref v0.1.5` puts `omxqua/{src,fonts,VERSION}` in the package; the gateway serves exactly those files from an explicit list under `/console/omxqua/…` (still never a directory server); CSP unchanged
+- [ ] `index.html` loads omxqua before the console CSS; the root carries `oq-root oq-family-dev` and `oq-night | oq-light` from `theme.js` (system until toggled, remembered, as today)
+- [ ] the console's own copies of Geist and Geist Mono are dropped in favour of omxqua's; nothing else changes visually yet
+- [ ] a test checks every omxqua asset is served with the console headers and that nothing outside the list is
+
+## F-043 Top islands and the Beacon [todo]
+Brief: docs/briefs/omxconsole.md · Needs: F-042 · Files: topbar.js, topbar.css, hardware.js
+- [ ] the dark top bar becomes islands: brand (`.mark` "omx" that writes itself, "omxconsole", "local"), breadcrumb in the middle, API keys · Gateway · Settings · theme on the right, then the Beacon
+- [ ] the Beacon replaces the hardware chip and shows one thing, in order: a pull or port in progress (with %), a crashed model, running models with live tok/s, else GPU memory in use; tapping opens it (details, up to 3 actions), × or outside closes it
+- [ ] the priority is a pure function with unit tests over the admin data (pull, port, crash, running, idle)
+- [ ] at ≤ 760 px the tools fold into one ••• menu and the breadcrumb hides; no overlap at 390 px
+- [ ] checked in the running console in both themes, desktop and 390 px
+
+## F-044 Blades in omxqua: My models and a model's blade [todo]
+Brief: docs/briefs/omxconsole.md · Needs: F-042 · Files: blades.css, blade-home.*, blade-model.*
+- [ ] blades are omxqua surfaces (surface-1, card radius, shadow-1) that settle in (fade + 12 px, no bounce); older ones still fold to rails
+- [ ] My models: stats card, filter (floating label), list/cards toggle (`.seg2`), table (`.tbl`), state as dot + word, a laptop "Local" badge; the compact list beside an open model and on phones
+- [ ] a model's blade: menu, command bar of flat buttons (one filled verb), cards (Essentials, Tokens · live, Call it, Security, Hardware fit), each ending in its `mxc` source line; `.xbtn` close
+- [ ] every console test still passes; checked in the running console, both themes, desktop and 390 px, against the mock
+
+## F-045 The other blades in omxqua [todo]
+Brief: docs/briefs/omxconsole.md · Needs: F-044 · Files: blade-add.*, blade-security.*, blade-keys.*, blade-bench.*, blade-logs.*, blade-notebook.*, blade-gateway.*, blade-settings.*
+- [ ] Add a model, Security, API keys, Benchmark, Logs, Notebook, Gateway and Settings use omxqua parts (fields, chips, menus, toasts, progress, empty states) and flat buttons; no blade keeps the old look
+- [ ] the old Graphite CSS that no blade uses any more is deleted; the brace-balance test still passes
+- [ ] checked each blade in the running console, both themes
+
+## F-046 Name on screen: omxconsole [todo]
+Brief: docs/briefs/omxconsole.md · ADR: docs/adr/0004-name-omxconsole.md · Needs: none
+- [ ] page and window titles, the wordmark, the API reference header, CLI messages and `/v1/models`' `owned_by` say omxconsole; the `mxc` command, the `mxconsole` package, `~/.mxc` and `MXC_*` stay
+- [ ] README, USER_GUIDE, CLI.md and docs/site say omxconsole; lessons.md's naming line is updated
+- [ ] a test checks `/v1/models` `owned_by` and the console title
