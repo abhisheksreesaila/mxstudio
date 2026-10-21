@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Console tour · mxconsole</title>
-<meta name="description" content="Every screen of the mxconsole web console, with numbered notes on what each part does and the mxc command behind it.">
+<title>Console tour · omxconsole</title>
+<meta name="description" content="Every screen of the omxconsole web console, with numbered notes on what each part does and the mxc command behind it.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="site.css">
 <script>try { const t = localStorage.getItem("mxc-docs-theme"); if (t) document.documentElement.classList.add(t); } catch (_) {}</script>
@@ -83,7 +83,7 @@
   <section class="intro">
     <p class="lab">Console tour</p>
     <h1>Every screen of the console</h1>
-    <p class="lede">The console is the web page mxconsole serves at <code>http://127.0.0.1:11435/console</code>, only on the machine that runs it.
+    <p class="lede">The console is the web page omxconsole serves at <code>http://127.0.0.1:11435/console</code>, only on the machine that runs it.
       Each screen is a blade. Blades open side by side from left to right, and older ones fold into a narrow rail so the newest one has room.
       Pick a screen below. The numbered markers sit on the real controls; hover or tap one to see what it does and the <code>mxc</code> command that does the same thing.</p>
     <p class="open">Open it yourself: <code>pixi run mxc console</code></p>
@@ -140,7 +140,7 @@ const SCREENS = [
       { b: [650, 114, 614, 104], t: "Secure on your network", d: "The current state. Manage API keys opens the API keys blade. Stop exposing turns LAN access off (click it twice to confirm); localhost keeps working. On a machine that is not exposed yet, this card has a \"Make it secure\" button instead.", cli: ["mxc expose --stop"] },
       { b: [649, 230, 615, 85], t: "What \"Make it secure\" does", d: "Three steps: a local certificate authority signs a certificate for this machine's name, the gateway gets its own key and refuses requests without a valid app key (401), and Caddy plus LiteLLM listen on your LAN.", cli: ["mxc expose"] },
       { b: [650, 327, 614, 38], t: "The LAN address", d: "What other devices call: https://<host>.local:8443/v1. Copy it with the button on the right." },
-      { b: [649, 385, 615, 235], t: "Trust the certificate", d: "Other devices must trust the mxconsole CA once, or HTTPS calls fail with a certificate error. The path of root.crt is shown, with the steps for Linux, macOS, Windows and phones." },
+      { b: [649, 385, 615, 235], t: "Trust the certificate", d: "Other devices must trust the omxconsole CA once, or HTTPS calls fail with a certificate error. The path of root.crt is shown, with the steps for Linux, macOS, Windows and phones." },
       { b: [650, 654, 614, 124], t: "From another device", d: "A curl to try from a laptop or phone on the same Wi-Fi. It points at the CA file and reads the key from $MXC_API_KEY." },
     ] },
   { id: "bench", group: "A model", name: "Benchmark", hue: "var(--hue-bench)", img: "bench.png",
@@ -180,7 +180,7 @@ const SCREENS = [
       { b: [1103, 59, 94, 24], m: [1150, 94], t: "Saved view", d: "Back to the read-only view from the previous screen." },
       { b: [1206, 60, 24, 22], m: [1218, 94], t: "Open in a new tab", d: "Opens the same Jupyter page in its own browser tab." },
       { b: [93, 100, 1187, 678], m: [104, 112], t: "JupyterLab", d: "A real Jupyter, running on this machine and listening on 127.0.0.1 only. Edit and run cells as usual, with a Python 3 kernel." },
-      { b: [122, 218, 255, 64], m: [110, 262], t: "Other notebooks", d: "The file browser shows the folder with every notebook mxconsole has built, one per model." },
+      { b: [122, 218, 255, 64], m: [110, 262], t: "Other notebooks", d: "The file browser shows the folder with every notebook omxconsole has built, one per model." },
       { b: [983, 695, 282, 72], t: "Jupyter's own prompt", d: "This news popup comes from JupyterLab, not from mxconsole. Answer it or close it." },
     ] },
   { id: "add", group: "Add a model", name: "Search", hue: "var(--hue-add)", img: "add.png",
@@ -195,10 +195,10 @@ const SCREENS = [
       { b: [996, 444, 68, 34], t: "too big", d: "It will not fit on this GPU. Clicking it shows the numbers and suggests smaller models that do." },
     ] },
   { id: "port", group: "Add a model", name: "Port offer", hue: "var(--hue-add)", img: "port-offer.png",
-    sum: "A model whose architecture MAX cannot run yet. mxconsole offers to port it.",
+    sum: "A model whose architecture MAX cannot run yet. omxconsole offers to port it.",
     spots: [
       { b: [249, 120, 828, 38], t: "Search by repo id", d: "Here a Hugging Face repo id: EleutherAI/gpt-neo-125m." },
-      { b: [249, 208, 828, 242], t: "Architecture check", d: "mxconsole reads the model's config before downloading anything. GPTNeoForCausalLM is not an architecture MAX supports, so it stops here instead of fetching weights." },
+      { b: [249, 208, 828, 242], t: "Architecture check", d: "omxconsole reads the model's config before downloading anything. GPTNeoForCausalLM is not an architecture MAX supports, so it stops here instead of fetching weights." },
       { b: [264, 268, 800, 54], t: "What Port it does", d: "Claude Code, with Modular's import-model skill, writes the model as a MAX graph in a sandbox, checks it against the original and fixes what fails. It runs unattended, uses your Claude Code session, and can take many minutes. You see every stage and the full log, and you can cancel." },
       { b: [264, 330, 220, 62], m: [252, 361], t: "The details", d: "The architecture, its size (parameters and GB) and the skill that will do the port." },
       { b: [264, 405, 350, 30], t: "Port it", d: "Starts the port. The command beside it does the same from a terminal. It needs Claude Code, and Linux with bubblewrap for the sandbox.", cli: ["mxc port EleutherAI/gpt-neo-125m --auto"] },
@@ -207,7 +207,7 @@ const SCREENS = [
   { id: "keys", group: "Shared", name: "API keys", hue: "var(--hue-keys)", img: "keys.png",
     sum: "One key per app, shared by every model. Requests without a valid key get 401.",
     spots: [
-      { b: [1151, 59, 80, 24], t: "New key", d: "Creates a key for an app. The secret is shown once, so save it then. mxconsole only keeps a hash.", cli: ["mxc keys new <app>"] },
+      { b: [1151, 59, 80, 24], t: "New key", d: "Creates a key for an app. The secret is shown once, so save it then. omxconsole only keeps a hash.", cli: ["mxc keys new <app>"] },
       { b: [316, 74, 290, 14], m: [620, 81], t: "Shared by every model", d: "A key is not tied to a model. Any valid key can call any model on this machine." },
       { b: [284, 148, 166, 206], t: "App", d: "The name you gave the key. Give each app its own, so you can revoke one without breaking the others." },
       { b: [450, 148, 180, 206], t: "Key prefix", d: "Only the first few characters, so you can tell keys apart. The full key is never shown again.", cli: ["mxc keys ls"] },
@@ -230,7 +230,7 @@ const SCREENS = [
       { b: [282, 115, 984, 120], t: "Appearance", d: "Light or Dark, kept in this browser. The sun and moon button in the top bar does the same. Until you pick one, the console follows your system." },
       { b: [282, 248, 984, 400], t: "Idle unload", d: "How long each model stays loaded after its last request. The default is 5 minutes; pinned models never unload. This blade only shows it. There is no single setting for all models." },
       { b: [290, 580, 970, 56], t: "Change it from the CLI", d: "Copy a command, put in a model name and run it.", cli: ["mxc set <model> --keep-alive 10m", "mxc set <model> --pin"] },
-      { b: [282, 662, 984, 138], t: "Daemon", d: "Host name, both endpoints, MAX version and uptime. Further down (not in this shot): Stop daemon, and every port and process mxconsole owns.", cli: ["mxc status", "mxc ps"] },
+      { b: [282, 662, 984, 138], t: "Daemon", d: "Host name, both endpoints, MAX version and uptime. Further down (not in this shot): Stop daemon, and every port and process omxconsole owns.", cli: ["mxc status", "mxc ps"] },
     ] },
 ];
 
@@ -291,7 +291,7 @@ function paintImage() {
   const file = s.dark && isDark() ? s.dark : s.img;
   const img = $("img");
   if (!img.src.endsWith(file)) img.src = `../assets/screens/${file}`;
-  img.alt = `Screenshot of the mxconsole ${s.name} screen${file === s.dark ? " in dark mode" : ""}`;
+  img.alt = `Screenshot of the omxconsole ${s.name} screen${file === s.dark ? " in dark mode" : ""}`;
 }
 
 function show(i, push) {

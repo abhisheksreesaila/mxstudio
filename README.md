@@ -1,7 +1,7 @@
-# mxconsole
+# omxconsole
 
 **Local AI on Modular MAX, made easy.** One command gives you an OpenAI-compatible endpoint. Models load when
-they're called and unload when idle. If MAX can't run a model yet, mxconsole can port it for you.
+they're called and unload when idle. If MAX can't run a model yet, omxconsole can port it for you.
 
 [![latest release](https://img.shields.io/github/v/release/abhisheksreesaila/mxstudio?label=latest)](https://github.com/abhisheksreesaila/mxstudio/releases/latest)
 ![platform](https://img.shields.io/badge/platform-Linux%20%C2%B7%20NVIDIA-555)
@@ -12,11 +12,11 @@ they're called and unload when idle. If MAX can't run a model yet, mxconsole can
 [Porting, behind the scenes](https://abhisheksreesaila.github.io/mxstudio/site/porting.html) ·
 [User guide](docs/USER_GUIDE.md) · [CLI reference](docs/CLI.md)
 
-![The mxconsole web console: My models](docs/assets/screens/home.png)
+![The omxconsole web console: My models](docs/assets/screens/home.png)
 
 ## Why
 
-[Modular MAX](https://www.modular.com/max) is a fast inference engine. mxconsole is a convenience wrapper
+[Modular MAX](https://www.modular.com/max) is a fast inference engine. omxconsole is a convenience wrapper
 around it, for running models on your own machine.
 
 - **Local AI, easy.** `mxc serve qwen2.5-0.5b` downloads the model, starts it and prints a URL, a key and a
@@ -25,7 +25,7 @@ around it, for running models on your own machine.
   so you can register a dozen and only pay GPU memory for the ones in use. Pin the ones you want kept loaded.
 - **Safe to share.** One revocable key per app. `mxc expose` puts it on your LAN over HTTPS.
 - **Porting, fast.** When MAX doesn't support an architecture yet, `mxc port <repo> --auto` has Claude Code
-  write a MAX version in a sandbox. mxconsole then checks that it matches the Hugging Face original and serves
+  write a MAX version in a sandbox. omxconsole then checks that it matches the Hugging Face original and serves
   it. That takes about 7–40 minutes and $2–5 of Claude usage. [How it works](https://abhisheksreesaila.github.io/mxstudio/site/porting.html).
 - **Not a black box.** A web console with live throughput, benchmarks, logs, and a notebook for each model
   that shows how it's built and runs in Jupyter right in the page.
@@ -122,7 +122,7 @@ Run them as `pixi run mxc …`. Every command and option: [docs/CLI.md](docs/CLI
 - **Keys** (`keys.py`): `mst-…`, stored only as SHA-256 hashes, shown once.
 - **Expose** (`expose.py`): runs Caddy (its own certificate authority) and LiteLLM as your user. Only the four `/v1`
   routes reach the daemon from the LAN.
-- **Port** (`port.py`, `port_auto.py`, `port_try.py`): a sandboxed Claude Code run, then mxconsole's own check
+- **Port** (`port.py`, `port_auto.py`, `port_try.py`): a sandboxed Claude Code run, then omxconsole's own check
   against Hugging Face before anything is registered. [Step by step](https://abhisheksreesaila.github.io/mxstudio/site/porting.html) ·
   [PORTING.md](docs/PORTING.md).
 - **State** lives in `~/.mxc/` (or `MXC_HOME`). Weights stay in the Hugging Face cache.
@@ -135,5 +135,5 @@ pixi run pytest tests/mxconsole -q      # uses a fake `max`, so it needs no GPU
 
 Checking it on real hardware, step by step: [docs/VERIFY.md](docs/VERIFY.md). Plans and decisions:
 [brief](docs/brief.md) · [tickets](docs/plan.md) · [architecture](docs/adr/0001-mst-core-architecture.md). The
-older MX Studio (`mxs`) code is still in `notebooks/` until mxconsole replaces it; its guide is
+older MX Studio (`mxs`) code is still in `notebooks/` until omxconsole replaces it; its guide is
 [LEGACY_NUCLEUS.md](docs/LEGACY_NUCLEUS.md).

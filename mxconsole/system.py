@@ -202,7 +202,7 @@ def collect(rows: list[dict] | None = None, *, proc_root: str | Path = "/proc", 
     pids = expose_pids if expose_pids is not None else {n: expose._running_pid(n) for n in expose.PROCESSES}
     ports = {"daemon": daemon_port(), "caddy": EXPOSE_PORT, "litellm": LITELLM_PORT}
     crew = []
-    for kind, label, pid in (("daemon", "mxconsole daemon", daemon), ("caddy", "Caddy", pids.get("caddy")),
+    for kind, label, pid in (("daemon", "omxconsole daemon", daemon), ("caddy", "Caddy", pids.get("caddy")),
                              ("litellm", "LiteLLM", pids.get("litellm"))):
         stats = proc_stats(pid, proc_root) if pid else None
         unknown = kind == "daemon" and not stats and health is not None and health()
@@ -230,7 +230,7 @@ def listeners(crew: list[dict]) -> list[dict]:
         return "listening" if by[i]["state"] == "running" else "off"
 
     rows = [
-        {"name": "mxconsole daemon", "kind": "daemon", "host": DAEMON_HOST, "port": by["daemon"]["port"],
+        {"name": "omxconsole daemon", "kind": "daemon", "host": DAEMON_HOST, "port": by["daemon"]["port"],
          "exposed": False, "state": state("daemon"),
          "talks_to": "the mxc CLI, this console, your apps on this machine, LiteLLM and Caddy's key check"},
         {"name": "LiteLLM", "kind": "litellm", "host": "127.0.0.1", "port": by["litellm"]["port"], "exposed": False,

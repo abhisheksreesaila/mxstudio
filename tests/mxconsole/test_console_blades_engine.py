@@ -119,11 +119,14 @@ def test_every_icon_the_later_blades_need_is_already_in_icons_js():
 
 # -- accessibility and the contract -------------------------------------------------------------
 def test_the_topbar_marks_the_current_crumb_and_stays_on_tokens():
-    assert "aria-current" in (CONSOLE_DIR / "topbar.js").read_text()
+    js = (CONSOLE_DIR / "topbar.js").read_text()
+    assert "aria-current" in js
     css = (CONSOLE_DIR / "topbar.css").read_text()
-    assert not re.findall(r"#[0-9a-fA-F]{3,6}\b", css), "topbar.css uses the chrome tokens, not raw hex"
-    narrow = css[css.index("@media (max-width: 520px)"):]
-    assert 'data-nav="keys"' not in narrow and 'data-nav="gateway"' not in narrow  # API keys and Gateway stay reachable on a phone
+    assert not re.findall(r"#[0-9a-fA-F]{3,6}\b", css), "topbar.css uses omxqua tokens, not raw hex"
+    # at phone width the tools fold into one menu that still reaches API keys, Gateway, Settings and the theme
+    phone = css[css.index("@media (max-width: 760px)"):]
+    assert ".cx-crumbs" in phone and ".more { display: flex; }" in phone
+    assert all(f'"{label}"' in js for label in ("API keys", "Gateway", "Settings")) and '"Theme"' in js
 
 
 def test_rows_and_cards_are_real_buttons_and_rails_can_be_focused():

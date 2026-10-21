@@ -59,7 +59,7 @@ def test_fallback_command_per_platform():
 
 def test_desktop_entry_content(tmp_path):
     text = app.desktop_entry(tmp_path, "/home/u/.local/share/icons/mxconsole.svg", pixi="/usr/bin/pixi")
-    assert "[Desktop Entry]" in text and "Name=mxconsole" in text
+    assert "[Desktop Entry]" in text and "Name=omxconsole" in text
     assert "Path=" not in text
     assert f'Exec="/usr/bin/pixi" run --manifest-path "{tmp_path}/pixi.toml" mxc app' in text
     assert "Icon=/home/u/.local/share/icons/mxconsole.svg" in text

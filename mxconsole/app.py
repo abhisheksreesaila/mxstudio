@@ -86,7 +86,7 @@ def run(ensure_daemon: Callable[[], bool], open_window: Callable[[str], bool],
     """Make sure the daemon is up (a no-op when it already answers), then open the window.
     Returns "native" or "browser-app"."""
     if ensure_daemon():
-        say("started the mxconsole daemon")
+        say("started the omxconsole daemon")
     if open_window(url):
         return "native"
     say("native window unavailable (is the pixi `app` environment installed?); using a browser app window")
@@ -121,7 +121,7 @@ def _arg(value: str | Path) -> str:
 def desktop_entry(project: Path, icon: str | Path, pixi: str | None = None) -> str:
     pixi = pixi or shutil.which("pixi") or "pixi"
     exec_line = f"{_arg(pixi)} run --manifest-path {_arg(Path(project) / 'pixi.toml')} mxc app"
-    return ("[Desktop Entry]\nType=Application\nName=mxconsole\nComment=Local AI runtime on Modular MAX\n"
+    return ("[Desktop Entry]\nType=Application\nName=omxconsole\nComment=Local AI runtime on Modular MAX\n"
             f"Exec={exec_line}\nIcon={icon}\nTerminal=false\n"
             "Categories=Development;Utility;\n")
 

@@ -171,7 +171,7 @@ def test_a_daemon_that_refuses_gives_one_error_line(hub, monkeypatch):
     import httpx as real_httpx
     monkeypatch.setattr("httpx.request", lambda *a, **kw: (_ for _ in ()).throw(real_httpx.ConnectError("refused")))
     result = runner.invoke(cli.app, ["pull", "qwen2.5-0.5b"])
-    assert result.exit_code == 1 and "could not reach the mxconsole daemon" in result.output
+    assert result.exit_code == 1 and "could not reach the omxconsole daemon" in result.output
     assert "Traceback" not in result.output
 
 

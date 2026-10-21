@@ -133,7 +133,7 @@ mxc pull acme/model --port ~/.mxc/ports/model/port/pkg   # register a port you f
 ### `mxc port`
 
 Adds an architecture MAX doesn't support. With `--auto`, Claude Code writes a small MAX package for it in a
-sandbox. mxconsole checks that the package matches the original Hugging Face model, then registers it and serves
+sandbox. omxconsole checks that the package matches the original Hugging Face model, then registers it and serves
 it. Expect $2–5 of Claude usage and 7–40 minutes per model. It needs Claude Code, and Linux with bubblewrap. Elsewhere it only runs with `--unsandboxed`.
 
 ```bash
@@ -186,7 +186,7 @@ The "Try it" cells need `MXC_API_KEY` set before Jupyter starts.
 
 ### `mxc ps`
 
-*No daemon needed.* Every process mxconsole runs (daemon, Caddy, LiteLLM, each `max serve`) with pid, port, memory and
+*No daemon needed.* Every process omxconsole runs (daemon, Caddy, LiteLLM, each `max serve`) with pid, port, memory and
 uptime.
 
 | Option | |
@@ -331,7 +331,7 @@ Opens the console in its own window. Closing the window stops nothing.
 
 | Option | |
 |---|---|
-| `--install` | Linux: add an mxconsole launcher to the app menu. |
+| `--install` | Linux: add an omxconsole launcher to the app menu. |
 | `--uninstall` | Linux: remove that launcher. |
 
 ### `mxc daemon`
@@ -347,7 +347,7 @@ The common ones:
 
 | Variable | Used for |
 |---|---|
-| `MXC_HOME` | Where mxconsole keeps its state (default `~/.mxc`). |
+| `MXC_HOME` | Where omxconsole keeps its state (default `~/.mxc`). |
 | `MXC_PORT` | The daemon's port (default 11435). |
 | `MXC_LITELLM_PORT` | LiteLLM's port when exposed (default 4000). |
 | `MXC_EXPOSE_PORT` | The HTTPS port when exposed (default 8443). |

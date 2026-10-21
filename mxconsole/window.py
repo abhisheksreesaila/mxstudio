@@ -14,7 +14,7 @@ def main(url: str, storage: str) -> int:
 
     # Browser storage persists in `storage` (under ~/.mxc): the console keeps its theme and view
     # preferences in localStorage. Nothing else is remembered (no window size or position).
-    webview.create_window("mxconsole", url, width=1440, height=900)
+    webview.create_window("omxconsole", url, width=1440, height=900)
     webview.start(gui="qt", private_mode=False, storage_path=storage)
     return 0
 

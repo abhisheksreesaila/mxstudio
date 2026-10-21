@@ -1,4 +1,4 @@
-// mxconsole, the part of /admin/system the shell needs: per-model GPU memory for the hardware chip.
+// mxconsole, the part of /admin/system the shell needs: per-model GPU memory for the Beacon and the model blade.
 // Polled on its own, slower than the main data; a failure just leaves the old numbers (or none).
 import { api, emitData } from "./core.js";
 

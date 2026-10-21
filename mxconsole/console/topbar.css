@@ -1,49 +1,49 @@
-/* mxconsole, the top bar: brand, breadcrumb, hardware chip + popover, shared blades, theme toggle, daemon dot. */
-.top { position: fixed; top: 0; left: 0; right: 0; height: var(--top); z-index: 50; background: var(--chrome); border-bottom: 1px solid var(--chrome-line); display: flex; align-items: center; gap: 12px; padding: 0 10px; color: var(--chrome-text); }
-.brand { display: flex; align-items: center; gap: 9px; font: 600 15px/1 var(--sans); color: var(--chrome-text); letter-spacing: -.01em; background: none; border: 0; padding: 7px 9px; border-radius: 7px; flex: none; }
-.brand:hover { background: var(--chrome-hover); }
-.brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent); }
-.brand .dot.down { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 25%, transparent); }
-.brand small { font-size: 11px; font-weight: 400; color: var(--chrome-muted); margin-left: 2px; }
-.bc { display: flex; align-items: center; gap: 1px; min-width: 0; flex: 1; overflow: hidden; font-size: 13px; padding-left: 12px; border-left: 1px solid var(--chrome-line); height: 24px; }
-.bc button { background: none; border: 0; color: var(--chrome-muted); padding: 4px 7px; border-radius: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-.bc button:hover { background: var(--chrome-hover); color: var(--chrome-text); }
-.bc button.cur { color: var(--chrome-text); font-weight: 500; cursor: default; background: none; }
-.bc svg { width: 12px; height: 12px; opacity: .45; flex: none; }
+/* omxconsole, the top islands: brand left, breadcrumb centre, tools and the Beacon right, all floating 14px from the top.
+   The island shapes come from omxqua's components.css (.brand-isl, .mark, .beacon, .menu); this file places them. */
+.top { position: fixed; top: 0; left: 0; right: 0; height: var(--top); z-index: 50; pointer-events: none; --cx-side: 230px; }
+.top > *, .top .cx-right > * { pointer-events: auto; }
 
-.hwchip { display: flex; align-items: center; gap: 8px; background: var(--chrome-on); border: 1px solid var(--chrome-line); border-radius: 7px; padding: 5px 9px; font: 12px var(--mono); color: var(--chrome-muted); flex: none; white-space: nowrap; }
-.hwchip:hover, .hwchip[aria-expanded="true"] { border-color: var(--chrome-line-2); color: var(--chrome-text); }
-.hwchip b { color: var(--chrome-text); font-weight: 500; }
-.hwchip .vbar { width: 64px; height: 6px; background: var(--chrome-track); }
+.top .brand-isl { display: flex; border: 0; color: var(--oq-ink); cursor: pointer; }
+.brand-isl .loc { font: 500 11px var(--oq-font-mono); color: var(--oq-ink-2); border: 1px solid var(--oq-line); border-radius: 999px; padding: 2px 7px; margin-left: 2px; }
 
-.tnav { display: flex; align-items: center; gap: 2px; flex: none; }
-.tn { display: flex; align-items: center; gap: 7px; background: none; border: 0; color: var(--chrome-muted); padding: 7px 10px; border-radius: 7px; font-size: 13px; font-weight: 500; white-space: nowrap; }
-.tn svg { color: var(--hue, currentColor); }
-.tn:hover { background: var(--chrome-hover); color: var(--chrome-text); }
-.tn.on { background: var(--chrome-on); color: var(--chrome-text); box-shadow: inset 0 -2px 0 var(--hue, var(--accent)); }
-.tn.icon { padding: 8px; }
-.live { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent); flex: none; }
-.live.down { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 25%, transparent); }
+.cx-crumbs { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 30; height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 6px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); max-width: calc(100% - 2 * var(--cx-side)); }
+.cx-crumbs button { border: 0; background: none; height: 34px; padding: 0 14px; border-radius: 999px; font: 600 13.5px var(--oq-font); color: var(--oq-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cx-crumbs button:hover { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
+.cx-crumbs button.on { color: var(--oq-ink); cursor: default; }
+.cx-crumbs svg { width: 14px; height: 14px; color: var(--oq-ink-faint); flex: none; }
 
-/* the hardware popover */
-.hwpop { position: fixed; top: calc(var(--top) + 6px); right: 150px; width: 360px; max-width: calc(100vw - 20px); background: var(--card); color: var(--text); border: 1px solid var(--card-line); border-radius: 10px; box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .35); padding: 14px 16px; z-index: 60; animation: popIn .2s var(--ease) backwards; }
-@keyframes popIn { from { transform: translateY(6px); opacity: 0; } }
-.pop-head { display: flex; align-items: center; gap: 10px; }
-.pop-head .sq { width: 28px; height: 28px; }
-.pop-title { min-width: 0; }
-.pop-title b { font-weight: 600; }
-.pop-body { margin-top: 14px; }
-.hwpop .vbar { height: 12px; margin: 8px 0 8px; }
-.legend { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 5px 8px; font: 12px var(--mono); color: var(--text-2); align-items: center; }
-.legend i { width: 8px; height: 8px; border-radius: 2px; }
-.pop-foot { margin-top: 12px; }
+.cx-right { position: absolute; top: 14px; right: 16px; z-index: 35; display: flex; align-items: flex-start; gap: 8px; }
+.cx-tools { height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 5px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); }
+.cx-tools .tool { border: 0; background: none; height: 34px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; gap: 7px; font: 600 13px var(--oq-font); color: var(--oq-ink-2); white-space: nowrap; }
+.cx-tools .tool:hover { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
+.cx-tools .tool.on { background: rgb(var(--oq-state) / .1); color: var(--oq-ink); }
+.cx-tools .tool.ic { width: 34px; padding: 0; justify-content: center; }
+.cx-tools .tool svg { color: var(--hue, currentColor); }
+.cx-tools .tool.ic svg { color: inherit; }
+.cx-tools .more { display: none; }
+.cx-right .menu { top: 50px; right: 0; }
+.menu .mi svg { color: var(--oq-ink-2); }
+.menu .mi .cur { margin-left: auto; font: 11px var(--oq-font-mono); color: var(--oq-ink-2); }
 
-@media (max-width: 1240px) { .tn span { display: none; } .tn { padding: 8px; } }
-@media (max-width: 1100px) { .hwchip .gname { display: none; } }
-@media (max-width: 860px) {
-  .bc .far { display: none; }
-  .bc { padding-left: 6px; }
-  .brand small, .hwchip .vbar { display: none; }
-  .hwpop { right: 10px; }
+/* the Beacon sits at the far right over the space the tools leave (topbar.js pads .cx-right by its width) */
+.cx-right .beacon { position: absolute; top: 0; right: 0; left: auto; transform: none; }
+.beacon .bc-compact { height: 44px; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; font-size: 13px; text-align: left; }
+.beacon .bc-lb { overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
+.beacon .live.bad { background: var(--oq-bad); box-shadow: 0 0 0 4px color-mix(in srgb, var(--oq-bad) 25%, transparent); }
+.beacon .ring-track { stroke: rgb(255 255 255 / .14); }
+.beacon .ring-arc { stroke: var(--oq-beacon-accent); transition: stroke-dashoffset .6s linear; }
+.beacon .ring-arc.warn { stroke: var(--oq-warn); }
+.beacon .bc-compact svg:not(.ring) { color: var(--oq-beacon-accent); }
+.beacon .bbtn:hover { filter: brightness(1.15); }
+.beacon button:focus-visible { outline: 2px solid var(--oq-beacon-accent); outline-offset: 2px; }
+
+@media (max-width: 1240px) { .cx-tools .lbl { display: none; } .cx-tools .tool { padding: 0; width: 34px; justify-content: center; } }
+@media (max-width: 1000px) { .cx-crumbs .far { display: none; } }
+@media (max-width: 760px) {
+  .cx-crumbs, .cx-tools .tool:not(.more) { display: none; }
+  .cx-tools .more { display: flex; }
+  .top .brand-isl .nm, .top .brand-isl .loc { display: none; }
+  .top .brand-isl { padding: 0 8px; }
+  .beacon .bc-lb { max-width: 150px; }
+  .cx-right .beacon .bc-open { width: min(350px, calc(100vw - 32px)); }
 }
-@media (max-width: 520px) { .bc { display: none; } .top { gap: 4px; } .brand { margin-right: auto; } .hwchip b { display: none; } }

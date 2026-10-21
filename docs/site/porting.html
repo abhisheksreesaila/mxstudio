@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Porting, behind the scenes · mxconsole docs</title>
+<title>Porting, behind the scenes · omxconsole docs</title>
 <meta name="description" content="What happens when you run mxc port <repo> --auto: what runs, where, what is checked, what it costs and what can come back.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="site.css">
@@ -117,11 +117,11 @@
 <main class="wrap">
   <p class="lab eyebrow">mxc port &lt;hf-repo&gt; --auto</p>
   <h1>Porting, behind the scenes</h1>
-  <p class="lede">mxconsole runs any model whose architecture MAX already supports. For one it doesn't, <code>mxc port &lt;hf-repo&gt; --auto</code> (or <strong>Port it</strong> in the console's Add a model) has Claude Code write a small MAX package for that architecture in a sandbox, following Modular's own porting skill. mxconsole then compiles and serves the package itself, compares its output with the original Hugging Face model, and registers the model only if it matches. After that it works like any other model: same endpoint, keys, idle unload and notebook.</p>
+  <p class="lede">omxconsole runs any model whose architecture MAX already supports. For one it doesn't, <code>mxc port &lt;hf-repo&gt; --auto</code> (or <strong>Port it</strong> in the console's Add a model) has Claude Code write a small MAX package for that architecture in a sandbox, following Modular's own porting skill. omxconsole then compiles and serves the package itself, compares its output with the original Hugging Face model, and registers the model only if it matches. After that it works like any other model: same endpoint, keys, idle unload and notebook.</p>
 
   <div class="card note" style="margin-top:22px">
     <h3>Why it's a separate step from pull</h3>
-    <p>A pull downloads files: it's free and predictable, and it either works or tells you why. A port spends your Claude usage (about $2–5), takes 7–40 minutes, needs Claude Code and Linux with bubblewrap, and can fail after spending that. So mxconsole never starts one on its own. <code>mxc pull</code> reads <code>config.json</code> before downloading any weights; if MAX doesn't support the architecture it stops and points to <code>mxc port</code>. In the console, Add a model shows the model as "needs porting" with a <strong>Port it</strong> button.</p>
+    <p>A pull downloads files: it's free and predictable, and it either works or tells you why. A port spends your Claude usage (about $2–5), takes 7–40 minutes, needs Claude Code and Linux with bubblewrap, and can fail after spending that. So omxconsole never starts one on its own. <code>mxc pull</code> reads <code>config.json</code> before downloading any weights; if MAX doesn't support the architecture it stops and points to <code>mxc port</code>. In the console, Add a model shows the model as "needs porting" with a <strong>Port it</strong> button.</p>
     <figure>
       <img src="../assets/screens/port-offer.png" alt="The console's Add a model page for EleutherAI/gpt-neo-125m: an architecture check card says GPTNeoForCausalLM is not something MAX can run yet, explains what Port it does, and shows the Port it button next to the CLI equivalent mxc port EleutherAI/gpt-neo-125m --auto." loading="lazy" width="1280" height="800">
       <figcaption>The console's offer. The search result is marked "needs porting"; the CLI twin is shown next to the button.</figcaption>
@@ -159,34 +159,34 @@
 
   <!-- ===================================================================== where -->
   <h2 id="where">Where things live</h2>
-  <p>The model's <code>config.json</code> and model card are untrusted input (assume prompt injection), so the agent, the checks and the test server all run under bubblewrap with a scrubbed environment. mxconsole keeps its own records outside.</p>
+  <p>The model's <code>config.json</code> and model card are untrusted input (assume prompt injection), so the agent, the checks and the test server all run under bubblewrap with a scrubbed environment. omxconsole keeps its own records outside.</p>
   <div class="where">
     <div class="card in">
       <p class="lab" style="color:var(--port-fg)">Inside the sandbox</p>
       <h3>What the agent can touch</h3>
       <ul>
         <li><strong>Writes:</strong> its workspace (<code>~/.mxc/ports/&lt;model&gt;/</code>) and the job's private <code>work/</code> folder. Nothing else.</li>
-        <li><strong>Reads:</strong> the system, read-only. Your home folder and <code>~/.mxc</code> are empty there (no <code>~/.ssh</code>, no database, no API keys, no other models). Bound back read-only: the Claude, pixi and git installs, Modular's skills, this model's weights, and for try-port mxconsole's own Python.</li>
+        <li><strong>Reads:</strong> the system, read-only. Your home folder and <code>~/.mxc</code> are empty there (no <code>~/.ssh</code>, no database, no API keys, no other models). Bound back read-only: the Claude, pixi and git installs, Modular's skills, this model's weights, and for try-port omxconsole's own Python.</li>
         <li><strong>Runs:</strong> Read, Write, Edit, Glob, Grep; WebFetch on huggingface.co; the skill's own scripts through its pixi env; copying the donor's folders; the try-port command. Anything else would prompt, and prompts are denied. No <code>ls</code>, <code>cat</code>, <code>pip</code>.</li>
         <li><strong>Environment:</strong> anything named like a key, token, secret, password or cookie is removed, plus <code>HF_TOKEN</code>, <code>MXC_API_KEY</code> and agent sockets. Claude keeps only its own login. Private <code>/tmp</code>, own PID namespace.</li>
         <li><strong>Can't change its own rules:</strong> <code>.claude/settings.json</code> in the workspace is bound read-only on top.</li>
       </ul>
     </div>
     <div class="card out">
-      <p class="lab" style="color:var(--max-fg)">Outside, kept by mxconsole</p>
+      <p class="lab" style="color:var(--max-fg)">Outside, kept by omxconsole</p>
       <h3>What the harness keeps to itself</h3>
       <ul>
         <li>The log, the transcripts and the copy of the best attempt, in the job folder <code>~/.mxc/ports/&lt;job id&gt;/</code>.</li>
         <li>Installing the skill's pixi env and downloading the weights: done once, outside, from the pristine clone. Inside they are read-only.</li>
         <li>The gate scripts. They are hashed after the clone is updated and checked before every gate; if touched, they are restored from git, and if that fails the job fails.</li>
-        <li>Registering and serving. Only mxconsole writes the model database.</li>
+        <li>Registering and serving. Only omxconsole writes the model database.</li>
       </ul>
       <p style="margin-top:10px"><strong>Accepted risks</strong> (documented in <code>port_auto.py</code>): the agent can read the Claude login and has network access, which bubblewrap can't prevent. And the checks import and run the generated code, so a pass means "an agent that did not cheat produced matching output"; the sandbox limits damage, it doesn't vouch for the port.</p>
     </div>
   </div>
 
   <ul class="tree card" style="padding:0" aria-label="Files a port creates">
-    <li><span class="p"><code>~/.mxc/skills/modular/</code></span><span class="what"><span class="tag ro">read-only in every sandbox</span>Modular's skills, cloned from github.com/modular/skills and fast-forwarded each run. Two known bugs patched locally (<a href="https://github.com/modular/skills/issues/15">modular/skills#15</a>), and the env's MAX pinned to the one mxconsole serves with.</span></li>
+    <li><span class="p"><code>~/.mxc/skills/modular/</code></span><span class="what"><span class="tag ro">read-only in every sandbox</span>Modular's skills, cloned from github.com/modular/skills and fast-forwarded each run. Two known bugs patched locally (<a href="https://github.com/modular/skills/issues/15">modular/skills#15</a>), and the env's MAX pinned to the one omxconsole serves with.</span></li>
     <li class="d1"><span class="p"><code>ports/&lt;model&gt;/</code></span><span class="what"><span class="tag rw">agent writes</span>The workspace. Named after the model, never all digits, so it can't collide with a job folder.</span></li>
     <li class="d2"><span class="p"><code>config.json</code>, <code>PORT.md</code></span><span class="what">The model's config at the pinned revision; the donor, the lane, the scaffold command and the loop.</span></li>
     <li class="d2"><span class="p"><code>.claude/skills/</code></span><span class="what"><span class="tag ro">read-only</span>Links to Modular's skills. <code>.claude/settings.json</code> is read-only too.</span></li>
@@ -199,7 +199,7 @@
     <li class="d2"><span class="p"><code>best/</code></span><span class="what">A copy of the package from the attempt that got furthest.</span></li>
     <li class="d2"><span class="p"><code>work/</code></span><span class="what"><span class="tag rw">agent writes</span><span class="tag gone">deleted when the job ends</span>Private caches (pixi, uv, Hugging Face, MAX compile), the agent's private Claude config, try-port's state. The model's weights are bound in read-only.</span></li>
   </ul>
-  <p style="font-size:13px;color:var(--muted)">The tree starts at <code>~/.mxc</code>, mxconsole's home (it moves if you configure another).</p>
+  <p style="font-size:13px;color:var(--muted)">The tree starts at <code>~/.mxc</code>, omxconsole's home (it moves if you configure another).</p>
 
   <!-- ===================================================================== outcomes -->
   <h2 id="outcomes">What can come back</h2>
@@ -208,13 +208,13 @@
     <thead><tr><th>Outcome</th><th>When</th><th>What you get</th><th>What to do next</th></tr></thead>
     <tbody>
       <tr><td class="oc ported">ported</td>
-        <td>mxconsole's own build check and comparison with Hugging Face pass.</td>
+        <td>omxconsole's own build check and comparison with Hugging Face pass.</td>
         <td>The model in <code>mxc ls</code> with source <code>port</code>, at a pinned revision, started. Same endpoint, keys, idle unload and notebook as any other. CLI exits 0.</td>
         <td>Use it. Review the package code if that matters to you (it runs in normal serving). After a MAX upgrade it may need redoing.</td></tr>
       <tr><td class="oc parked">parked</td>
         <td>The config loads Python code from the Hub (<code>auto_map</code> for a model type transformers doesn't know).</td>
         <td>A message that says so, before anything is spent: no skills, no weights, no agent. The job is recorded as failed (CLI exits 1).</td>
-        <td>Nothing. mxconsole doesn't run remote code, so these stay parked (EXAONE is one).</td></tr>
+        <td>Nothing. omxconsole doesn't run remote code, so these stay parked (EXAONE is one).</td></tr>
       <tr><td class="oc failed">failed</td>
         <td>Attempts used up, the same failure twice in a row, or something another attempt can't fix (no Claude Code, Hugging Face down).</td>
         <td>A message saying which attempt got furthest ("built but did not serve", "served; the comparison failed"), that attempt's package in the workspace, and the path to the full log. If Hugging Face was unreachable or rate-limiting, it says so and doesn't blame the port. CLI exits 1.</td>
@@ -261,14 +261,14 @@
     <li><strong>Text LLMs only so far.</strong> Vision and embedding architectures haven't been tried.</li>
     <li><strong>Safetensors weights only.</strong> Repos with only <code>.bin</code> or GGUF files are refused.</li>
     <li><strong>It must fit one GPU</strong> at the precision the weights are stored in.</li>
-    <li><strong>A port is tied to a MAX version.</strong> It's built against the MAX mxconsole serves with; after a MAX upgrade it may need redoing.</li>
-    <li><strong>Ported code runs inside mxconsole's serving.</strong> It's sandboxed while it's written and checked, not when it serves. Review it if that matters to you.</li>
+    <li><strong>A port is tied to a MAX version.</strong> It's built against the MAX omxconsole serves with; after a MAX upgrade it may need redoing.</li>
+    <li><strong>Ported code runs inside omxconsole's serving.</strong> It's sandboxed while it's written and checked, not when it serves. Review it if that matters to you.</li>
     <li><strong>The checks compare with the original model</strong> (first-token score and top token at several prefix lengths). They don't evaluate quality on your workload.</li>
   </ul>
 
   <!-- ===================================================================== guided -->
   <h2 id="guided">Guided mode: <code>mxc port &lt;repo&gt;</code> without --auto</h2>
-  <p>Without <code>--auto</code>, mxconsole only sets things up and hands you the command. It updates Modular's skills, makes the same workspace (<code>config.json</code>, a <code>PORT.md</code> naming the donor, the scaffold command and the loop, and the skills linked under <code>.claude/skills</code>), and prints:</p>
+  <p>Without <code>--auto</code>, omxconsole only sets things up and hands you the command. It updates Modular's skills, makes the same workspace (<code>config.json</code>, a <code>PORT.md</code> naming the donor, the scaffold command and the loop, and the skills linked under <code>.claude/skills</code>), and prints:</p>
 <pre>Modular skills: …
 Closest supported donor: &lt;Donor&gt;
 Workspace: ~/.mxc/ports/&lt;model&gt; (config.json, PORT.md, .claude/skills)
@@ -286,23 +286,23 @@ When it works: mxc pull &lt;repo&gt; --port &lt;port dir&gt;</pre>
   "use strict";
   // Each step: who runs it, the code behind it, what it checks, what you see. Content is static and ours (innerHTML is safe here).
   const STEPS = [
-    { title: "Read the config", who: "mxconsole", whoCls: "",
-      what: `<p>Before the job starts, mxconsole refuses to run without bubblewrap (unless <code>--unsandboxed</code>), refuses a second port of the same repo or name, and takes 1 to 10 attempts. Then it resolves the name to a Hugging Face repo at a pinned revision, reads <code>architectures</code> from its <code>config.json</code> and looks it up in MAX's catalog. It checks the model name is free and copies <code>config.json</code> into a new workspace.</p>`,
+    { title: "Read the config", who: "omxconsole", whoCls: "",
+      what: `<p>Before the job starts, omxconsole refuses to run without bubblewrap (unless <code>--unsandboxed</code>), refuses a second port of the same repo or name, and takes 1 to 10 attempts. Then it resolves the name to a Hugging Face repo at a pinned revision, reads <code>architectures</code> from its <code>config.json</code> and looks it up in MAX's catalog. It checks the model name is free and copies <code>config.json</code> into a new workspace.</p>`,
       code: [["port_auto.py", "PortManager.start, _pipeline (workspace)"], ["resolve.py", "resolve, HubClient.inspect"], ["port.py", "make_workspace"]],
       checks: `<ul><li>The architecture isn't supported already (if it is: "run <code>mxc pull</code> instead").</li><li>The repo exists and isn't gated.</li><li>The name isn't taken.</li></ul>`,
       console: "Prepare workspace", cli: "workspace  ..  looking up &lt;repo&gt;…" },
-    { title: "Park check", who: "mxconsole", whoCls: "",
+    { title: "Park check", who: "omxconsole", whoCls: "",
       what: `<p>If <code>config.json</code> has an <code>auto_map</code> for a model type transformers doesn't know, the config class is Python code on the Hub. <code>max serve</code> won't run remote code, so the job stops here, with only <code>config.json</code> fetched: no skills, no weights, no agent.</p>`,
       code: [["port_auto.py", "needs_remote_code"]],
       checks: `<ul><li><code>auto_map</code> present and <code>model_type</code> not in transformers' config mapping.</li></ul>`,
       console: "Prepare workspace → failed", cli: "error: &lt;repo&gt; loads its config from Python code on the Hugging Face Hub … parked before spending any agent time." },
-    { title: "Pick the closest supported architecture", who: "mxconsole", whoCls: "",
+    { title: "Pick the closest supported architecture", who: "omxconsole", whoCls: "",
       what: `<p>The donor is the architecture in MAX's catalog whose name best matches the target's architecture and <code>model_type</code>: the longest shared name prefix (at least 3 characters), with extra weight when the target's name starts with the donor's (the same family at a newer version), and shorter names winning ties. If nothing matches, it falls back to <code>LlamaForCausalLM</code>, the most common decoder-only starting point. It also finds the donor's source folder in the installed MAX and a ModuleV3 twin if there is one.</p><p>This is a name match, a starting point for the agent, not a guarantee the structures match.</p>`,
       code: [["port.py", "pick_donor, _source_dir, _v3_twin"]],
       checks: `<p>Nothing is checked here.</p>`,
       console: "Prepare workspace → done", cli: "workspace  ok  &lt;Arch&gt;, donor &lt;Donor&gt;, workspace ~/.mxc/ports/&lt;model&gt;" },
-    { title: "Prepare skills, sandbox and weights", who: "mxconsole, outside the sandbox", whoCls: "",
-      what: `<p>Clones or fast-forwards Modular's skills into <code>~/.mxc/skills/modular</code>, applies two local bug fixes and pins the skill env's MAX to the version mxconsole serves with. Writes <code>PORT.md</code> and links the skills into the workspace. Then, outside any sandbox and from the pristine clone, it installs the skill's pixi env and downloads the weights once (safetensors only). The gate scripts are hashed so tampering shows later.</p>`,
+    { title: "Prepare skills, sandbox and weights", who: "omxconsole, outside the sandbox", whoCls: "",
+      what: `<p>Clones or fast-forwards Modular's skills into <code>~/.mxc/skills/modular</code>, applies two local bug fixes and pins the skill env's MAX to the version omxconsole serves with. Writes <code>PORT.md</code> and links the skills into the workspace. Then, outside any sandbox and from the pristine clone, it installs the skill's pixi env and downloads the weights once (safetensors only). The gate scripts are hashed so tampering shows later.</p>`,
       code: [["port_auto.py", "_pipeline (skills), apply_skill_patches, gate_hash, _skill_install"], ["port.py", "ensure_skills, finish_workspace"], ["resolve.py", "download_snapshot"]],
       checks: `<ul><li>The skill has <code>import-model</code>.</li><li>MAX could be pinned (else the job fails: a port built on another MAX won't load).</li><li>A patch that no longer applies is logged as a warning.</li></ul>`,
       console: "Load Modular skills", cli: "skills  ok  &lt;n&gt; skills in ~/.mxc/skills/modular, read-only for the agent and the gates; weights at …" },
@@ -312,7 +312,7 @@ When it works: mxc pull &lt;repo&gt; --port &lt;port dir&gt;</pre>
       checks: `<ul><li>Claude exits 0 within 3 hours. A non-zero exit is a failed attempt (retried, unless <code>claude</code> couldn't run).</li></ul><p>Transcript: <code>agent-&lt;n&gt;.jsonl</code>; readable steps in <code>port.log</code>.</p>`,
       console: "Generate the model (· attempt n)", cli: "generate (attempt 1)  ..  running Claude Code headless…" },
     { title: "Compile and serve (try-port)", who: "agent · sandbox", whoCls: "agent",
-      what: `<p>The agent's one way to see its package run. <code>python -m mxconsole.port_try --config &lt;job&gt;/try-&lt;n&gt;.json</code> starts <code>max serve</code> on the package with the same flags as mxconsole's final check, waits for it to be healthy and sends "The capital of France is" for 16 greedy tokens. A cold compile can take 5–25 minutes, so a call waits up to 9 minutes, says "still running", and the next call picks the same run up.</p><p>Only offered under bubblewrap: its PID namespace takes a stray run down with the agent.</p>`,
+      what: `<p>The agent's one way to see its package run. <code>python -m mxconsole.port_try --config &lt;job&gt;/try-&lt;n&gt;.json</code> starts <code>max serve</code> on the package with the same flags as omxconsole's final check, waits for it to be healthy and sends "The capital of France is" for 16 greedy tokens. A cold compile can take 5–25 minutes, so a call waits up to 9 minutes, says "still running", and the next call picks the same run up.</p><p>Only offered under bubblewrap: its PID namespace takes a stray run down with the agent.</p>`,
       code: [["port_try.py", "main, _start, _work"], ["port_auto.py", "try_config, _try_text"]],
       checks: `<ul><li>The server becomes healthy; the prompt gets text back.</li><li>Up to 4 runs and 90 minutes of runs per attempt.</li></ul>`,
       console: "still Generate the model", cli: "claude&gt; Bash … -m mxconsole.port_try --config ~/.mxc/ports/&lt;id&gt;/try-1.json" },
@@ -321,18 +321,18 @@ When it works: mxc pull &lt;repo&gt; --port &lt;port dir&gt;</pre>
       code: [["port_try.py", "_work"], ["skill", "compare_layers.py, run_oss_gates.py --phase verify"]],
       checks: `<ul><li>First-token score and top token at several prefix lengths, against the Hugging Face model.</li></ul>`,
       console: "still Generate the model", cli: "RESULT: PASS" },
-    { title: "mxconsole's own check", who: "mxconsole · sandbox", whoCls: "check",
-      what: `<p>When the agent stops, mxconsole checks for itself, whatever the agent said. <strong>Build:</strong> the package folder has <code>arch.py</code> and an <code>__init__.py</code> exposing <code>ARCHITECTURES</code>; the gate scripts match their hash (restored from git if not); <code>check_port.py</code> from the pristine clone imports the package like <code>max serve</code> does and maps every weight. <strong>Parity:</strong> its own <code>max serve</code> on the package (workspace read-only), a smoke prompt, then the verify gates against Hugging Face.</p><p>If Hugging Face itself fails (429, 5xx, network) while the server is up, the check is run again up to twice, 30 s apart; if it keeps failing, the job stops without counting it against the port.</p>`,
+    { title: "omxconsole's own check", who: "omxconsole · sandbox", whoCls: "check",
+      what: `<p>When the agent stops, omxconsole checks for itself, whatever the agent said. <strong>Build:</strong> the package folder has <code>arch.py</code> and an <code>__init__.py</code> exposing <code>ARCHITECTURES</code>; the gate scripts match their hash (restored from git if not); <code>check_port.py</code> from the pristine clone imports the package like <code>max serve</code> does and maps every weight. <strong>Parity:</strong> its own <code>max serve</code> on the package (workspace read-only), a smoke prompt, then the verify gates against Hugging Face.</p><p>If Hugging Face itself fails (429, 5xx, network) while the server is up, the check is run again up to twice, 30 s apart; if it keeps failing, the job stops without counting it against the port.</p>`,
       code: [["port_auto.py", "_attempt (build, parity), _pristine, _skill_build, _parity, _smoke, _skill_verify, infra_error"]],
       checks: `<ul><li>Every weight maps.</li><li>The server is healthy within 40 min and answers with text.</li><li>The verify gates pass against Hugging Face.</li></ul>`,
       console: "Build the graph, Parity check", cli: "build (attempt 1)  ok  the package imports and every weight maps" },
-    { title: "Next attempt, with the failure fed back", who: "mxconsole", whoCls: "",
+    { title: "Next attempt, with the failure fed back", who: "omxconsole", whoCls: "",
       what: `<p>If the check fails in a way another attempt could fix, the last 6000 characters of its output go into the next prompt and a new attempt starts (back to step 5). It stops when the attempts are used up (<code>--max-attempts</code>, 3 by default), when the same failure happens twice in a row, or when the failure isn't the port's to fix.</p><p>Each failed attempt's package is copied if it got further than the ones before. If an earlier attempt got furthest, its package is put back in the workspace and the message names it.</p>`,
       code: [["port_auto.py", "_pipeline (attempt loop), failure_signature, reached_text, _snapshot, _restore_best"]],
       checks: `<ul><li>How far it got: the build check, built but did not serve, or served but the comparison failed.</li><li>Same failure: gate result lines, or error lines, with timestamps and ports removed.</li></ul>`,
       console: "Generate the model · attempt 2 …", cli: "attempt 1 failed: … Trying again with the error fed back." },
-    { title: "Register and serve", who: "mxconsole", whoCls: "",
-      what: `<p>The model is added like a <code>mxc pull --port</code>: the package folder is checked again, the weights are taken at the pinned revision, and the model is recorded with source <code>port</code> and the package as its custom architecture. Then mxconsole starts it (MAX gets <code>--custom-architectures &lt;package&gt;</code>). From here it's a normal model: same endpoint, keys, idle unload, notebook. The job's private <code>work/</code> folder is deleted.</p>`,
+    { title: "Register and serve", who: "omxconsole", whoCls: "",
+      what: `<p>The model is added like a <code>mxc pull --port</code>: the package folder is checked again, the weights are taken at the pinned revision, and the model is recorded with source <code>port</code> and the package as its custom architecture. Then omxconsole starts it (MAX gets <code>--custom-architectures &lt;package&gt;</code>). From here it's a normal model: same endpoint, keys, idle unload, notebook. The job's private <code>work/</code> folder is deleted.</p>`,
       code: [["port.py", "register, check_port_dir"], ["port_auto.py", "_pipeline (register, serve)"], ["admin_port.py", "serve → supervisor.ensure_running"]],
       checks: `<ul><li>The model starts within 40 minutes (else: "registered but did not start").</li></ul>`,
       console: "Register the model, Serve on localhost", cli: "Ported &lt;name&gt; (&lt;repo&gt;@&lt;rev&gt;) and serving it." },

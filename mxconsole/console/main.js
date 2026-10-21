@@ -1,4 +1,4 @@
-// mxconsole: the blades console. A dark top bar, a journey of blades docked side by side, My models at home.
+// mxconsole: the blades console. Top islands and the Beacon, a journey of blades docked side by side, My models at home.
 // Each blade is its own blade-*.js (registered on import) with its own CSS; see blades.js for the contract.
 // The URL hash opens a blade (#keys, #model/<name>, #bench/<name>, ...; see routes.js) and follows what is open.
 import { $, store, onData, startPolling } from "./core.js";
@@ -47,7 +47,7 @@ const decode = (v) => { try { return decodeURIComponent(v); } catch (_) { return
 const here = () => decode(location.hash.slice(1));
 const want = () => decode(hashFor(stack));
 mountJourney($("journey"));
-mountTopbar($("topbar"), $("hwpop"));
+mountTopbar($("topbar"));
 push("home");
 startPolling();
 startSystemPolling();

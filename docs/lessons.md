@@ -12,7 +12,7 @@ Claude reads this at the start of each session. -->
 - 2026-10-03 · Appended CSS blocks from parallel agents can leave a media query unclosed and silently swallow later blocks; a brace-balance test on console.css now guards it.
 - 2026-10-03 · Don't drop a workaround from old code as 'environment-specific' without testing on the real hardware: MAX 26.5 device graph capture crashes on this native Linux box too (CUDA_ERROR_INVALID_DEVICE), not just WSL.
 - 2026-10-03 · Concurrent starts read the same nvidia-smi snapshot: placement must count what this process already placed, not just live free memory.
-- 2026-10-03 · The product is written as one lowercase word, mxconsole (mx carries the weight), never "MX Console"; the command stays mxc.
+- 2026-10-03 · The product is written as one lowercase word, never "MX Console"; the command stays mxc. (Since 2026-10-20 it is **omxconsole**, ADR 0004; the package, `~/.mxc` and wire names keep "mxconsole".)
 - 2026-10-03 · ↗ only on links that leave the console and open a new tab; a link to our own page (the API reference) gets no arrow.
 - 2026-10-03 · The menu must collapse to an icon rail (☰ in the top bar), with tooltips on hover.
 - 2026-10-10 · Show design concepts and mockups as Claude Artifacts, not Lavish Editor: that's where the person reviews them.
@@ -22,3 +22,4 @@ Claude reads this at the start of each session. -->
 - 2026-10-14 · Describe UI from a screenshot of the running app, not from what a mode is supposed to look like (Jupyter's /doc view still has menus and a file browser).
 - 2026-10-14 · A cross-origin iframe on loopback must use the same host name as the page (localhost vs 127.0.0.1 are different sites; the browser holds back cookies). Check both.
 - 2026-10-14 · In a classic script, never declare a global `const`/`let` named like a window property (`top`, `name`, `parent`): it throws and the whole script dies silently. Wrap page scripts or pick another name.
+- 2026-10-20 · A developer agent's cleanup `pkill -f "mxc daemon"` killed the owner's real daemon on 11435. Agents run a scratch daemon with their own `MXC_HOME` and port, and stop only the PID they started; never pkill by pattern.
