@@ -6,8 +6,9 @@
 <title>Console tour · omxconsole</title>
 <meta name="description" content="Every screen of the omxconsole web console, with numbered notes on what each part does and the mxc command behind it.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="omxqua/tokens.css">
 <link rel="stylesheet" href="site.css">
-<script>try { const t = localStorage.getItem("mxc-docs-theme"); if (t) document.documentElement.classList.add(t); } catch (_) {}</script>
+<script src="theme.js"></script>
 <style>
   .wrap.tourwrap { max-width: 1280px; }
   .intro { max-width: 760px; }
@@ -21,7 +22,9 @@
   .screens > div:first-child .grp { margin-top: 0; }
   .screens ul { list-style: none; margin: 0; padding: 0; }
   .screens button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font: 14px var(--sans); color: var(--text-2);
-    background: none; border: 0; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+    background: none; border: 0; border-radius: 999px; padding: 6px 12px; cursor: pointer;
+    transition: background .15s, transform var(--oq-spring-fast-dur) var(--oq-spring-fast); }
+  .screens button:active { transform: scale(var(--oq-press-scale)); }
   .screens button::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--hue, var(--faint)); flex: none; }
   .screens button:hover { background: var(--hover); color: var(--text); }
   .screens button[aria-current="true"] { background: var(--sel); color: var(--text); font-weight: 560; }
@@ -35,27 +38,28 @@
   .stagehead h2 { margin: 2px 0 4px; }
   .stagehead p { margin: 0; }
   .pager { display: flex; gap: 6px; flex: none; }
-  .pager button { font: 13px var(--sans); color: var(--text-2); background: var(--card); border: 1px solid var(--card-line); border-radius: 6px; padding: 5px 11px; cursor: pointer; }
+  .pager button { font: 550 13px var(--sans); color: var(--text-2); background: var(--oq-surface-2); border: 0; box-shadow: var(--oq-shadow-1); border-radius: 999px; padding: 0 14px; height: 32px; cursor: pointer;
+    transition: transform var(--oq-spring-fast-dur) var(--oq-spring-fast); }
+  .pager button:active { transform: scale(var(--oq-press-scale)); }
   .pager button:hover { background: var(--hover); color: var(--text); }
 
-  .shot { position: relative; margin: 0; contain: paint; clip-path: inset(0 round 10px); border: 1px solid var(--card-line); border-radius: 10px; overflow: hidden; background: var(--card);
-    box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06); }
+  .shot { position: relative; margin: 0; contain: paint; clip-path: inset(0 round var(--radius)); border-radius: var(--radius); overflow: hidden; background: var(--card);
+    box-shadow: var(--oq-shadow-2); }
   .shot img { display: block; width: 100%; height: auto; }
   .hl { position: absolute; border-radius: 6px; pointer-events: none; opacity: 0;
     box-shadow: 0 0 0 2px var(--accent), 0 0 0 9999px rgb(10 10 12 / .38); transition: opacity .15s var(--ease); }
   .hl.on { opacity: 1; }
   .spot { position: absolute; transform: translate(-50%, -50%); width: 24px; height: 24px; border-radius: 50%; padding: 0;
-    display: grid; place-items: center; font: 600 12px var(--mono); color: #fff; background: var(--accent); cursor: pointer;
-    border: 2px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .35); transition: transform .12s var(--ease), background .12s; z-index: 1; }
-  .spot:hover, .spot.on { transform: translate(-50%, -50%) scale(1.18); background: var(--hue-gateway); z-index: 2; }
+    display: grid; place-items: center; font: 600 12px var(--mono); color: var(--on-accent); background: var(--accent); cursor: pointer;
+    border: 2px solid var(--on-accent); box-shadow: 0 1px 4px rgb(0 0 0 / .35); transition: transform var(--oq-spring-fast-dur) var(--oq-spring-fast); z-index: 1; }
+  .spot:hover, .spot.on { transform: translate(-50%, -50%) scale(1.22); z-index: 2; }
 
   /* the notes */
   .notes { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
   .notes li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 11px 14px; background: var(--card);
-    border: 1px solid var(--card-line); border-radius: 10px; transition: border-color .12s, background .12s; }
-  .notes li.on { border-color: var(--accent); background: var(--sel); }
-  .notes .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 600 11.5px var(--mono); color: #fff; background: var(--accent); margin-top: 1px; }
-  .notes li.on .n { background: var(--hue-gateway); }
+    border-radius: var(--radius); box-shadow: var(--oq-shadow-1); transition: box-shadow .2s, transform var(--oq-spring-dur) var(--oq-spring); }
+  .notes li.on { box-shadow: 0 0 0 2px var(--accent), var(--oq-shadow-2); transform: translateX(3px); }
+  .notes .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 600 11.5px var(--mono); color: var(--on-accent); background: var(--accent); margin-top: 1px; }
   .notes h3 { margin: 0; font-size: 15px; }
   .notes p { margin: 3px 0 0; font-size: 14px; }
   .notes .cli { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
@@ -69,7 +73,7 @@
     .screens > div { min-width: 0; }
     .screens .grp { margin: 6px 0 2px; width: 100%; }
     .screens ul { display: flex; flex-wrap: wrap; gap: 4px; }
-    .screens button { width: auto; border: 1px solid var(--card-line); background: var(--card); padding: 4px 10px; font-size: 13px; }
+    .screens button { width: auto; background: var(--card); box-shadow: var(--oq-shadow-1); padding: 4px 12px; font-size: 13px; }
     .screens .keys { display: none; }
     .stagehead { flex-wrap: wrap; }
     .spot { width: 18px; height: 18px; font-size: 10px; border-width: 1.5px; }

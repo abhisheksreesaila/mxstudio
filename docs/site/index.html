@@ -5,94 +5,188 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>omxconsole docs: local AI on Modular MAX</title>
 <link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="omxqua/tokens.css">
 <link rel="stylesheet" href="site.css">
-<script>try { const t = localStorage.getItem("mxc-docs-theme"); if (t) document.documentElement.classList.add(t); } catch (_) {}</script>
+<script src="theme.js"></script>
+<script>if (!matchMedia("(prefers-reduced-motion: reduce)").matches) document.documentElement.classList.add("rise-on");</script>
 <style>
-  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 32px; align-items: center; }
-  .hero img { width: 100%; border-radius: 10px; border: 1px solid var(--card-line); box-shadow: 0 12px 40px rgba(0, 0, 0, .12); }
-  .cmds { margin-top: 18px; }
-  .links { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
-  .btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 7px; font-size: 14px; font-weight: 500;
-    border: 1px solid var(--card-line); background: var(--card); color: var(--text); }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .btn:hover { text-decoration: none; filter: brightness(1.05); }
-  .why .card h3 { margin-top: 0; display: flex; align-items: center; gap: 8px; }
-  .why .card h3 i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-  .why .card p { margin: 0; font-size: 14px; }
+  /* the landing page: omxqua components drawn by hand (pill buttons, tonal cards, one soft shadow, springs), no extra stylesheet */
+  .wrap.land { padding-top: 56px; }
+  .ico { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: end; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px 0 10px; border-radius: 999px; background: var(--oq-surface-1);
+    box-shadow: var(--oq-shadow-1); font: 500 12px var(--mono); color: var(--text-2); }
+  .eyebrow i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); animation: live 2.4s ease-in-out infinite; }
+  @keyframes live { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ok) 0%, transparent); } }
+  .hero h1 { font-size: clamp(38px, 5.4vw, 60px); line-height: 1.02; letter-spacing: -.045em; margin: 18px 0 16px; font-weight: 680; }
+  .hero h1 em { font-style: normal; color: var(--text-2); }
+  .hero .lede { font-size: 18px; line-height: 1.55; margin: 0; }
+  .links { margin-top: 26px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 20px; border-radius: 999px; font-size: 14.5px; font-weight: 600;
+    border: 0; color: var(--text); background: var(--oq-surface-2); box-shadow: var(--oq-shadow-1); cursor: pointer;
+    transition: transform var(--oq-spring-fast-dur) var(--oq-spring-fast), box-shadow var(--oq-spring-fast-dur) var(--oq-spring-fast); }
+  .btn:hover { text-decoration: none; box-shadow: var(--oq-shadow-2); transform: translateY(-1px); }
+  .btn:active { transform: scale(var(--oq-press-scale)); }
+  .btn.fill { background: var(--accent); color: var(--on-accent); }
+  .btn.fill .ico { transition: transform var(--oq-spring-dur) var(--oq-spring); }
+  .btn.fill:hover .ico { transform: translateX(3px); }
+  .btn.text { background: none; box-shadow: none; color: var(--text-2); padding: 0 12px; }
+  .btn.text:hover { color: var(--text); transform: none; }
+
+  /* get started: a terminal card */
+  .start { padding: 0; overflow: hidden; }
+  .start-h { display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 18px; }
+  .start-h b { font-size: 14px; font-weight: 600; flex: 1; }
+  .cp { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: 0; border-radius: 999px; background: rgb(var(--oq-state) / .06);
+    color: var(--text-2); font: 500 12px var(--mono); cursor: pointer; transition: background .15s, transform var(--oq-spring-fast-dur) var(--oq-spring-fast); }
+  .cp:hover { background: rgb(var(--oq-state) / .1); color: var(--text); }
+  .cp:active { transform: scale(var(--oq-press-scale)); }
+  .cp .ico { width: 13px; height: 13px; }
+  .start pre { margin: 0; border-radius: 0; box-shadow: none; padding: 16px 18px 18px; font-size: 12.5px; line-height: 1.8; }
+  .start pre span { color: #8c8c96; user-select: none; }
+  .start .src { font: 12px var(--mono); color: var(--muted); padding: 10px 18px; border-top: 1px solid var(--card-line-2); }
+
+  /* the console, in a raised window */
+  .shot { position: relative; margin: 48px 0 0; }
+  .win { border-radius: 18px; overflow: hidden; background: var(--oq-surface-1); box-shadow: var(--oq-shadow-4); }
+  .win img { display: block; width: 100%; height: auto; }
+  .oq-light .win .dk, .oq-night .win .lt { display: none; }
+  .float { position: absolute; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 999px;
+    background: var(--oq-surface-2); box-shadow: var(--oq-shadow-3); font: 500 12.5px var(--mono); color: var(--text); white-space: nowrap; }
+  .float i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .float.a { left: -14px; bottom: 44px; } .float.b { right: 40px; top: -20px; }
+  .float small { color: var(--muted); font-size: 11.5px; }
+
+  /* why */
+  .sec-h { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 72px 0 18px; }
+  .sec-h h2 { margin: 6px 0 0; font-size: 28px; letter-spacing: -.03em; }
+  .sec-h p { margin: 6px 0 0; max-width: 520px; }
+  .why { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .why .card { padding: 20px; display: flex; flex-direction: column; gap: 10px;
+    transition: transform var(--oq-spring-dur) var(--oq-spring), box-shadow var(--oq-spring-dur) var(--oq-spring); }
+  .why .card:hover { transform: translateY(-3px); box-shadow: var(--oq-shadow-2); }
+  .chipi { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--hue);
+    background: color-mix(in srgb, var(--hue) 13%, transparent); }
+  .why h3 { margin: 6px 0 0; font-size: 16px; }
+  .why p { margin: 0; font-size: 14px; }
 
   /* how a request travels */
-  .flow-ctl { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 14px 0; }
-  .seg { display: flex; gap: 2px; background: var(--sunk); padding: 2px; border-radius: 7px; }
-  .seg button { border: 0; background: none; padding: 5px 12px; border-radius: 5px; font: 13px var(--sans); color: var(--muted); cursor: pointer; }
-  .seg button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
-  .play { height: 32px; padding: 0 14px; border-radius: 7px; border: 0; background: var(--text); color: var(--canvas); font: 500 13px var(--sans); cursor: pointer; }
+  .stage { padding: 20px; }
+  .flow-ctl { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+  .seg { position: relative; display: inline-flex; padding: 3px; border-radius: 999px; background: var(--oq-surface-0); box-shadow: inset 0 0 0 1px var(--card-line); }
+  .seg > i { position: absolute; top: 3px; bottom: 3px; left: 3px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-1);
+    transition: left var(--oq-spring-fast-dur) var(--oq-spring-fast), width var(--oq-spring-fast-dur) var(--oq-spring-fast); }
+  .seg button { position: relative; z-index: 1; border: 0; background: none; height: 30px; padding: 0 14px; border-radius: 999px; font: 500 13px var(--sans); color: var(--muted); cursor: pointer; transition: color .2s; }
+  .seg button.on { color: var(--text); }
+  .play { margin-left: auto; height: 36px; padding: 0 18px 0 14px; }
+  .play .ico { width: 14px; height: 14px; fill: currentColor; stroke: none; }
   .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; align-items: stretch; position: relative; }
   .hop { position: relative; padding: 0 6px; }
-  .hop .box { background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; padding: 12px; height: 100%; transition: border-color .25s, box-shadow .25s, opacity .25s; }
+  .hop .box { background: var(--oq-surface-2); box-shadow: var(--oq-shadow-1); border-radius: 12px; padding: 12px; height: 100%;
+    transition: box-shadow .25s, opacity .3s, transform var(--oq-spring-dur) var(--oq-spring); }
+  .oq-light .hop .box { background: var(--oq-surface-0); box-shadow: inset 0 0 0 1px var(--card-line-2); }
   .hop .box b { display: block; font: 600 13px var(--mono); }
-  .hop .box small { display: block; font: 11px var(--mono); color: var(--muted); margin-bottom: 6px; }
+  .hop .box small { display: flex; align-items: center; gap: 6px; font: 11px var(--mono); color: var(--muted); margin-bottom: 6px; }
+  .hop .box small::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--hue-c); }
   .hop .box span { font-size: 12.5px; color: var(--text-2); line-height: 1.45; display: block; }
-  .hop:not(:last-child)::after { content: "▶"; position: absolute; right: -7px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--faint); z-index: 1; }
-  .hop.off .box { opacity: .35; }
-  .hop.on .box { border-color: var(--hue-c, var(--accent)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--hue-c, var(--accent)) 20%, transparent); }
-  .log { margin-top: 14px; background: var(--code); color: var(--code-text); border-radius: 8px; padding: 12px 14px; font: 12.5px/1.7 var(--mono); min-height: 128px; }
+  .hop:not(:last-child)::after { content: ""; position: absolute; right: -4px; top: 50%; width: 8px; height: 8px; border-top: 1.5px solid var(--faint); border-right: 1.5px solid var(--faint);
+    transform: translateY(-50%) rotate(45deg); z-index: 1; }
+  .hop.off .box { opacity: .32; }
+  .hop.on .box { transform: translateY(-4px); background: var(--oq-surface-1); box-shadow: 0 0 0 2px var(--hue-c), var(--oq-shadow-2); }
+  .log { margin-top: 18px; background: var(--code); color: var(--code-text); border-radius: 12px; padding: 12px 14px; font: 12.5px/1.7 var(--mono); min-height: 128px; }
   .log .t { color: #8c8c96; margin-right: 8px; }
-  .log .ok { color: #4ade80; } .log .warn { color: #fbbf24; } /* the dark-theme --ok-fg / --warn-fg: the log is always dark */
-  .note { font-size: 13px; color: var(--muted); }
+  .log .ok { color: #4ade80; } .log .warn { color: #fbbf24; } /* the log is always dark */
+  .log > div { animation: logIn .28s var(--oq-ease-in) both; }
+  @keyframes logIn { from { opacity: 0; transform: translateY(4px); } }
+  .note { font-size: 13px; color: var(--muted); margin-top: 14px; }
+
+  /* more */
+  .more { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .more a.card h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .more a.card h3 .ico { width: 16px; height: 16px; color: var(--muted); transition: transform var(--oq-spring-dur) var(--oq-spring), color .15s; }
+  .more a.card:hover h3 .ico { transform: translateX(3px); color: var(--text); }
+  .more p { font-size: 14px; margin: 0; }
+
+  /* rise: sections settle in as they scroll into view (Liquid's slow spring); off under reduced motion */
+  .rise-on .rise { opacity: 0; transform: translateY(18px); }
+  .rise-on .rise.in { opacity: 1; transform: none; transition: opacity .5s var(--oq-ease-in), transform var(--oq-spring-slow-dur) var(--oq-spring-slow); transition-delay: var(--d, 0ms); }
+
+  @media (max-width: 1000px) { .why, .more { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 900px) {
-    .hero { grid-template-columns: minmax(0, 1fr); }
-    .flow { grid-template-columns: 1fr; gap: 10px; }
-    .hop:not(:last-child)::after { content: "▼"; right: auto; left: 50%; top: auto; bottom: -12px; transform: translateX(-50%); }
+    .hero { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    .float { display: none; }
+    .flow { grid-template-columns: 1fr; gap: 14px; }
+    .hop:not(:last-child)::after { right: auto; left: 50%; top: auto; bottom: -11px; transform: translateX(-50%) rotate(135deg); }
+    .play { margin-left: 0; }
+    .sec-h { display: block; }
   }
+  @media (max-width: 560px) { .why, .more { grid-template-columns: minmax(0, 1fr); } .wrap.land { padding-top: 32px; } }
 </style>
 </head>
 <body>
 <header class="top" data-page="index.html"></header>
-<main class="wrap">
+<main class="wrap land">
 
 <section class="hero">
-  <div>
-    <div class="lab">omxconsole · docs</div>
-    <h1>Local AI on Modular MAX, made easy.</h1>
+  <div class="rise">
+    <span class="eyebrow"><i></i>omxconsole · runs on your machine</span>
+    <h1>Local AI on Modular&nbsp;MAX, <em>made easy.</em></h1>
     <p class="lede">A convenience wrapper around MAX. One command gives you an OpenAI-compatible endpoint. Models load
       when they're called and unload when idle. If MAX can't run a model yet, omxconsole can port it.</p>
-<pre class="cmds">git clone https://github.com/abhisheksreesaila/mxstudio.git
-cd mxstudio
-pixi install
-pixi run mxc serve qwen2.5-0.5b</pre>
     <div class="links">
-      <a class="btn primary" href="console.html">Tour the console</a>
+      <a class="btn fill" href="console.html">Tour the console <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
       <a class="btn" href="porting.html">How porting works</a>
-      <a class="btn" href="https://github.com/abhisheksreesaila/mxstudio/blob/main/docs/USER_GUIDE.md">User guide ↗</a>
+      <a class="btn text" href="https://github.com/abhisheksreesaila/mxstudio/blob/main/docs/USER_GUIDE.md">User guide ↗</a>
     </div>
   </div>
-  <img src="../assets/screens/home.png" alt="The omxconsole console: My models, with live throughput and GPU memory">
+  <div class="card start rise" style="--d:120ms">
+    <div class="start-h"><b>Start in four commands</b>
+      <button type="button" class="cp" id="copy"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span>Copy</span></button></div>
+<pre id="cmds"><span>$ </span>git clone https://github.com/abhisheksreesaila/mxstudio.git
+<span>$ </span>cd mxstudio
+<span>$ </span>pixi install
+<span>$ </span>pixi run mxc serve qwen2.5-0.5b</pre>
+    <div class="src">↳ prints a URL, a key and a curl line you can paste</div>
+  </div>
 </section>
 
-<h2>Why</h2>
+<figure class="shot rise" style="--d:200ms">
+  <div class="win"><img class="lt" src="../assets/screens/home.png" alt="The omxconsole console: My models, with live throughput and GPU memory"><img class="dk" src="../assets/screens/home-dark.png" alt="" loading="lazy"></div>
+  <div class="float a"><i></i>http://127.0.0.1:11435/v1 <small>one endpoint</small></div>
+  <div class="float b">mxc keys new my-app <small>one key per app</small></div>
+</figure>
+
+<div class="sec-h rise"><div><div class="lab">Why</div><h2>Small models, served properly.</h2></div>
+  <p>Everything MAX needs to feel like a local service: one endpoint, models that come and go on demand, keys, and a way through when MAX can't run a model yet.</p></div>
 <div class="grid why">
-  <div class="card"><h3><i style="background:var(--hue-add)"></i>Local AI, easy</h3>
+  <div class="card rise" style="--hue:var(--hue-add)"><span class="chipi"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span>
+    <h3>Local AI, easy</h3>
     <p><code>mxc serve</code> downloads, starts and prints a URL, a key and a <code>curl</code> line. Any OpenAI client works.</p></div>
-  <div class="card"><h3><i style="background:var(--hue-models)"></i>Many models, one endpoint</h3>
+  <div class="card rise" style="--hue:var(--hue-models); --d:70ms"><span class="chipi"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span>
+    <h3>Many models, one endpoint</h3>
     <p>Each model starts on its first request and unloads when idle. GPU memory goes only to the models in use. Pin the ones you need kept loaded.</p></div>
-  <div class="card"><h3><i style="background:var(--hue-keys)"></i>Safe to share</h3>
+  <div class="card rise" style="--hue:var(--hue-keys); --d:140ms"><span class="chipi"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>
+    <h3>Safe to share</h3>
     <p>One revocable key per app. <code>mxc expose</code> serves it over HTTPS on your LAN.</p></div>
-  <div class="card"><h3><i style="background:var(--port-fg)"></i>Porting, fast</h3>
+  <div class="card rise" style="--hue:var(--port-fg); --d:210ms"><span class="chipi"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span>
+    <h3>Porting, fast</h3>
     <p>For an architecture MAX can't run yet, Claude Code writes a MAX version in a sandbox, and omxconsole checks it against the original. <a href="porting.html">Behind the scenes</a>.</p></div>
 </div>
 
-<h2 id="request">How a request travels</h2>
-<p>Pick where the call comes from and whether the model is already loaded, then press Play.</p>
+<div class="sec-h rise" id="request"><div><div class="lab">Under the hood</div><h2>How a request travels</h2></div>
+  <p>Pick where the call comes from and whether the model is already loaded, then press Play.</p></div>
+<div class="card stage rise">
 <div class="flow-ctl">
-  <div class="seg" role="group" aria-label="Where the call comes from">
+  <div class="seg" role="group" aria-label="Where the call comes from"><i></i>
     <button type="button" class="on" aria-pressed="true" data-from="local">This machine</button>
     <button type="button" aria-pressed="false" data-from="lan">Another device on the LAN</button>
   </div>
-  <div class="seg" role="group" aria-label="Model state">
+  <div class="seg" role="group" aria-label="Model state"><i></i>
     <button type="button" class="on" aria-pressed="true" data-state="cold">Model idle (cold)</button>
     <button type="button" aria-pressed="false" data-state="warm">Model loaded</button>
   </div>
-  <button type="button" class="play" id="play">▶ Play</button>
+  <button type="button" class="btn fill play" id="play"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>Play</button>
 </div>
 <div class="flow" id="flow">
   <div class="hop" data-hop="app" style="--hue-c:var(--hue-network)"><div class="box"><small>your app</small><b>OpenAI client</b>
@@ -107,15 +201,16 @@ pixi run mxc serve qwen2.5-0.5b</pre>
     <span>One MAX server per model. Stopped after <code>keep_alive</code> idle (default 5 minutes) unless pinned.</span></div></div>
 </div>
 <div class="log" id="log" aria-live="polite"><span class="t">—</span>press Play</div>
+</div>
 <p class="note">The console at <code>/console</code> and the <code>/admin</code> routes only answer on this machine. From the LAN, only
 <code>/v1/models</code>, <code>/v1/chat/completions</code>, <code>/v1/completions</code> and <code>/v1/embeddings</code> get through.</p>
 
-<h2>More</h2>
-<div class="grid">
-  <a class="card" href="console.html"><h3>Console tour →</h3><p>Every screen, from real screenshots, with what each part means and the matching command.</p></a>
-  <a class="card" href="porting.html"><h3>Porting, behind the scenes →</h3><p>What <code>mxc port --auto</code> does step by step, what it checks, and what can come back.</p></a>
-  <a class="card" href="https://github.com/abhisheksreesaila/mxstudio/blob/main/docs/CLI.md"><h3>CLI reference ↗</h3><p>Every <code>mxc</code> command and option.</p></a>
-  <a class="card" href="https://github.com/abhisheksreesaila/mxstudio#http-api"><h3>HTTP API ↗</h3><p>The OpenAI-compatible endpoints, in one table.</p></a>
+<div class="sec-h rise"><div><div class="lab">Read on</div><h2>More</h2></div></div>
+<div class="grid more">
+  <a class="card rise" href="console.html"><h3>Console tour <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></h3><p>Every screen, from real screenshots, with what each part means and the matching command.</p></a>
+  <a class="card rise" href="porting.html"><h3>Porting, behind the scenes <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></h3><p>What <code>mxc port --auto</code> does step by step, what it checks, and what can come back.</p></a>
+  <a class="card rise" href="https://github.com/abhisheksreesaila/mxstudio/blob/main/docs/CLI.md"><h3>CLI reference ↗</h3><p>Every <code>mxc</code> command and option.</p></a>
+  <a class="card rise" href="https://github.com/abhisheksreesaila/mxstudio#http-api"><h3>HTTP API ↗</h3><p>The OpenAI-compatible endpoints, in one table.</p></a>
 </div>
 
 <div class="foot">omxconsole · <a href="https://github.com/abhisheksreesaila/mxstudio">github.com/abhisheksreesaila/mxstudio</a></div>
@@ -163,11 +258,33 @@ document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click"
   const key = b.dataset.from ? "from" : "state";
   b.parentElement.querySelectorAll("button").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
   opts[key] = b.dataset[key];
+  thumb(b.parentElement);
   paint();
   log.innerHTML = '<span class="t">—</span>press Play';
 }));
 document.getElementById("play").addEventListener("click", play);
 paint();
+
+// The segmented controls: the first child is the thumb; it springs under the chosen button.
+function thumb(seg) { const on = seg.querySelector("button.on"), t = seg.firstElementChild; t.style.left = on.offsetLeft + "px"; t.style.width = on.offsetWidth + "px"; }
+const segs = [...document.querySelectorAll(".seg")];
+const placeAll = () => segs.forEach(thumb);
+placeAll(); document.fonts.ready.then(placeAll); addEventListener("resize", placeAll);
+
+// Copy the four commands, without the "$ " prompts.
+const copy = document.getElementById("copy");
+copy.addEventListener("click", async () => {
+  const text = [...document.getElementById("cmds").childNodes].filter(n => n.nodeType === 3).map(n => n.textContent.trim()).filter(Boolean).join("\n");
+  try { await navigator.clipboard.writeText(text); copy.lastElementChild.textContent = "Copied"; }
+  catch (_) { copy.lastElementChild.textContent = "Select and copy"; }
+  setTimeout(() => { copy.lastElementChild.textContent = "Copy"; }, 1600);
+});
+
+// Rise: each section settles in the first time it scrolls into view.
+if (document.documentElement.classList.contains("rise-on")) {
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { rootMargin: "0px 0px -8% 0px" });
+  document.querySelectorAll(".rise").forEach(el => io.observe(el));
+}
 </script>
 </body>
 </html>

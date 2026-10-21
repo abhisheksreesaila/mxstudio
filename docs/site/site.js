@@ -8,13 +8,6 @@ if (bar) {
     `<a href="${href}"${href === here ? ' aria-current="page"' : ""}>${label}</a>`).join("")}
     <a href="${REPO}/blob/main/docs/CLI.md">CLI reference ↗</a><a href="${REPO}">GitHub ↗</a></nav>
     <button class="theme" type="button" aria-label="Switch light or dark">◐</button>`;
-  const saved = localStorage.getItem("mxc-docs-theme");
-  if (saved) document.documentElement.classList.add(saved);
-  bar.querySelector(".theme").addEventListener("click", () => {
-    const dark = document.documentElement.classList.contains("dark") ||
-      (!document.documentElement.classList.contains("light") && matchMedia("(prefers-color-scheme: dark)").matches);
-    document.documentElement.classList.remove("dark", "light");
-    document.documentElement.classList.add(dark ? "light" : "dark");
-    localStorage.setItem("mxc-docs-theme", dark ? "light" : "dark");
-  });
+  bar.querySelector(".theme").addEventListener("click", () =>
+    window.mxcDocsTheme(document.documentElement.classList.contains("oq-night") ? "light" : "dark"));
 }
