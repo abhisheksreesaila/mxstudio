@@ -4,35 +4,25 @@
    Hue tokens (--hue-<section>) colour each section's outline icon; the label beside it stays a quieter tint. */
 
 :root {
-  /* chrome (the top bar) */
-  --chrome: #1f1f23; --chrome-line: #36363c; --chrome-text: #ededef; --chrome-muted: #a1a1aa; --chrome-hover: #2c2c31; --chrome-on: #34343b; --chrome-line-2: #55555c; --chrome-track: #3a3a40;
+  /* omxconsole (F-043): the console keeps its token names, but every value is omxqua's Developer family.
+     theme.js puts oq-root oq-family-dev oq-night|oq-light on <html>; omxqua's tokens.css defines the --oq-* values. */
+  /* chrome (islands and the Beacon draw from these) */
+  --chrome: var(--oq-surface-2); --chrome-line: var(--oq-line); --chrome-text: var(--oq-ink); --chrome-muted: var(--oq-ink-2);
+  --chrome-hover: rgb(var(--oq-state) / .06); --chrome-on: rgb(var(--oq-state) / .1); --chrome-line-2: var(--oq-line); --chrome-track: rgb(var(--oq-state) / .1);
   /* surfaces and text */
-  --canvas: #f5f5f7; --card: #fff; --card-line: #e4e4e7; --card-line-2: #f1f1f3; --sunk: #f4f4f5; --hover: #fafafa; --hover-2: #f0f0f2; --sel: #eef5fc;
-  --text: #0a0a0b; --text-2: #3f3f46; --muted: #71717a; --faint: #a1a1aa; --inv: #0a0a0b; --inv-text: #fff;
-  /* status and accent */
-  --ok: #16a34a; --warn: #d97706; --bad: #dc2626; --accent: #0078d4; --accent-hover: #1a9cff;
-  --ok-fg: #15803d; --bad-fg: #b91c1c; --warn-fg: #b45309; --port-fg: #7e22ce; --max-fg: #0d7d70; --hf-fg: #9a6a00;
-  --code: #0d0d10; --code-text: #e4e4e7;
+  --canvas: var(--oq-surface-0); --card: var(--oq-surface-1); --card-line: var(--oq-line); --card-line-2: var(--oq-line-2);
+  --sunk: rgb(var(--oq-state) / .05); --hover: rgb(var(--oq-state) / .035); --hover-2: rgb(var(--oq-state) / .07); --sel: rgb(var(--oq-state) / .08);
+  --text: var(--oq-ink); --text-2: var(--oq-ink-2); --muted: var(--oq-ink-2); --faint: var(--oq-ink-faint); --inv: var(--oq-accent); --inv-text: var(--oq-on-accent);
+  /* status and accent (one accent: ink; states always come with a word) */
+  --ok: var(--oq-ok); --warn: var(--oq-warn); --bad: var(--oq-bad); --accent: var(--oq-accent); --accent-hover: var(--oq-accent);
+  --ok-fg: var(--oq-ok); --bad-fg: var(--oq-bad); --warn-fg: var(--oq-warn); --port-fg: var(--oq-data-1); --max-fg: var(--oq-data-3); --hf-fg: var(--oq-data-4);
+  --code: #0b0b0d; --code-text: #e4e4e7;
   /* section hues: the outline icon takes the hue, the label stays quiet */
-  --hue-models: #8e4ec6; --hue-add: #12a594; --hue-network: #00a2c7; --hue-keys: #e09d00; --hue-bench: #e5484d;
-  --hue-logs: #697177; --hue-gateway: #f76b15; --hue-notebook: #3e63dd; --hue-settings: #697177;
-  --sans: Geist, ui-sans-serif, system-ui, sans-serif; --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --ease: cubic-bezier(.2, .8, .2, 1);
-  --top: 48px;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --chrome: #0c0c0e; --chrome-line: #26262b; --chrome-hover: #232328; --chrome-on: #2a2a30;
-    --card: #1a1a1e; --card-line: #2c2c33; --card-line-2: #24242a; --text: #ededef; --text-2: #c2c2ca; --muted: #8c8c96; --sunk: #232328; --canvas: #111113;
-    --hover: #212126; --hover-2: #26262c; --sel: #15253a; --faint: #5c5c66; --inv: #ededef; --inv-text: #0a0a0b;
-    --ok-fg: #4ade80; --bad-fg: #f87171; --warn-fg: #fbbf24; --port-fg: #c084fc; --max-fg: #2dd4bf; --hf-fg: #f5c451; color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --chrome: #0c0c0e; --chrome-line: #26262b; --chrome-hover: #232328; --chrome-on: #2a2a30;
-  --card: #1a1a1e; --card-line: #2c2c33; --card-line-2: #24242a; --text: #ededef; --text-2: #c2c2ca; --muted: #8c8c96; --sunk: #232328; --canvas: #111113;
-  --hover: #212126; --hover-2: #26262c; --sel: #15253a; --faint: #5c5c66; --inv: #ededef; --inv-text: #0a0a0b;
-  --ok-fg: #4ade80; --bad-fg: #f87171; --warn-fg: #fbbf24; --port-fg: #c084fc; --max-fg: #2dd4bf; --hf-fg: #f5c451; color-scheme: dark;
+  --hue-models: var(--oq-data-1); --hue-add: var(--oq-data-3); --hue-network: var(--oq-data-2); --hue-keys: var(--oq-data-4); --hue-bench: var(--oq-data-5);
+  --hue-logs: var(--oq-ink-2); --hue-gateway: var(--oq-data-6); --hue-notebook: var(--oq-data-2); --hue-settings: var(--oq-ink-2);
+  --sans: var(--oq-font); --mono: var(--oq-font-mono);
+  --ease: var(--oq-ease-in);
+  --top: 72px;
 }
 
 * { box-sizing: border-box; }

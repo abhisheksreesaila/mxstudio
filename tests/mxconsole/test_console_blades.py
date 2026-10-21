@@ -52,8 +52,13 @@ def test_braces_balance_in_every_stylesheet():
 
 
 def test_themes_are_tokens_light_and_dark_and_dark_follows_the_system():
+    """Since omxconsole (F-043): the console's tokens are omxqua's Developer family, night and light."""
     css = (CONSOLE_DIR / "blades.css").read_text()
-    assert "prefers-color-scheme: dark" in css and ':root:not([data-theme="light"])' in css and ':root[data-theme="dark"]' in css
+    for mapping in ("--canvas: var(--oq-surface-0)", "--card: var(--oq-surface-1)", "--text: var(--oq-ink)", "--bad: var(--oq-bad)"):
+        assert mapping in css, mapping
+    theme = (CONSOLE_DIR / "theme.js").read_text()
+    for want in ("oq-root", "oq-family-dev", "oq-night", "oq-light", "prefers-color-scheme: dark", "MutationObserver"):
+        assert want in theme, want  # classes follow data-theme, else the system, and stay in sync when either changes
     for token in ("--chrome", "--card", "--canvas", "--text", "--accent", "--bad", "--hue-models", "--hue-keys", "--hue-bench", "--hue-gateway"):
         assert token in css, token
 

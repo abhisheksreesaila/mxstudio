@@ -11,7 +11,7 @@ async def test_console_page_is_served_to_this_machine(http):
     js = await http.get("/console/core.js")
     assert js.status_code == 200 and "X-Mst-Admin" in js.text
     css = await http.get("/console/blades.css")
-    assert css.status_code == 200 and "--canvas" in css.text and 'data-theme="dark"' in css.text
+    assert css.status_code == 200 and "--canvas" in css.text and "var(--oq-" in css.text  # the console's tokens sit on omxqua's
 
 
 def test_the_product_is_one_lowercase_word_everywhere_people_read_it():

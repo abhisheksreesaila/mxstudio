@@ -47,6 +47,19 @@ def test_the_vendored_copy_is_a_pinned_omxqua_release():
     assert 'createElement("style")' not in (CONSOLE_DIR / "omxqua" / "src" / "omxqua.js").read_text()
 
 
+async def test_the_console_loads_omxqua_before_its_own_css(http):
+    page = (await http.get("/console")).text
+    for f in ("fonts.css", "tokens.css", "components.css"):
+        assert f'<link rel="stylesheet" href="/console/omxqua/src/{f}">' in page, f
+        assert page.index(f"/console/omxqua/src/{f}") < page.index("/console/blades.css"), f
+    assert '<script src="/console/omxqua/src/omxqua.js" defer></script>' in page
+
+
+async def test_the_api_reference_page_shares_the_omxqua_tokens(http):
+    page = (await http.get("/docs")).text
+    assert page.index("/console/omxqua/src/tokens.css") < page.index("/console/blades.css")
+
+
 async def test_the_console_uses_omxquas_fonts_not_its_own_copies(http):
     page = (await http.get("/console")).text
     assert '<link rel="stylesheet" href="/console/omxqua/src/fonts.css">' in page
