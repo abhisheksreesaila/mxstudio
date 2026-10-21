@@ -51,10 +51,10 @@ def render(spec: dict, base: str) -> str:
     model = models[0]
     out = [f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mxconsole API reference</title><meta name="color-scheme" content="light dark">
+<title>omxconsole API reference</title><meta name="color-scheme" content="light dark">
 <link rel="icon" href="/console/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/console/omxqua/src/fonts.css"><link rel="stylesheet" href="/console/omxqua/src/tokens.css"><link rel="stylesheet" href="/console/blades.css">
 <link rel="stylesheet" href="{STYLE}"><script src="/console/theme.js"></script></head>
-<body class="docs"><header class="top"><a class="brand" href="/console">mxconsole</a><span class="mono">API reference</span>
+<body class="docs"><header class="top"><a class="brand" href="/console">omxconsole</a><span class="mono">API reference</span>
 <a class="back" href="/console">Back to the console</a></header><main>
 <h1>OpenAI-compatible API</h1>
 <p>{md(spec['info']['description'])}</p>

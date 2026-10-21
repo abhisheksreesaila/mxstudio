@@ -30,7 +30,7 @@ class DaemonSource:
         try:
             return httpx.request(method, f"{daemon_url()}/admin/ports{path}", headers=ADMIN, timeout=10.0, **kw)
         except httpx.HTTPError as e:
-            raise PortFailed(f"could not reach the mxconsole daemon at {daemon_url()}: {e}")
+            raise PortFailed(f"could not reach the omxconsole daemon at {daemon_url()}: {e}")
 
     def start(self, ref, name, max_attempts, unsandboxed=False):
         body = {"ref": ref, "max_attempts": max_attempts, **({"name": name} if name else {}), **({"unsandboxed": True} if unsandboxed else {})}
@@ -99,7 +99,7 @@ def run(ref: str, name: str | None, as_json: bool, max_attempts: int = DEFAULT_A
     try:
         if source is None:
             if serve.ensure_daemon() and not as_json:
-                print("started the mxconsole daemon", file=sys.stderr)
+                print("started the omxconsole daemon", file=sys.stderr)
             source = DaemonSource()
         job = source.start(ref, name, max_attempts, unsandboxed)
     except (PortFailed, serve.DaemonError) as e:

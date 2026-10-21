@@ -13,7 +13,7 @@ from mxconsole import expose, keys
 from mxconsole import report, resolve
 from mxconsole.store import Store, format_duration, parse_duration
 
-app = typer.Typer(help="mxconsole: local models on Modular MAX you can see into and reshape.",
+app = typer.Typer(help="omxconsole: local models on Modular MAX you can see into and reshape.",
                   no_args_is_help=True, add_completion=False,
                   epilog="Exit codes: 0 ok, 1 refused (one `error:` line on stderr), 2 bad usage.")
 
@@ -226,7 +226,7 @@ def bench_cmd(models: list[str] = typer.Argument(None, help="Registered model na
         _fail("no models yet. Try: mxc serve qwen2.5-0.5b")
     try:
         if serve.ensure_daemon() and not as_json:
-            typer.echo("started the mxconsole daemon")
+            typer.echo("started the omxconsole daemon")
         started = bench.start(None if all_ else list(dict.fromkeys(models)), runs)
         if not as_json:
             typer.echo(f"benchmarking {len(started['models'])} model{'s' if len(started['models']) != 1 else ''}: "
@@ -358,7 +358,7 @@ def keys_ls(as_json: bool = JSON) -> None:
 def keys_revoke(app_name: str = typer.Argument(..., metavar="APP")) -> None:
     """Disable an app's key."""
     if app_name.startswith("_"):
-        _fail(f"{app_name} is managed by mxconsole (mxc expose --stop revokes it)")
+        _fail(f"{app_name} is managed by omxconsole (mxc expose --stop revokes it)")
     if not keys.revoke_key(Store.open(), app_name):
         _fail(f"no active key for {app_name}")
     typer.echo(f"revoked the key for {app_name}")
@@ -493,7 +493,7 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
         store.set_lifecycle(name, pinned=pin, keep_alive=seconds)
     try:
         if serve.ensure_daemon():
-            typer.echo("started the mxconsole daemon")
+            typer.echo("started the omxconsole daemon")
         if not no_wait:
             typer.echo(f"loading {name} (the first load compiles the model and can take a minute)…")
             started = time.monotonic()
@@ -558,7 +558,7 @@ def expose_cmd(host: str = typer.Option(None, help="Hostname clients use. Defaul
 
 
 @app.command("app")
-def app_cmd(install: bool = typer.Option(False, "--install", help="Linux: add an mxconsole launcher to the app menu."),
+def app_cmd(install: bool = typer.Option(False, "--install", help="Linux: add an omxconsole launcher to the app menu."),
             uninstall: bool = typer.Option(False, "--uninstall", help="Linux: remove that launcher.")) -> None:
     """Open the console in its own window (starts the daemon if needed; closing the window stops nothing)."""
     from mxconsole import app as desktop, report, serve

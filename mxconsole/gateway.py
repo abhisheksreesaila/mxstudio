@@ -81,13 +81,13 @@ def openapi_spec(model_names: list[str]) -> dict:
           "503": {"description": "The model failed to start; the message has the log tail"}}
     return {
         "openapi": "3.1.0",
-        "info": {"title": "mxconsole API", "version": "1.0.0",
+        "info": {"title": "omxconsole API", "version": "1.0.0",
                  "description": "OpenAI-compatible endpoint for local models on Modular MAX. "
                                 "Point any OpenAI client at `/v1` with a `mxc keys new <app>` key."},
         "servers": [{"url": "/"}],
         "paths": {
             "/v1/models": {"get": {"summary": "List models", "security": secured, "responses": {
-                "200": {"description": "Registered models, with load state in the `mxconsole` field",
+                "200": {"description": "Registered models, with load state in the `mxconsole` field (the wire name stays; ADR 0004)",
                         "content": {"application/json": {"schema": {"type": "object"}}}},
                 "401": {"description": "Missing or invalid key"}}}},
             "/v1/chat/completions": {"post": {"summary": "Create a chat completion", "security": secured,
@@ -219,7 +219,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             return unauthorized()
         note(app_name, None, "models", 200, started)
         states = {s["name"]: s for s in supervisor.status()}
-        data = [{"id": m.name, "object": "model", "created": 0, "owned_by": "mxconsole",
+        data = [{"id": m.name, "object": "model", "created": 0, "owned_by": "omxconsole",
                  "mxconsole": {"state": states.get(m.name, {}).get("state", "cold"), "repo_id": m.repo_id,
                                "pinned": m.pinned, "keep_alive": m.keep_alive}}
                 for m in store.models()]
@@ -308,7 +308,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         counters.bump("unknown_route")
         if authenticate(request) is None:
             return unauthorized()
-        return openai_error(404, f"mxconsole does not serve /v1/{path}. Supported: /v1/models, "
+        return openai_error(404, f"omxconsole does not serve /v1/{path}. Supported: /v1/models, "
                                  + ", ".join(PROXIED) + ".", "unknown_route")
 
     def note(app_name, model, route, status, started, meter=None, ttft_ms=None):

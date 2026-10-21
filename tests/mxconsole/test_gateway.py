@@ -80,7 +80,7 @@ async def test_models_list_openai_format_with_state(http, key):
     body = (await http.get("/v1/models", headers=auth(key))).json()
     assert body["object"] == "list"
     assert {m["id"]: m["mxconsole"]["state"] for m in body["data"]} == {"tiny": "cold", "other": "cold"}
-    assert all(m["object"] == "model" and m["owned_by"] == "mxconsole" for m in body["data"])
+    assert all(m["object"] == "model" and m["owned_by"] == "omxconsole" for m in body["data"])
     await http.post("/v1/chat/completions", json=CHAT, headers=auth(key))
     body = (await http.get("/v1/models", headers=auth(key))).json()
     assert {m["id"]: m["mxconsole"]["state"] for m in body["data"]}["tiny"] == "ready"

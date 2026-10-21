@@ -197,7 +197,7 @@ class Supervisor:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             f.close()
-            raise DaemonAlreadyRunning("another mxconsole daemon is already running for this MXC_HOME") from None
+            raise DaemonAlreadyRunning("another omxconsole daemon is already running for this MXC_HOME") from None
         f.seek(0)
         f.truncate()
         pid = os.getpid()  # "pid starttime", so `mxc ps` can tell this daemon from a reused pid without the lock
