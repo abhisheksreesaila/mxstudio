@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>omxconsole · mock</title>
+<link rel="stylesheet" href="omxqua/src/fonts.css">
+<link rel="stylesheet" href="omxqua/src/tokens.css">
+<link rel="stylesheet" href="omxqua/src/components.css">
+<script src="omxqua/src/omxqua.js" defer></script>
+<style>
+/* omxconsole: the mxconsole 1.0 blades, in omxqua (Developer family). Console-only parts are prefixed cx-. */
+html, body { margin: 0; height: 100%; }
+.app { position: relative; height: 100vh; overflow: hidden; container-type: inline-size; background: var(--oq-surface-0); color: var(--oq-ink); font-family: var(--oq-font); font-size: var(--oq-text); }
+
+/* ---- top islands ---- */
+.app .brand-isl { display: flex; border: 0; color: var(--oq-ink); cursor: pointer; }
+.brand-isl .loc { font: 500 11px var(--oq-font-mono); color: var(--oq-ink-2); border: 1px solid var(--oq-line); border-radius: 999px; padding: 2px 7px; margin-left: 2px; }
+.cx-crumbs { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 30; height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 6px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); max-width: 46%; }
+.cx-crumbs button { border: 0; background: none; height: 34px; padding: 0 14px; border-radius: 999px; font: 600 13.5px var(--oq-font); color: var(--oq-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-crumbs button:hover { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
+.cx-crumbs button.on { color: var(--oq-ink); }
+.cx-crumbs .ico { width: 14px; height: 14px; color: var(--oq-ink-faint); flex: none; }
+.cx-right { position: absolute; top: 14px; right: 16px; z-index: 35; display: flex; align-items: flex-start; gap: 8px; }
+.cx-tools { height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 5px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); }
+.cx-tools button { border: 0; background: none; height: 34px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; gap: 7px; font: 600 13px var(--oq-font); color: var(--oq-ink-2); }
+.cx-tools button:hover { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
+.cx-tools button.ic { width: 34px; padding: 0; justify-content: center; }
+.cx-tools .more { display: none; }
+.cx-tools .k .ico { color: var(--oq-data-3); } .cx-tools .g .ico { color: var(--oq-data-5); }
+.app .cx-right .beacon { position: absolute; top: 0; right: 0; left: auto; transform: none; }
+.app .beacon .bc-compact { height: 44px; }
+
+/* ---- blades ---- */
+.cx-blades { position: absolute; inset: 72px 0 0 0; display: flex; gap: 12px; padding: 0 14px 14px; }
+.cx-blade { background: var(--oq-surface-1); border-radius: var(--oq-radius-card); box-shadow: var(--oq-shadow-1); display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.cx-blade[hidden] { display: none; }
+.cx-blade.home { flex: 1; }
+.app.open .cx-blade.home { flex: 0 0 300px; }
+.cx-blade.model { flex: 1; }
+.cx-bh { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--oq-line-2); }
+.cx-bh .bi { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--c); flex: none; }
+.cx-bh h2 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -.02em; display: flex; align-items: center; gap: 8px; }
+.cx-bh .cnt { font: 500 11px var(--oq-font-mono); color: var(--oq-ink-2); background: rgb(var(--oq-state) / .07); border-radius: 999px; padding: 2px 8px; }
+.cx-bh .sub { font-size: 12.5px; color: var(--oq-ink-2); margin-top: 2px; }
+.cx-bh .sp { flex: 1; }
+.cx-bh .cmd { font: 12px var(--oq-font-mono); color: var(--oq-ink-2); }
+.cx-bb { flex: 1; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.cx-bb > * { flex-shrink: 0; }
+
+/* home: wide */
+.cx-tools2 { display: flex; align-items: center; gap: 12px; }
+.cx-tools2 .mo { width: 320px; }
+.cx-tools2 .sp { flex: 1; }
+.cx-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); display: inline-block; flex: none; }
+.tbl td .nm { display: flex; align-items: center; gap: 9px; font: 600 13.5px var(--oq-font-mono); }
+.tbl td .rp { font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); margin: 2px 0 0 17px; }
+.tbl tbody tr { cursor: pointer; }
+.tbl tbody tr:hover td { background: rgb(var(--oq-state) / .04); }
+.cx-arch { color: var(--oq-ink-2); }
+.cx-gpu .prog { margin-top: 10px; }
+
+/* home: compact list (a model is open beside it) */
+.cx-list { display: none; flex-direction: column; padding: 6px; gap: 2px; overflow: auto; flex: 1; }
+.app.open .cx-list { display: flex; }
+.app.open .cx-wide { display: none; }
+.cx-row { border: 0; background: none; text-align: left; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; color: var(--oq-ink); font: inherit; }
+.cx-row:hover { background: rgb(var(--oq-state) / .05); }
+.cx-row.on { background: rgb(var(--oq-state) / .09); }
+.cx-row .t { flex: 1; min-width: 0; }
+.cx-row .t b { display: block; font: 600 13px var(--oq-font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-row .t span { font-size: 12px; color: var(--oq-ink-2); }
+.cx-row .v { font: 12px var(--oq-font-mono); color: var(--oq-ink-2); }
+.cx-row.add { color: var(--oq-ink-2); font-weight: 600; font-size: 13px; margin-top: 4px; }
+
+/* state words (always dot + word) */
+.cx-st { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--oq-ink-2); }
+.cx-st i { width: 7px; height: 7px; border-radius: 50%; background: var(--oq-ink-faint); }
+.cx-st.run { color: var(--oq-ok); } .cx-st.run i { background: var(--oq-ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--oq-ok) 22%, transparent); }
+.cx-st.bad { color: var(--oq-bad); } .cx-st.bad i { background: var(--oq-bad); }
+.cx-st.warn { color: var(--oq-warn); } .cx-st.warn i { background: var(--oq-warn); }
+
+/* model blade */
+.cx-mb { flex: 1; display: grid; grid-template-columns: 184px 1fr; min-height: 0; }
+.cx-menu { border-right: 1px solid var(--oq-line-2); padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; overflow: auto; }
+.cx-menu button { border: 0; background: none; height: 36px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 10px; font: 550 13.5px var(--oq-font); color: var(--oq-ink-2); text-align: left; }
+.cx-menu button:hover { background: rgb(var(--oq-state) / .05); color: var(--oq-ink); }
+.cx-menu button.on { background: rgb(var(--oq-state) / .09); color: var(--oq-ink); }
+.cx-menu button .ico { color: var(--c); }
+.cx-menu .lab { font: 500 11px var(--oq-font-mono); color: var(--oq-ink-2); text-transform: uppercase; letter-spacing: .06em; padding: 14px 10px 6px; }
+.cx-menu .cl { font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); padding: 3px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-menu .cl::before { content: "$ "; color: var(--oq-ink-faint); }
+.cx-main { overflow: auto; min-width: 0; }
+.cx-cmdbar { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 16px; border-bottom: 1px solid var(--oq-line-2); position: sticky; top: 0; background: var(--oq-surface-1); z-index: 2; }
+.cx-cmdbar .btn.tonal .ico { color: var(--c); }
+.cx-cmdbar .btn.danger { margin-left: auto; }
+.cx-cards { padding: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cx-cards .wide { grid-column: 1 / -1; }
+.cx-dl { display: grid; grid-template-columns: 120px 1fr; gap: 9px 14px; margin: 0; font-size: 13.5px; }
+.cx-dl dt { color: var(--oq-ink-2); } .cx-dl dd { margin: 0; font-family: var(--oq-font-mono); font-size: 13px; }
+.cx-dl a { color: var(--oq-ink); }
+.cx-spark { width: 100%; height: 70px; display: block; margin-top: 12px; }
+.cx-spark path.l { fill: none; stroke: var(--oq-data-1); stroke-width: 1.6; }
+.cx-spark path.a { fill: color-mix(in srgb, var(--oq-data-1) 14%, transparent); }
+.cx-ep { display: flex; align-items: center; gap: 10px; border: 1px solid var(--oq-line); border-radius: 12px; padding: 0 6px 0 12px; height: 44px; font: 13px var(--oq-font-mono); }
+.cx-ep .k { font-size: 11px; color: var(--oq-ink-2); text-transform: uppercase; letter-spacing: .06em; }
+.cx-ep .u { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-code { position: relative; margin-top: 12px; background: #0b0b0d; color: #d4d4d8; border-radius: 12px; padding: 14px 16px; font: 12px/1.65 var(--oq-font-mono); white-space: pre; overflow: auto; }
+.cx-code .btn { position: absolute; top: 8px; right: 8px; background: #27272a; color: #e4e4e7; box-shadow: none; }
+.cx-sec { display: flex; gap: 12px; align-items: flex-start; }
+.cx-sec .si { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--oq-warn) 14%, transparent); color: var(--oq-warn); flex: none; }
+.cx-sec b { display: block; font-size: 14px; } .cx-sec p { margin: 3px 0 12px; font-size: 13px; color: var(--oq-ink-2); }
+.cx-fit { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: rgb(var(--oq-state) / .08); margin: 10px 0 6px; }
+.cx-fit i { display: block; height: 100%; }
+.cx-fitk { display: flex; justify-content: space-between; font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); }
+
+/* phone: one blade at a time */
+@container (max-width: 760px) {
+  .cx-crumbs, .cx-tools button:not(.more) { display: none; }
+  .cx-tools .more { display: flex; }
+  .cx-cmdbar .btn { --h: 36px; }
+  .demo { max-width: calc(100% - 28px); overflow-x: auto; }
+  .app .brand-isl .nm, .brand-isl .loc { display: none; }
+  .cx-blades { inset: 66px 0 0 0; padding: 0 8px 8px; }
+  .app.open .cx-blade.home { display: none; }
+  .cx-mb { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .cx-menu { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--oq-line-2); overflow-x: auto; padding: 8px; }
+  .cx-menu .lab, .cx-menu .cl { display: none; }
+  .cx-menu button { flex: none; }
+  .cx-cards { grid-template-columns: 1fr; padding: 12px; }
+  .cx-cmdbar .btn.tonal .lbl { display: none; }
+  .cx-cmdbar .btn.tonal { width: var(--h); padding: 0; }
+  .cx-cmdbar .btn.danger { margin-left: 0; }
+  .cx-tools2 .mo { width: 100%; } .cx-tools2 .seg2 { display: none; }
+  .cx-wide .card.models, .cx-tools2 { display: none; }
+  .app:not(.open) .cx-list { display: flex; }
+  .cx-bb { flex: none; padding-bottom: 4px; }
+  #homeSub { display: none; }
+  .cx-bh .cmd { display: none; }
+}
+
+/* mock-only control strip */
+.demo { position: fixed; left: 14px; bottom: 14px; z-index: 60; display: flex; gap: 6px; align-items: center; background: #0b0b0d; color: #a1a1aa; padding: 6px 6px 6px 12px; border-radius: 999px; font: 11.5px var(--oq-font-mono); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+.demo button { border: 0; background: #27272a; color: #e4e4e7; height: 26px; padding: 0 10px; border-radius: 999px; font: 600 11.5px var(--oq-font-mono); }
+.demo button.on { background: #3ee0d8; color: #0b0b0d; }
+</style>
+</head>
+<body>
+<div class="app oq-root oq-night oq-family-dev oq-top" id="app">
+
+  <button class="brand-isl" id="brand" aria-label="omxconsole home"><span class="mark">omx</span><span class="nm">omxconsole</span><span class="loc">local</span></button>
+  <nav class="cx-crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+  <div class="cx-right">
+    <div class="cx-tools">
+      <button class="k" aria-label="API keys"><svg class="ico" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></svg><span class="lbl">API keys</span></button>
+      <button class="g" aria-label="Gateway"><svg class="ico" viewBox="0 0 24 24"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg><span class="lbl">Gateway</span></button>
+      <button class="ic" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></button>
+      <button class="ic more" aria-label="API keys, Gateway, Settings"><svg class="ico" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
+      <button class="ic" id="theme" aria-label="Light or night"><svg class="ico" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    </div>
+    <div class="beacon" id="beacon"><div class="bc-compact" id="bcC"></div><div class="bc-open" id="bcO"></div></div>
+  </div>
+
+  <div class="cx-blades">
+    <section class="cx-blade home" aria-label="My models">
+      <div class="cx-bh">
+        <span class="bi" style="--c:var(--oq-data-4)"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
+        <div><h2>My models <span class="cnt">11</span></h2><div class="sub" id="homeSub">Everything this machine serves, behind one OpenAI-compatible endpoint</div></div>
+        <span class="sp"></span>
+        <span class="cmd cx-wide">$ mxc serve &lt;model&gt;</span>
+        <button class="btn fill cx-wide"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add a model</button>
+      </div>
+      <div class="cx-bb cx-wide">
+        <section class="card">
+          <div class="card-b"><div class="stats">
+            <div><b>2<span class="ink2" style="font-size:.5em;font-weight:500"> of 11</span></b><span>serving · 1 crashed</span></div>
+            <div><b id="tps">182</b><span>tok/s across 2 models</span></div>
+            <div><b>37</b><span>requests · 5 min</span></div>
+            <div class="cx-gpu"><b>3.1<span class="ink2" style="font-size:.5em;font-weight:500"> / 24 GB</span></b><span>GPU memory · RTX 3090</span><div class="prog"><i style="width:13%"></i></div></div>
+          </div></div>
+          <div class="src">mxc ls --json</div>
+        </section>
+        <div class="cx-tools2">
+          <label class="mo has-lead"><span class="lead"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span><input placeholder=" "><span class="fl">Filter models</span></label>
+          <span class="sp"></span>
+          <div class="seg2" id="view"><i></i><button class="on">List</button><button>Cards</button></div>
+        </div>
+        <section class="card models">
+          <div class="card-b" style="padding:0"><table class="tbl"><thead><tr><th>Model</th><th>State</th><th class="hide-n">Access</th><th class="num">Tok/s</th><th class="num hide-n">First token</th><th class="num hide-n">Req · 5 min</th><th class="num hide-n">VRAM</th><th class="hide-n">Architecture</th></tr></thead><tbody id="rows"></tbody></table></div>
+          <div class="src note">click a model to open its blade beside this list</div>
+        </section>
+      </div>
+      <div class="cx-list" id="list"></div>
+    </section>
+
+    <section class="cx-blade model" id="model" aria-label="Model" hidden></section>
+  </div>
+
+  <div class="demo" aria-label="Mock controls">beacon
+    <button data-b="idle">idle</button><button data-b="run" class="on">running</button><button data-b="pull">pulling</button><button data-b="port">porting</button><button data-b="crash">crashed</button>
+  </div>
+</div>
+
+<script>
+(() => {
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const app = $("#app");
+const I = {
+  box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
+  play: '<path d="m7 4 13 8-13 8z"/>', stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+  lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  gauge: '<path d="M12 14l4-4"/><path d="M3.3 19a10 10 0 1 1 17.4 0"/>',
+  book: '<path d="M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z"/>',
+  logs: '<path d="M4 6h16M4 12h16M4 18h10"/>', copy: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>', chev: '<path d="m9 6 6 6-6 6"/>',
+  over: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/>', plus: '<path d="M12 5v14M5 12h14"/>', dl: '<path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/>',
+  wrench: '<path d="M14.7 6.3a4 4 0 0 0 5 5L22 14l-8 8-2.3-2.3a4 4 0 0 0-5-5L4 12l8-8z"/>', alert: '<path d="M12 3 2 21h20zM12 10v4M12 18h.01"/>',
+  laptop: '<rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/>',
+  chip: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>', zap: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>'
+};
+const ico = (n, c = "") => `<svg class="ico" viewBox="0 0 24 24"${c ? ` style="color:${c}"` : ""}>${I[n]}</svg>`;
+
+/* the real 11 models; run/crash state made up for the mock */
+const M = [
+  ["gpt2", "openai-community/gpt2", "GPT2", 1], ["granite-3.1-1b-a400m-instruct", "ibm-granite/granite-3.1-1b-a400m-instruct", "GraniteMoe", 2],
+  ["olmoe-1b-7b-0924-instruct", "allenai/OLMoE-1B-7B-0924-Instruct", "Olmoe", 3], ["phi-2", "microsoft/phi-2", "Phi", 4, "crash"],
+  ["pythia-1.4b-deduped", "EleutherAI/pythia-1.4b-deduped", "GPTNeoX", 5], ["qwen2.5-0.5b", "Qwen/Qwen2.5-0.5B-Instruct", "Qwen2", 1, "run", 141, "38 ms", 29, "1.2 GB"],
+  ["qwen2.5-1.5b", "Qwen/Qwen2.5-1.5B-Instruct", "Qwen2", 2], ["smollm2-1.7b", "HuggingFaceTB/SmolLM2-1.7B-Instruct", "Llama", 3, "run", 41, "61 ms", 8, "1.9 GB", "pinned"],
+  ["smollm3-3b", "HuggingFaceTB/SmolLM3-3B", "SmolLM3", 4], ["stablelm-2-1_6b-chat", "stabilityai/stablelm-2-1_6b-chat", "StableLM", 5], ["starcoder2-3b", "bigcode/starcoder2-3b", "Starcoder2", 6]
+];
+const st = m => m[4] === "run" ? `<span class="cx-st run"><i></i>Running</span>` : m[4] === "crash" ? `<span class="cx-st bad"><i></i>Crashed</span>` : `<span class="cx-st"><i></i>Idle${m[9] ? " · pinned" : ""}</span>`;
+const dot = m => `<span class="cx-dot" style="--c:var(--oq-data-${m[3]})"></span>`;
+$("#rows").innerHTML = M.map((m, i) => `<tr data-m="${i}"><td><div class="nm">${dot(m)}${m[0]}</div><div class="rp">${m[1]}</div></td><td>${st(m)}</td><td class="hide-n"><span class="badge">${ico("laptop")}Local</span></td><td class="num">${m[5] ?? "—"}</td><td class="num hide-n">${m[6] ?? "—"}</td><td class="num hide-n">${m[7] ?? "—"}</td><td class="num hide-n">${m[8] ?? "—"}</td><td class="hide-n cx-arch">${m[2]}</td></tr>`).join("");
+$("#list").innerHTML = M.map((m, i) => `<button class="cx-row" data-m="${i}">${dot(m)}<span class="t"><b>${m[0]}</b>${st(m)}</span><span class="v">${m[5] ?? "—"}</span></button>`).join("") + `<button class="cx-row add">${ico("plus")}Add a model</button>`;
+
+/* breadcrumb */
+function crumbs(m) {
+  $("#crumbs").innerHTML = `<button data-home class="${m ? "" : "on"}">My models</button>` + (m ? `${ico("chev")}<button class="on">${m[0]}</button>` : "");
+  $("#homeSub").textContent = m ? `${M.filter(x => x[4] === "run").length} running` : "Everything this machine serves, behind one OpenAI-compatible endpoint";
+}
+
+/* the model blade */
+function openModel(i) {
+  const m = M[i], b = $("#model"), run = m[4] === "run", crash = m[4] === "crash";
+  b.innerHTML = `
+  <div class="cx-bh"><span class="bi" style="--c:var(--oq-data-${m[3]})">${ico("box")}</span>
+    <div><h2>${m[0]}</h2><div class="sub">Model · ${m[1]}</div></div><span class="sp"></span>
+    <button class="xbtn" data-close aria-label="Close">${ico("x")}</button></div>
+  <div class="cx-mb">
+    <nav class="cx-menu" aria-label="${m[0]}">
+      <button class="on" style="--c:var(--oq-data-1)">${ico("over")}Overview</button>
+      <button style="--c:var(--oq-warn)">${ico("lock")}Security</button>
+      <button style="--c:var(--oq-data-4)">${ico("gauge")}Benchmark</button>
+      <button style="--c:var(--oq-ink-2)">${ico("logs")}Logs</button>
+      <button style="--c:var(--oq-data-2)">${ico("book")}Notebook</button>
+      <div class="lab">command line</div><div class="cl">mxc serve ${m[0]}</div><div class="cl">mxc rm ${m[0]}</div>
+    </nav>
+    <div class="cx-main">
+      <div class="cx-cmdbar">
+        <button class="btn fill sm">${ico(run ? "stop" : "play")}${run ? "Stop" : crash ? "Restart" : "Start"}</button>
+        <button class="btn tonal sm" style="--c:var(--oq-warn)">${ico("lock")}<span class="lbl">Make it secure</span></button>
+        <button class="btn tonal sm" style="--c:var(--oq-data-4)">${ico("gauge")}<span class="lbl">Run benchmark</span></button>
+        <button class="btn tonal sm" style="--c:var(--oq-data-2)">${ico("book")}<span class="lbl">Open notebook</span></button>
+        <button class="btn tonal sm" style="--c:var(--oq-data-1)" data-copyep>${ico("copy")}<span class="lbl">Copy endpoint</span></button>
+        <button class="btn danger sm">${ico("trash")}Remove</button>
+      </div>
+      <div class="cx-cards">
+        ${crash ? `<section class="card wide"><div class="card-h"><h3>It crashed</h3><span class="sp"></span><span class="badge bad"><i></i>exit 1</span></div><div class="card-b" style="font-size:13.5px">phi-2 stopped 4 minutes ago: <span class="mono">CUDA out of memory</span> while compiling. Restart it, or free memory by stopping another model.</div><div class="src">mxc logs phi-2 --tail 40</div></section>` : ""}
+        <section class="card"><div class="card-h"><h3>Essentials</h3></div><div class="card-b"><dl class="cx-dl">
+          <dt>Repository</dt><dd>${m[1]}</dd><dt>Architecture</dt><dd>${m[2]}</dd><dt>Source</dt><dd>hf-supported</dd>
+          <dt>Unloads</dt><dd>${m[9] ? "never (pinned)" : "after 1m idle"}</dd><dt>Endpoint</dt><dd>http://127.0.0.1:11435/v1</dd>
+          <dt>Access</dt><dd>localhost only · <a href="#">make it secure</a></dd><dt>GPU memory</dt><dd>${m[8] ?? "—"}</dd><dt>State</dt><dd>${st(m)}</dd></dl></div>
+          <div class="src">mxc show ${m[0]}</div></section>
+        <section class="card"><div class="card-h"><h3>Tokens · live</h3></div><div class="card-b">
+          <div class="stats" style="grid-template-columns:repeat(3,1fr)"><div><b>${m[5] ?? "—"}</b><span>tok/s</span></div><div><b>${m[6] ?? "—"}</b><span>first token</span></div><div><b>${m[7] ?? 0}</b><span>requests · 5 min</span></div></div>
+          ${run ? `<svg class="cx-spark" viewBox="0 0 300 70" preserveAspectRatio="none"><path class="a" d="M0 52 L25 48 L50 50 L75 38 L100 41 L125 30 L150 34 L175 22 L200 27 L225 18 L250 24 L275 14 L300 17 L300 70 L0 70Z"/><path class="l" d="M0 52 L25 48 L50 50 L75 38 L100 41 L125 30 L150 34 L175 22 L200 27 L225 18 L250 24 L275 14 L300 17"/></svg>` : `<div class="empty" style="padding:14px 0 4px"><b>No traffic yet</b>Start it, or call it: it starts on the first request.</div>`}
+          </div><div class="src">mxc metrics ${m[0]}</div></section>
+        <section class="card"><div class="card-h"><h3>Call it</h3></div><div class="card-b">
+          <div class="cx-ep"><span class="k">local</span><span class="u">http://127.0.0.1:11435/v1</span><button class="btn text sm icon" aria-label="Copy URL" data-copyep>${ico("copy")}</button></div>
+          <div class="cx-code"><button class="btn sm" data-copyep>${ico("copy")}copy</button>curl http://127.0.0.1:11435/v1/chat/completions \\
+  -H "Authorization: Bearer $MXC_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"${m[0]}","messages":[{"role":"user","content":"hi"}]}'</div>
+          </div><div class="src">mxc keys new &lt;app&gt;</div></section>
+        <section class="card"><div class="card-h"><h3>Security</h3><span class="sp"></span><span class="badge warn"><i></i>localhost only</span></div><div class="card-b">
+          <div class="cx-sec"><span class="si">${ico("lock")}</span><div><b>Only this machine can call it</b><p>One step adds a certificate, a key and HTTPS, so your phone and laptop can reach it on the LAN.</p><button class="btn fill sm">${ico("lock")}Make it secure</button></div></div>
+          <div style="margin-top:18px;font-weight:600;font-size:13px">Hardware fit</div>
+          <div class="cx-fit"><i style="width:${run ? 5 : 0}%;background:var(--oq-data-${m[3]})"></i><i style="width:8%;background:var(--oq-ink-faint)"></i></div>
+          <div class="cx-fitk"><span>this ${m[8] ?? "0 GB"} · others ${run ? "1.9" : "3.1"} GB</span><span>free ${run ? "21.0" : "20.9"} of 24 GB</span></div>
+          </div><div class="src">mxc expose</div></section>
+      </div>
+    </div>
+  </div>`;
+  b.hidden = false; app.classList.add("open");
+  $$(".cx-row").forEach(r => r.classList.toggle("on", r.dataset.m == i));
+  crumbs(m); if (window.Omxqua) Omxqua.settle(b);
+}
+function closeModel() { $("#model").hidden = true; app.classList.remove("open"); crumbs(null); if (window.Omxqua) Omxqua.settle($(".cx-blade.home")); }
+
+/* the Beacon: whatever is happening now (pull or port > crash > running > idle GPU) */
+const B = {
+  idle: { c: `${ico("chip")}<span>RTX 3090</span><span class="mono">0.1 / 24 GB</span>`, o: `<h4>${ico("chip")}RTX 3090 · 24 GB</h4><div class="sub2">nothing running · models start on the first request</div><div class="big">0.1 GB</div><div class="bar2"><i style="width:1%"></i></div><div class="bacts"><button class="bbtn pri">Add a model</button></div>` },
+  run: { c: `<span class="live"></span><span>2 running</span><span class="mono">182 tok/s</span>`, o: `<h4>${ico("zap")}2 models running</h4><div class="sub2">3.1 of 24 GB · RTX 3090</div><ul class="steps"><li><i class="d ok"></i>qwen2.5-0.5b<span>141 tok/s · 1.2 GB</span></li><li><i class="d ok"></i>smollm2-1.7b · pinned<span>41 tok/s · 1.9 GB</span></li></ul><div class="bacts"><button class="bbtn pri" data-open="5">Open qwen2.5-0.5b</button><button class="bbtn">Stop all</button></div>` },
+  pull: { c: `<svg class="ring" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="none" stroke="#27272a" stroke-width="2.5"/><circle cx="10" cy="10" r="8" fill="none" stroke="var(--oq-beacon-accent)" stroke-width="2.5" stroke-dasharray="50.3" stroke-dashoffset="18" transform="rotate(-90 10 10)"/></svg><span>Pulling smollm3-3b</span><span class="mono">64%</span>`, o: `<h4>${ico("dl")}Pulling smollm3-3b</h4><div class="sub2">HuggingFaceTB/SmolLM3-3B · 41.2 MB/s</div><div class="big">64%</div><div class="bar2"><i style="width:64%"></i></div><ul class="steps"><li><i class="d ok"></i>resolve<span>MAX catalog</span></li><li><i class="d ok"></i>architecture<span>SmolLM3 · supported</span></li><li><i class="d run"></i>download<span>3.9 of 6.2 GB</span></li><li><i class="d"></i>verify, register</li></ul><div class="bacts"><button class="bbtn">Cancel</button></div>` },
+  port: { c: `<svg class="ring" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="none" stroke="#27272a" stroke-width="2.5"/><circle cx="10" cy="10" r="8" fill="none" stroke="#f5a524" stroke-width="2.5" stroke-dasharray="50.3" stroke-dashoffset="30" transform="rotate(-90 10 10)"/></svg><span>Porting olmoe</span><span class="mono">step 3 of 5</span>`, o: `<h4>${ico("wrench")}Porting olmoe-1b-7b</h4><div class="sub2">Olmoe isn't supported yet · Claude is porting it</div><ul class="steps"><li><i class="d ok"></i>study the architecture<span>2m 10s</span></li><li><i class="d ok"></i>write the MAX graph<span>6m 02s</span></li><li><i class="d run"></i>build and fix<span>attempt 2</span></li><li><i class="d"></i>smoke test</li><li><i class="d"></i>register and serve</li></ul><div class="bacts"><button class="bbtn pri">Watch the log</button><button class="bbtn">Cancel</button></div>` },
+  crash: { c: `<span class="live" style="background:#f87171;box-shadow:0 0 0 4px rgba(248,113,113,.25)"></span><span>phi-2 crashed</span><span class="mono">4 min ago</span>`, o: `<h4>${ico("alert", "#f87171")}phi-2 crashed</h4><div class="sub2">exit 1 · CUDA out of memory while compiling</div><div class="bacts"><button class="bbtn pri" data-open="3">Open phi-2</button><button class="bbtn">Restart</button><button class="bbtn">View logs</button></div>` }
+};
+const beacon = $("#beacon");
+function setBeacon(k) {
+  $("#bcC").innerHTML = B[k].c; $("#bcO").innerHTML = `<button class="x" aria-label="Close">${ico("x")}</button>` + B[k].o;
+  beacon.classList.remove("open"); $$(".demo button").forEach(b => b.classList.toggle("on", b.dataset.b === k));
+  if (window.Omxqua) requestAnimationFrame(() => { Omxqua.sizeBeacon(beacon, true); $(".cx-right").style.paddingRight = $("#bcC").offsetWidth + 8 + "px"; });
+}
+
+document.addEventListener("click", e => {
+  const t = e.target;
+  const row = t.closest("[data-m]"); if (row) return openModel(+row.dataset.m);
+  if (t.closest("[data-close]") || t.closest("[data-home]") || t.closest("#brand")) { if (t.closest("#brand") && window.Omxqua) Omxqua.writeLogo($("#brand .mark")); return closeModel(); }
+  const d = t.closest(".demo [data-b]"); if (d) return setBeacon(d.dataset.b);
+  const op = t.closest("[data-open]"); if (op) { beacon.classList.remove("open"); Omxqua.sizeBeacon(beacon, true); return openModel(+op.dataset.open); }
+  if (t.closest("#beacon .x")) { beacon.classList.remove("open"); Omxqua.sizeBeacon(beacon, true); e.stopPropagation(); return; }
+  if (t.closest("#beacon") && !beacon.classList.contains("open")) { beacon.classList.add("open"); Omxqua.sizeBeacon(beacon, true); return; }
+  if (!t.closest("#beacon") && beacon.classList.contains("open")) { beacon.classList.remove("open"); Omxqua.sizeBeacon(beacon, true); }
+  if (t.closest("#theme")) { const n = app.classList.contains("oq-night"); app.classList.toggle("oq-night", !n); app.classList.toggle("oq-light", n); }
+  const sg = t.closest(".seg2 button"); if (sg) { $$("button", sg.parentElement).forEach(b => b.classList.toggle("on", b === sg)); Omxqua.placeThumb(sg.parentElement); }
+});
+
+/* live numbers update in place (no motion) */
+setInterval(() => { const v = 170 + Math.round(Math.random() * 24); const el = $("#tps"); if (el) el.textContent = v; const bc = $("#bcC .mono"); if (bc && /tok\/s/.test(bc.textContent)) bc.textContent = v + " tok/s"; }, 1500);
+
+crumbs(null);
+addEventListener("DOMContentLoaded", () => { setBeacon("run"); Omxqua.placeThumb($("#view")); });
+if (location.hash === "#open") addEventListener("DOMContentLoaded", () => openModel(5));
+})();
+</script>
+</body>
+</html>
