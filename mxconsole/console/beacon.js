@@ -150,7 +150,7 @@ export function mountBeacon(host, onSize) {
   onData(draw);
   // Mounted once for the page's life, so the loop never needs stopping. Each poll waits for the last one to
   // finish (a slow daemon never stacks requests) and a hidden tab skips polling until it is shown again.
-  const loop = async () => { if (!document.hidden) { await pollJobs(); draw(); } setTimeout(loop, POLL_MS); };
+  const loop = async () => { try { if (!document.hidden) { await pollJobs(); draw(); } } finally { setTimeout(loop, POLL_MS); } };
   loop();
   draw();
   return { el: root, close, isOpen: () => open };

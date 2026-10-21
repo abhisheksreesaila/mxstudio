@@ -35,7 +35,7 @@
 .beacon .ring-arc.warn { stroke: var(--oq-warn); }
 .beacon .bc-compact svg:not(.ring) { color: var(--oq-beacon-accent); }
 .beacon .bbtn:hover { filter: brightness(1.15); }
-.beacon .bbtn.armed { background: var(--oq-bad); color: white; }
+.beacon .bbtn.armed { background: var(--oq-bad); color: var(--oq-on-accent); }
 .beacon button:focus-visible { outline: 2px solid var(--oq-beacon-accent); outline-offset: 2px; }
 
 @media (max-width: 1240px) { .cx-tools .tl { display: none; } .cx-tools .tool { padding: 0; width: 34px; justify-content: center; } }
