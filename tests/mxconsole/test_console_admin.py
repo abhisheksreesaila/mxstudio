@@ -183,13 +183,13 @@ async def test_docs_is_the_api_reference_page(http):
 
 async def test_only_listed_console_files_are_served(http):
     from mxconsole.gateway import CONSOLE_ASSETS, CONSOLE_DIR
-    assert "blades.css" in CONSOLE_ASSETS and "geist-variable.woff2" in CONSOLE_ASSETS
+    assert "blades.css" in CONSOLE_ASSETS and "geist-variable.woff2" not in CONSOLE_ASSETS  # fonts come from omxqua (F-042)
     assert not any("source-" in a for a in CONSOLE_ASSETS)
     for asset in sorted(CONSOLE_ASSETS):
         assert (CONSOLE_DIR / asset).is_file(), asset  # nothing listed is missing
         r = await http.get(f"/console/{asset}")
         assert r.status_code == 200, asset
-    on_disk = {p.name for p in CONSOLE_DIR.iterdir() if p.name not in ("index.html", "LICENSE-fonts.txt")}
+    on_disk = {p.name for p in CONSOLE_DIR.iterdir() if p.name not in ("index.html", "omxqua")}  # omxqua has its own list
     assert on_disk == set(CONSOLE_ASSETS)  # nothing unlisted ships, nothing listed is missing
     for bad in ("index.html", "LICENSE-fonts.txt", "console.js", "source-sans-3-400.woff2", "..%2Fgateway.py", "%2e%2e/gateway.py"):
         assert (await http.get(f"/console/{bad}")).status_code == 404, bad

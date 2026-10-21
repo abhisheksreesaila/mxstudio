@@ -2,8 +2,6 @@
    Themes: light ("contrast": dark chrome, light surfaces) is the default; dark follows the system
    (prefers-color-scheme) until the top-bar toggle is used, which sets data-theme="light" or "dark" on <html>.
    Hue tokens (--hue-<section>) colour each section's outline icon; the label beside it stays a quieter tint. */
-@font-face { font-family: "Geist"; src: url("/console/geist-variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
-@font-face { font-family: "Geist Mono"; src: url("/console/geist-mono-variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 
 :root {
   /* chrome (the top bar) */

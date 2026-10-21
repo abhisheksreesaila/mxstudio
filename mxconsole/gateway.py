@@ -27,7 +27,6 @@ PROXIED = ("/v1/chat/completions", "/v1/completions", "/v1/embeddings")
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 ADMIN_HEADER = "x-mst-admin"
 CONSOLE_DIR = Path(__file__).parent / "console"
-CONSOLE_FONTS = {"geist-variable.woff2", "geist-mono-variable.woff2"}
 # An explicit list: the console is never a directory server. Add a file here when you add one to console/.
 CONSOLE_SCRIPTS = {"theme.js", "main.js", "core.js", "icons.js", "routes.js",
                    # the blades console: engine, shell and one file per blade, each with its own CSS
@@ -38,7 +37,12 @@ CONSOLE_STYLES = {"blades.css", "topbar.css", "docs.css", "blade-home.css", "bla
                   "blade-security.css", "blade-keys.css", "blade-bench.css", "blade-logs.css", "blade-notebook.css",
                   "blade-gateway.css", "blade-settings.css"}
 CONSOLE_IMAGES = {"favicon.svg"}
-CONSOLE_ASSETS = CONSOLE_STYLES | CONSOLE_SCRIPTS | CONSOLE_FONTS | CONSOLE_IMAGES
+CONSOLE_ASSETS = CONSOLE_STYLES | CONSOLE_SCRIPTS | CONSOLE_IMAGES
+# omxqua, the design language (F-042), vendored with `omxqua-sync mxconsole/console --ref <tag>`. Only these files are served;
+# the other fonts (Fraunces, Nunito: travel and kids skins) and the licence files stay in the package, unserved.
+CONSOLE_OMXQUA = {"src/fonts.css": "text/css", "src/tokens.css": "text/css", "src/components.css": "text/css",
+                  "src/omxqua.js": "text/javascript",
+                  "fonts/geist-variable.woff2": "font/woff2", "fonts/geist-mono-variable.woff2": "font/woff2"}
 LOG_TAIL_BYTES = 8000
 TRY_MAX_TOKENS = 1024  # the API page's "Try it" is for a quick look, not for load
 # no-cache: an upgraded mxconsole never shows a stale console. The rest: no other site can frame the
@@ -558,8 +562,17 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             return Response("the console is only served to this machine", status_code=403)
         if asset not in CONSOLE_ASSETS:  # a fixed list: no path ever reaches the filesystem
             return Response("not found", status_code=404)
-        media = "font/woff2" if asset in CONSOLE_FONTS else "image/svg+xml" if asset in CONSOLE_IMAGES else None
+        media = "image/svg+xml" if asset in CONSOLE_IMAGES else None
         return FileResponse(CONSOLE_DIR / asset, headers=CONSOLE_HEADERS, media_type=media)
+
+    @app.get("/console/omxqua/{path:path}")
+    def console_omxqua(request: Request, path: str):
+        if not loopback_only(request):
+            return Response("the console is only served to this machine", status_code=403)
+        media = CONSOLE_OMXQUA.get(path)  # a fixed list: no path ever reaches the filesystem
+        if media is None:
+            return Response("not found", status_code=404)
+        return FileResponse(CONSOLE_DIR / "omxqua" / path, headers=CONSOLE_HEADERS, media_type=media)
 
     @app.get("/admin/status")
     def admin_status(request: Request):

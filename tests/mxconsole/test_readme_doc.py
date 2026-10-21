@@ -14,7 +14,7 @@ README = (ROOT / "README.md").read_text()
 SITE = ROOT / "docs" / "site"
 ROW = re.compile(r"^\| `(GET|POST|PUT|PATCH|DELETE) (/[^`]*)` \|", re.M)
 PAGES_URL = re.compile(r"https://abhisheksreesaila\.github\.io/mxstudio/([^)\s\"'#]*)")
-NOT_API = {"/console", "/console/{asset}", "/favicon.ico", "/docs", "/openapi.json", "/v1/{path:path}"}
+NOT_API = {"/console", "/console/{asset}", "/console/omxqua/{path:path}", "/favicon.ico", "/docs", "/openapi.json", "/v1/{path:path}"}
 
 
 def api_section() -> str:

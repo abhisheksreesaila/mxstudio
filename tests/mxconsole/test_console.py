@@ -93,10 +93,10 @@ async def test_console_cannot_be_framed_and_loads_nothing_from_elsewhere(http):
 
 
 async def test_console_fonts_are_served_locally(http):
-    css = (await http.get("/console/blades.css")).text
+    css = (await http.get("/console/omxqua/src/fonts.css")).text  # omxqua's fonts since F-042
     for font in ("geist-variable.woff2", "geist-mono-variable.woff2"):
-        assert f"/console/{font}" in css
-        r = await http.get(f"/console/{font}")
+        assert f"url(../fonts/{font})" in css
+        r = await http.get(f"/console/omxqua/fonts/{font}")
         assert r.status_code == 200 and r.headers["content-type"] == "font/woff2" and r.content[:4] == b"wOF2"
 
 

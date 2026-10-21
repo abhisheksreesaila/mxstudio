@@ -296,18 +296,18 @@ Brief: docs/brief.md · Needs: none
 Design: the omxqua language, Developer family; mock `docs/design/omxconsole/mock.html` (approved 2026-10-20, with flat buttons inside blades).
 A skin over the 1.0 console: no behaviour changes except the Beacon. Order: F-041 first (an omxqua release), then F-042; F-043 and F-044 in parallel (topbar files vs blade files); F-045 after F-044; F-046 any time.
 
-## F-041 omxqua 0.1.5: CSP-safe and flat panel buttons [todo]
+## F-041 omxqua 0.1.5: CSP-safe and flat panel buttons [done]
 Brief: docs/briefs/omxconsole.md · Needs: none · Repo: ~/Projects/omxqua
-- [ ] `omxqua.js` no longer injects a `<style>` element; that CSS lives in `components.css` (works under `default-src 'self'`)
-- [ ] buttons inside a panel are flat: `.oq-flat` (or a blade/panel container class) removes shadow and hover lift, tonal gets a state tint; documented in AGENTS.md and LANGUAGE.md
-- [ ] `Omxqua.settle` rises 12 px as the docs say (today 6 px)
-- [ ] tagged v0.1.5 with a changelog entry; the showcase still renders the same (spot-check three families)
+- [x] `omxqua.js` no longer injects a `<style>` element; that CSS lives in `components.css` (works under `default-src 'self'`)
+- [x] buttons inside a panel are flat: `.oq-flat` (or a blade/panel container class) removes shadow and hover lift, tonal gets a state tint; documented in AGENTS.md and LANGUAGE.md
+- [x] `Omxqua.settle` rises 12 px as the docs say (today 6 px)
+- [x] tagged v0.1.5 with a changelog entry; the showcase still renders the same (spot-checked); `tests/csp.test.cjs` guards the no-injected-style rule. v0.1.5 also ships the Money family another session added. Reviewer: PASS (after fixing landing.html's logo and the changelog). Tag is local until the push is approved.
 
 ## F-042 Vendor omxqua into the console [todo]
 Brief: docs/briefs/omxconsole.md · Needs: F-041
 - [ ] `omxqua-sync mxconsole/console --ref v0.1.5` puts `omxqua/{src,fonts,VERSION}` in the package; the gateway serves exactly those files from an explicit list under `/console/omxqua/…` (still never a directory server); CSP unchanged
-- [ ] `index.html` loads omxqua before the console CSS; the root carries `oq-root oq-family-dev` and `oq-night | oq-light` from `theme.js` (system until toggled, remembered, as today)
-- [ ] the console's own copies of Geist and Geist Mono are dropped in favour of omxqua's; nothing else changes visually yet
+- [ ] `index.html` loads omxqua's `fonts.css` before the console CSS; the console's own copies of Geist and Geist Mono (and their licence file) are dropped; nothing changes visually
+- [ ] (moved to F-043/F-044: `tokens.css`, `components.css`, `omxqua.js` and the root classes, since `tokens.css` restyles the root and would change the old look before the new one exists)
 - [ ] a test checks every omxqua asset is served with the console headers and that nothing outside the list is
 
 ## F-043 Top islands and the Beacon [todo]
