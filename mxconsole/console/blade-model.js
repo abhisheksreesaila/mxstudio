@@ -23,11 +23,12 @@ export function cliTwin(action, name) {
 
 /** The command bar for a state ("ready" | "starting" | "cold" | "crashed"). Remove is always last and is the danger one. */
 export function commandsFor(state, secure) {
-  const c = (key, label, ic, hue, danger = false) => ({ key, label, icon: ic, hue: hue || null, danger });
+  const c = (key, label, ic, hue, danger = false) => ({ key, label, icon: ic, hue: hue || null, danger, primary: false });
   const power = state === "ready" ? [c("stop", "Stop", "square", HUE.stop), c("restart", "Restart", "rotate-cw", HUE.restart)]
     : state === "starting" ? [c("stop", "Stop", "square", HUE.stop)]
     : state === "crashed" ? [c("restart", "Restart", "rotate-cw", HUE.restart)]
     : [c("start", "Start", "play", HUE.start)];
+  power[0].primary = true;  // one filled verb per command bar: the power one
   return [...power,
     ...(secure ? [] : [c("secure", "Make it secure", "lock", HUE.security)]),
     c("bench", "Run benchmark", "gauge", HUE.bench), c("notebook", "Open notebook", "book-open", HUE.notebook), c("logs", "Logs", "scroll-text", HUE.logs),
@@ -83,13 +84,15 @@ function areaChart(points, color) {
     s("polyline", { points: line, fill: "none", stroke: live ? color : "var(--faint)", "stroke-width": "1.8", "stroke-linejoin": "round", "stroke-linecap": "round", "vector-effect": "non-scaling-stroke" }));
 }
 const dd = () => h("dd", {});
-const box = (title, right, ...kids) => h("section", { class: "box" }, h("div", { class: "h3" }, title, right ? h("span", { class: "r" }, right) : null), ...kids);
+/** An omxqua card: heading, body, and its `mxc` source line (the command that shows the same thing). */
+const card = (title, source, ...kids) => h("section", { class: "card" }, h("div", { class: "card-h" }, h("h3", {}, title)), h("div", { class: "card-b" }, ...kids), h("div", { class: "src" }, source));
 const cliLine = (text) => h("div", { class: "cli mono" }, text);
+const stat = (value, label) => h("div", {}, value, h("span", {}, label));
 
 register("model", (blade) => {
   const name = blade.opts.id;
   return {
-    title: h("span", { class: "t-row" }, h("span", { class: "mdot", style: { "--mc": colorOf(name) } }), name),
+    title: name,
     crumb: name, sub: "Model", icon: "box", hue: colorOf(name), side: 660, narrow: 470, min: 620,
     mount(body) {
       const idx = () => stack.indexOf(blade);
@@ -112,27 +115,26 @@ register("model", (blade) => {
       const crash = h("div", { class: "span" });
       const dds = Array.from({ length: 8 }, dd);
       const accessLink = h("button", { class: "lnk", type: "button", onClick: () => open("security") }, "make it secure");
-      const essentials = box("Essentials", null, h("dl", { class: "ess" }, ["Repository", "Architecture", "Source", "Unloads", "Endpoint", "Access", "GPU memory", "State"].flatMap((l, i) => [h("dt", {}, l), dds[i]])));
-      essentials.classList.add("span");
-      const mTps = h("div", { class: "v mono" }), mTtft = h("div", { class: "v mono" }), mReq = h("div", { class: "v mono" }), chart = h("div", { class: "chart" });
-      const metric = (label, el) => h("div", {}, h("div", { class: "lbl mono" }, label), el);
-      const tokens = box("Tokens · live", cliLine(`mxc metrics`), h("div", { class: "metrics" }, metric("Throughput", mTps), metric("First token", mTtft), metric("Requests · 5 min", mReq)), chart);
-      tokens.classList.add("span");
+      const essentials = card("Essentials", "mxc ls --json", h("dl", { class: "ess" }, ["Repository", "Architecture", "Source", "Unloads", "Endpoint", "Access", "GPU memory", "State"].flatMap((l, i) => [h("dt", {}, l), dds[i]])));
+      const mTps = h("b", {}), mTtft = h("b", {}), mReq = h("b", {}), chart = h("div", { class: "chart" });
+      const tokens = card("Tokens · live", "mxc metrics --json", h("div", { class: "stats" }, stat(mTps, "tok/s"), stat(mTtft, "first token"), stat(mReq, "requests · 5 min")), chart);
       const urlTag = h("span", { class: "tag" }), urlText = h("span", { class: "u" });
       const urlRow = h("div", { class: "urlrow" }, urlTag, urlText, h("button", { class: "ib", type: "button", "aria-label": "Copy URL", title: "Copy URL", onClick: async () => toast((await copyText(urlText.textContent)) ? "Endpoint copied" : "Could not reach the clipboard") }, icon("copy", 14)));
       const curlText = h("pre", { class: "curl mono" });
-      const call = box("Call it", null, urlRow,
+      const call = card("Call it", "mxc keys new <app>", urlRow,
         h("div", { class: "keyrow" }, h("span", { class: "klabel" }, "API key"), h("code", { class: "kval mono" }, "$MXC_API_KEY"),
           h("button", { class: "lnk", type: "button", onClick: () => open("keys") }, "manage keys")),
-        h("div", { class: "code" }, copyButton(() => curlText.textContent, "copy", "cp"), curlText), cliLine("mxc keys new <app>"));
+        h("div", { class: "code" }, copyButton(() => curlText.textContent, "copy", "cp"), curlText));
       const secTitle = h("b", {}), secText = h("span", {});
-      const secIcon = h("span", { class: "sq", style: { "--h": HUE.security, width: "28px", height: "28px" } });
-      const secBtn = h("button", { class: "btn", type: "button", onClick: () => open("security", { run: !currentSecure }) });
+      const secIcon = h("span", { class: "sq", style: { "--h": HUE.security, width: "36px", height: "36px" } });
+      const secBtn = h("button", { class: "btn sm", type: "button", onClick: () => open("security", { run: !currentSecure }) });
       let currentSecure = false;
-      const fitNum = h("span", { class: "r mono" }), fitBar = h("div", { class: "fitbar" }), fitCap = h("div", { class: "fitcap" });
-      const security = h("section", { class: "box" },
-        h("div", { class: "h3" }, "Security"), h("div", { class: "secsum" }, secIcon, h("div", { class: "tx" }, secTitle, secText)), h("div", { class: "secact" }, secBtn),
-        h("div", { class: "h3 fit-h" }, "Hardware fit", fitNum), fitBar, fitCap);
+      const secBadge = h("span", { class: "badge" }), fitNum = h("span", { class: "r mono" }), fitBar = h("div", { class: "fitbar" }), fitCap = h("div", { class: "fitcap" });
+      const security = h("section", { class: "card" },
+        h("div", { class: "card-h" }, h("h3", {}, "Security"), h("span", { class: "sp" }), secBadge),
+        h("div", { class: "card-b" }, h("div", { class: "secsum" }, secIcon, h("div", { class: "tx" }, secTitle, secText, h("div", { class: "secact" }, secBtn))),
+          h("div", { class: "h3 fit-h" }, "Hardware fit", fitNum), fitBar, fitCap),
+        h("div", { class: "src" }, "mxc expose"));
       const grid = h("div", { class: "ovgrid" }, crash, essentials, tokens, call, security);
       const content = h("div", { class: "rcontent" }, barHost, grid);
       body.replaceChildren(h("div", { class: "rwrap" }, menu, content));
@@ -197,9 +199,8 @@ register("model", (blade) => {
       function buildBar(cmds) {
         const nodes = [];
         cmds.forEach((c) => {
-          if (c.key === "copy") nodes.push(h("span", { class: "cbsep" }));
-          nodes.push(h("button", { class: `cb${c.danger ? " danger" : ""}${c.key === "secure" ? " hl" : ""}`, type: "button", "data-cmd": c.key, title: cliTwin(c.key, name) ? `$ ${cliTwin(c.key, name)}` : c.label,
-            style: c.hue ? { "--h": c.hue } : null, onClick: () => ACTIONS[c.key]() }, icon(c.icon, 14, "currentColor", 1.75), h("span", {}, c.label)));
+          nodes.push(h("button", { class: `cb btn sm ${c.primary ? "fill" : c.danger ? "danger" : "tonal"}`, type: "button", "data-cmd": c.key, "aria-label": c.label, title: cliTwin(c.key, name) ? `$ ${cliTwin(c.key, name)}` : c.label,
+            style: c.hue ? { "--c": c.hue } : null, onClick: () => ACTIONS[c.key]() }, icon(c.icon, 14, "currentColor", 1.75), h("span", { class: "bl" }, c.label)));
         });
         barHost.replaceChildren(...nodes);
         confirming = false;
@@ -225,20 +226,21 @@ register("model", (blade) => {
         if (v.crashed !== (crashSig === "1")) {
           crashSig = v.crashed ? "1" : "0";
           crash.replaceChildren(...(v.crashed ? [h("div", { class: "attn", role: "alert" }, icon("triangle-alert", 16), h("span", {}, h("b", { class: "mono" }, name), " crashed. Its log says why."), h("span", { class: "grow" }),
-            h("button", { class: "btn ghost sm", type: "button", onClick: () => open("logs") }, icon("scroll-text", 13), "View logs"),
-            h("button", { class: "btn dark sm", type: "button", onClick: () => ACTIONS.restart() }, icon("rotate-cw", 13), "Restart"))] : []));
+            h("button", { class: "btn tonal sm", type: "button", onClick: () => open("logs") }, icon("scroll-text", 13), "View logs"),
+            h("button", { class: "btn fill sm", type: "button", onClick: () => ACTIONS.restart() }, icon("rotate-cw", 13), "Restart"))] : []));
         }
         // essentials
         const essSig = JSON.stringify(v.essentials);
         if (essSig !== essigPrev) {
           essigPrev = essSig;
-          v.essentials.forEach(([, val], i) => dds[i].replaceChildren(val, ...(i === 5 && !v.secure ? [" · ", accessLink] : [])));
+          v.essentials.forEach(([, val], i) => dds[i].replaceChildren(...(i === 7 ? [h("span", { class: `state ${v.state}` }, h("span", { class: "sd" }), val)] : [val]), ...(i === 5 && !v.secure ? [" · ", accessLink] : [])));
         }
         // tokens
-        mTps.replaceChildren(...(v.tokens.tps === null ? ["—"] : [fmt(v.tokens.tps), h("small", {}, " tok/s")]));
+        mTps.textContent = v.tokens.tps === null ? "—" : fmt(v.tokens.tps);
         mTtft.replaceChildren(...(v.tokens.ttft === null ? ["—"] : [fmt(v.tokens.ttft), h("small", {}, " ms")]));
         mReq.textContent = v.state === "running" || v.tokens.requests ? fmt(v.tokens.requests) : "0";
-        chart.replaceChildren(areaChart(v.tokens.points, colorOf(name)));
+        chart.replaceChildren(v.tokens.points.length > 1 ? areaChart(v.tokens.points, colorOf(name))
+          : h("div", { class: "nodata" }, h("b", {}, "No traffic yet"), "Start it, or call it: it starts on the first request."));
         // call it
         currentSecure = v.secure;
         urlRow.classList.toggle("secure", v.secure);
@@ -250,7 +252,9 @@ register("model", (blade) => {
         secIcon.replaceChildren(icon(v.secure ? "lock" : "unlock", 16, "currentColor", 1.75));
         secTitle.textContent = v.secure ? "Secure on your network" : "Localhost only";
         secText.textContent = v.secure ? "HTTPS with a key. Other devices on your Wi-Fi can call it." : "Only this machine can call it. One click adds a certificate, a key and HTTPS.";
-        secBtn.className = `btn ${v.secure ? "ghost" : "dark"}`;
+        secBtn.className = `btn sm ${v.secure ? "tonal" : "fill"}`;
+        secBadge.className = `badge ${v.secure ? "ok" : "warn"}`;
+        secBadge.replaceChildren(h("i", {}), v.secure ? "secure" : "localhost only");
         secBtn.replaceChildren(icon("lock", 14, "currentColor", 1.75), v.secure ? "View security" : "Make it secure");
         const f = v.fit;
         fitNum.textContent = f.thisGb ? `${f.thisGb} GB` : "";

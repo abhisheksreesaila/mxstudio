@@ -7,6 +7,7 @@ import { readView, writeView, safeStorage } from "./prefs.js";
 import { syncKeyed } from "./keyed.js";
 import { hardwareView } from "./hardware.js";
 import { system } from "./system-data.js";
+import { PHONE_W } from "./blade-layout.js";
 
 const STATE = { ready: ["running", "Running"], starting: ["starting", "Starting"], cold: ["idle", "Idle"], crashed: ["crashed", "Crashed"] };
 
@@ -53,7 +54,9 @@ function sparkline(points, w, hgt, color) {
     s("polyline", { points: xy, fill: "none", stroke: points.length > 1 ? color : "var(--faint)", "stroke-width": "1.6", "stroke-linejoin": "round", "stroke-linecap": "round", "vector-effect": "non-scaling-stroke" }));
 }
 const stateEl = (v) => h("span", { class: `state ${v.stateKey}` }, h("span", { class: "sd" }), v.stateLabel);
-const accessEl = (v) => h("span", { class: `acc ${v.access}` }, icon(v.access === "secure" ? "lock" : "plug", 11, "currentColor", 2), v.access === "secure" ? "Secure" : "Local");
+/** A laptop for Local (a lock would read as secure), a lock for a model served over HTTPS on the LAN. */
+export const accessIcon = (access) => (access === "secure" ? "lock" : "laptop");
+const accessEl = (v) => h("span", { class: `acc ${v.access}` }, icon(accessIcon(v.access), 12, "currentColor", 1.75), v.access === "secure" ? "Secure" : "Local");
 const mdot = (name) => h("span", { class: "mdot", style: { "--mc": colorOf(name) } });
 const shortEndpoint = (url) => String(url || "").replace(/^https?:\/\//, "");
 const cliHint = (text) => h("span", { class: "cli mono" }, text);
@@ -94,7 +97,7 @@ register("home", (blade) => ({
     const selected = () => (stack[1] && stack[1].name === "model" ? stack[1].opts.id : null);
 
     function addButton(compact) {
-      return h("button", { class: compact ? "ib" : "btn primary", type: "button", "data-act": "add", title: "Add a model", "aria-label": "Add a model", onClick: (e) => { e.stopPropagation(); openAdd(); } },
+      return h("button", { class: compact ? "ib" : "btn fill", type: "button", "data-act": "add", title: "Add a model", "aria-label": "Add a model", onClick: (e) => { e.stopPropagation(); openAdd(); } },
         icon("plus", compact ? 15 : 14, "currentColor", 2), compact ? null : "Add a model");
     }
     function heading(views, mode) {
@@ -103,7 +106,7 @@ register("home", (blade) => ({
         title: h("span", { class: "t-row" }, "My models", h("span", { class: "count mono" }, String(views.length))),
         sub: mode === "full" ? `Everything this machine serves, behind one OpenAI-compatible endpoint: ${shortEndpoint(ctxNow().endpoint)}` : `${running} running`,
       });
-      const want = mode === "full" || mode === "narrow" ? "full" : "compact";
+      const want = (mode === "full" || mode === "narrow") && window.innerWidth > PHONE_W ? "full" : "compact";
       if (want !== toolsMode) {  // the Add button is focusable: only rebuild it when the mode changes
         toolsMode = want;
         blade.toolsEl.replaceChildren(...(want === "full" ? [cliHint("mxc serve <model>"), addButton(false)] : [addButton(true)]));
@@ -115,7 +118,7 @@ register("home", (blade) => ({
     function makeRow(v) {
       const nameBtn = h("button", { class: "namebtn", type: "button", "data-id": v.name, onClick: (e) => { e.stopPropagation(); openModel(v.name); } });
       const rep = h("span", { class: "rep" });
-      const cells = Array.from({ length: 7 }, () => h("td", {}));
+      const cells = ["", "hide-n", "num", "num hide-n", "num hide-n", "num hide-n", "hide-n arch"].map((c) => h("td", { class: c || null }));
       const tr = h("tr", { class: "row", "data-id": v.name, onClick: () => openModel(v.name) }, h("td", { class: "nm" }, nameBtn, rep), ...cells);
       Object.assign(tr, { _sel: "on", _nameBtn: nameBtn, _rep: rep, _cells: cells });
       return tr;
@@ -126,13 +129,10 @@ register("home", (blade) => ({
       const [state, access, tps, ttft, req, vram, arch] = tr._cells;
       state.replaceChildren(...[stateEl(v), v.note ? h("span", { class: "rep" }, v.note) : null].filter(Boolean));
       access.replaceChildren(accessEl(v));
-      tps.className = "num";
-      tps.replaceChildren(h("span", { class: "tpsrow" }, h("span", { class: "tpsn" }, v.tps === null ? "—" : fmt(v.tps)), v.points.length > 1 ? sparkline(v.points, 64, 18, colorOf(v.name)) : null));
-      ttft.className = req.className = vram.className = "num";
+      tps.replaceChildren(h("span", { class: "tpsrow" }, v.points.length > 1 ? sparkline(v.points, 64, 18, colorOf(v.name)) : null, h("span", { class: "tpsn" }, v.tps === null ? "—" : fmt(v.tps))));
       ttft.textContent = v.ttft === null || v.ttft === undefined ? "—" : `${fmt(v.ttft)} ms`;
       req.textContent = v.stateKey === "running" ? fmt(v.requests) : "—";
       vram.textContent = v.vramGb === null ? "—" : `${v.vramGb} GB`;
-      arch.className = "num muted";
       arch.textContent = v.arch;
       markSel(tr);
     }
@@ -182,37 +182,55 @@ register("home", (blade) => ({
       if (view === "list") {
         const tbody = h("tbody", {});
         refs.rowsParent = tbody; refs.make = makeRow; refs.update = updateRow;
-        host.replaceChildren(h("div", { class: "table tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Model", "State", "Access", "Tokens/s", "First token", "Req · 5 min", "VRAM", "Architecture"].map((t) => h("th", {}, t)))), tbody)));
+        const head = [["Model", ""], ["State", ""], ["Access", "hide-n"], ["Tokens/s", "num"], ["First token", "num hide-n"], ["Req · 5 min", "num hide-n"], ["VRAM", "num hide-n"], ["Architecture", "hide-n"]];
+        host.replaceChildren(h("section", { class: "card models" }, h("div", { class: "card-b flush tablewrap" },
+          h("table", { class: "tbl" }, h("thead", {}, h("tr", {}, head.map(([label, c]) => h("th", { class: c || null }, label)))), tbody)),
+          h("div", { class: "src note" }, "click a model to open its blade beside this list")));
       } else {
         const grid = h("div", { class: "grid" }, h("button", { class: "card add", type: "button", onClick: openAdd }, icon("plus", 18, "currentColor", 2), h("span", {}, "Add a model"), h("span", { class: "mono small" }, "mxc serve <model>")));
         refs.rowsParent = grid; refs.make = makeCard; refs.update = updateCard;
         host.replaceChildren(grid);
       }
     }
+    /** The filter field (omxqua's floating label) and, on a wide blade, the list/cards toggle. */
+    function filterBar(withToggle) {
+      const input = h("input", { placeholder: " ", "aria-label": "Filter models", value: query, onInput: (e) => { query = e.target.value; draw(); } });
+      const field = h("label", { class: "mo has-lead" }, h("span", { class: "lead" }, icon("search", 16)), input, h("span", { class: "fl" }, "Filter models"));
+      const bar = h("div", { class: "homebar" }, field, h("span", { class: "grow" }));
+      if (withToggle) {
+        const seg = (id, label) => h("button", { type: "button", "data-view": id, onClick: () => { view = id; writeView(storage, id); buildContent(refs.content); draw(); } }, label);
+        refs.segs = h("div", { class: "seg2", role: "group", "aria-label": "View" }, h("i", {}), seg("list", "List"), seg("cards", "Cards"));
+        bar.append(refs.segs);
+      }
+      return bar;
+    }
     function buildFull() {
-      const input = h("input", { placeholder: "Filter models", "aria-label": "Filter models", value: query, onInput: (e) => { query = e.target.value; draw(); } });
-      const seg = (id, label, ic) => h("button", { type: "button", "data-view": id, onClick: () => { view = id; writeView(storage, id); buildContent(refs.content); draw(); } }, icon(ic, 14), label);
       refs = { kpis: h("div", { class: "kpis-host" }), callouts: h("div", {}), stale: h("div", { class: "stale mono", role: "status", hidden: true }, "daemon not answering: showing the last numbers"),
-        empty: h("div", {}), content: h("div", {}), input, segs: h("div", { class: "seg", role: "group", "aria-label": "View" }, seg("list", "List", "list"), seg("cards", "Cards", "layout-grid")) };
+        empty: h("div", {}), content: h("div", {}) };
       crashSig = "";
       buildContent(refs.content);
-      body.replaceChildren(h("div", { class: "hbody" }, refs.stale, refs.kpis, refs.callouts, h("div", { class: "homebar" }, h("label", { class: "filter" }, icon("search", 14), input), h("span", { class: "grow" }), refs.segs), refs.empty, refs.content));
+      body.replaceChildren(h("div", { class: "hbody" }, refs.stale, refs.kpis, refs.callouts, filterBar(true), refs.empty, refs.content));
     }
     function buildCompact(kind) {
-      const parent = h("div", { class: kind === "side" ? "compact" : "rdots" });
-      refs = { rows: new Map(), rowsParent: parent, make: kind === "side" ? makeMrow : makeDot, update: kind === "side" ? updateMrow : updateDot };
-      parent.append(kind === "side"
+      const list = kind === "side" || kind === "phone";
+      const parent = h("div", { class: list ? "compact" : "rdots" });
+      refs = { rows: new Map(), rowsParent: parent, make: list ? makeMrow : makeDot, update: list ? updateMrow : updateDot };
+      parent.append(list
         ? h("button", { class: "addrow", type: "button", onClick: openAdd }, icon("plus", 14, "currentColor", 2), "Add a model")
         : h("button", { class: "rdot plus", type: "button", title: "Add a model", "aria-label": "Add a model", onClick: (e) => { e.stopPropagation(); openAdd(); } }, icon("plus", 14, "currentColor", 2)));
-      body.replaceChildren(parent);
+      if (kind === "phone") {  // a phone: the numbers, the filter and the compact list; no wide table
+        Object.assign(refs, { kpis: h("div", { class: "kpis-host" }), callouts: h("div", {}), stale: h("div", { class: "stale mono", role: "status", hidden: true }, "daemon not answering: showing the last numbers"), empty: h("div", {}), content: parent });
+        crashSig = "";
+        body.replaceChildren(h("div", { class: "hbody" }, refs.stale, refs.kpis, refs.callouts, filterBar(false), refs.empty), parent);
+      } else body.replaceChildren(parent);
     }
     function downPanel() {
       return h("div", { class: "hbody" }, h("div", { class: "notice down", role: "alert" },
         h("div", { class: "lab mono" }, icon("triangle-alert", 14), "the daemon is not answering"),
         h("h4", {}, "mxconsole cannot reach the daemon"),
         h("p", {}, "Start it in a terminal, then this page fills in on its own. Nothing here is lost."),
-        h("div", { class: "cmd-row" }, h("code", { class: "mono cmd" }, "mxc daemon"), copyButton(() => "mxc daemon", "Copy", "btn ghost sm"),
-          h("button", { class: "btn dark sm", type: "button", onClick: () => refresh() }, icon("refresh-cw", 13), "Try again"))));
+        h("div", { class: "cmd-row" }, h("code", { class: "mono cmd" }, "mxc daemon"), copyButton(() => "mxc daemon", "Copy", "btn tonal sm"),
+          h("button", { class: "btn fill sm", type: "button", onClick: () => refresh() }, icon("refresh-cw", 13), "Try again"))));
     }
     const setShape = (next, build) => { if (shape !== next) { shape = next; build(); } };
 
@@ -222,14 +240,15 @@ register("home", (blade) => ({
       const tps = running.reduce((a, v) => a + (v.tps || 0), 0);
       const hw = hardwareView(store.metrics && store.metrics.gpus, system.crew);
       const counts = [["starting", views.filter((v) => v.stateKey === "starting").length], ["idle", views.filter((v) => v.stateKey === "idle").length], ["crashed", views.filter((v) => v.crashed).length]]
-        .filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(" · ") || "all running";
-      const tile = (label, value, unit, sub, extra) => h("div", { class: "kpi" }, h("div", { class: "lbl mono" }, label), h("div", { class: "v mono" }, value, unit ? h("small", {}, ` ${unit}`) : null), sub ? h("div", { class: "sub" }, sub) : null, extra);
-      refs.kpis.replaceChildren(h("div", { class: "kpis" },
-        tile("Serving", String(running.length), `of ${views.length} models`, counts),
-        tile("Throughput now", fmt(tps), "tok/s", `across ${running.length} running model${running.length === 1 ? "" : "s"}`),
-        tile("Requests · 5 min", fmt(store.metrics ? store.metrics.requests : null), "", store.info && store.info.lan_endpoint ? "secured for your LAN" : "localhost only"),
-        tile("GPU memory", hw.present ? hw.label.split("/")[0] : "—", hw.present ? `/ ${hw.totalGb} GB` : "no GPU found", null,
-          hw.present ? h("div", { class: "vbar" }, hw.segments.map((seg) => h("span", { title: `${seg.name} · ${seg.gb} GB`, style: { width: `${seg.pct}%`, background: seg.name === "other" || seg.name === "in use" ? "var(--faint)" : colorOf(seg.name) } }))) : null)));
+        .filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(" · ");
+      const tile = (value, unit, label, extra) => h("div", {}, h("b", {}, value, unit ? h("small", {}, ` ${unit}`) : null), h("span", {}, label), extra);
+      refs.kpis.replaceChildren(h("section", { class: "card" }, h("div", { class: "card-b" }, h("div", { class: "stats" },
+        tile(String(running.length), `of ${views.length}`, counts ? `serving · ${counts}` : "serving · all running"),
+        tile(fmt(tps), "", `tok/s across ${running.length} running model${running.length === 1 ? "" : "s"}`),
+        tile(fmt(store.metrics ? store.metrics.requests : null), "", "requests · 5 min"),
+        tile(hw.present ? hw.label.split("/")[0] : "—", hw.present ? `/ ${hw.totalGb} GB` : "", hw.present ? `GPU memory · ${hw.short}` : "GPU memory · no GPU found",
+          hw.present ? h("div", { class: "vbar" }, hw.segments.map((seg) => h("span", { title: `${seg.name} · ${seg.gb} GB`, style: { width: `${seg.pct}%`, background: seg.name === "other" || seg.name === "in use" ? "var(--faint)" : colorOf(seg.name) } }))) : null))),
+        h("div", { class: "src" }, "mxc ls --json")));
     }
     function callouts(views) {
       const crashed = views.filter((v) => v.crashed);
@@ -238,8 +257,8 @@ register("home", (blade) => ({
       crashSig = sig;
       refs.callouts.replaceChildren(...crashed.map((v) => h("div", { class: "attn", role: "alert" },
         icon("triangle-alert", 16), h("span", {}, h("b", { class: "mono" }, v.name), " crashed. Its log says why."), h("span", { class: "grow" }),
-        h("button", { class: "btn ghost sm", type: "button", onClick: () => viewLogs(v.name) }, icon("scroll-text", 13), "View logs"),
-        h("button", { class: "btn dark sm", type: "button", onClick: () => restart(v.name) }, icon("refresh-cw", 13), "Restart"))));
+        h("button", { class: "btn tonal sm", type: "button", onClick: () => viewLogs(v.name) }, icon("scroll-text", 13), "View logs"),
+        h("button", { class: "btn fill sm", type: "button", onClick: () => restart(v.name) }, icon("refresh-cw", 13), "Restart"))));
     }
     function emptyNote(views, shown) {
       let note = null;
@@ -254,26 +273,31 @@ register("home", (blade) => ({
     function draw() {
       if (!blade.alive) return;
       const mode = blade.mode || "full";
-      const wide = mode === "full" || mode === "narrow";
+      const phone = window.innerWidth <= PHONE_W && mode === "full";
+      const wide = (mode === "full" || mode === "narrow") && !phone;
+      const numbers = wide || phone;  // the stats and the crashed callout show on a wide blade and on a phone
       if (store.error && !store.models) {
         heading([], mode);
-        setShape(`down|${wide}`, () => body.replaceChildren(wide ? downPanel() : h("div", { class: "empty" }, "Daemon not answering")));
+        setShape(`down|${numbers}`, () => body.replaceChildren(numbers ? downPanel() : h("div", { class: "empty" }, "Daemon not answering")));
         return;
       }
       if (store.models === null) { heading([], mode); setShape("loading", () => body.replaceChildren(h("div", { class: "empty" }, "Loading…"))); return; }
       const ctx = ctxNow();
       const views = store.models.map((m) => modelView(m, ctx));
       heading(views, mode);
-      setShape(wide ? "full" : mode, () => (wide ? buildFull() : buildCompact(mode === "rail" ? "rail" : "side")));
+      setShape(wide ? "full" : phone ? "phone" : mode, () => (wide ? buildFull() : buildCompact(phone ? "phone" : mode === "rail" ? "rail" : "side")));
       let shown = views;
-      if (wide) {
+      if (numbers) {
         const keep = new Set(filterModels(store.models, query).map((m) => m.name));
         shown = views.filter((v) => keep.has(v.name));
         kpis(views);
         callouts(views);
         refs.stale.hidden = !store.error;
-        refs.segs.querySelectorAll("button").forEach((b) => { b.classList.toggle("on", b.dataset.view === view); b.setAttribute("aria-pressed", String(b.dataset.view === view)); });
         emptyNote(views, shown);
+      }
+      if (wide) {
+        refs.segs.querySelectorAll("button").forEach((b) => { b.classList.toggle("on", b.dataset.view === view); b.setAttribute("aria-pressed", String(b.dataset.view === view)); });
+        if (window.Omxqua) window.Omxqua.placeThumb(refs.segs);
       }
       syncKeyed(refs.rowsParent, refs.rows, shown, refs.make, refs.update);
       flashNew(store.models.map((m) => m.name));
@@ -292,9 +316,10 @@ register("home", (blade) => ({
     }
     blade.redraw = draw;
     blade.onMode = draw;
+    window.addEventListener("resize", draw);  // a phone turned sideways, or a window dragged across the phone width
     blade.sync = () => { if (refs && refs.rows) refs.rows.forEach(markSel); };
     const off = onData(draw);
-    blade.onClose = () => { off(); flashTimers.forEach(clearTimeout); flashTimers.clear(); };
+    blade.onClose = () => { off(); window.removeEventListener("resize", draw); flashTimers.forEach(clearTimeout); flashTimers.clear(); };
     draw();
   },
 }));

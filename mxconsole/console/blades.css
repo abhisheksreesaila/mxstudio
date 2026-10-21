@@ -1,6 +1,7 @@
-/* mxconsole, the blades console: tokens, base, the blade engine and the pieces every blade shares.
-   Themes: light ("contrast": dark chrome, light surfaces) is the default; dark follows the system
-   (prefers-color-scheme) until the top-bar toggle is used, which sets data-theme="light" or "dark" on <html>.
+/* omxconsole, the blades console: tokens, base, the blade engine and the pieces every blade shares.
+   Themes: omxqua's Developer family, night or light. theme.js follows the system until the top-bar toggle is used,
+   which sets data-theme="light" or "dark" on <html>; omxqua's tokens.css does the rest.
+   Blades are floating omxqua surfaces (surface-1, card radius, shadow-1). Buttons inside them are flat (.oq-flat).
    Hue tokens (--hue-<section>) colour each section's outline icon; the label beside it stays a quieter tint. */
 
 :root {
@@ -38,84 +39,84 @@ svg { flex: none; }
 .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 [hidden] { display: none !important; }
 
-/* ---------- the journey: blades docked side by side ---------- */
-.journey { position: fixed; top: var(--top); left: 0; right: 0; bottom: 0; display: flex; overflow-x: auto; overflow-y: hidden; background: var(--canvas); }
-.blade { flex: none; display: flex; flex-direction: column; height: 100%; background: var(--card); border-right: 1px solid var(--card-line); min-width: 0; color: var(--text); transition: width .26s var(--ease), min-width .26s var(--ease); }
-.blade.enter { animation: bladeIn .26s var(--ease) backwards; }
-@keyframes bladeIn { from { opacity: 0; transform: translateX(24px); } }
-.blade.last { border-right: 0; }
+/* ---------- the journey: floating blades docked side by side ---------- */
+.journey { position: fixed; top: var(--top); left: 0; right: 0; bottom: 0; display: flex; gap: 12px; padding: 0 14px 14px; overflow-x: auto; overflow-y: hidden; background: var(--canvas); }
+.blade { flex: none; display: flex; flex-direction: column; height: 100%; background: var(--card); border-radius: var(--oq-radius-card); box-shadow: var(--oq-shadow-1); overflow: hidden; min-width: 0; color: var(--text); transition: width .26s var(--ease), min-width .26s var(--ease); }
+/* Settle: fade in and rise 12px, decelerating, no bounce, no sideways slide. "backwards" so no transform lingers after it ends. */
+.blade.enter { animation: bladeIn .28s cubic-bezier(.2, 0, 0, 1) backwards; }
+@keyframes bladeIn { from { opacity: 0; transform: translateY(12px); } }
 .blade.hidden { display: none; }
-.bh { display: flex; align-items: center; gap: 11px; padding: 12px 16px; border-bottom: 1px solid var(--card-line); flex: none; height: 65px; background: var(--card); }
+/* omxqua's sidebar rule (:where(.oq-root) .side) also matches a docked blade: undo its padding, gap and layer */
+.blade.side { padding: 0; gap: 0; z-index: auto; }
+.bh { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--card-line-2); flex: none; min-height: 65px; background: var(--card); }
 .bh .tt { min-width: 0; flex: 1; }
-.bh .t { font-weight: 600; font-size: 16px; letter-spacing: -.015em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 8px; }
+.bh .t { font-weight: 650; font-size: 17px; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 8px; }
 .bh .t-row { display: inline-flex; align-items: center; gap: 8px; }
-.bh .s { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bh .count { font-weight: 500; font-size: 12px; color: var(--muted); background: var(--sunk); border-radius: 999px; padding: 1px 8px; }
+.bh .s { font-size: 12.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bh .count { font: 500 11px var(--mono); color: var(--muted); background: var(--sunk); border-radius: 999px; padding: 2px 8px; }
 .bb { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; container-type: inline-size; }
 .blade.side .bh, .blade.rail .bh { cursor: pointer; }
 .blade.side .bh:hover { background: var(--hover); }
 .tools { display: flex; gap: 8px; align-items: center; }
-.x { border: 0; background: none; width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; color: var(--muted); flex: none; }
-.x:hover { background: var(--sunk); color: var(--text); }
+/* close: omxqua's .xbtn, a 32px circle with the icon dead centre */
+.x { border: 0; padding: 0; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--sunk); color: var(--muted); flex: none; transition: background .15s, color .15s; }
+.x:hover { background: var(--hover-2); color: var(--text); }
 /* a folded blade: a strip with its name written down it; click it to come back */
-.blade.rail { background: var(--hover); cursor: pointer; }
-.blade.rail:hover { background: var(--hover-2); }
+.blade.rail { cursor: pointer; }
+.blade.rail:hover { background: linear-gradient(var(--hover), var(--hover)), var(--card); }
 .blade.rail .bh { flex-direction: column; align-items: center; padding: 12px 0; gap: 12px; border-bottom: 0; background: none; height: auto; }
 .blade.rail .tt { writing-mode: vertical-rl; flex: none; }
 .blade.rail .t { font-size: 13px; font-family: var(--mono); }
 .blade.rail .s, .blade.rail .tools, .blade.rail .x, .blade.rail .count { display: none; }
 .blade.rail:not(.b-home) .bb { display: none; }
 
-/* outline icon in a square: the icon takes the section hue */
-.sq { display: grid; place-items: center; flex: none; border-radius: 7px; color: var(--h, var(--accent)); box-shadow: inset 0 0 0 1.25px color-mix(in srgb, var(--h, var(--accent)) 42%, transparent); }
+/* the header icon: a tinted rounded square, the icon in the section hue */
+.sq { display: grid; place-items: center; flex: none; border-radius: 10px; color: var(--h, var(--accent)); background: color-mix(in srgb, var(--h, var(--accent)) 14%, transparent); }
 
 /* ---------- shared pieces ---------- */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 7px; font-size: 13px; font-weight: 500; white-space: nowrap; border: 1px solid transparent; transition: background .15s, transform .1s; }
-.btn:active { transform: translateY(1px); }
-.btn.primary { background: var(--accent); color: #fff; }
-.btn.primary:hover { background: var(--accent-hover); }
-.btn.dark { background: var(--inv); color: var(--inv-text); }
-.btn.dark:hover { opacity: .88; }
-.btn.ghost { background: var(--card); color: var(--text-2); border-color: var(--card-line); }
-.btn.ghost:hover { background: var(--sunk); }
-.btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
-.btn[disabled] { opacity: .5; cursor: default; }
-.ib { border: 0; background: none; width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; color: var(--accent); flex: none; }
+/* Buttons are omxqua's (pill, .fill / .tonal / .text / .danger, .sm). These are the console's older names for the same parts,
+   so every blade keeps working while it moves over: primary and dark are .fill, ghost is .tonal. Inside a blade they are flat (.oq-flat). */
+.btn.primary, .btn.dark { background: var(--oq-accent); color: var(--oq-on-accent); }
+.btn.ghost { background: rgb(var(--oq-state) / .06); color: var(--text); }
+.oq-flat .btn.primary, .oq-flat .btn.dark, .oq-flat .btn.ghost { box-shadow: none; }
+.btn.danger { color: var(--bad-fg); }
+.ib { border: 0; background: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--accent); flex: none; }
 .ib:hover { background: var(--sel); }
 .cli { font: 11.5px var(--mono); color: var(--muted); display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .cli::before { content: "$"; color: var(--faint); }
 .lbl { font: 500 10.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.h3 { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
-.h3 .r { margin-left: auto; text-transform: none; letter-spacing: 0; }
+.h3 { font: 600 14px var(--sans); letter-spacing: -.01em; color: var(--text); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+.h3 .r { margin-left: auto; font: 500 12px var(--mono); letter-spacing: 0; color: var(--muted); }
 .vbar { height: 8px; border-radius: 4px; background: var(--sunk); display: flex; overflow: hidden; gap: 1px; }
 .vbar span { height: 100%; transition: width .6s var(--ease); }
 
-/* state, access, model dot */
+/* state, access, model dot: a state is always a dot and a word */
 .mdot { width: 9px; height: 9px; border-radius: 50%; background: var(--mc); flex: none; }
-.state { font: 500 12px var(--mono); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--text-2); }
+.state { font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--text-2); }
 .sd { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
-.state.running .sd { background: var(--ok); animation: pulse 2s infinite; }
+.state.running { color: var(--ok-fg); }
+.state.running .sd { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
 .state.starting { color: var(--warn-fg); }
 .state.starting .sd { background: none; border: 2px solid color-mix(in srgb, var(--warn) 35%, transparent); border-top-color: var(--warn); width: 10px; height: 10px; animation: spin .8s linear infinite; }
 .state.crashed { color: var(--bad-fg); }
 .state.crashed .sd { background: var(--bad); }
 .state.idle { color: var(--muted); }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 50%, transparent); } 70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
 @keyframes spin { to { transform: rotate(360deg); } }
-.acc { font: 500 11px var(--mono); display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: 999px; white-space: nowrap; box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 40%, transparent); }
+/* access: omxqua's .badge look (hairline, 4px corners, mono) */
+.acc { font: 500 11px/1 var(--mono); display: inline-flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: var(--oq-radius-xs); border: 1px solid var(--card-line); background: var(--card); white-space: nowrap; }
 .acc.local { color: var(--muted); }
 .acc.secure { color: var(--ok-fg); }
 
 /* notices and callouts */
-.attn { display: flex; align-items: center; gap: 10px; background: color-mix(in srgb, var(--bad) 4%, transparent); border: 1px solid color-mix(in srgb, var(--bad) 45%, transparent); color: var(--bad-fg); border-radius: 10px; padding: 8px 10px 8px 12px; font-size: 13px; margin-bottom: 14px; flex-wrap: wrap; }
-.notice { border: 1px solid var(--card-line); border-radius: 12px; padding: 16px; background: var(--card); }
-.notice.down { border-color: color-mix(in srgb, var(--bad) 50%, transparent); background: color-mix(in srgb, var(--bad) 4%, var(--card)); }
+.attn { display: flex; align-items: center; gap: 10px; background: color-mix(in srgb, var(--bad) 7%, var(--card)); border-radius: var(--oq-radius-card); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 40%, transparent); color: var(--bad-fg); padding: 8px 10px 8px 14px; font-size: 13px; margin-bottom: 14px; flex-wrap: wrap; }
+.notice { border-radius: var(--oq-radius-card); padding: 16px; background: var(--card); box-shadow: var(--oq-shadow-1); }
+.notice.down { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 50%, transparent); background: color-mix(in srgb, var(--bad) 5%, var(--card)); }
 .notice .lab { display: flex; gap: 8px; align-items: center; font: 12px var(--mono); margin-bottom: 8px; color: var(--bad-fg); }
 .notice h4 { margin: 0 0 6px; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
 .notice p { margin: 0 0 12px; color: var(--text-2); font-size: 13px; }
 .cmd-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.cmd { background: var(--code); color: var(--code-text); border-radius: 7px; padding: 6px 10px; font-size: 12.5px; }
-.empty { color: var(--muted); font: 12.5px var(--mono); padding: 14px 16px; }
+.cmd { background: var(--code); color: var(--code-text); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; }
+.empty { color: var(--muted); font: 12.5px var(--mono); padding: 14px 16px; text-align: left; }
 .stale { color: var(--warn-fg); font-size: 12px; margin-bottom: 10px; }
 
 /* the placeholder every unbuilt blade shows */
@@ -124,10 +125,11 @@ svg { flex: none; }
 .stub-tag { display: inline-block; font-size: 11px; color: var(--muted); box-shadow: inset 0 0 0 1px var(--card-line); border-radius: 999px; padding: 2px 9px; }
 .stub p { color: var(--text-2); margin: 12px 0 0; }
 
-/* toast */
-.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--chrome); color: var(--chrome-text); border: 1px solid var(--chrome-line); padding: 9px 14px; border-radius: 8px; font-size: 12.5px; z-index: 95; pointer-events: none; max-width: calc(100vw - 32px); }
+/* toast: omxqua's (surface-3, shadow-3), fixed to the window */
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--oq-surface-3); color: var(--text); box-shadow: var(--oq-shadow-3); padding: 10px 16px; border-radius: 12px; font-size: 12.5px; z-index: 95; pointer-events: none; max-width: calc(100vw - 32px); white-space: normal; }
 
 @media (max-width: 860px) {
+  .journey { padding: 0 8px 8px; }
   .blade.last { min-width: 0 !important; width: 100% !important; }
 }
 @media (prefers-reduced-motion: reduce) {

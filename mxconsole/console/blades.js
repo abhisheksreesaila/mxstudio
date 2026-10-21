@@ -33,7 +33,7 @@
 //
 //   6. Optional hooks set on `blade`: onClose(), onMode(mode) ("full"|"side"|"narrow"|"rail"|"hidden"), redraw(), sync().
 import { h, icon, reducedMotion } from "./core.js";
-import { planLayout } from "./blade-layout.js";
+import { planLayout, spendable, PHONE_W } from "./blade-layout.js";
 import { closeFrom, openAt, escapeTarget } from "./blade-stack.js";
 
 const factories = new Map();
@@ -84,10 +84,10 @@ export function push(name, opts = {}, at = stack.length - 1) {
   Object.assign(blade, { crumb: crumbOf(def), wide: !!def.wide, side: def.side || 600, narrow: def.narrow || 0, min: def.min ?? 520 });
   const titleEl = h("div", { class: "t" }), subEl = h("div", { class: "s" });
   const toolsEl = h("div", { class: "tools" }, asNodes(def.tools));
-  const closeBtn = stack.length ? h("button", { class: "x", type: "button", "aria-label": "Close", title: "Close (Esc)" }, icon("x", 16)) : null;
-  const header = h("header", { class: "bh" }, hueSquare(def.icon || "box", def.hue || "var(--accent)"), h("div", { class: "tt" }, titleEl, subEl), toolsEl, closeBtn);
+  const closeBtn = stack.length ? h("button", { class: "x", type: "button", "aria-label": "Close", title: "Close (Esc)" }, icon("x", 16, "currentColor", 2)) : null;
+  const header = h("header", { class: "bh" }, hueSquare(def.icon || "box", def.hue || "var(--accent)", 36), h("div", { class: "tt" }, titleEl, subEl), toolsEl, closeBtn);
   const body = h("div", { class: "bb" });
-  const el = h("section", { class: `blade b-${name} enter`, "aria-label": blade.crumb || name }, header, body);
+  const el = h("section", { class: `blade oq-flat b-${name} enter`, "aria-label": blade.crumb || name }, header, body);
   Object.assign(blade, { el, body, titleEl, subEl, toolsEl, header });
   setText(titleEl, def.title);
   setText(subEl, def.sub);
@@ -132,7 +132,8 @@ export function truncate(n) {
 
 export function layout() {
   if (!journey || !stack.length) return;
-  const modes = planLayout(stack, journey.clientWidth || window.innerWidth);
+  const width = journey.clientWidth || window.innerWidth, room = spendable(width, stack.length);
+  const modes = planLayout(stack, room, PHONE_W - (width - room));
   const last = stack.length - 1;
   stack.forEach((blade, i) => {
     const mode = modes[i], prev = blade.mode, el = blade.el;
