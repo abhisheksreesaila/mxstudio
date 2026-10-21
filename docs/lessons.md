@@ -22,3 +22,4 @@ Claude reads this at the start of each session. -->
 - 2026-10-14 · Describe UI from a screenshot of the running app, not from what a mode is supposed to look like (Jupyter's /doc view still has menus and a file browser).
 - 2026-10-14 · A cross-origin iframe on loopback must use the same host name as the page (localhost vs 127.0.0.1 are different sites; the browser holds back cookies). Check both.
 - 2026-10-14 · In a classic script, never declare a global `const`/`let` named like a window property (`top`, `name`, `parent`): it throws and the whole script dies silently. Wrap page scripts or pick another name.
+- 2026-10-20 · A developer agent's cleanup `pkill -f "mxc daemon"` killed the owner's real daemon on 11435. Agents run a scratch daemon with their own `MXC_HOME` and port, and stop only the PID they started; never pkill by pattern.
