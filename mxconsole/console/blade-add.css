@@ -96,7 +96,8 @@
 
 /* the Ready card */
 .b-add .ready { animation: add-up .3s var(--oq-ease-in) backwards; }
-.b-add .ad-ready { display: grid; gap: 12px; }
+.b-add .ad-ready { display: grid; gap: 12px; min-width: 0; }
+.b-add .ad-ready > * { min-width: 0; }  /* a long curl or URL scrolls inside its box instead of pushing past the card */
 .b-add .ad-ready .ox-note { margin: 0; }
 .b-add .ready .nm-in { font: 500 12.5px var(--oq-font-mono); max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 

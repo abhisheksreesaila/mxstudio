@@ -28,7 +28,13 @@ export function mountTopbar(bar) {
   bar.replaceChildren(brand, crumbs, right);
 
   // keep the breadcrumb clear of both side islands: it centres in what is left of the wider side
-  const fit = () => bar.style.setProperty("--cx-side", `${Math.max(brand.offsetWidth, right.offsetWidth) + 32}px`);
+  // and when a wide Beacon ("Pulling qwen2.5-coder-1.5b-instruct") leaves the breadcrumb no room, the tools fold to icons first
+  const side = () => Math.max(brand.offsetWidth, right.offsetWidth) + 32;
+  const fit = () => {
+    bar.classList.remove("tight");
+    if (bar.clientWidth - 2 * side() < 240) bar.classList.add("tight");
+    bar.style.setProperty("--cx-side", `${side()}px`);
+  };
   mountBeacon(right, (w) => { right.style.paddingRight = `${w + 8}px`; fit(); });
   new ResizeObserver(fit).observe(bar);
 

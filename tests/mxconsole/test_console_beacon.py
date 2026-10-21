@@ -95,3 +95,15 @@ def test_job_polling_waits_for_each_poll_keeps_the_last_value_on_error_and_rests
     js = (CONSOLE_DIR / "beacon.js").read_text()
     assert "setInterval(" not in js and "document.hidden" in js  # chained setTimeout: no stacked requests, idle in a hidden tab
     assert "jobs.pulls = []" not in js and "jobs.ports = []" not in js  # a failed poll keeps what we last knew
+
+
+@needs_node
+def test_a_model_that_is_starting_shows_instead_of_idle_and_loses_to_a_crash():
+    """Found in the live pull (omxconsole finish, D-07): a minute of compile used to read as idle."""
+    b = state(models="[{name:'smollm2-360m',state:'starting'},{name:'qwen',state:'ready'}]")
+    assert (b["kind"], b["label"]) == ("starting", "Starting smollm2-360m")
+    assert b["actions"][0]["go"] == "#model/smollm2-360m"
+    crash = state(models="[{name:'phi-2',state:'crashed'},{name:'smol',state:'starting'}]")
+    assert crash["kind"] == "crash"
+    pull = state(pulls=f"[{PULL}]", models="[{name:'smol',state:'starting'}]")
+    assert pull["kind"] == "pull"

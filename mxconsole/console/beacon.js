@@ -51,6 +51,12 @@ export function beaconState(d) {
     return { kind: "crash", label: `${n} crashed`, value: "", sub: "it stopped on its own; the log says why", steps: [],
       actions: [{ label: `Open ${n}`, go: `#model/${n}`, primary: true }, { label: "Restart", post: `/admin/models/${n}/load` }, { label: "View logs", go: `#logs/${n}` }] };
   }
+  const starting = models.find((m) => m.state === "starting");
+  if (starting) {
+    const n = starting.name;
+    return { kind: "starting", label: `Starting ${n}`, value: "", sub: "compiling the graph and loading the weights; the first start takes a while", steps: [],
+      actions: [{ label: `Open ${n}`, go: `#model/${n}`, primary: true }, { label: "View logs", go: `#logs/${n}` }] };
+  }
   const hw = hardwareView(d.gpus, d.crew);
   const running = models.filter((m) => m.state === "ready");
   if (running.length) {
@@ -85,7 +91,7 @@ function ring(pct, warn) {
     s("circle", { cx: 10, cy: 10, r: 8, fill: "none", "stroke-width": 2.5, class: "ring-track" }),
     s("circle", { cx: 10, cy: 10, r: 8, fill: "none", "stroke-width": 2.5, class: warn ? "ring-arc warn" : "ring-arc", "stroke-dasharray": 50.3, "stroke-dashoffset": 50.3 * (1 - frac), transform: "rotate(-90 10 10)" }));
 }
-const KIND_ICON = { pull: "download", port: "wrench", crash: "circle-alert", running: "zap", idle: "cpu", nogpu: "cpu", offline: "circle-alert", loading: "cpu" };
+const KIND_ICON = { pull: "download", port: "wrench", crash: "circle-alert", starting: "loader-circle", running: "zap", idle: "cpu", nogpu: "cpu", offline: "circle-alert", loading: "cpu" };
 
 function compact(st) {
   const lead = st.kind === "pull" || st.kind === "port" ? ring(st.pct, st.kind === "port")

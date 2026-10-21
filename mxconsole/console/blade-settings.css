@@ -28,7 +28,7 @@
 .ox-warnbox code { background: var(--code); color: var(--code-text); border-radius: 5px; padding: 1px 7px; }
 .ox-fail { display: flex; align-items: center; gap: 8px; border-radius: 12px; padding: 10px 12px; font-size: 13px; background: color-mix(in srgb, var(--oq-bad) 8%, transparent); color: var(--oq-bad); }
 /* the dark code panel keeps its look in both themes, like a terminal */
-.ox-code { position: relative; background: var(--code); color: var(--code-text); border-radius: 12px; padding: 14px 16px; }
+.ox-code { position: relative; min-width: 0; overflow: hidden; background: var(--code); color: var(--code-text); border-radius: 12px; padding: 14px 16px; }
 .ox-code pre { margin: 0; font: 12px/1.65 var(--oq-font-mono); white-space: pre; overflow: auto; padding-right: 76px; }
 .ox-code .btn { position: absolute; top: 8px; right: 8px; background: rgb(255 255 255 / .1); color: inherit; }
 /* an endpoint or a file: tag, value, copy */
