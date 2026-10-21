@@ -32,7 +32,7 @@ export function mountTopbar(bar) {
   const side = () => Math.max(brand.offsetWidth, right.offsetWidth) + 32;
   const fit = () => {
     bar.classList.remove("tight");
-    if (bar.clientWidth - 2 * side() < 240) bar.classList.add("tight");
+    if (bar.clientWidth < 1240 || bar.clientWidth - 2 * side() < 240) bar.classList.add("tight");
     bar.style.setProperty("--cx-side", `${side()}px`);
   };
   mountBeacon(right, (w) => { right.style.paddingRight = `${w + 8}px`; fit(); });

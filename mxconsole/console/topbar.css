@@ -39,7 +39,7 @@
 .beacon .bbtn.armed { background: var(--oq-bad); color: var(--oq-on-accent); }
 .beacon button:focus-visible { outline: 2px solid var(--oq-beacon-accent); outline-offset: 2px; }
 
-@media (max-width: 1240px) { .cx-tools .tl { display: none; } .cx-tools .tool { padding: 0; width: 34px; justify-content: center; } }
+/* .tight (set by topbar.js below 1240 px, or when a wide Beacon leaves the breadcrumb short): the tools fold to icons */
 .tight .cx-tools .tl { display: none; } .tight .cx-tools .tool { padding: 0; width: 34px; justify-content: center; }
 /* only the parent and the current crumb: the rails on the left show the older blades, and the brand goes home */
 .cx-crumbs .far, .cx-crumbs .far + svg { display: none; }

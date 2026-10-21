@@ -328,12 +328,13 @@ Brief: docs/briefs/omxconsole.md · Needs: F-042 · Files: blades.css, blade-hom
 - [x] every console test still passes; checked in the running console, both themes, desktop and 390 px, against the mock
 - [x] reviewer: PASS. Checked in the running console against the mock, both themes, desktop and 390 px, with a model running.
 
-## F-045 The other blades in omxqua [review]
+## F-045 The other blades in omxqua [done]
 Brief: docs/briefs/omxconsole.md · Needs: F-044 · Files: blade-add.*, blade-security.*, blade-keys.*, blade-bench.*, blade-logs.*, blade-notebook.*, blade-gateway.*, blade-settings.*
-- [ ] Add a model, Security, API keys, Benchmark, Logs, Notebook, Gateway and Settings use omxqua parts (fields, chips, menus, toasts, progress, empty states) and flat buttons; no blade keeps the old look
-- [ ] the old Graphite CSS that no blade uses any more is deleted; the brace-balance test still passes
-- [ ] checked each blade in the running console, both themes
-- [ ] reviewer: no code objections; waiting on a look at three states nobody has seen render: Security while it sets up, Add a model's port and Ready cards, and Bench/Keys/Gateway/Logs/Notebook/Add in both themes (seen: Keys armed + rows light and dark, Gateway dark, Logs dark, Notebook dark, Add light and dark, Bench bars and history light, Settings light). Needs a real pull or port to see the rest.
+- [x] Add a model, Security, API keys, Benchmark, Logs, Notebook, Gateway and Settings use omxqua parts (fields, chips, menus, toasts, progress, empty states) and flat buttons; no blade keeps the old look
+- [x] the old Graphite CSS that no blade uses any more is deleted; the brace-balance test still passes
+- [x] checked each blade in the running console, both themes
+- [x] reviewer: no code objections; waiting on a look at three states nobody has seen render: Security while it sets up, Add a model's port and Ready cards, and Bench/Keys/Gateway/Logs/Notebook/Add in both themes (seen: Keys armed + rows light and dark, Gateway dark, Logs dark, Notebook dark, Add light and dark, Bench bars and history light, Settings light). Needs a real pull or port to see the rest.
+- [x] closed overnight (docs/goals/omxconsole-finish.md): a real pull watched live (setup stages, Ready card, Beacon pull and starting states), every blade seen in the running console, reviewer PASS. Still only unit-tested: Security mid-setup (the machine is already secured), a real port run (paid agent run), the Beacon's two-tap Cancel against a live pull (the download finished too fast).
 
 ## F-046 Name on screen: omxconsole [done]
 Brief: docs/briefs/omxconsole.md · ADR: docs/adr/0004-name-omxconsole.md · Needs: none

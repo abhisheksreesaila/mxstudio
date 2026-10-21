@@ -35,11 +35,19 @@ export function commandsFor(state, secure) {
     c("copy", "Copy endpoint", "copy", HUE.copy), c("rm", "Remove", "trash-2", null, true)];
 }
 
-/** What the Tokens card says when there is nothing to chart: never "no traffic" beside a request count. */
+/** What the Tokens card says when there is nothing to chart yet: one true line per state (running, starting, idle,
+ *  crashed), and never "no traffic" beside a request count. */
 export function quietNote(state, requests) {
-  if (requests > 0 && state !== "running")
-    return { title: "Not loaded right now", text: `${requests} requests in the last 5 min; it loads again on the next one.` };
-  return { title: "No traffic yet", text: "Start it, or call it: it starts on the first request." };
+  const seen = requests > 0 ? `${requests} requests in the last 5 min` : "";
+  if (state === "crashed")
+    return { title: "It stopped", text: `${seen ? `${seen} before it stopped. ` : ""}Restart it, or open Logs to see why.` };
+  if (state === "starting")
+    return { title: "Starting up", text: `${seen ? `${seen}. ` : ""}It answers as soon as the graph is compiled and loaded.` };
+  if (state === "running")
+    return seen ? { title: "Warming up the chart", text: `${seen}; the chart fills in as more arrive.` }
+      : { title: "No traffic yet", text: "It is loaded and waiting: call it and the numbers fill in." };
+  return seen ? { title: "Not loaded right now", text: `${seen}; it loads again on the next one.` }
+    : { title: "No traffic yet", text: "Start it, or call it: it starts on the first request." };
 }
 
 /** The curl that calls this model. The key is read from $MXC_API_KEY, never shown. */
