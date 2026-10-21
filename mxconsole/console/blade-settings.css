@@ -45,3 +45,4 @@
 .ox-stop { margin-top: 16px; }
 .b-settings .seg2 button { display: inline-flex; align-items: center; gap: 6px; }
 .ox-pnote { padding: 0 16px 12px; margin: 0; }
+.empty > div:not(.ring) { margin-top: 12px; }

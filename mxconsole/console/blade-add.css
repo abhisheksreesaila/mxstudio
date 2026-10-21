@@ -1,5 +1,5 @@
-/* omxconsole, the Add a model blade (F-026, omxqua since F-045). Cards, chips, the .mo field, .prog, badges and
-   .empty come from omxqua; ox- pieces from blade-settings.css. Every selector is scoped under .b-add. */
+/* omxconsole, the Add a model blade (F-026, omxqua since F-045). Cards, chips, the mo field, progress bars, badges and
+   empty states come from omxqua; ox- pieces from blade-settings.css. Every selector is scoped under b-add. */
 .b-add .bb { overflow: hidden; display: flex; flex-direction: column; }
 
 /* ---------- find ---------- */
@@ -77,7 +77,6 @@
 .b-add .stg.done .ring { border-color: var(--oq-ok); color: var(--oq-ok); }
 .b-add .stg.failed .ring { border-color: var(--oq-bad); color: var(--oq-bad); }
 .b-add .stg.cancelled .ring { border-color: var(--oq-warn); color: var(--oq-warn); }
-.b-add .stg.skipped .ring { border-style: dashed; }
 .b-add .stg .n { font-size: 14.5px; font-weight: 550; align-self: center; color: var(--oq-ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .b-add .stg.running .n, .b-add .stg.done .n, .b-add .stg.failed .n, .b-add .stg.cancelled .n { color: var(--oq-ink); }
 .b-add .stg .meta { align-self: center; font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); display: flex; gap: 10px; white-space: nowrap; }
