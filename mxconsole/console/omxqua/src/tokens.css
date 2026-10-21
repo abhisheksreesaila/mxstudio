@@ -90,7 +90,7 @@
   --oq-accent:#0b6e69; --oq-on-accent:#ffffff; --oq-ok:#137036; --oq-warn:#8f5400; --oq-bad:#c01f25; --oq-info:#0960b5;
   --oq-data-1:#3f7a46; --oq-data-2:#c2462b; --oq-data-3:#2f6fbf; --oq-data-4:#9a6700; --oq-data-5:#8a4fa8; --oq-data-6:#7a6a58; }
 .oq-family-travel.oq-night { --oq-surface-0:#0b1214; --oq-surface-1:#121b1e; --oq-surface-2:#182326; --oq-surface-3:#1f2c30; --oq-ink:#e9efee; --oq-ink-2:#9fb0b0; --oq-line:#24312f; --oq-line-2:#1a2527; --oq-state:233 239 238;
-  --oq-accent:#5fd4c8; --oq-on-accent:#06201e; --oq-ok:#3ccf6e; --oq-warn:#f5a524; --oq-bad:#f2555a; --oq-info:#6cb6ff;
+  --oq-accent:#5fd4c8; --oq-on-accent:#06201e; --oq-ok:#3ccf6e; --oq-warn:#f5a524; --oq-bad:#f56065; --oq-info:#6cb6ff;
   --oq-data-1:#9fd8a0; --oq-data-2:#ff8a6b; --oq-data-3:#6cb6ff; --oq-data-4:#f2c14e; --oq-data-5:#c79bf2; --oq-data-6:#c9b9a5; }
 .oq-family-travel { --oq-radius-card: 16px; --oq-target: 40px; --oq-text: 14px; --oq-beacon-accent: #5fd4c8; }
 

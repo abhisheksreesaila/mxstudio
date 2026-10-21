@@ -23,6 +23,18 @@ async def test_nothing_outside_the_list_is_served(http):
         assert (await http.get(f"/console/omxqua/{path}")).status_code == 404, path
 
 
+async def test_encoded_paths_never_reach_the_filesystem(http):
+    for raw in ["%2e%2e/gateway.py", "src%2f..%2f..%2fgateway.py", "src/%2e%2e/VERSION", "%2e%2e%2f%2e%2e%2fgateway.py"]:
+        assert (await http.get(f"/console/omxqua/{raw}")).status_code == 404, raw
+    from mxconsole.gateway import CONSOLE_OMXQUA
+    assert all(".." not in p and not p.startswith("/") for p in CONSOLE_OMXQUA)  # the list itself is plain relative paths
+
+
+async def test_fonts_never_block_text(http):
+    css = (await http.get("/console/omxqua/src/fonts.css")).text
+    assert css.count("font-display: swap") == css.count("@font-face") > 0
+
+
 async def test_omxqua_is_refused_through_a_proxy(http):
     assert (await http.get("/console/omxqua/src/tokens.css", headers={"Host": "evil.example"})).status_code == 403
 

@@ -303,12 +303,13 @@ Brief: docs/briefs/omxconsole.md · Needs: none · Repo: ~/Projects/omxqua
 - [x] `Omxqua.settle` rises 12 px as the docs say (today 6 px)
 - [x] tagged v0.1.5 with a changelog entry; the showcase still renders the same (spot-checked); `tests/csp.test.cjs` guards the no-injected-style rule. v0.1.5 also ships the Money family another session added. Reviewer: PASS (after fixing landing.html's logo and the changelog). Tag is local until the push is approved.
 
-## F-042 Vendor omxqua into the console [todo]
+## F-042 Vendor omxqua into the console [done]
 Brief: docs/briefs/omxconsole.md · Needs: F-041
-- [ ] `omxqua-sync mxconsole/console --ref v0.1.5` puts `omxqua/{src,fonts,VERSION}` in the package; the gateway serves exactly those files from an explicit list under `/console/omxqua/…` (still never a directory server); CSP unchanged
-- [ ] `index.html` loads omxqua's `fonts.css` before the console CSS; the console's own copies of Geist and Geist Mono (and their licence file) are dropped; nothing changes visually
+- [x] `omxqua-sync mxconsole/console --ref v0.1.5` puts `omxqua/{src,fonts,VERSION}` in the package; the gateway serves exactly those files from an explicit list under `/console/omxqua/…` (still never a directory server); CSP unchanged
+- [x] `index.html` loads omxqua's `fonts.css` before the console CSS; the console's own copies of Geist and Geist Mono (and their licence file) are dropped; nothing changes visually
 - [ ] (moved to F-043/F-044: `tokens.css`, `components.css`, `omxqua.js` and the root classes, since `tokens.css` restyles the root and would change the old look before the new one exists)
-- [ ] a test checks every omxqua asset is served with the console headers and that nothing outside the list is
+- [x] a test checks every omxqua asset is served with the console headers and that nothing outside the list is
+- [x] reviewer: PASS; follow-ups done (omxqua fonts.css gets `font-display: swap`, re-synced; encoded-path test)
 
 ## F-043 Top islands and the Beacon [todo]
 Brief: docs/briefs/omxconsole.md · Needs: F-042 · Files: topbar.js, topbar.css, hardware.js
