@@ -16,7 +16,7 @@ export function mountTopbar(bar) {
   const crumbs = h("nav", { class: "cx-crumbs", "aria-label": "Breadcrumb" });
   const nav = h("div", { class: "cx-tools" }, SHARED.map(([name, label, ic, hue]) =>
     h("button", { class: `tool${hue ? "" : " ic"}`, type: "button", "data-nav": name, title: label, "aria-label": label, style: hue ? { "--hue": hue } : {}, onClick: () => toggleBlade(name) },
-      icon(ic, 16, "currentColor", 1.75), hue ? h("span", { class: "lbl" }, label) : null)));
+      icon(ic, 16, "currentColor", 1.75), hue ? h("span", { class: "tl" }, label) : null)));
   const themeBtn = h("button", { class: "tool ic", type: "button", onClick: () => setTheme(nextTheme(currentTheme())) });
   const themeItem = h("button", { class: "mi", type: "button", role: "menuitem", onClick: () => { closeMenu(); setTheme(nextTheme(currentTheme())); } });
   const moreBtn = h("button", { class: "tool ic more", type: "button", title: "API keys, Gateway, Settings, Theme", "aria-label": "More", "aria-haspopup": "menu", "aria-expanded": "false", onClick: (e) => { e.stopPropagation(); menu.hidden ? openMenu() : closeMenu(); } },
