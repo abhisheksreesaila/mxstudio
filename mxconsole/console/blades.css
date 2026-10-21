@@ -74,17 +74,12 @@ svg { flex: none; }
 .sq { display: grid; place-items: center; flex: none; border-radius: 10px; color: var(--h, var(--accent)); background: color-mix(in srgb, var(--h, var(--accent)) 14%, transparent); }
 
 /* ---------- shared pieces ---------- */
-/* Buttons are omxqua's (pill, .fill / .tonal / .text / .danger, .sm). These are the console's older names for the same parts,
-   so every blade keeps working while it moves over: primary and dark are .fill, ghost is .tonal. Inside a blade they are flat (.oq-flat). */
-.btn.primary, .btn.dark { background: var(--oq-accent); color: var(--oq-on-accent); }
-.btn.ghost { background: rgb(var(--oq-state) / .06); color: var(--text); }
-.oq-flat .btn.primary, .oq-flat .btn.dark, .oq-flat .btn.ghost { box-shadow: none; }
+/* Buttons are omxqua's (pill, .fill / .tonal / .text / .danger, .sm); inside a blade they are flat (.oq-flat). */
 .btn.danger { color: var(--bad-fg); }
 .ib { border: 0; background: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--accent); flex: none; }
 .ib:hover { background: var(--sel); }
 .cli { font: 11.5px var(--mono); color: var(--muted); display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .cli::before { content: "$"; color: var(--faint); }
-.lbl { font: 500 10.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .h3 { font: 600 14px var(--sans); letter-spacing: -.01em; color: var(--text); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
 .h3 .r { margin-left: auto; font: 500 12px var(--mono); letter-spacing: 0; color: var(--muted); }
 .vbar { height: 8px; border-radius: 4px; background: var(--sunk); display: flex; overflow: hidden; gap: 1px; }
@@ -116,7 +111,8 @@ svg { flex: none; }
 .notice p { margin: 0 0 12px; color: var(--text-2); font-size: 13px; }
 .cmd-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .cmd { background: var(--code); color: var(--code-text); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; }
-.empty { color: var(--muted); font: 12.5px var(--mono); padding: 14px 16px; text-align: left; }
+/* a one-line note ("Loading…", "No model matches…"); omxqua's centred empty state (with a .ring icon) is left alone */
+.empty:not(:has(> .ring)) { color: var(--muted); font: 12.5px var(--mono); padding: 14px 16px; text-align: left; }
 .stale { color: var(--warn-fg); font-size: 12px; margin-bottom: 10px; }
 
 /* the placeholder every unbuilt blade shows */

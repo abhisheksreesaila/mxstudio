@@ -20,7 +20,7 @@ function pullState(job) {
     kind: "pull", label: `Pulling ${name}`, value: pct === null ? "…" : `${Math.round(pct)}%`, pct, big: pct === null ? "…" : `${Math.round(pct)}%`,
     sub: [job.ref, SPEED(job.speed)].filter(Boolean).join(" · "),
     steps: (job.steps || []).map((st) => ({ state: st.state === "done" ? "ok" : st.state === "now" ? "run" : "next", label: st.label, detail: st.detail || "" })),
-    actions: [{ label: "Open pull", go: ADD, primary: true }, { label: "Cancel", post: `/admin/pulls/${job.id}/cancel` }],
+    actions: [{ label: "Open pull", go: ADD, primary: true }, { label: "Cancel", post: `/admin/pulls/${job.id}/cancel`, confirm: "Tap again to cancel" }],
   };
 }
 
@@ -33,7 +33,7 @@ function portState(job) {
     kind: "port", label: `Porting ${job.name || job.ref}`, value: `step ${Math.min(done + 1, stages.length)} of ${stages.length}`,
     pct: stages.length ? (done / stages.length) * 100 : null, sub: job.ref,
     steps: stages.map((st) => ({ state: st.status === "done" || st.status === "skipped" ? "ok" : st.status === "running" ? "run" : "next", label: st.name, detail: st.detail || "" })),
-    actions: [{ label: "Open port", go: ADD, primary: true }, { label: "Cancel", post: `/admin/ports/${job.id}/cancel` }],
+    actions: [{ label: "Open port", go: ADD, primary: true }, { label: "Cancel", post: `/admin/ports/${job.id}/cancel`, confirm: "Tap again to cancel" }],
   };
 }
 
@@ -74,8 +74,9 @@ const POLL_MS = 3000;
 const jobs = { pulls: [], ports: [] };
 
 async function pollJobs() {
-  try { jobs.pulls = (await api("GET", "/admin/pulls")).pulls || []; } catch (_) { jobs.pulls = []; }
-  try { jobs.ports = (await api("GET", "/admin/ports")).ports || []; } catch (_) { jobs.ports = []; }
+  // a failed poll keeps what we last knew: a blip must not flip "Pulling 62%" to idle and back (store.error drives "offline")
+  try { jobs.pulls = (await api("GET", "/admin/pulls")).pulls || []; } catch (_) { /* keep the last value */ }
+  try { jobs.ports = (await api("GET", "/admin/ports")).ports || []; } catch (_) { /* keep the last value */ }
 }
 
 function ring(pct, warn) {
@@ -93,15 +94,22 @@ function compact(st) {
   return [lead, h("span", { class: "bc-lb" }, st.label), st.value ? h("span", { class: "mono" }, st.value) : null];
 }
 
-function details(st, close) {
+// Cancel throws work away, so it asks for a second tap within 3 s (armed survives redraws while the percent ticks)
+let armed = null, armedTimer = null;
+function arm(post, redraw) { armed = post; clearTimeout(armedTimer); armedTimer = setTimeout(() => { armed = null; redraw(); }, 3000); redraw(); }
+
+function details(st, close, redraw) {
   return [
     h("h4", {}, icon(KIND_ICON[st.kind], 18, "currentColor", 1.75), st.label),
     st.sub ? h("div", { class: "sub2" }, st.sub) : null,
     st.big ? h("div", { class: "big" }, st.big) : null,
     st.pct !== null && st.pct !== undefined ? h("div", { class: "bar2" }, h("i", { style: { width: `${Math.max(0, Math.min(100, st.pct))}%` } })) : null,
     st.steps.length ? h("ul", { class: "steps" }, st.steps.map((x) => h("li", {}, h("i", { class: `d ${x.state === "next" ? "" : x.state}` }), x.label, x.detail ? h("span", {}, x.detail) : null))) : null,
-    st.actions.length ? h("div", { class: "bacts" }, st.actions.map((a) => h("button", { type: "button", class: `bbtn${a.primary ? " pri" : ""}`,
-      onClick: () => { close(); if (a.go) location.hash = a.go; else api("POST", a.post).then(refresh, refresh); } }, a.label))) : null,
+    st.actions.length ? h("div", { class: "bacts" }, st.actions.map((a) => h("button", { type: "button", class: `bbtn${a.primary ? " pri" : ""}${a.confirm && armed === a.post ? " armed" : ""}`,
+      onClick: () => {
+        if (a.confirm && armed !== a.post) return arm(a.post, redraw);
+        armed = null; close(); if (a.go) location.hash = a.go; else api("POST", a.post).then(refresh, refresh);
+      } }, a.confirm && armed === a.post ? a.confirm : a.label))) : null,
   ];
 }
 
@@ -126,12 +134,12 @@ export function mountBeacon(host, onSize) {
   }
   function draw() {
     st = beaconState({ models: store.models, pulls: jobs.pulls, ports: jobs.ports, gpus: store.metrics && store.metrics.gpus, crew: system.crew, series: store.series, error: store.error });
-    const key = JSON.stringify(st);
+    const key = JSON.stringify(st) + (armed || "");
     if (key === shown) return;
     shown = key;
     root.dataset.kind = st.kind;
     pill.replaceChildren(...compact(st).filter(Boolean));
-    panel.replaceChildren(h("button", { class: "x", type: "button", "aria-label": "Close", onClick: close }, icon("x", 16, "currentColor", 2)), ...details(st, close).filter(Boolean));
+    panel.replaceChildren(h("button", { class: "x", type: "button", "aria-label": "Close", onClick: close }, icon("x", 16, "currentColor", 2)), ...details(st, close, draw).filter(Boolean));
     size(open);
   }
   document.addEventListener("click", (e) => { if (open && !root.contains(e.target)) close(); });
@@ -140,8 +148,10 @@ export function mountBeacon(host, onSize) {
   window.addEventListener("resize", () => size(false));
   panel.inert = true;
   onData(draw);
-  setInterval(() => pollJobs().then(draw), POLL_MS);
-  pollJobs().then(draw);
+  // Mounted once for the page's life, so the loop never needs stopping. Each poll waits for the last one to
+  // finish (a slow daemon never stacks requests) and a hidden tab skips polling until it is shown again.
+  const loop = async () => { if (!document.hidden) { await pollJobs(); draw(); } setTimeout(loop, POLL_MS); };
+  loop();
   draw();
   return { el: root, close, isOpen: () => open };
 }

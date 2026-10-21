@@ -35,10 +35,12 @@
 .beacon .ring-arc.warn { stroke: var(--oq-warn); }
 .beacon .bc-compact svg:not(.ring) { color: var(--oq-beacon-accent); }
 .beacon .bbtn:hover { filter: brightness(1.15); }
+.beacon .bbtn.armed { background: var(--oq-bad); color: white; }
 .beacon button:focus-visible { outline: 2px solid var(--oq-beacon-accent); outline-offset: 2px; }
 
 @media (max-width: 1240px) { .cx-tools .tl { display: none; } .cx-tools .tool { padding: 0; width: 34px; justify-content: center; } }
-@media (max-width: 1000px) { .cx-crumbs .far { display: none; } }
+/* only the parent and the current crumb: the rails on the left show the older blades, and the brand goes home */
+.cx-crumbs .far, .cx-crumbs .far + svg { display: none; }
 @media (max-width: 760px) {
   .cx-crumbs, .cx-tools .tool:not(.more) { display: none; }
   .cx-tools .more { display: flex; }

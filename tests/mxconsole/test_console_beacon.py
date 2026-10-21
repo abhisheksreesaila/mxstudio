@@ -78,3 +78,20 @@ def test_without_a_gpu_or_with_the_daemon_down_the_beacon_still_says_one_true_th
     off = state(error="true", models="null")
     assert (off["kind"], off["label"]) == ("offline", "daemon offline")
     assert state(gpus="null", models="null")["label"] == "…"
+
+
+@needs_node
+def test_cancelling_a_pull_or_port_from_the_beacon_takes_a_second_tap():
+    """Cancel is the only Beacon action that throws work away, so it asks first (review of F-043)."""
+    for b in (state(pulls=f"[{PULL}]"), state(ports=f"[{PORT}]")):
+        cancel = next(a for a in b["actions"] if a["label"] == "Cancel")
+        assert cancel["confirm"].startswith("Tap again")
+    crash = state(models=CRASH)
+    assert all("confirm" not in a for a in crash["actions"])  # open, restart and logs are safe
+
+
+def test_job_polling_waits_for_each_poll_keeps_the_last_value_on_error_and_rests_when_hidden():
+    from mxconsole.gateway import CONSOLE_DIR
+    js = (CONSOLE_DIR / "beacon.js").read_text()
+    assert "setInterval(" not in js and "document.hidden" in js  # chained setTimeout: no stacked requests, idle in a hidden tab
+    assert "jobs.pulls = []" not in js and "jobs.ports = []" not in js  # a failed poll keeps what we last knew
