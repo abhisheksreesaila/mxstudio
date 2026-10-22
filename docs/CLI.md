@@ -334,6 +334,13 @@ Opens the console in its own window. Closing the window stops nothing.
 | `--install` | Linux: add an omxconsole launcher to the app menu. |
 | `--uninstall` | Linux: remove that launcher. |
 
+### `mxc tray`
+
+Puts an omxconsole icon in the system tray (the bar on Linux). It starts the daemon if it isn't running. Its
+menu shows what's happening now (a pull or port, a crashed model, a model starting, what's running), plus Open
+console, Start/Stop server, Start at login and Quit. A left click opens the console. Quit stops the daemon only
+if the tray started it. Only one tray runs at a time. Needs the pixi `app` environment (`mxc app --install`).
+
 ### `mxc daemon`
 
 Runs the gateway in the foreground with logs on stdout. Ctrl-C stops it and unloads every model. You rarely need

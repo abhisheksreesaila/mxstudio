@@ -557,6 +557,35 @@ def expose_cmd(host: str = typer.Option(None, help="Hostname clients use. Defaul
     typer.echo("           Linux: sudo trust anchor root.crt · or pass it as the CA bundle (curl --cacert root.crt)")
 
 
+@app.command("tray")
+def tray_cmd() -> None:
+    """An omxconsole icon in the system tray: starts the daemon, shows what's running, opens the console."""
+    import signal
+
+    from mxconsole import app as desktop, serve, tray
+    from mxconsole.store import mxc_home
+    lock = tray.single_instance(mxc_home() / "tray.lock")
+    if lock is None:
+        _fail("the omxconsole tray is already running")
+    controller = tray.Controller(fetch=tray.fetch, ensure_daemon=serve.ensure_daemon, shutdown=serve.shutdown,
+                                 open_console=tray.open_console, get_autostart=lambda: False,
+                                 set_autostart=tray.autostart_not_yet)
+    icon = Path(desktop.__file__).with_name("console") / "favicon.svg"
+    try:
+        child = subprocess.Popen(tray.qt_command(desktop.project_dir(), icon), stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE, text=True)
+    except OSError as e:
+        _fail(f"could not start the tray (is the pixi `app` environment installed? `mxc app --install`): {e}")
+
+    def on_term(signum, frame):  # logout or `systemctl --user stop`: leave as Quit would
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, on_term)
+    code = tray.run(controller, child)
+    if code:
+        _fail(f"the tray icon closed unexpectedly (exit {code}). Is a tray host running in your bar? "
+              "Run `pixi run -e app python mxconsole/tray_qt.py mxconsole/console/favicon.svg` to see why.")
+
+
 @app.command("app")
 def app_cmd(install: bool = typer.Option(False, "--install", help="Linux: add an omxconsole launcher to the app menu."),
             uninstall: bool = typer.Option(False, "--uninstall", help="Linux: remove that launcher.")) -> None:

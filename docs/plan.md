@@ -346,13 +346,15 @@ Brief: docs/briefs/omxconsole.md · ADR: docs/adr/0004-name-omxconsole.md · Nee
 ## Desktop app (brief: docs/briefs/desktop-app.md)
 Order: F-047 → F-048 on Linux; F-049 (the Mac check) gates F-050 and F-051. The tray is a native Qt menu (no page to design); F-051's setup screen goes through the designer first.
 
-## F-047 Tray icon on Linux [todo]
+## F-047 Tray icon on Linux [done]
 Brief: docs/briefs/desktop-app.md · Needs: none · Files: mxconsole/tray*.py, mxconsole/app.py, cli.py
-- [ ] `mxc tray` runs a tray icon (Qt `QSystemTrayIcon`, in the `app` env) that starts the daemon if it isn't running
-- [ ] menu: a status line (what's happening now, the Beacon's order: pull/port %, crashed, starting, N running, else idle/stopped), Open console, Start/Stop server, Start at login (checkbox, wired in F-048), Quit
-- [ ] Quit stops the daemon only if the tray started it; Open console uses `mxc app`'s window
-- [ ] the status line and menu are a pure function of the admin data, unit-tested; the Qt part stays thin
-- [ ] seen in Waybar on Omarchy: icon shows, menu works, status follows a model starting and stopping
+- [x] `mxc tray` runs a tray icon (Qt `QSystemTrayIcon`, in the `app` env) that starts the daemon if it isn't running
+- [x] menu: a status line (what's happening now, the Beacon's order: pull/port %, crashed, starting, N running, else idle/stopped), Open console, Start/Stop server, Start at login (checkbox, wired in F-048), Quit
+- [x] Quit stops the daemon only if the tray started it; Open console uses `mxc app`'s window
+- [x] the status line and menu are a pure function of the admin data, unit-tested; the Qt part stays thin
+- [x] seen in Waybar on Omarchy: icon shows, menu works, status follows a model starting and stopping
+- Checked live through the bar's D-Bus (quickshell hosts the tray): menu labels, Stop/Start server, Ready → Starting qwen2.5-0.5b → running, Open console opened the window, Quit stopped the daemon and the model, SIGTERM does the same, a second tray is refused. Not yet looked at by eye (the screen was locked). Status wording: "qwen running" for one model, "2 models running" for more.
+- Reviewer (general-purpose stand-in): PASS; fixed: the child dying, Ctrl-C and SIGTERM now stop a daemon the tray started; clicks made during a slow action are dropped (except Quit); busy follows state; autostart read can't crash the view; queued Qt signal.
 
 ## F-048 Start at login, and `mxc` on PATH [todo]
 Brief: docs/briefs/desktop-app.md · Needs: F-047
