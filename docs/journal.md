@@ -12,3 +12,4 @@ What was tried, what happened, dead ends. Read before each new attempt.
 
 ## 2026-10-21 · desktop app overnight (docs/goals/desktop-app-overnight.md)
 - Start: F-047 done, F-048 in review (needs a reboot by the owner), F-049 blocked on a Mac. Real tray service running for the owner; leave it alone.
+- M1: metrics.mac_memory (sysctl hw.memsize + vm_stat active+wired+compressed) is the one 'GPU' on darwin; report prints '-' for unknown utilisation; supervisor skips --devices on unified memory (D-15). 6 tests on recorded Mac output.

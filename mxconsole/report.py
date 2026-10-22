@@ -127,7 +127,7 @@ def metrics_text(s: dict, range_: str, gpus: list[dict]) -> str:
     if gpus:
         lines += ["", f"{'GPU':<4} {'NAME':<28} {'MEMORY':>18} {'UTIL':>5}"]
         for g in gpus:
-            lines.append(f"{g['index']:<4} {g['name']:<28} {str(g['used_mb']) + ' / ' + str(g['total_mb']) + ' MB':>18} {g['util']:>4}%")
+            lines.append(f"{g['index']:<4} {g['name']:<28} {str(g['used_mb']) + ' / ' + str(g['total_mb']) + ' MB':>18} {'-' if g.get('util') is None else str(g['util']) + '%':>5}")
     return "\n".join(lines)
 
 

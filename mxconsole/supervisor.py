@@ -344,6 +344,13 @@ class Supervisor:
         best = min(roomy, key=lambda g: (ours.count(g["index"]), -free(g)))
         return best["index"]
 
+    def _unified(self, gpu: int | None) -> bool:
+        """A Mac's GPU shares the machine's memory; MAX picks the device itself there (as plain `max serve` does)."""
+        try:
+            return any(g.get("unified") for g in self.gpus() if g["index"] == gpu)
+        except Exception:
+            return False
+
     def _gpu_total_mb(self, gpu: int | None) -> int | None:
         if gpu is None:
             return None
@@ -356,7 +363,7 @@ class Supervisor:
         # A pulled model loads from its pinned local snapshot, so serving needs no network.
         cmd = [*self.max_command, "serve", "--port", str(port), "--served-model-name", model.name]
         cmd += launch_flags()
-        if gpu is not None:
+        if gpu is not None and not self._unified(gpu):
             cmd += ["--devices", f"gpu:{gpu}"]
         cmd += ["--device-memory-utilization",
                 env("GPU_MEMORY_FRACTION") or memory_fraction(weights_bytes(model.weights_path), self._gpu_total_mb(gpu))]

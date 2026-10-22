@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
+import sys
 import time
 
 from mxconsole.store import Store
@@ -223,8 +225,39 @@ def gpu_processes(runner=_nvidia_smi_apps) -> dict[int, int]:
     return result
 
 
-def gpus(runner=_nvidia_smi) -> list[dict]:
-    """Memory and utilisation per NVIDIA GPU; [] when there is no nvidia-smi."""
+def _sysctl(name: str) -> str:
+    return subprocess.run(["sysctl", "-n", name], capture_output=True, text=True, timeout=5, check=True).stdout
+
+
+def _vm_stat() -> str:
+    return subprocess.run(["vm_stat"], capture_output=True, text=True, timeout=5, check=True).stdout
+
+
+def mac_memory(sysctl=_sysctl, vm_stat=_vm_stat) -> list[dict]:
+    """A Mac's GPU shares the machine's memory: one entry, `unified`, with used = active + wired + compressed
+    pages (what Activity Monitor calls Memory Used, near enough). No utilisation: that needs root."""
+    try:
+        total = int(sysctl("hw.memsize").strip())
+        name = sysctl("machdep.cpu.brand_string").strip() or "Apple silicon"
+        out = vm_stat()
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return []
+    page = re.search(r"page size of (\d+) bytes", out)
+    counts = {k.strip().strip('"'): int(v) for k, v in re.findall(r"^([^:\n]+):\s+(\d+)\.", out, re.M)}
+    try:
+        pages = counts["Pages active"] + counts["Pages wired down"] + counts.get("Pages occupied by compressor", 0)
+    except KeyError:
+        return []
+    if not page:
+        return []
+    return [{"index": 0, "name": name, "used_mb": pages * int(page.group(1)) // 2**20, "total_mb": total // 2**20,
+             "util": None, "unified": True}]
+
+
+def gpus(runner=_nvidia_smi, platform: str = sys.platform, mac=mac_memory) -> list[dict]:
+    """Memory and utilisation per NVIDIA GPU; [] when there is no nvidia-smi. On a Mac, the unified memory."""
+    if platform == "darwin":
+        return mac()
     try:
         out = runner()
     except (OSError, subprocess.SubprocessError):
