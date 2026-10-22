@@ -154,3 +154,9 @@ def test_a_failed_env_install_says_where_the_details_are(tmp_path):
     assert r.returncode == 1 and "setup-output.log" in r.stderr
     env = next(s for s in setup_server.read_state((rt / "setup.log").read_text(), 0)["steps"] if s["id"] == "env")
     assert env["state"] == "failed"
+
+
+def test_a_finished_setup_reports_its_real_length_not_time_since():
+    log = "100 pixi running\n" + "".join(f"110 {sid} done\n" for sid in ("pixi", "source", "env", "app", "login")) + \
+          "133 start done\n"
+    assert setup_server.read_state(log, now=500)["elapsed"] == 33

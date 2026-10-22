@@ -1,0 +1,27 @@
+# M3 live run, 2026-10-21T23:16:55-07:00: docs/goals/desktop-app-overnight/live_run.sh
+# scratch HOME with no pixi, PATH=/usr/local/bin:/usr/bin:/bin, env -i; source = git archive of HEAD 38507ee
+# real pixi download, real conda/PyPI downloads (4.9 GB into the scratch cache), real tray and daemon on 18461
+
+install.sh exit 0 after 33s
+
+## setup.log
+1792649607 pixi running 
+1792649620 pixi done pixi 0.82.1
+1792649622 source running /home/abhisheksreesaila/mxc-setup-scratch/mxstudio.tar.gz
+1792649622 source done 
+1792649622 env running 
+1792649632 env done 2.9G
+1792649632 app running 
+1792649637 app done 1.6G
+1792649637 login skipped left alone (MXC_SETUP_NO_LOGIN)
+1792649637 start running 
+1792649640 console - http://127.0.0.1:18461/console
+1792649640 start done 
+
+console up: http://127.0.0.1:18461/console answered /health with service mst after 33 s from nothing
+
+## second launch (the app opened again)
+tray started, daemon up, console window opened (pid seen in hyprctl), nothing reinstalled
+
+## screenshots
+setup-progress*.png and setup-done*.png render this run's own log, replayed time-shifted into the setup server (the real run finished too fast to catch mid-way).

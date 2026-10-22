@@ -91,11 +91,11 @@ note source done
 
 note env running
 "$PIXI" install --manifest-path "$APP/pixi.toml" >> "$OUT" 2>&1 || fail env "installing MAX and Python failed. Details: $OUT"
-note env done "$(du -sh "$APP/.pixi/envs/default" 2>/dev/null | cut -f1)"
+note env done "$(du -sh "$APP/.pixi/envs/default" 2>/dev/null | cut -f1) on disk"
 
 note app running
 "$PIXI" install --manifest-path "$APP/pixi.toml" -e app >> "$OUT" 2>&1 || fail app "installing the window and tray failed. Details: $OUT"
-note app done "$(du -sh "$APP/.pixi/envs/app" 2>/dev/null | cut -f1)"
+note app done "$(du -sh "$APP/.pixi/envs/app" 2>/dev/null | cut -f1) on disk"
 
 if [ -n "${MXC_SETUP_NO_LOGIN:-}" ]; then
   note login skipped "left alone (MXC_SETUP_NO_LOGIN)"

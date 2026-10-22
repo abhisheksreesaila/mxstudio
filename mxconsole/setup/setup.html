@@ -107,7 +107,9 @@
     }
     if (st.state === "done") {
       $("title").textContent = "omxconsole is ready";
-      $("lede").textContent = "It's in your menu bar from now on, and starts when you log in. Opening the console…";
+      const login = st.steps.find((s) => s.id === "login");
+      $("lede").textContent = (login && login.state === "done" ? "It's in your menu bar from now on, and starts when you log in."
+        : "It's in your menu bar.") + " Opening the console…";
       $("status").innerHTML = `Set up in <b>${clock(st.elapsed)}</b>`;
       if (st.console) {
         $("go").href = st.console; $("go").hidden = false;

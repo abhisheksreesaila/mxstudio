@@ -36,7 +36,7 @@ def read_state(log_text: str, now: float) -> dict:
     steps = {sid: {"id": sid, "label": label, "hint": hint, "state": "next", "message": "", "seconds": None}
              for sid, label, hint in STEPS}
     started: dict[str, float] = {}
-    first = None
+    first = last = None
     extra: dict = {}
     for line in log_text.splitlines():
         parts = line.split(" ", 3)
@@ -48,6 +48,7 @@ def read_state(log_text: str, now: float) -> dict:
             continue
         sid, state, message = parts[1], parts[2], parts[3] if len(parts) > 3 else ""
         first = ts if first is None else first
+        last = ts
         if sid == "console":  # the URL to open when everything is up
             extra["console"] = message
             continue
@@ -68,7 +69,8 @@ def read_state(log_text: str, now: float) -> dict:
         overall = "done"
     else:
         overall = "running"
-    return {"state": overall, "steps": ordered, "elapsed": round(now - first) if first is not None else 0, **extra}
+    end = now if overall == "running" else last  # a finished setup took what it took
+    return {"state": overall, "steps": ordered, "elapsed": round(end - first) if first is not None else 0, **extra}
 
 
 def make_handler(log: Path, page: Path = PAGE):
