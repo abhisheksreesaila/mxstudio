@@ -342,3 +342,39 @@ Brief: docs/briefs/omxconsole.md · ADR: docs/adr/0004-name-omxconsole.md · Nee
 - [x] README, USER_GUIDE, CLI.md and docs/site say omxconsole; lessons.md's naming line is updated
 - [x] a test checks `/v1/models` `owned_by` and the console title
 - [x] reviewer: PASS. Command, package, ~/.mxc, MXC_* and wire names (the `mxconsole` JSON field, the CA "mxconsole local") unchanged.
+
+## Desktop app (brief: docs/briefs/desktop-app.md)
+Order: F-047 → F-048 on Linux; F-049 (the Mac check) gates F-050 and F-051. The tray is a native Qt menu (no page to design); F-051's setup screen goes through the designer first.
+
+## F-047 Tray icon on Linux [todo]
+Brief: docs/briefs/desktop-app.md · Needs: none · Files: mxconsole/tray*.py, mxconsole/app.py, cli.py
+- [ ] `mxc tray` runs a tray icon (Qt `QSystemTrayIcon`, in the `app` env) that starts the daemon if it isn't running
+- [ ] menu: a status line (what's happening now, the Beacon's order: pull/port %, crashed, starting, N running, else idle/stopped), Open console, Start/Stop server, Start at login (checkbox, wired in F-048), Quit
+- [ ] Quit stops the daemon only if the tray started it; Open console uses `mxc app`'s window
+- [ ] the status line and menu are a pure function of the admin data, unit-tested; the Qt part stays thin
+- [ ] seen in Waybar on Omarchy: icon shows, menu works, status follows a model starting and stopping
+
+## F-048 Start at login, and `mxc` on PATH [todo]
+Brief: docs/briefs/desktop-app.md · Needs: F-047
+- [ ] `mxc app --autostart on|off` (and the tray checkbox) writes/removes a systemd user unit (Linux) or a LaunchAgent plist (Mac) that runs `mxc tray`; `--autostart` alone prints the state
+- [ ] `mxc app --install` also puts an `mxc` shim in `~/.local/bin` that runs through the project's pixi
+- [ ] unit/plist contents and enable/disable calls are unit-tested with injected runners
+- [ ] after a real reboot on Omarchy: tray in the bar, `mxc serve qwen2.5-0.5b` works without starting anything by hand
+
+## F-049 Mac check: does MAX serve our models on Apple silicon? [todo]
+Brief: docs/briefs/desktop-app.md · Needs: a Mac
+- [ ] `scripts/mac_check.sh`: installs pixi if missing, `pixi install`, runs the test suite, serves qwen2.5-0.5b with `max serve` and sends one chat request; prints GPU or CPU, tok/s and anything that failed
+- [ ] result recorded here; decides whether F-050/F-051 go ahead and which models the Mac app offers
+
+## F-050 Mac platform gaps [todo]
+Brief: docs/briefs/desktop-app.md · Needs: F-049
+- [ ] memory for placement and the Beacon comes from the Mac's unified memory (no `nvidia-smi`); unit-tested with fakes
+- [ ] porting on Mac: `mxc port` and the Port button say it's Linux-only for now, before anything runs
+- [ ] Jupyter, `mxc expose` (Caddy) and `mxc app` checked on the Mac
+
+## F-051 omxconsole.app for Mac [todo]
+Brief: docs/briefs/desktop-app.md · Needs: F-048, F-050
+- [ ] `scripts/build_mac_app.sh` makes `omxconsole.app` (zip, unsigned): a thin launcher; first launch shows a setup screen while it installs pixi and the env into `~/.mxc/runtime`, then runs the tray (menu-bar icon)
+- [ ] setup screen designed first (designer skill): honest steps, time left, ends on My models
+- [ ] README: download, right-click → Open once
+- [ ] on a clean Mac user account: from the zip to a chat answer from qwen2.5-0.5b
