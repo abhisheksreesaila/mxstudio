@@ -368,7 +368,7 @@ Brief: docs/briefs/desktop-app.md · Needs: F-047
 
 ## F-049 Mac check: does MAX serve our models on Apple silicon? [blocked]
 Brief: docs/briefs/desktop-app.md · Needs: a Mac
-Blocked: on your Apple-silicon Mac, clone the repo and run `sh scripts/mac_check.sh` (10-30 min), then send back `mac-check.log`.
+Blocked: on your Apple-silicon Mac, clone the repo and run `sh scripts/mac_check.sh` (15-40 min; it also tries the Mac app), then send back `mac-check.log`.
 - [x] `scripts/mac_check.sh`: installs pixi if missing, `pixi install`, runs the test suite, serves qwen2.5-0.5b with `max serve` and sends one chat request; prints GPU or CPU, tok/s and anything that failed
 - [ ] result recorded here; decides whether F-050/F-051 go ahead and which models the Mac app offers
 

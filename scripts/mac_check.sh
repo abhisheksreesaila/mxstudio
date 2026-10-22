@@ -5,9 +5,10 @@
 #   git clone https://github.com/abhisheksreesaila/mxstudio.git && cd mxstudio && sh scripts/mac_check.sh
 #
 # It installs pixi if missing (into ~/.pixi, nothing system-wide), sets up the project, runs the test suite,
-# then serves qwen2.5-0.5b two ways: plain `max serve` (does MAX work here?) and `mxc serve` (does omxconsole?).
+# then serves qwen2.5-0.5b two ways: plain `max serve` (does MAX work here?) and `mxc serve` (does omxconsole?),
+# and finally runs omxconsole.app from nothing in a scratch home (its setup page opens in your browser).
 # It stops only the processes it started. Everything goes to mac-check.log; send that file back.
-# Takes 10-30 minutes, most of it the first download and the first model compile.
+# Takes 15-40 minutes, most of it the first download and the first model compile.
 
 set -u
 LOG="$(pwd)/mac-check.log"
@@ -84,7 +85,25 @@ MXC_API_KEY=$KEY chat "http://127.0.0.1:$MXC_PORT/v1" qwen2.5-0.5b ""; MXC_OK=$?
 pixi run mxc status 2>&1 | tee -a "$LOG"
 pixi run mxc stop 2>&1 | tee -a "$LOG"
 
+say "3/3 omxconsole.app from nothing (scratch home; downloads MAX again; the setup page opens in your browser)"
+WORK="$(mktemp -d)"
+git archive --prefix=mxstudio/ -o "$WORK/src.tar.gz" HEAD
+pixi run python scripts/build_mac_app.py --source "$WORK/src.tar.gz" --out "$WORK/omxconsole-mac.zip" | tee -a "$LOG"
+ditto -x -k "$WORK/omxconsole-mac.zip" "$WORK/Applications"   # as Finder unzips: modes kept
+mkdir -p "$WORK/home"
+env -i HOME="$WORK/home" USER="$USER" PATH=/usr/bin:/bin:/usr/sbin:/sbin MXC_PORT=18453 MXC_SETUP_PORT=18454 \
+  MXC_SETUP_NO_LOGIN=1 "$WORK/Applications/omxconsole.app/Contents/MacOS/omxconsole"; APP_OK=$?
+RT="$WORK/home/.mxc/runtime"
+cat "$RT/setup.log" "$RT/app-launch.log" >> "$LOG" 2>/dev/null
+tail -20 "$RT/setup.log" 2>/dev/null
+appmxc() { env HOME="$WORK/home" MXC_PORT=18453 "$(command -v pixi)" run --manifest-path "$RT/app/pixi.toml" mxc "$@"; }
+appmxc status 2>&1 | tee -a "$LOG"                       # GPU memory should be the Mac's unified memory
+appmxc port acme/weird --auto 2>&1 | tee -a "$LOG"      # should say the automatic port is Linux-only
+TRAY=$(lsof -t "$WORK/home/.mxc/tray.lock" 2>/dev/null)
+[ -n "$TRAY" ] && kill -TERM $TRAY                       # the app's tray; it stops the daemon it started
+
 say "RESULT"
 { [ $MAX_OK -eq 0 ] && echo "max serve: works" || echo "max serve: FAILED"
   [ $MXC_OK -eq 0 ] && echo "mxc serve: works" || echo "mxc serve: FAILED"
+  [ $APP_OK -eq 0 ] && echo "omxconsole.app first run: works" || echo "omxconsole.app first run: FAILED"
   echo "Full log: $LOG"; } | tee -a "$LOG"
