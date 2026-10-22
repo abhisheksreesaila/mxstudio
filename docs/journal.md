@@ -9,3 +9,6 @@ What was tried, what happened, dead ends. Read before each new attempt.
 - M2 fixes, seen live: the Beacon's new starting state ('Starting qwen2.5-coder-1.5b-instruct', beacon-starting.png); the tight top bar keeps the breadcrumb clear (478–802 px vs tools from 818); the Ready card's curl now scrolls inside the card; the parent crumb stays whole.
 - M3: retook all 13 tour screenshots at 1280x800 in the real console (light; home also dark) with a model running and live traffic. Every hotspot box came from getBoundingClientRect, not guessed; 7 spots that scrolled below the fold were dropped and their commands folded into a neighbour. Checked the tour page: markers sit on the Beacon, tools, Add a model, etc. Also fixed the docs header and the tour's title template, which still said mxconsole.
 - M4: reviewer found quietNote only split running vs not (wrong for running-with-count, starting, crashed); fixed per state with a test. Tools fold decided in one place (JS). Reviewer PASS; F-045 done. The console daemon stopped at the session's 1 h background limit; left off (mxc console/serve start it).
+
+## 2026-10-21 · desktop app overnight (docs/goals/desktop-app-overnight.md)
+- Start: F-047 done, F-048 in review (needs a reboot by the owner), F-049 blocked on a Mac. Real tray service running for the owner; leave it alone.
