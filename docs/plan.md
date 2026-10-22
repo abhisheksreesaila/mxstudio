@@ -366,9 +366,10 @@ Brief: docs/briefs/desktop-app.md · Needs: F-047
 - Reviewer (general-purpose stand-in): PASS; fixed: tests can't reach the real user systemd, a failed re-enable keeps an existing unit, status asks systemd, no login entry with a bare `pixi`.
 - Left for you: reboot (or log out and in) once and check the icon is in the bar on its own.
 
-## F-049 Mac check: does MAX serve our models on Apple silicon? [todo]
+## F-049 Mac check: does MAX serve our models on Apple silicon? [blocked]
 Brief: docs/briefs/desktop-app.md · Needs: a Mac
-- [ ] `scripts/mac_check.sh`: installs pixi if missing, `pixi install`, runs the test suite, serves qwen2.5-0.5b with `max serve` and sends one chat request; prints GPU or CPU, tok/s and anything that failed
+Blocked: on your Apple-silicon Mac, clone the repo and run `sh scripts/mac_check.sh` (10-30 min), then send back `mac-check.log`.
+- [x] `scripts/mac_check.sh`: installs pixi if missing, `pixi install`, runs the test suite, serves qwen2.5-0.5b with `max serve` and sends one chat request; prints GPU or CPU, tok/s and anything that failed
 - [ ] result recorded here; decides whether F-050/F-051 go ahead and which models the Mac app offers
 
 ## F-050 Mac platform gaps [todo]
