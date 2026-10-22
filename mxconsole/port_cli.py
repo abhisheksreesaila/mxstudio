@@ -94,8 +94,10 @@ class Display:
 def run(ref: str, name: str | None, as_json: bool, max_attempts: int = DEFAULT_ATTEMPTS, *, unsandboxed: bool = False, source=None,
         display: Display | None = None, sleep=time.sleep) -> tuple[int, str]:
     """Start the port and watch it. Returns (exit code, the line to print; empty with --json)."""
-    from mxconsole import serve
+    from mxconsole import port_auto, serve
     display = display or Display(as_json)
+    if not port_auto.platform().startswith("linux"):
+        return _failed(as_json, port_auto.linux_only(ref.strip()))
     try:
         if source is None:
             if serve.ensure_daemon() and not as_json:

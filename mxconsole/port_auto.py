@@ -128,6 +128,19 @@ class PortUnsafe(Exception):
     """No sandbox is available and the caller did not accept running without one."""
 
 
+class PortUnsupported(Exception):
+    """This machine can't run the automatic port (its sandbox is Linux-only)."""
+
+
+def platform() -> str:
+    return sys.platform
+
+
+def linux_only(ref: str) -> str:
+    return (f"Automatic port runs only on Linux for now: it confines the agent with bubblewrap, which is Linux-only. "
+            f"On this machine, `mxc port {ref}` sets up a workspace to port it with your own Claude Code.")
+
+
 class _Cancelled(Exception):
     pass
 
@@ -634,6 +647,8 @@ class PortManager:
             raise BadPull("`name` may use letters, digits, '.', '_' and '-' (64 characters at most).")
         if not isinstance(max_attempts, int) or isinstance(max_attempts, bool) or not 1 <= max_attempts <= MAX_ATTEMPTS:
             raise BadPull(f"`max_attempts` must be a whole number from 1 to {MAX_ATTEMPTS}.")
+        if not platform().startswith("linux"):
+            raise PortUnsupported(linux_only(ref))
         if self.sandbox and not unsandboxed and port_sandbox.have_bwrap(self.bwrap) is None:
             raise PortUnsafe(NO_SANDBOX)
         key = resolve.CURATED.get(ref.lower(), ref).lower()

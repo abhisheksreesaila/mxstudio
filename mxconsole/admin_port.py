@@ -11,7 +11,7 @@ import json
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from mxconsole.port_auto import DEFAULT_ATTEMPTS, PortBusy, PortManager, PortUnsafe, cleanup_at_exit
+from mxconsole.port_auto import DEFAULT_ATTEMPTS, PortBusy, PortManager, PortUnsafe, PortUnsupported, cleanup_at_exit
 from mxconsole.pulls import BadPull
 
 MAX_BODY = 4096
@@ -74,6 +74,8 @@ def register(app, store, supervisor, admin_only, *, manager: PortManager | None 
             return _error(400, str(e), "invalid_request_body")
         except PortUnsafe as e:
             return _error(400, str(e), "no_sandbox")
+        except PortUnsupported as e:
+            return _error(400, str(e), "linux_only")
         except PortBusy as e:
             return _error(409, f"{e.job['ref']} is already being ported.", "port_in_progress", port=e.job)
         return JSONResponse(job, status_code=202)
