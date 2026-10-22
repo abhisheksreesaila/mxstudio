@@ -63,9 +63,10 @@ later() {
 }
 [ -f "$APP/.mxc-ready" ] && later
 
-# An earlier first run that gave up waiting for a slow first start, while omxconsole did come up from $APP:
-# adopt it rather than delete it under the running server.
-if [ -f "$APP/pixi.toml" ] && answers "http://127.0.0.1:$DAEMON_PORT/health" mst 2; then
+# An earlier first run that got as far as starting omxconsole (.mxc-started) but gave up waiting for a slow first
+# start, while it did come up: adopt it rather than delete it under the running server. Without that marker the
+# answer could come from another omxconsole (a dev checkout) or a half-installed run, so set up again.
+if [ -f "$APP/.mxc-started" ] && answers "http://127.0.0.1:$DAEMON_PORT/health" mst 2; then
   touch "$APP/.mxc-ready"
   later
 fi
@@ -147,6 +148,7 @@ else
 fi
 
 note start running
+touch "$APP/.mxc-started"
 nohup "$PIXI" run --manifest-path "$APP/pixi.toml" mxc tray >> "$RUNTIME/tray.log" 2>&1 &
 answers "http://127.0.0.1:$DAEMON_PORT/health" mst 600 || fail start "omxconsole didn't start. Details: $RUNTIME/tray.log"
 touch "$APP/.mxc-ready"

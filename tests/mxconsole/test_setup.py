@@ -182,19 +182,9 @@ def test_a_rerun_adopts_an_install_whose_server_already_answers(tmp_path):
     app.mkdir(parents=True)
     (app / "pixi.toml").write_text("[workspace]\n")
     (app / "keep.txt").write_text("still here")
-    server = subprocess.Popen([sys.executable, "-c",
-        "import http.server\nclass H(http.server.BaseHTTPRequestHandler):\n"
-        "  def do_GET(s): s.send_response(200); s.end_headers(); s.wfile.write(b'{\"service\":\"mst\"}')\n"
-        "  def log_message(s,*a): pass\n"
-        f"http.server.HTTPServer(('127.0.0.1',{port}),H).serve_forever()\n"])
+    (app / ".mxc-started").write_text("")  # that run got as far as starting omxconsole
+    server = fake_daemon(port)
     try:
-        import time
-        for _ in range(50):
-            try:
-                urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=0.2)
-                break
-            except OSError:
-                time.sleep(0.1)
         r, calls, rt = launch(tmp_path, src, MXC_PORT=str(port))
     finally:
         server.kill()
@@ -259,3 +249,43 @@ def test_server_writes_its_pid_file(tmp_path):
         assert pidfile.read_text().strip() == str(p.pid)
     finally:
         p.kill()
+
+
+FAKE_DAEMON = """
+import http.server, sys
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(s):
+        s.send_response(200); s.end_headers(); s.wfile.write(b'{"status": "ok", "service": "mst"}')
+    def log_message(s, *a): pass
+http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
+"""
+
+
+def fake_daemon(port: int) -> subprocess.Popen:
+    """Something answering /health like an omxconsole daemon (another install, or a dev checkout)."""
+    import time
+    p = subprocess.Popen([sys.executable, "-c", FAKE_DAEMON, str(port)])
+    for _ in range(50):
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=0.2)
+            return p
+        except OSError:
+            time.sleep(0.1)
+    return p
+
+
+def test_a_half_installed_app_is_not_adopted_by_some_other_daemon(tmp_path):
+    """A run that failed before its start step, with another omxconsole (a dev checkout) on the port: set up again."""
+    port = free_port()
+    app = tmp_path / "rt" / "app"
+    app.mkdir(parents=True)
+    (app / "pixi.toml").write_text("[workspace]\n")
+    (app / "half.txt").write_text("from the failed run")
+    server = fake_daemon(port)
+    try:
+        r, calls, rt = launch(tmp_path, tarball(tmp_path / "src.tar.gz"), MXC_PORT=str(port))
+    finally:
+        server.kill()
+    assert r.returncode == 0, r.stderr
+    assert not (app / "half.txt").exists()  # replaced by a fresh download
+    assert ["install", "--manifest-path", str(app / "pixi.toml")] in calls
