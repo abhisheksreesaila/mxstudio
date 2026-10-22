@@ -144,7 +144,7 @@ def test_cli_install_stops_when_env_setup_fails(monkeypatch):
 
 def test_cli_rejects_install_with_uninstall():
     r = CliRunner().invoke(cli.app, ["app", "--install", "--uninstall"])
-    assert r.exit_code != 0 and "not both" in r.output
+    assert r.exit_code != 0 and "pass one of" in r.output
 
 
 def test_cli_install_on_mac_refuses_before_downloading_the_app_env(monkeypatch):
@@ -154,3 +154,14 @@ def test_cli_install_on_mac_refuses_before_downloading_the_app_env(monkeypatch):
     r = CliRunner().invoke(cli.app, ["app", "--install"])
     assert r.exit_code != 0 and ".app bundle comes later" in r.output
     assert calls == []
+
+
+def test_pixi_is_found_without_path(tmp_path):
+    """Under systemd or launchd PATH has no ~/.pixi/bin: pixi's own PIXI_EXE comes first, then PATH, then ~/.pixi."""
+    assert app.pixi_exe(env={"PIXI_EXE": "/x/pixi"}, which=lambda n: "/usr/bin/pixi") == "/x/pixi"
+    assert app.pixi_exe(env={}, which=lambda n: "/usr/bin/pixi") == "/usr/bin/pixi"
+    home_pixi = tmp_path / ".pixi/bin/pixi"
+    home_pixi.parent.mkdir(parents=True)
+    home_pixi.write_text("")
+    assert app.pixi_exe(env={}, which=lambda n: None, home=tmp_path) == str(home_pixi)
+    assert app.pixi_exe(env={}, which=lambda n: None, home=tmp_path / "nobody") == "pixi"

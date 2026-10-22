@@ -12,6 +12,7 @@ Closing the window stops nothing: the daemon is started detached and keeps runni
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -28,6 +29,17 @@ class AppError(RuntimeError):
     pass
 
 
+def pixi_exe(env: dict | None = None, which: Callable[[str], str | None] = shutil.which,
+             home: Path | None = None) -> str:
+    """The pixi binary. Under systemd or launchd PATH has no ~/.pixi/bin, so pixi's own PIXI_EXE (set for
+    everything `pixi run` starts) comes first, then PATH, then pixi's default install place."""
+    found = (os.environ if env is None else env).get("PIXI_EXE") or which("pixi")
+    if found:
+        return found
+    default = (home or Path.home()) / ".pixi/bin/pixi"
+    return str(default) if default.exists() else "pixi"
+
+
 def project_dir() -> Path:
     """The checkout holding pixi.toml (this package is installed editable from it)."""
     return Path(__file__).resolve().parents[1]
@@ -40,7 +52,7 @@ def storage_dir() -> Path:
 
 
 def native_command(project: Path, url: str, storage: Path | str, pixi: str | None = None) -> list[str]:
-    return [pixi or shutil.which("pixi") or "pixi", "run", "--manifest-path", str(project / "pixi.toml"),
+    return [pixi or pixi_exe(), "run", "--manifest-path", str(project / "pixi.toml"),
             "-e", APP_ENV, "python", str(Path(__file__).with_name("window.py")), url, str(storage)]
 
 
@@ -119,7 +131,7 @@ def _arg(value: str | Path) -> str:
 
 
 def desktop_entry(project: Path, icon: str | Path, pixi: str | None = None) -> str:
-    pixi = pixi or shutil.which("pixi") or "pixi"
+    pixi = pixi or pixi_exe()
     exec_line = f"{_arg(pixi)} run --manifest-path {_arg(Path(project) / 'pixi.toml')} mxc app"
     return ("[Desktop Entry]\nType=Application\nName=omxconsole\nComment=Local AI runtime on Modular MAX\n"
             f"Exec={exec_line}\nIcon={icon}\nTerminal=false\n"
@@ -128,7 +140,7 @@ def desktop_entry(project: Path, icon: str | Path, pixi: str | None = None) -> s
 
 def prepare_env(project: Path, pixi: str | None = None, runner: Callable[[list[str]], int] | None = None) -> None:
     """`pixi install -e app`, output visible, so the first launch from the menu isn't a silent wait."""
-    cmd = [pixi or shutil.which("pixi") or "pixi", "install", "--manifest-path", str(project / "pixi.toml"),
+    cmd = [pixi or pixi_exe(), "install", "--manifest-path", str(project / "pixi.toml"),
            "-e", APP_ENV]
     run_ = runner or (lambda c: subprocess.run(c).returncode)
     try:

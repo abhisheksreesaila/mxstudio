@@ -3,9 +3,15 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def mxc_home(tmp_path, monkeypatch):
-    """Every test gets its own MXC_HOME so nothing touches ~/.mxc."""
+    """Every test gets its own MXC_HOME so nothing touches ~/.mxc, and its own HOME so nothing touches the
+    real home folder (a CLI test once removed the real ~/.local/bin/mxc shim)."""
     home = tmp_path / "mxc-home"
     monkeypatch.setenv("MXC_HOME", str(home))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+    def no_systemctl(cmd):  # `systemctl --user` reaches the real user manager over D-Bus, whatever HOME says
+        raise AssertionError(f"a test tried to run {cmd}; inject a runner")
+    monkeypatch.setattr("mxconsole.autostart._default_runner", no_systemctl)
     return home
 
 

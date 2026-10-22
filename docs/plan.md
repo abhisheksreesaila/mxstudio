@@ -356,12 +356,15 @@ Brief: docs/briefs/desktop-app.md · Needs: none · Files: mxconsole/tray*.py, m
 - Checked live through the bar's D-Bus (quickshell hosts the tray): menu labels, Stop/Start server, Ready → Starting qwen2.5-0.5b → running, Open console opened the window, Quit stopped the daemon and the model, SIGTERM does the same, a second tray is refused. Not yet looked at by eye (the screen was locked). Status wording: "qwen running" for one model, "2 models running" for more.
 - Reviewer (general-purpose stand-in): PASS; fixed: the child dying, Ctrl-C and SIGTERM now stop a daemon the tray started; clicks made during a slow action are dropped (except Quit); busy follows state; autostart read can't crash the view; queued Qt signal.
 
-## F-048 Start at login, and `mxc` on PATH [todo]
+## F-048 Start at login, and `mxc` on PATH [review]
 Brief: docs/briefs/desktop-app.md · Needs: F-047
-- [ ] `mxc app --autostart on|off` (and the tray checkbox) writes/removes a systemd user unit (Linux) or a LaunchAgent plist (Mac) that runs `mxc tray`; `--autostart` alone prints the state
-- [ ] `mxc app --install` also puts an `mxc` shim in `~/.local/bin` that runs through the project's pixi
-- [ ] unit/plist contents and enable/disable calls are unit-tested with injected runners
+- [x] `mxc app --autostart on|off|status` (and the tray checkbox) writes/removes a systemd user unit (Linux) or a LaunchAgent plist (Mac) that runs `mxc tray`
+- [x] `mxc app --install` also puts an `mxc` shim in `~/.local/bin` that runs through the project's pixi (never replaces an `mxc` it didn't write); `--uninstall` removes it
+- [x] unit/plist contents and enable/disable calls are unit-tested with injected runners
 - [ ] after a real reboot on Omarchy: tray in the bar, `mxc serve qwen2.5-0.5b` works without starting anything by hand
+- Live on this machine: unit enabled; `systemctl --user start` brings up the icon and the daemon; the shim works from /tmp; a second tray exits 3 (no restart loop); the tray checkbox switches the unit off and on without touching the running tray. Found by running it: systemd's PATH has no pixi (now `app.pixi_exe()`), and a CLI test deleted the real shim (tests now get their own HOME and can't run systemctl).
+- Reviewer (general-purpose stand-in): PASS; fixed: tests can't reach the real user systemd, a failed re-enable keeps an existing unit, status asks systemd, no login entry with a bare `pixi`.
+- Left for you: reboot (or log out and in) once and check the icon is in the bar on its own.
 
 ## F-049 Mac check: does MAX serve our models on Apple silicon? [todo]
 Brief: docs/briefs/desktop-app.md · Needs: a Mac

@@ -562,14 +562,15 @@ def tray_cmd() -> None:
     """An omxconsole icon in the system tray: starts the daemon, shows what's running, opens the console."""
     import signal
 
-    from mxconsole import app as desktop, serve, tray
+    from mxconsole import app as desktop, autostart as login, serve, tray
     from mxconsole.store import mxc_home
     lock = tray.single_instance(mxc_home() / "tray.lock")
     if lock is None:
-        _fail("the omxconsole tray is already running")
+        typer.echo("error: the omxconsole tray is already running", err=True)
+        raise typer.Exit(login.ALREADY_RUNNING)
     controller = tray.Controller(fetch=tray.fetch, ensure_daemon=serve.ensure_daemon, shutdown=serve.shutdown,
-                                 open_console=tray.open_console, get_autostart=lambda: False,
-                                 set_autostart=tray.autostart_not_yet)
+                                 open_console=tray.open_console, get_autostart=login.enabled,
+                                 set_autostart=lambda on: login.set_enabled(on, desktop.project_dir()))
     icon = Path(desktop.__file__).with_name("console") / "favicon.svg"
     try:
         child = subprocess.Popen(tray.qt_command(desktop.project_dir(), icon), stdin=subprocess.PIPE,
@@ -587,24 +588,40 @@ def tray_cmd() -> None:
 
 
 @app.command("app")
-def app_cmd(install: bool = typer.Option(False, "--install", help="Linux: add an omxconsole launcher to the app menu."),
-            uninstall: bool = typer.Option(False, "--uninstall", help="Linux: remove that launcher.")) -> None:
+def app_cmd(install: bool = typer.Option(False, "--install", help="Linux: add an omxconsole launcher to the app menu and `mxc` to ~/.local/bin."),
+            uninstall: bool = typer.Option(False, "--uninstall", help="Linux: remove that launcher and the `mxc` shim."),
+            autostart: str = typer.Option(None, "--autostart", metavar="on|off|status",
+                                          help="Start the tray icon at login (systemd user unit, or a LaunchAgent on a Mac).")) -> None:
     """Open the console in its own window (starts the daemon if needed; closing the window stops nothing)."""
-    from mxconsole import app as desktop, report, serve
+    from mxconsole import app as desktop, autostart as login, report, serve
     try:
-        if install and uninstall:
-            _fail("pass --install or --uninstall, not both")
+        if sum((install, uninstall, autostart is not None)) > 1:
+            _fail("pass one of --install, --uninstall or --autostart")
+        if autostart is not None:
+            if autostart not in ("on", "off", "status"):
+                _fail("--autostart takes on, off or status")
+            if autostart != "status":
+                login.set_enabled(autostart == "on", desktop.project_dir())
+            on = login.enabled()
+            typer.echo(f"start at login: {'on' if on else 'off'}" + (" (from the next login)" if autostart == "on" else ""))
+            return
         if install or uninstall:
             if install:
                 desktop._require_linux(sys.platform)  # before the Qt env download, not after it
                 desktop.prepare_env(desktop.project_dir())
             for path in (desktop.install(desktop.project_dir()) if install else desktop.uninstall()):
                 typer.echo(("installed " if install else "removed ") + str(path))
+            if install:
+                typer.echo("installed " + str(login.install_shim(desktop.project_dir())))
+            else:
+                shim = login.remove_shim()
+                if shim:
+                    typer.echo("removed " + str(shim))
             return
         how = desktop.run(serve.ensure_daemon, desktop.open_native, desktop.open_browser_app,
                           report.console_link(), say=typer.echo)
         typer.echo(f"window: {how}")
-    except (desktop.AppError, serve.DaemonError) as e:
+    except (desktop.AppError, serve.DaemonError, login.AutostartError) as e:
         _fail(str(e))
 
 

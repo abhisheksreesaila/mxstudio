@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import queue
-import shutil
 import subprocess
 import sys
 import threading
@@ -171,10 +170,6 @@ def open_console() -> None:
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
 
-def autostart_not_yet(on: bool) -> None:
-    raise RuntimeError("Start at login arrives with `mxc app --autostart` (F-048)")
-
-
 def single_instance(lock: Path):
     """Hold an exclusive lock on `lock` for the life of the process; None if another tray holds it."""
     import fcntl
@@ -189,8 +184,8 @@ def single_instance(lock: Path):
 
 
 def qt_command(project: Path, icon: Path, pixi: str | None = None) -> list[str]:
-    from mxconsole.app import APP_ENV
-    return [pixi or shutil.which("pixi") or "pixi", "run", "--manifest-path", str(project / "pixi.toml"),
+    from mxconsole.app import APP_ENV, pixi_exe
+    return [pixi or pixi_exe(), "run", "--manifest-path", str(project / "pixi.toml"),
             "-e", APP_ENV, "python", str(Path(__file__).with_name("tray_qt.py")), str(icon)]
 
 
