@@ -372,15 +372,17 @@ Blocked: on your Apple-silicon Mac, clone the repo and run `sh scripts/mac_check
 - [x] `scripts/mac_check.sh`: installs pixi if missing, `pixi install`, runs the test suite, serves qwen2.5-0.5b with `max serve` and sends one chat request; prints GPU or CPU, tok/s and anything that failed
 - [ ] result recorded here; decides whether F-050/F-051 go ahead and which models the Mac app offers
 
-## F-050 Mac platform gaps [todo]
-Brief: docs/briefs/desktop-app.md · Needs: F-049
-- [ ] memory for placement and the Beacon comes from the Mac's unified memory (no `nvidia-smi`); unit-tested with fakes
-- [ ] porting on Mac: `mxc port` and the Port button say it's Linux-only for now, before anything runs
-- [ ] Jupyter, `mxc expose` (Caddy) and `mxc app` checked on the Mac
+## F-050 Mac platform gaps [review]
+Brief: docs/briefs/desktop-app.md · Needs: F-049 (built ahead of it overnight, D-14)
+- [x] memory for placement and the Beacon comes from the Mac's unified memory (no `nvidia-smi`); unit-tested with fakes (test_mac_memory.py, recorded vm_stat); MAX picks the device there (D-15)
+- [x] porting on Mac: `mxc port --auto`, POST /admin/ports and the Port button say it's Linux-only for now, before anything runs (400 `linux_only`, D-16); the guided `mxc port <ref>` still works
+- [ ] Jupyter, `mxc expose` (Caddy) and `mxc app` checked on the Mac: waits for F-049's run (its step 3 shows `mxc metrics` and the port refusal)
 
-## F-051 omxconsole.app for Mac [todo]
+## F-051 omxconsole.app for Mac [review]
 Brief: docs/briefs/desktop-app.md · Needs: F-048, F-050
-- [ ] `scripts/build_mac_app.sh` makes `omxconsole.app` (zip, unsigned): a thin launcher; first launch shows a setup screen while it installs pixi and the env into `~/.mxc/runtime`, then runs the tray (menu-bar icon)
-- [ ] setup screen designed first (designer skill): honest steps, time left, ends on My models
-- [ ] README: download, right-click → Open once
-- [ ] on a clean Mac user account: from the zip to a chat answer from qwen2.5-0.5b
+- [x] `scripts/build_mac_app.py` makes `omxconsole.app` (zip, unsigned, 72 KB): a thin launcher; first launch shows a setup page while it installs pixi and the env into `~/.mxc/runtime`, then runs the tray (menu-bar icon). Same `mxconsole/setup/install.sh` works on Linux. 24 tests (fake pixi, Finder-style unzip).
+- [x] live on Linux from nothing (env -i, scratch HOME, no pixi): console up in 22-33 s; a second launch only starts the tray and opens the window (docs/goals/desktop-app-overnight/live-run.txt)
+- [ ] setup screen designed first (designer skill): built overnight as a draft in the console's omxqua look instead; needs your eye (screenshots in docs/goals/desktop-app-overnight/)
+- [ ] README: download, then (macOS 15+) System Settings → Privacy & Security → Open Anyway; waits for a hosted download (a release is a publish: your call)
+- [ ] on a clean Mac user account: from the zip to a chat answer from qwen2.5-0.5b: F-049's step 3 does most of it
+- Reviewer (general-purpose stand-in): round 1 FAIL → fixed (one setup at a time, adopt a late-starting install, stop a lingering page, check the download, escapes); round 2 FAIL → fixed (adopt only an install that reached its start step); round 3 PASS.
