@@ -160,3 +160,102 @@ def test_a_finished_setup_reports_its_real_length_not_time_since():
     log = "100 pixi running\n" + "".join(f"110 {sid} done\n" for sid in ("pixi", "source", "env", "app", "login")) + \
           "133 start done\n"
     assert setup_server.read_state(log, now=500)["elapsed"] == 33
+
+
+# --- the review's failure cases --------------------------------------------------------------------
+
+def test_a_cut_off_download_fails_at_the_download_step(tmp_path):
+    whole = tarball(tmp_path / "src.tar.gz").read_bytes()
+    cut = tmp_path / "cut.tar.gz"
+    cut.write_bytes(whole[: len(whole) // 2])
+    r, calls, rt = launch(tmp_path, cut)
+    src = next(s for s in setup_server.read_state((rt / "setup.log").read_text(), 0)["steps"] if s["id"] == "source")
+    assert r.returncode == 1 and src["state"] == "failed"
+    assert not any(c[:1] == ["install"] for c in calls)
+
+
+def test_a_rerun_adopts_an_install_whose_server_already_answers(tmp_path):
+    """A first run that gave up waiting (slow first start) must not wipe the install that then came up."""
+    src = tarball(tmp_path / "src.tar.gz")
+    port = free_port()
+    app = tmp_path / "rt" / "app"
+    app.mkdir(parents=True)
+    (app / "pixi.toml").write_text("[workspace]\n")
+    (app / "keep.txt").write_text("still here")
+    server = subprocess.Popen([sys.executable, "-c",
+        "import http.server\nclass H(http.server.BaseHTTPRequestHandler):\n"
+        "  def do_GET(s): s.send_response(200); s.end_headers(); s.wfile.write(b'{\"service\":\"mst\"}')\n"
+        "  def log_message(s,*a): pass\n"
+        f"http.server.HTTPServer(('127.0.0.1',{port}),H).serve_forever()\n"])
+    try:
+        import time
+        for _ in range(50):
+            try:
+                urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=0.2)
+                break
+            except OSError:
+                time.sleep(0.1)
+        r, calls, rt = launch(tmp_path, src, MXC_PORT=str(port))
+    finally:
+        server.kill()
+    assert r.returncode == 0, r.stderr
+    assert (app / "keep.txt").exists() and (app / ".mxc-ready").exists()
+    assert not any(c[:1] == ["install"] for c in calls)
+    assert ["run", "--manifest-path", str(app / "pixi.toml"), "mxc", "app"] in calls
+
+
+def test_a_second_setup_while_one_runs_steps_aside(tmp_path):
+    lock = tmp_path / "rt" / ".setup-lock"
+    lock.mkdir(parents=True)
+    (lock / "pid").write_text(str(os.getpid()))  # a live process holds it
+    r, calls, rt = launch(tmp_path, tarball(tmp_path / "src.tar.gz"))
+    assert r.returncode == 0 and "already" in r.stderr and calls == []
+
+
+def test_a_stale_lock_is_taken_over(tmp_path):
+    lock = tmp_path / "rt" / ".setup-lock"
+    lock.mkdir(parents=True)
+    (lock / "pid").write_text("999999999")
+    r, _, rt = launch(tmp_path, tarball(tmp_path / "src.tar.gz"))
+    assert r.returncode == 0, r.stderr and not lock.exists()
+
+
+def test_an_old_setup_page_server_is_stopped_first(tmp_path):
+    rt = tmp_path / "rt"
+    rt.mkdir()
+    old = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)", "setup_server.py"])
+    (rt / "setup-server.pid").write_text(str(old.pid))
+    try:
+        launch(tmp_path, tarball(tmp_path / "src.tar.gz"))
+        assert old.wait(timeout=10) is not None
+    finally:
+        old.kill()
+
+
+def test_an_unrelated_process_in_the_pid_file_is_left_alone(tmp_path):
+    rt = tmp_path / "rt"
+    rt.mkdir()
+    other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    (rt / "setup-server.pid").write_text(str(other.pid))
+    try:
+        launch(tmp_path, tarball(tmp_path / "src.tar.gz"))
+        assert other.poll() is None
+    finally:
+        other.kill()
+
+
+def test_server_writes_its_pid_file(tmp_path):
+    log, pidfile = tmp_path / "setup.log", tmp_path / "setup-server.pid"
+    log.write_text("1 pixi failed nope\n")
+    port = free_port()
+    p = subprocess.Popen([sys.executable, str(SETUP / "setup_server.py"), str(log), str(port)],
+                         env={**os.environ, "MXC_SETUP_LINGER": "3"})
+    try:
+        import time
+        for _ in range(50):
+            if pidfile.exists():
+                break
+            time.sleep(0.1)
+        assert pidfile.read_text().strip() == str(p.pid)
+    finally:
+        p.kill()

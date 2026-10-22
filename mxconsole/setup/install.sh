@@ -24,11 +24,15 @@ DAEMON_PORT="${MXC_PORT:-11435}"
 PIXI_DIR="${PIXI_HOME:-$HOME/.pixi}"
 
 note() { printf '%s %s %s %s\n' "$(date +%s)" "$1" "$2" "${3:-}" >> "$LOG"; }
+tell() {  # $1: title, $2: text. A Mac app started from Finder has no terminal: say it in a dialog.
+  [ "$(uname -s)" = Darwin ] && [ -z "${MXC_SETUP_NO_BROWSER:-}" ] || return 0
+  text=$(printf '%s' "$2" | sed 's/\\/\\\\/g; s/"/\\"/g')  # AppleScript string: escape \ and "
+  osascript -e "display alert \"$1\" message \"$text\"" >/dev/null 2>&1
+}
 fail() {
   note "$1" failed "$2"
   echo "omxconsole setup: $2" >&2
-  [ "$(uname -s)" = Darwin ] && [ -z "${MXC_SETUP_NO_BROWSER:-}" ] && \
-    osascript -e "display alert \"omxconsole setup stopped\" message \"$2\"" >/dev/null 2>&1
+  tell "omxconsole setup stopped" "$2"
   exit 1
 }
 open_url() {
@@ -51,14 +55,44 @@ answers() {  # $1: URL, $2: text the body must contain, $3: seconds to wait
 mkdir -p "$RUNTIME"
 
 # --- later launches -----------------------------------------------------------------------------------
-if [ -f "$APP/.mxc-ready" ]; then
+later() {
   find_pixi
   [ -n "$PIXI" ] || { echo "omxconsole: pixi is gone; delete $APP/.mxc-ready to set up again" >&2; exit 1; }
   nohup "$PIXI" run --manifest-path "$APP/pixi.toml" mxc tray >> "$RUNTIME/tray.log" 2>&1 &  # exits 3 if one runs
   exec "$PIXI" run --manifest-path "$APP/pixi.toml" mxc app
+}
+[ -f "$APP/.mxc-ready" ] && later
+
+# An earlier first run that gave up waiting for a slow first start, while omxconsole did come up from $APP:
+# adopt it rather than delete it under the running server.
+if [ -f "$APP/pixi.toml" ] && answers "http://127.0.0.1:$DAEMON_PORT/health" mst 2; then
+  touch "$APP/.mxc-ready"
+  later
 fi
 
 # --- first run ----------------------------------------------------------------------------------------
+# One setup at a time (a double click, or a click and a terminal): the lock is a directory, made atomically.
+LOCK="$RUNTIME/.setup-lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  holder=$(cat "$LOCK/pid" 2>/dev/null)
+  if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then
+    echo "omxconsole setup is already running (pid $holder); its page is http://127.0.0.1:$SETUP_PORT/" >&2
+    open_url "http://127.0.0.1:$SETUP_PORT/"
+    exit 0
+  fi
+  rm -rf "$LOCK" && mkdir "$LOCK" || fail pixi "couldn't take the setup lock $LOCK"
+fi
+echo $$ > "$LOCK/pid"
+trap 'rm -rf "$LOCK"' EXIT
+
+# A setup page left over from an earlier run (it lingers a minute) would answer for this one, then vanish.
+old=$(cat "$RUNTIME/setup-server.pid" 2>/dev/null)
+if [ -n "$old" ] && ps -o args= -p "$old" 2>/dev/null | grep -q setup_server.py; then
+  kill "$old" 2>/dev/null
+  i=0; while kill -0 "$old" 2>/dev/null && [ $i -lt 20 ]; do sleep 0.2; i=$((i + 1)); done
+fi
+rm -f "$RUNTIME/setup-server.pid"
+
 : > "$LOG"
 : > "$OUT"
 
@@ -77,14 +111,18 @@ if answers "http://127.0.0.1:$SETUP_PORT/state" steps 90; then
   open_url "http://127.0.0.1:$SETUP_PORT/"
 else
   echo "omxconsole setup: the setup page didn't start; carrying on (progress in $LOG)" >&2
+  tell "Setting up omxconsole" "The setup page couldn't start, so this runs quietly: a few minutes, then the console opens. Progress: $LOG"
 fi
 
 note source running "$SOURCE"
 rm -rf "$APP.part" && mkdir -p "$APP.part"
 case "$SOURCE" in
-  http://*|https://*) curl -fsSL "$SOURCE" | tar xz -C "$APP.part" --strip-components 1 2>> "$OUT" ;;
-  *) tar xzf "$SOURCE" -C "$APP.part" --strip-components 1 2>> "$OUT" ;;
+  http://*|https://*) TARBALL="$RUNTIME/source.tar.gz"
+    curl -fsSL -o "$TARBALL" "$SOURCE" 2>> "$OUT" || fail source "couldn't download omxconsole ($SOURCE). Is the internet reachable?" ;;
+  *) TARBALL="$SOURCE" ;;
 esac
+tar xzf "$TARBALL" -C "$APP.part" --strip-components 1 2>> "$OUT" || fail source "the download was cut off or damaged ($SOURCE); open omxconsole again to retry"
+[ "$TARBALL" = "$SOURCE" ] || rm -f "$TARBALL"
 [ -f "$APP.part/pixi.toml" ] || fail source "the download didn't contain omxconsole ($SOURCE)"
 rm -rf "$APP" && mv "$APP.part" "$APP"
 note source done
@@ -110,7 +148,7 @@ fi
 
 note start running
 nohup "$PIXI" run --manifest-path "$APP/pixi.toml" mxc tray >> "$RUNTIME/tray.log" 2>&1 &
-answers "http://127.0.0.1:$DAEMON_PORT/health" mst 180 || fail start "omxconsole didn't start. Details: $RUNTIME/tray.log"
+answers "http://127.0.0.1:$DAEMON_PORT/health" mst 600 || fail start "omxconsole didn't start. Details: $RUNTIME/tray.log"
 touch "$APP/.mxc-ready"
 note console - "http://127.0.0.1:$DAEMON_PORT/console"
 note start done

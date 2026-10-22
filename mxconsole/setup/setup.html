@@ -111,7 +111,7 @@
       $("lede").textContent = (login && login.state === "done" ? "It's in your menu bar from now on, and starts when you log in."
         : "It's in your menu bar.") + " Opening the console…";
       $("status").innerHTML = `Set up in <b>${clock(st.elapsed)}</b>`;
-      if (st.console) {
+      if (st.console && /^http:\/\/127\.0\.0\.1:\d+\//.test(st.console)) {
         $("go").href = st.console; $("go").hidden = false;
         if (!moved) { moved = true; setTimeout(() => { location.href = st.console; }, 1500); }
       }

@@ -113,6 +113,8 @@ def finished(log: Path) -> bool:
 
 def main(log: str, port: int) -> int:
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(Path(log)))
+    # install.sh stops a lingering server from an earlier run with this (after checking it is one of ours).
+    Path(log).with_name("setup-server.pid").write_text(str(os.getpid()))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     deadline = time.monotonic() + MAX_LIFETIME
     while not finished(Path(log)) and time.monotonic() < deadline:

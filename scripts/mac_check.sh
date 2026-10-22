@@ -96,8 +96,10 @@ env -i HOME="$WORK/home" USER="$USER" PATH=/usr/bin:/bin:/usr/sbin:/sbin MXC_POR
 RT="$WORK/home/.mxc/runtime"
 cat "$RT/setup.log" "$RT/app-launch.log" >> "$LOG" 2>/dev/null
 tail -20 "$RT/setup.log" 2>/dev/null
-appmxc() { env HOME="$WORK/home" MXC_PORT=18453 "$(command -v pixi)" run --manifest-path "$RT/app/pixi.toml" mxc "$@"; }
-appmxc status 2>&1 | tee -a "$LOG"                       # GPU memory should be the Mac's unified memory
+# step 2 exported a scratch MXC_HOME and port: drop them so this talks to the app's own daemon and database
+appmxc() { env -u MXC_HOME -u MXC_API_KEY HOME="$WORK/home" MXC_PORT=18453 "$(command -v pixi)" run --manifest-path "$RT/app/pixi.toml" mxc "$@"; }
+appmxc status 2>&1 | tee -a "$LOG"
+appmxc metrics 2>&1 | tee -a "$LOG"                      # the GPU line should be the Mac's unified memory
 appmxc port acme/weird --auto 2>&1 | tee -a "$LOG"      # should say the automatic port is Linux-only
 TRAY=$(lsof -t "$WORK/home/.mxc/tray.lock" 2>/dev/null)
 [ -n "$TRAY" ] && kill -TERM $TRAY                       # the app's tray; it stops the daemon it started
