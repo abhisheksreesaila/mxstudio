@@ -175,3 +175,19 @@ def test_cli_autostart_rejects_other_words(monkeypatch, tmp_path):
 
 def test_tests_never_see_the_real_home():
     assert "mxc-home" not in str(Path.home()) and Path.home().name == "home" and "pytest" in str(Path.home())
+
+
+def test_first_run_turns_on_login_and_the_shim(tmp_path):
+    calls, run = runner()
+    said = autostart.first_run(PROJECT, platform="linux", home=tmp_path, pixi=PIXI, runner=run)
+    assert ["systemctl", "--user", "enable", autostart.UNIT] in calls
+    assert (tmp_path / ".local/bin/mxc").exists() and "on from the next login" in said
+
+
+def test_first_run_leaves_a_foreign_mxc_and_says_so(tmp_path):
+    other = tmp_path / ".local/bin/mxc"
+    other.parent.mkdir(parents=True)
+    other.write_text("mine")
+    _, run = runner()
+    said = autostart.first_run(PROJECT, platform="darwin", home=tmp_path, pixi=PIXI, runner=run)
+    assert other.read_text() == "mine" and "left it alone" in said

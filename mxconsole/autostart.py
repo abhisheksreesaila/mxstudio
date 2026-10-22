@@ -165,3 +165,23 @@ def remove_shim(home: Path | None = None) -> Path | None:
         path.unlink()
         return path
     return None
+
+
+def first_run(project: Path, platform: str = sys.platform, home: Path | None = None, pixi: str | None = None,
+              runner: Callable[[list[str]], int] | None = None) -> str:
+    """What the first-run setup does once everything is installed: start at login, and `mxc` on PATH.
+    A foreign `mxc` is left alone (and said so); failing to turn on start at login raises."""
+    set_enabled(True, project, platform=platform, home=home, pixi=pixi, runner=runner)
+    try:
+        shim = f"`mxc` in {install_shim(project, home=home, pixi=pixi).parent}"
+    except AutostartError as e:
+        shim = str(e)
+    return f"on from the next login; {shim}"
+
+
+if __name__ == "__main__":  # `python -m mxconsole.autostart`, run by the first-run setup (mxconsole/setup/install.sh)
+    from mxconsole.app import project_dir
+    try:
+        print(first_run(project_dir()))
+    except AutostartError as e:
+        sys.exit(str(e))

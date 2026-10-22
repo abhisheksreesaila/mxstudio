@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setting up omxconsole</title>
+<!-- The first-run setup page. Self-contained (it runs before omxconsole is downloaded): omxqua's Developer family
+     values are copied in, not linked. It polls /state (setup_server.py) and moves to the console when it's up. -->
+<style>
+  :root {
+    --s0: #eeeef1; --s1: #ffffff; --s2: #f6f6f8; --ink: #0b0b0d; --ink2: #5b5b63; --faint: #c9c9cf; --line: #e3e3e8;
+    --ok: #137036; --bad: #c01f25; --accent: #0b0b0d; --on-accent: #ffffff;
+    --sh1: 0 1px 2px rgba(20,16,10,.06), 0 0 0 1px rgba(20,16,10,.045);
+    --sh2: 0 6px 18px rgba(20,16,10,.10), 0 0 0 1px rgba(20,16,10,.05);
+    --spring: linear(0, 0.023, 0.079, 0.154, 0.237, 0.322, 0.405, 0.482, 0.553, 0.617, 0.674, 0.723, 0.766, 0.803, 0.835, 0.862, 0.885, 0.905, 0.921, 0.935, 0.946, 0.955, 0.963, 0.97, 0.975, 0.98, 0.983, 0.986, 0.989, 0.991, 0.993, 0.994, 0.995, 0.996, 0.997, 0.997, 0.998, 0.998, 0.999, 0.999, 1);
+    --sans: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --s0: #0b0b0d; --s1: #151518; --s2: #1d1d21; --ink: #ededef; --ink2: #a9a9b1; --faint: #3a3a40; --line: #2a2a30;
+      --ok: #3ccf6e; --bad: #f2555a; --accent: #ededef; --on-accent: #0b0b0d;
+      --sh1: 0 1px 0 rgba(255,255,255,.035) inset, 0 1px 2px rgba(0,0,0,.5);
+      --sh2: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 18px rgba(0,0,0,.45); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--s0); color: var(--ink);
+    font: 15px/1.5 var(--sans); padding: 24px; -webkit-font-smoothing: antialiased; }
+  .card { width: min(520px, 100%); background: var(--s1); border-radius: 16px; box-shadow: var(--sh2); padding: 28px 28px 22px; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; font-weight: 600; letter-spacing: -.01em; }
+  .brand svg { width: 28px; height: 28px; border-radius: 8px; }
+  h1 { font-size: 24px; line-height: 1.2; letter-spacing: -.02em; margin: 0 0 6px; font-weight: 650; }
+  .lede { color: var(--ink2); margin: 0 0 20px; }
+  .bar { height: 6px; border-radius: 99px; background: var(--s2); box-shadow: var(--sh1); overflow: hidden; margin-bottom: 18px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .6s var(--spring); }
+  ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  li { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: start; padding: 9px 10px; border-radius: 10px;
+    transition: background .3s, transform .4s var(--spring); }
+  li.running { background: var(--s2); transform: translateX(2px); }
+  .mark { position: relative; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; margin-top: 1px;
+    box-shadow: inset 0 0 0 1.5px var(--faint); color: var(--on-accent); font-size: 12px; }
+  li.done .mark, li.skipped .mark { background: var(--ok); box-shadow: none; }
+  li.skipped .mark { background: var(--ink2); }
+  li.failed .mark { background: var(--bad); box-shadow: none; }
+  li.running .mark { box-shadow: inset 0 0 0 2px var(--faint); }
+  li.running .mark::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid transparent;
+    border-top-color: var(--ink); animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(1turn); } }
+  .label { font-weight: 550; }
+  li.next .label { color: var(--ink2); font-weight: 450; }
+  .hint { color: var(--ink2); font-size: 13px; }
+  li.failed .hint { color: var(--bad); }
+  .time { font: 12.5px/22px var(--mono); color: var(--ink2); font-variant-numeric: tabular-nums; }
+  .foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 18px; padding-top: 14px;
+    border-top: 1px solid var(--line); color: var(--ink2); font-size: 13px; }
+  .foot b { font: 500 13px var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .btn { display: inline-flex; align-items: center; height: 34px; padding: 0 16px; border-radius: 99px; border: 0;
+    background: var(--accent); color: var(--on-accent); font: 550 14px var(--sans); text-decoration: none; cursor: pointer;
+    transition: transform .25s var(--spring); }
+  .btn:active { transform: scale(.96); }
+  .btn[hidden] { display: none; }
+  @media (prefers-reduced-motion: reduce) { * { transition-duration: .15s !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<main class="card" aria-live="polite">
+  <div class="brand">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="#0a0a0b"/><path d="M8 35V21a5.5 5.5 0 0 1 11 0v14M19 21a5.5 5.5 0 0 1 11 0l10 14M40.5 18 29.5 35" fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40.5" cy="11.5" r="2.6" fill="#16a34a"/></svg>
+    omxconsole
+  </div>
+  <h1 id="title">Setting up omxconsole</h1>
+  <p class="lede" id="lede">This happens once. It downloads MAX and Python into one folder in your home; nothing else on your machine changes. The big download is most of the wait.</p>
+  <div class="bar" role="progressbar" aria-label="Setup progress" aria-valuemin="0" aria-valuemax="100"><i id="fill"></i></div>
+  <ol id="steps"></ol>
+  <div class="foot"><span id="status">Starting…</span><a class="btn" id="go" hidden>Open the console</a></div>
+</main>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const clock = (s) => (s === null || s === undefined ? "" : s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`);
+  const symbol = { done: "✓", skipped: "–", failed: "!" };
+  let moved = false;
+
+  function paint(st) {
+    const list = $("steps");
+    list.replaceChildren(...st.steps.map((s) => {
+      const li = document.createElement("li");
+      li.className = s.state;
+      const mark = document.createElement("span"); mark.className = "mark"; mark.textContent = symbol[s.state] || "";
+      const text = document.createElement("div");
+      const label = document.createElement("div"); label.className = "label"; label.textContent = s.label;
+      const hint = document.createElement("div"); hint.className = "hint";
+      hint.textContent = s.state === "failed" || s.state === "skipped" || (s.state === "done" && s.message) ? s.message || s.hint : s.hint;
+      text.append(label, hint);
+      const time = document.createElement("span"); time.className = "time"; time.textContent = s.state === "next" ? "" : clock(s.seconds);
+      li.append(mark, text, time);
+      return li;
+    }));
+    const finished = st.steps.filter((s) => s.state === "done" || s.state === "skipped").length;
+    const pct = Math.round((finished / st.steps.length) * 100);
+    $("fill").style.width = `${pct}%`;
+    document.querySelector(".bar").setAttribute("aria-valuenow", String(pct));
+    if (st.state === "failed") {
+      $("title").textContent = "Setup stopped";
+      $("lede").textContent = "The step marked ! says why. Fix that and open omxconsole again: it picks up from the start.";
+      $("status").innerHTML = `Stopped after <b>${clock(st.elapsed)}</b>`;
+      return false;
+    }
+    if (st.state === "done") {
+      $("title").textContent = "omxconsole is ready";
+      $("lede").textContent = "It's in your menu bar from now on, and starts when you log in. Opening the console…";
+      $("status").innerHTML = `Set up in <b>${clock(st.elapsed)}</b>`;
+      if (st.console) {
+        $("go").href = st.console; $("go").hidden = false;
+        if (!moved) { moved = true; setTimeout(() => { location.href = st.console; }, 1500); }
+      }
+      return false;
+    }
+    const now = st.steps.find((s) => s.state === "running");
+    $("status").innerHTML = `${now ? now.label : "Working"} · <b>${clock(st.elapsed)}</b> so far`;
+    return true;
+  }
+
+  async function poll() {
+    let again = true;
+    try {
+      const r = await fetch("/state", { cache: "no-store" });
+      again = paint(await r.json());
+    } catch (_) {
+      $("status").textContent = "Lost touch with the setup; it may have finished. Reload to check.";
+    }
+    if (again) setTimeout(poll, 1000);
+  }
+  poll();
+})();
+</script>
+</body>
+</html>
