@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>omxconsole · pages, not blades · mock</title>
+<link rel="stylesheet" href="../omxconsole/omxqua/src/fonts.css">
+<link rel="stylesheet" href="../omxconsole/omxqua/src/tokens.css">
+<link rel="stylesheet" href="../omxconsole/omxqua/src/components.css">
+<style>
+/* Mock for docs/briefs/console-pages.md: one page at a time, the model is a picker. Console-only parts are cx-. */
+html, body { margin: 0; height: 100%; background: #050506; }
+body { display: grid; place-items: center; }
+.frame { width: 100vw; height: 100vh; transition: width .35s cubic-bezier(.2,.8,.2,1), height .35s cubic-bezier(.2,.8,.2,1), border-radius .35s; overflow: hidden; }
+body.phone .frame { width: 390px; height: 800px; border-radius: 44px; box-shadow: 0 0 0 10px #1c1c20, 0 30px 80px rgb(0 0 0 / .5); }
+.app { position: relative; height: 100%; overflow: hidden; container-type: inline-size; background: var(--oq-surface-0); color: var(--oq-ink); font-family: var(--oq-font); font-size: var(--oq-text); }
+.ico { width: 16px; height: 16px; flex: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
+
+/* ---- top islands ---- */
+.cx-top { position: absolute; inset: 14px 16px auto 16px; z-index: 30; display: flex; align-items: center; gap: 10px; }
+.isl { height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 5px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); }
+.isl button { border: 0; background: none; height: 34px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; gap: 7px; font: 600 13px var(--oq-font); color: var(--oq-ink-2); white-space: nowrap; }
+.isl button:hover { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
+.isl button.ic { width: 34px; padding: 0; justify-content: center; }
+.isl button.on { color: var(--oq-ink); background: rgb(var(--oq-state) / .09); }
+.brand { padding: 0 14px 0 8px; gap: 9px; font: 650 15px var(--oq-font); color: var(--oq-ink); }
+.brand .mk { width: 26px; height: 26px; border-radius: 8px; background: var(--oq-ink); color: var(--oq-surface-0); display: grid; place-items: center; font: 700 10px var(--oq-font-mono); }
+.crumbs { margin: 0 auto; }
+.crumbs .sep { color: var(--oq-ink-faint); width: 14px; height: 14px; }
+.picker { font-family: var(--oq-font-mono) !important; color: var(--oq-ink) !important; background: rgb(var(--oq-state) / .07) !important; }
+.picker .cv { width: 14px; height: 14px; color: var(--oq-ink-2); }
+.k .ico { color: var(--oq-data-3); } .g .ico { color: var(--oq-data-2); } .s .ico { color: var(--oq-warn); }
+.bcn { gap: 9px; padding: 0 14px; font: 600 13px var(--oq-font); }
+.bcn i { width: 8px; height: 8px; border-radius: 50%; background: var(--oq-ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--oq-ok) 25%, transparent); }
+.bcn .mono { color: var(--oq-ink-2); }
+
+/* ---- the picker menu ---- */
+.pmenu { position: absolute; z-index: 40; top: 64px; width: 340px; padding: 6px; border-radius: 16px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-3, var(--oq-shadow-2));
+  opacity: 0; transform: translateY(-6px) scale(.98); transform-origin: top center; pointer-events: none; transition: opacity .22s, transform .22s cubic-bezier(.2,.8,.2,1); }
+.pmenu.open { opacity: 1; transform: none; pointer-events: auto; }
+.pmenu .hd { font: 500 11px var(--oq-font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--oq-ink-2); padding: 8px 10px 6px; }
+.pmenu button { width: 100%; border: 0; background: none; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; text-align: left; }
+.pmenu button:hover { background: rgb(var(--oq-state) / .06); }
+.pmenu button.on { background: rgb(var(--oq-state) / .1); }
+.pmenu b { flex: 1; font: 600 13px var(--oq-font-mono); }
+.pmenu span { font: 12px var(--oq-font-mono); color: var(--oq-ink-2); }
+.pmenu .add { color: var(--oq-ink-2); font-weight: 600; font-size: 13px; border-top: 1px solid var(--oq-line-2); border-radius: 0 0 10px 10px; margin-top: 4px; }
+.scrim2 { position: absolute; inset: 0; z-index: 39; display: none; }
+.scrim2.on { display: block; }
+
+/* ---- pages ---- */
+.page { position: absolute; inset: 72px 14px 14px; display: none; }
+.page.on { display: flex; animation: settle .26s cubic-bezier(.2,.8,.2,1); }
+@keyframes settle { from { opacity: 0; transform: translateY(12px); } }
+.sheet2 { flex: 1; min-width: 0; background: var(--oq-surface-1); border-radius: var(--oq-radius-card); box-shadow: var(--oq-shadow-1); display: flex; flex-direction: column; overflow: hidden; }
+.ph2 { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--oq-line-2); }
+.ph2 .bi { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--c); flex: none; }
+.ph2 h2 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -.02em; }
+.ph2 .sub { font-size: 12.5px; color: var(--oq-ink-2); margin-top: 2px; }
+.ph2 .sp { flex: 1; }
+.ph2 .src { font: 12px var(--oq-font-mono); color: var(--oq-ink-2); }
+.ph2 .src::before { content: "$ "; color: var(--oq-ink-faint); }
+.back { border: 0; background: rgb(var(--oq-state) / .06); width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; color: var(--oq-ink-2); }
+.body2 { flex: 1; overflow: auto; padding: 16px 18px; }
+
+/* flat buttons everywhere: no shadow, no lift. Tonal = a tint; the one filled verb = ink. */
+.fb { height: 34px; padding: 0 13px; border-radius: 999px; border: 0; display: inline-flex; align-items: center; gap: 7px; font: 600 13px var(--oq-font); background: rgb(var(--oq-state) / .06); color: var(--oq-ink); box-shadow: none; transition: background .15s, transform .12s; }
+.fb:hover { background: rgb(var(--oq-state) / .1); }
+.fb:active { transform: scale(.97); }
+.fb .ico { color: var(--c, currentColor); }
+.fb.fill { background: var(--oq-accent); color: var(--oq-on-accent); }
+.fb.fill .ico { color: inherit; }
+.fb.danger { color: var(--oq-bad); }
+
+/* home */
+.cx-tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.cx-tbl th { text-align: left; font: 500 11px var(--oq-font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--oq-ink-2); padding: 8px 10px; border-bottom: 1px solid var(--oq-line-2); }
+.cx-tbl td { padding: 12px 10px; border-bottom: 1px solid var(--oq-line-2); }
+.cx-tbl tbody tr { cursor: pointer; } .cx-tbl tbody tr:hover td { background: rgb(var(--oq-state) / .04); }
+.cx-tbl .nm { font: 600 13.5px var(--oq-font-mono); }
+.cx-tbl .num { font-family: var(--oq-font-mono); text-align: right; }
+.st { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--oq-ink-2); }
+.st i { width: 7px; height: 7px; border-radius: 50%; background: var(--oq-ink-faint); }
+.st.run { color: var(--oq-ok); } .st.run i { background: var(--oq-ok); }
+.st.bad { color: var(--oq-bad); } .st.bad i { background: var(--oq-bad); }
+
+/* model page */
+.mp { flex: 1; display: grid; grid-template-columns: 196px 1fr; min-height: 0; }
+.menu2 { border-right: 1px solid var(--oq-line-2); padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
+.menu2 button { border: 0; background: none; height: 36px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 10px; font: 550 13.5px var(--oq-font); color: var(--oq-ink-2); text-align: left; }
+.menu2 button:hover { background: rgb(var(--oq-state) / .05); color: var(--oq-ink); }
+.menu2 button.on { background: rgb(var(--oq-state) / .09); color: var(--oq-ink); }
+.menu2 button .ico { color: var(--c); }
+.main2 { overflow: auto; min-width: 0; }
+.cmdbar { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 18px; border-bottom: 1px solid var(--oq-line-2); }
+.cmdbar .danger { margin-left: auto; }
+.sec { padding: 16px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.sec .wide { grid-column: 1 / -1; }
+.cardx { background: var(--oq-surface-2); border-radius: 14px; padding: 14px 16px; }
+.cardx h3 { margin: 0 0 10px; font-size: 13.5px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
+.cardx h3 .ico { color: var(--c); }
+.cardx .src { font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); margin-top: 10px; }
+.cardx .src::before { content: "$ "; color: var(--oq-ink-faint); }
+/* metrics: a regular 2×2, every tile the same surface, no elevation */
+.m4 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.m4 div { background: rgb(var(--oq-state) / .045); border-radius: 12px; padding: 12px 14px; }
+.m4 small { display: block; font: 500 11px var(--oq-font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--oq-ink-2); }
+.m4 b { display: block; margin-top: 4px; font: 600 24px var(--oq-font-mono); letter-spacing: -.02em; }
+.m4 b em { font: 500 12px var(--oq-font-mono); color: var(--oq-ink-2); font-style: normal; margin-left: 3px; }
+.dl { display: grid; grid-template-columns: 110px 1fr; gap: 9px 14px; margin: 0; font-size: 13.5px; }
+.dl dt { color: var(--oq-ink-2); } .dl dd { margin: 0; font: 13px var(--oq-font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spark { width: 100%; height: 76px; display: block; }
+.spark path.l { fill: none; stroke: var(--oq-data-1); stroke-width: 1.6; transition: d .3s; }
+.spark path.a { fill: color-mix(in srgb, var(--oq-data-1) 14%, transparent); transition: d .3s; }
+.fit { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: rgb(var(--oq-state) / .08); margin: 4px 0 6px; }
+.fit i { display: block; height: 100%; transition: width .3s cubic-bezier(.2,.8,.2,1); }
+.fitk { display: flex; justify-content: space-between; font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); }
+.logs { background: #0b0b0d; color: #c9c9cf; border-radius: 12px; padding: 14px 16px; font: 12px/1.7 var(--oq-font-mono); white-space: pre; overflow: auto; }
+.logs .w { color: #f5a524; }
+.nb { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.cell { border-left: 3px solid var(--oq-data-1); background: rgb(var(--oq-state) / .04); border-radius: 0 10px 10px 0; padding: 10px 14px; font: 12.5px/1.6 var(--oq-font-mono); white-space: pre-wrap; }
+.cell.md { border-color: transparent; font-family: var(--oq-font); font-size: 13.5px; }
+.swap { transition: opacity .18s; } .swap.dim { opacity: .35; }
+.empty2 { grid-column: 1 / -1; text-align: center; padding: 50px 20px; color: var(--oq-ink-2); }
+.empty2 b { display: block; color: var(--oq-ink); font-size: 15px; margin-bottom: 6px; }
+.row2 { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--oq-line-2); }
+.row2:last-child { border-bottom: 0; } .row2 .t { flex: 1; } .row2 .t b { display: block; font-size: 14px; } .row2 .t span { font-size: 12.5px; color: var(--oq-ink-2); }
+.row2 code { font: 12.5px var(--oq-font-mono); color: var(--oq-ink-2); }
+
+/* demo controls */
+.demo { position: fixed; left: 14px; bottom: 14px; z-index: 100; display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: #1c1c20; box-shadow: 0 6px 24px rgb(0 0 0 / .4); font: 600 12px var(--oq-font, system-ui); }
+.demo button { border: 0; background: none; color: #a1a1aa; height: 30px; padding: 0 12px; border-radius: 999px; }
+.demo button.on { background: #3f3f46; color: #fafafa; }
+.demo span { color: #71717a; padding: 0 8px 0 10px; align-self: center; }
+
+/* phone: same pages one at a time; the menu becomes a strip, the picker a sheet */
+@container (max-width: 760px) {
+  .cx-top { inset: 10px 10px auto 10px; }
+  .brand .nm, .tools .t, .crumbs .home-c, .crumbs .sep.a, .bcn .mono { display: none; }
+  .crumbs { margin: 0; flex: 1; min-width: 0; }
+  .crumbs .picker { flex: 1; min-width: 0; justify-content: space-between; }
+  .crumbs .sec-c, .crumbs .sep.b { display: none; }
+  .tools button.k, .tools button.g, .tools button.s, #theme { display: none; }
+  .crumbs .picker span { overflow: hidden; text-overflow: ellipsis; }
+  .page { inset: 66px 8px 8px; }
+  .mp { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .menu2 { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--oq-line-2); overflow-x: auto; padding: 8px; }
+  .menu2 button { flex: none; }
+  .sec { grid-template-columns: 1fr; padding: 12px; }
+  .cmdbar { padding: 10px 12px; } .cmdbar .fb:not(.fill) .t { display: none; } .cmdbar .fb:not(.fill) { width: 34px; padding: 0; justify-content: center; }
+  .pmenu { top: auto !important; bottom: 0; left: 0 !important; width: auto; right: 0; border-radius: 22px 22px 0 0; padding: 10px 10px 26px; transform: translateY(100%); }
+  .pmenu.open { transform: none; }
+  .pmenu .grab2 { display: block; }
+  .scrim2.on { background: rgb(0 0 0 / .35); }
+  .cx-tbl .hide-p { display: none; }
+  .ph2 .src { display: none; }
+}
+.grab2 { display: none; width: 38px; height: 5px; border-radius: 3px; background: var(--oq-line); margin: 0 auto 8px; }
+</style>
+</head>
+<body>
+<div class="frame">
+<div class="app oq-root oq-night oq-family-dev" id="app">
+  <div class="cx-top">
+    <div class="isl"><button class="brand" data-go="#/"><span class="mk">omx</span><span class="nm">omxconsole</span></button></div>
+    <div class="isl crumbs" id="crumbs"></div>
+    <div class="isl tools">
+      <button class="k" data-go="#/keys"><svg class="ico"><use href="#i-key"/></svg><span class="t">API keys</span></button>
+      <button class="g" data-go="#/gateway"><svg class="ico"><use href="#i-net"/></svg><span class="t">Gateway</span></button>
+      <button class="s" data-go="#/security"><svg class="ico"><use href="#i-lock"/></svg><span class="t">Security</span></button>
+      <button class="ic" data-go="#/settings" aria-label="Settings"><svg class="ico"><use href="#i-gear"/></svg></button>
+      <button class="ic" id="theme" aria-label="Theme"><svg class="ico"><use href="#i-moon"/></svg></button>
+    </div>
+    <div class="isl"><button class="bcn" data-go="#/"><i></i>2 running <span class="mono">84 tok/s</span></button></div>
+  </div>
+
+  <div class="scrim2" id="scrim"></div>
+  <div class="pmenu" id="pmenu"><div class="grab2"></div><div class="hd">Switch model · stays on <span id="pmsec"></span></div><div id="plist"></div>
+    <button class="add" data-go="#/add"><svg class="ico"><use href="#i-plus"/></svg>Add a model</button></div>
+
+  <!-- My models -->
+  <section class="page" data-page="home"><div class="sheet2">
+    <div class="ph2"><div class="bi" style="--c:var(--oq-data-1)"><svg class="ico"><use href="#i-box"/></svg></div><div><h2>My models</h2><div class="sub">4 models · 2 running · 11.2 of 24 GB GPU</div></div><div class="sp"></div><span class="src">mxc ls</span><button class="fb fill" data-go="#/add"><svg class="ico"><use href="#i-plus"/></svg>Add a model</button></div>
+    <div class="body2"><table class="cx-tbl"><thead><tr><th>Model</th><th>State</th><th class="hide-p">Architecture</th><th class="num hide-p">Memory</th><th class="num">tok/s</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </div></section>
+
+  <!-- the one model page -->
+  <section class="page" data-page="model"><div class="sheet2"><div class="mp">
+    <nav class="menu2" id="menu"></nav>
+    <div class="main2"><div class="cmdbar" id="cmdbar"></div><div class="sec swap" id="sec"></div></div>
+  </div></div></section>
+
+  <!-- plain pages -->
+  <section class="page" data-page="keys"><div class="sheet2"><div class="ph2"><button class="back" data-back><svg class="ico"><use href="#i-left"/></svg></button><div class="bi" style="--c:var(--oq-data-3)"><svg class="ico"><use href="#i-key"/></svg></div><div><h2>API keys</h2><div class="sub">One key per app. Revoke one and only that app stops.</div></div><div class="sp"></div><span class="src">mxc keys</span><button class="fb fill"><svg class="ico"><use href="#i-plus"/></svg>New key</button></div>
+    <div class="body2"><div class="row2"><div class="t"><b>notes-app</b><span>last used 2 min ago</span></div><code>mxk_…8f2a</code><button class="fb danger">Revoke</button></div><div class="row2"><div class="t"><b>zed</b><span>last used yesterday</span></div><code>mxk_…11c0</code><button class="fb danger">Revoke</button></div></div></div></section>
+  <section class="page" data-page="gateway"><div class="sheet2"><div class="ph2"><button class="back" data-back><svg class="ico"><use href="#i-left"/></svg></button><div class="bi" style="--c:var(--oq-data-2)"><svg class="ico"><use href="#i-net"/></svg></div><div><h2>Gateway</h2><div class="sub">One OpenAI-compatible endpoint for every model</div></div><div class="sp"></div><span class="src">mxc status</span></div>
+    <div class="body2"><div class="row2"><div class="t"><b>Endpoint</b><span>https://ablearn.local:11435/v1</span></div><button class="fb"><svg class="ico"><use href="#i-copy"/></svg>Copy</button></div><div class="row2"><div class="t"><b>Requests today</b><span>1,284 · p50 212 ms</span></div></div></div></div></section>
+  <section class="page" data-page="security"><div class="sheet2"><div class="ph2"><button class="back" data-back><svg class="ico"><use href="#i-left"/></svg></button><div class="bi" style="--c:var(--oq-warn)"><svg class="ico"><use href="#i-lock"/></svg></div><div><h2>Security</h2><div class="sub">HTTPS on your network, with a certificate your devices trust</div></div><div class="sp"></div><span class="src">mxc expose</span></div>
+    <div class="body2"><div class="row2"><div class="t"><b>HTTPS on the LAN</b><span>On · certificate valid until 2027-10-02</span></div><span class="st run"><i></i>secure</span></div></div></div></section>
+  <section class="page" data-page="settings"><div class="sheet2"><div class="ph2"><button class="back" data-back><svg class="ico"><use href="#i-left"/></svg></button><div class="bi" style="--c:var(--oq-ink-2)"><svg class="ico"><use href="#i-gear"/></svg></div><div><h2>Settings</h2><div class="sub">Start at login, theme, where models live</div></div></div>
+    <div class="body2"><div class="row2"><div class="t"><b>Start at login</b><span>The tray and the daemon come back after a reboot</span></div><span class="st run"><i></i>on</span></div><div class="row2"><div class="t"><b>Models folder</b><span>~/.mxc/models</span></div></div></div></div></section>
+  <section class="page" data-page="add"><div class="sheet2"><div class="ph2"><button class="back" data-back><svg class="ico"><use href="#i-left"/></svg></button><div class="bi" style="--c:var(--oq-data-1)"><svg class="ico"><use href="#i-plus"/></svg></div><div><h2>Add a model</h2><div class="sub">Unchanged: paste a Hugging Face name, watch the stages, it joins My models</div></div></div><div class="body2"><div class="empty2"><b>Same flow as today</b>Only the frame around it changes: a page with Back, not a blade.</div></div></div></section>
+</div>
+</div>
+
+<div class="demo"><span>Mock</span><button class="on" data-dev="desk">Desktop</button><button data-dev="phone">Phone</button></div>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m12 14 4-4"/><path d="M3.3 19a10 10 0 1 1 17.4 0"/></symbol>
+<symbol id="i-logs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M17 6l3 3"/></symbol>
+<symbol id="i-net" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+<symbol id="i-rot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></symbol>
+</defs></svg>
+
+<script>
+const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+const ic = (n) => `<svg class="ico"><use href="#i-${n}"/></svg>`;
+const MODELS = [
+  { name: "qwen2.5-0.5b", arch: "Qwen2", state: "run", word: "running", mem: 2.1, tps: 61, req: 1132, p50: 188, ctx: "32k", repo: "Qwen/Qwen2.5-0.5B-Instruct", q: "bf16", series: [3,5,4,8,7,9,12,10,13,11,15,14], bench: [[1, 61], [4, 196], [16, 512]] },
+  { name: "smollm3-3b", arch: "SmolLM3", state: "run", word: "running", mem: 9.1, tps: 23, req: 152, p50: 341, ctx: "64k", repo: "HuggingFaceTB/SmolLM3-3B", q: "bf16", series: [1,2,2,3,2,4,3,5,4,4,6,5], bench: [[1, 23], [4, 81]] },
+  { name: "qwen2.5-coder-1.5b-instruct", arch: "Qwen2", state: "", word: "stopped", mem: 0, tps: 0, req: 0, p50: 0, ctx: "32k", repo: "Qwen/Qwen2.5-Coder-1.5B-Instruct", q: "bf16", series: [], bench: [] },
+  { name: "llama-3.2-1b", arch: "Llama", state: "bad", word: "crashed", mem: 0, tps: 0, req: 40, p50: 260, ctx: "128k", repo: "meta-llama/Llama-3.2-1B-Instruct", q: "bf16", series: [2,3,2,1,0,0,0,0,0,0,0,0], bench: [] },
+];
+const SECS = [["overview", "Overview", "box", "var(--oq-data-1)"], ["security", "Security", "lock", "var(--oq-warn)"], ["bench", "Benchmark", "gauge", "var(--oq-data-4)"],
+  ["logs", "Logs", "logs", "var(--oq-data-2)"], ["notebook", "Notebook", "book", "var(--oq-data-3)"]];
+const find = (n) => MODELS.find((m) => m.name === n) || MODELS[0];
+
+// ---- routing: #/ · #/models/<name>/<section> · #/<page> ----
+function parse() { const p = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean); return p[0] === "models" ? { page: "model", model: p[1], sec: p[2] || "overview" } : { page: p[0] || "home" }; }
+let cur = {};
+function render() {
+  const r = parse(), samePage = cur.page === r.page && r.page === "model";
+  const switched = samePage && cur.model !== r.model;
+  $$(".page").forEach((s) => s.classList.toggle("on", s.dataset.page === r.page));
+  if (r.page === "model") { if (switched) { $("#sec").classList.add("dim"); setTimeout(() => { modelPage(r); $("#sec").classList.remove("dim"); }, 120); } else modelPage(r); }
+  crumbs(r); cur = r;
+}
+function crumbs(r) {
+  const names = { keys: "API keys", gateway: "Gateway", security: "Security", settings: "Settings", add: "Add a model" };
+  let h = `<button class="home-c ${r.page === "home" ? "on" : ""}" data-go="#/">My models</button>`;
+  if (r.page === "model") {
+    const m = find(r.model), s = SECS.find((x) => x[0] === r.sec);
+    h += `<svg class="ico sep a"><use href="#i-right"/></svg><button class="picker" id="picker"><span>${m.name}</span><svg class="ico cv"><use href="#i-down"/></svg></button><svg class="ico sep b"><use href="#i-right"/></svg><button class="sec-c on">${s[1]}</button>`;
+  } else if (names[r.page]) h += `<svg class="ico sep a"><use href="#i-right"/></svg><button class="on">${names[r.page]}</button>`;
+  $("#crumbs").innerHTML = h;
+}
+function homeRows() {
+  $("#rows").innerHTML = MODELS.map((m) => `<tr data-go="#/models/${m.name}/overview"><td class="nm">${m.name}</td><td><span class="st ${m.state}"><i></i>${m.word}</span></td><td class="hide-p">${m.arch}</td><td class="num hide-p">${m.mem ? m.mem + " GB" : "–"}</td><td class="num">${m.tps || "–"}</td></tr>`).join("");
+}
+function cmds(m) {
+  const b = (k, t, i, c, cls = "") => `<button class="fb ${cls}" style="--c:${c}">${ic(i)}<span class="t">${t}</span></button>`;
+  const power = m.state === "run" ? b("stop", "Stop", "stop", "", "fill") + b("r", "Restart", "rot", "var(--oq-warn)") : m.state === "bad" ? b("r", "Restart", "rot", "", "fill") : b("start", "Start", "play", "", "fill");
+  return power + b("b", "Run benchmark", "gauge", "var(--oq-data-4)") + b("n", "Open notebook", "book", "var(--oq-data-3)") + b("c", "Copy endpoint", "copy", "var(--oq-accent)") + `<button class="fb danger">${ic("trash")}<span class="t">Remove</span></button>`;
+}
+function spark(s) {
+  if (!s.length) return "";
+  const W = 300, H = 76, mx = Math.max(...s, 1), pts = s.map((v, i) => [i * W / (s.length - 1), H - 4 - v / mx * (H - 12)]);
+  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path class="a" d="${d} L${W} ${H} L0 ${H}Z"/><path class="l" d="${d}"/></svg>`;
+}
+function section(m, sec) {
+  const card = (t, i, c, body, src, wide) => `<div class="cardx ${wide ? "wide" : ""}"><h3 style="--c:${c}">${ic(i)}${t}</h3>${body}${src ? `<div class="src">${src}</div>` : ""}</div>`;
+  if (sec === "overview") return card("Right now", "gauge", "var(--oq-data-1)", `<div class="m4">
+      <div><small>Requests</small><b data-n="${m.req}">0</b></div><div><small>Speed</small><b><span data-n="${m.tps}">0</span><em>tok/s</em></b></div>
+      <div><small>Latency p50</small><b><span data-n="${m.p50}">0</span><em>ms</em></b></div><div><small>Memory</small><b><span data-n="${m.mem}" data-f="1">0</span><em>GB</em></b></div></div>`, `mxc status ${m.name}`)
+    + card("Tokens", "logs", "var(--oq-data-1)", m.series.length ? spark(m.series) : `<div style="color:var(--oq-ink-2);font-size:13px;padding:22px 0">Stopped. Start it to see traffic.</div>`, "")
+    + card("About", "box", "var(--oq-data-2)", `<dl class="dl"><dt>Source</dt><dd>${m.repo}</dd><dt>Architecture</dt><dd>${m.arch}</dd><dt>Context</dt><dd>${m.ctx}</dd><dt>Weights</dt><dd>${m.q}</dd></dl>`, `mxc info ${m.name}`)
+    + card("GPU fit", "gauge", "var(--oq-data-3)", `<div class="fit"><i style="width:${m.mem / 24 * 100}%;background:var(--oq-data-1)"></i><i style="width:${(11.2 - m.mem) / 24 * 100}%;background:var(--oq-ink-faint)"></i></div><div class="fitk"><span>this model ${m.mem || 0} GB</span><span>others ${(11.2 - m.mem).toFixed(1)} GB</span><span>24 GB</span></div>`, "");
+  if (sec === "bench") return m.bench.length ? card("Throughput by concurrency", "gauge", "var(--oq-data-4)", `<dl class="dl">${m.bench.map(([c, t]) => `<dt>${c} at once</dt><dd>${t} tok/s</dd>`).join("")}</dl>`, `mxc bench ${m.name}`, true)
+      : `<div class="empty2"><b>No benchmark for ${m.name} yet</b>One run takes about a minute.<br><br><button class="fb fill">${ic("gauge")}Run benchmark</button></div>`;
+  if (sec === "logs") return card("Logs", "logs", "var(--oq-data-2)", `<div class="logs">${m.state === "bad" ? `09:41:02 loading ${m.repo}\n09:41:09 <span class="w">CUDA_ERROR_OUT_OF_MEMORY while compiling graph</span>\n09:41:09 exited (1)` : `09:12:40 serving ${m.name} on :8001\n09:12:41 graph compiled in 38.2 s\n09:13:05 POST /v1/chat/completions 200 ${m.p50} ms`}</div>`, `mxc logs ${m.name}`, true);
+  if (sec === "security") return card("Who can reach it", "lock", "var(--oq-warn)", `<dl class="dl"><dt>Network</dt><dd>LAN, HTTPS</dd><dt>Keys</dt><dd>2 apps allowed</dd></dl>`, "mxc expose", true);
+  return card(`Learn ${m.name}`, "book", "var(--oq-data-3)", `<div class="nb"><div class="cell md">A ${m.arch} model, ${m.ctx} context. This notebook loads its config and tokenizer from <b>${m.repo}</b>.</div><div class="cell">from mxconsole import learn\nm = learn("${m.name}")\nm.config.num_hidden_layers</div></div>`, `mxc learn ${m.name}`, true);
+}
+function countUp() {
+  $$("#sec [data-n]").forEach((el) => { const to = +el.dataset.n, f = el.dataset.f ? 1 : 0, t0 = performance.now();
+    const step = (t) => { const k = Math.min(1, (t - t0) / 420), e = 1 - Math.pow(1 - k, 3); el.textContent = to ? (to * e).toFixed(f).replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "–"; if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step); });
+}
+function modelPage(r) {
+  const m = find(r.model);
+  $("#menu").innerHTML = SECS.map(([k, t, i, c]) => `<button class="${k === r.sec ? "on" : ""}" style="--c:${c}" data-go="#/models/${m.name}/${k}">${ic(i)}${t}</button>`).join("");
+  $("#cmdbar").innerHTML = cmds(m);
+  $("#sec").innerHTML = section(m, r.sec); countUp();
+}
+// ---- picker ----
+function openPicker() {
+  const r = parse(), p = $("#picker").getBoundingClientRect(), a = $("#app").getBoundingClientRect();
+  $("#pmsec").textContent = SECS.find((x) => x[0] === r.sec)[1];
+  $("#plist").innerHTML = MODELS.map((m) => `<button class="${m.name === r.model ? "on" : ""}" data-pick="${m.name}"><span class="st ${m.state}"><i></i></span><b>${m.name}</b><span>${m.tps ? m.tps + " tok/s" : m.word}</span></button>`).join("");
+  $("#pmenu").style.left = Math.max(8, p.left - a.left + p.width / 2 - 170) + "px";
+  $("#pmenu").classList.add("open"); $("#scrim").classList.add("on");
+}
+const closePicker = () => { $("#pmenu").classList.remove("open"); $("#scrim").classList.remove("on"); };
+document.addEventListener("click", (e) => {
+  const t = e.target;
+  if (t.closest("#picker")) return openPicker();
+  const pk = t.closest("[data-pick]"); if (pk) { closePicker(); location.hash = `#/models/${pk.dataset.pick}/${parse().sec}`; return; }
+  if (t.closest("#scrim")) return closePicker();
+  const g = t.closest("[data-go]"); if (g) { closePicker(); location.hash = g.dataset.go; return; }
+  if (t.closest("[data-back]")) return history.length > 1 ? history.back() : (location.hash = "#/");
+  if (t.closest("#theme")) { const a = $("#app"); a.classList.toggle("oq-night"); a.classList.toggle("oq-light"); return; }
+  const d = t.closest("[data-dev]"); if (d) { document.body.classList.toggle("phone", d.dataset.dev === "phone"); $$("[data-dev]").forEach((b) => b.classList.toggle("on", b === d)); }
+});
+addEventListener("hashchange", render);
+homeRows();
+if (!location.hash) location.hash = "#/models/qwen2.5-0.5b/overview"; else render();
+</script>
+</body>
+</html>
