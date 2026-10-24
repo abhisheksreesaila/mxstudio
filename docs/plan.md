@@ -407,13 +407,16 @@ Brief: docs/briefs/console-pages.md · Needs: F-052 · Files: blade-model.* → 
 - [ ] the picker here is a simple list (the wide switcher is F-056); a stopped model shows each tab's empty state
 - [ ] checked in the running console with a running and a stopped model, both themes, 1280 and 390 px
 
-## F-054 Labels: kind, your labels, store, API and CLI [todo]
+## F-054 Labels: kind, your labels, store, API and CLI [done]
 Brief: docs/briefs/console-pages.md · Needs: none · Files: store.py, resolve.py, admin_api.py, cli.py
-- [ ] each model has a kind (chat, coder, vision, embeddings, image) from the model card's `pipeline_tag` and name at pull time; existing models are backfilled; the kind can be corrected
-- [ ] your labels: a `labels` table (name, position) and a model↔label table; create, rename, reorder, delete (removing it from models), add/remove on many models at once
-- [ ] admin API for all of the above; `/admin` model data includes kind and labels
-- [ ] CLI: `mxc label <model> <label>…`, `mxc unlabel <model> <label>`, `mxc labels` (list, `--rename`, `--delete`), `mxc ls --label <l>` and `--kind <k>`
-- [ ] tests over the store, API and CLI; label names are lower-case `[a-z0-9-]`, unique
+- [x] each model has a kind (chat, coder, vision, embeddings, image) from the model card's `pipeline_tag` and name at pull time; existing models are backfilled; the kind can be corrected
+- [x] your labels: a `labels` table (name, position) and a model↔label table; create, rename, reorder, delete (removing it from models), add/remove on many models at once
+- [x] admin API for all of the above; `/admin` model data includes kind and labels
+- [x] CLI: `mxc label <model> <label>…`, `mxc unlabel <model> <label>`, `mxc labels` (list, `--rename`, `--delete`), `mxc ls --label <l>` and `--kind <k>`
+- [x] tests over the store, API and CLI; label names are lower-case `[a-z0-9-]`, unique
+- CLI shape: `mxc label/unlabel <model> <label>…`, `mxc labels [--rename old new | --delete name]`, `mxc ls --label/--kind`, kind corrected with `mxc set <model> --kind coder` (API: `PATCH /admin/models/{name}` `{kind}`). Labels are created on first use. Admin: `GET/POST /admin/labels`, `PATCH/DELETE /admin/labels/{name}`, `PUT /admin/labels/order`, `POST /admin/labels/{name}/add|remove`.
+- Checked live on a scratch home with an old-schema database and a real daemon (migration, CLI, every admin route, 403 without the header). A real Hugging Face pull wasn't run (no network in the agent); pull→kind is covered by fake-hub tests.
+- Reviewer: PASS; fixed its should-fixes (the kind migration is one transaction; stray label links from an older daemon are cleared on first insert and not counted). 942 tests.
 
 ## F-055 My models as a library: search, groups column, labelling [todo]
 Brief: docs/briefs/console-pages.md · Needs: F-052, F-054 · Files: blade-home.* → home-page.*, new library.*
