@@ -424,7 +424,7 @@ Brief: docs/briefs/console-pages.md · Needs: none · Files: store.py, resolve.p
 Brief: docs/briefs/console-pages.md · Needs: F-052, F-054 · Files: blade-home.* → home-page.*, new library.*
 - [ ] full-width search (`/` focuses) over name, kind and #label; groups column: Show (All, Running) · Kind · Your labels, each with a count; running models sort first
 - [ ] labels managed in the column: New label; Edit labels (rename field, drag handle to reorder with mouse or touch, delete ×)
-- [ ] tick models (and "select all shown"): a bar shows your labels as chips; tap adds to all ticked, tap again removes, a ring means some have it; desktop drag of a model (or the ticked ones) onto a label; "+ label" on a model's Overview
+- [ ] tick models (and "select all shown"): a bar shows your labels as chips; tap adds to all ticked, tap again removes, a ring means some have it; desktop drag of a model (or the ticked ones) onto a label
 - [ ] phone: the column becomes a scrolling chip row; Edit labels opens full-height
 - [ ] checked in the running console with 100 fake models (a fixture), both themes, 1280 and 390 px
 
@@ -432,6 +432,7 @@ Brief: docs/briefs/console-pages.md · Needs: F-052, F-054 · Files: blade-home.
 Brief: docs/briefs/console-pages.md · Needs: F-053, F-055 · Files: picker.* (reuses library.*)
 - [ ] the model name in the top bar (or `/`, Ctrl+K on a model page) opens a wide panel over the content: search across the top, the groups column (plus Recent), models as a grid of cards (name, state, kind and labels, tok/s), Recent first then grouped by kind
 - [ ] arrow keys and Enter; Esc closes; switching keeps the tab; Add a model in the footer
+- [ ] "+ label" on a model's Overview (moved here from F-055 so F-053 and F-055 don't share the model page)
 - [ ] phone: a full-height sheet with the same search and chip row
 - [ ] checked with 100 fake models, both themes, 1280 and 390 px
 
