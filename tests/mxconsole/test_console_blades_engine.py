@@ -127,6 +127,8 @@ def test_the_topbar_marks_the_current_crumb_and_stays_on_tokens():
     phone = css[css.index("@container (max-width: 760px)"):]
     assert ".crumbs" in phone and ".crumbs { flex: 1; }" in phone
     assert '"Theme"' not in js and "setTheme" not in js
+    # the bar is the crumbs and the Beacon, nothing else: no tool buttons, no menu
+    assert 'h("nav", { class: "crumbs"' in js and "mountBeacon(right" in js and "cx-tools" not in js and "menu" not in js
     assert "Appearance" in (CONSOLE_DIR / "blade-settings.js").read_text()
 
 

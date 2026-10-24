@@ -1,4 +1,4 @@
-// omxconsole, the console's hash routes (ADR 0005, plain pages). Pure: nothing here touches the DOM (main.js applies the result).
+// omxconsole, the console's hash routes (ADR 0005, plain pages). Pure: nothing here touches the DOM (pages.js applies the result).
 //   #/                          My models (home)
 //   #/keys  #/gateway  #/security  #/settings    the other places
 //   #/add                       Add a model
@@ -26,8 +26,8 @@ export function parseRoute(hash) {
   const head = parts[0].toLowerCase(), rest = parts.slice(1);
   if (head === "") return HOME;
   if (head === "models") return modelRoute(rest);
-  if (head in LEGACY_TAB) return legacyModel(head, rest);
-  if (head in LEGACY) {
+  if (Object.hasOwn(LEGACY_TAB, head)) return legacyModel(head, rest);
+  if (Object.hasOwn(LEGACY, head)) {
     const to = LEGACY[head];
     return to === null ? HOME : to.startsWith("/") ? { redirect: to } : { page: to };
   }
@@ -63,7 +63,7 @@ export function routeForBlade(name, opts = {}) {
   const id = opts && opts.id;
   if (name === "home") return HOME;
   if (name === "model" && id) return { page: "model", model: id, tab: "overview" };
-  if (id && name in { bench: 1, logs: 1, notebook: 1 }) return { page: "model", model: id, tab: name === "bench" ? "benchmark" : name };
+  if (id && ["bench", "logs", "notebook"].includes(name)) return { page: "model", model: id, tab: name === "bench" ? "benchmark" : name };
   if (name === "add" || name === "keys" || name === "gateway" || name === "settings" || name === "security") return { page: name };
   return HOME;
 }

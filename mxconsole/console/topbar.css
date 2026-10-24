@@ -4,15 +4,14 @@
 .bar .sp { flex: 1; }
 
 .crumbs { height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 5px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); min-width: 0; }
-.crumbs button { border: 0; background: none; height: 34px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; gap: 7px; font: 600 13px var(--oq-font); color: var(--oq-ink-2); white-space: nowrap; min-width: 0; }
-.crumbs button:not(.on):not(:disabled) { cursor: pointer; }
-.crumbs button:hover:not(.on) { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
-.crumbs button.on { color: var(--oq-ink); cursor: default; }
-.crumbs button:not(.on) { flex: none; }  /* the parents never shrink; only the current name truncates */
+.crumbs button, .crumbs .cur { border: 0; background: none; height: 34px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; gap: 7px; font: 600 13px var(--oq-font); color: var(--oq-ink-2); white-space: nowrap; min-width: 0; }
+.crumbs button { cursor: pointer; }
+.crumbs button:hover { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
+.crumbs .on { color: var(--oq-ink); cursor: default; }
+.crumbs button { flex: none; }  /* the parents never shrink; only the current name truncates */
 .crumbs .sep { display: grid; color: var(--oq-ink-faint); flex: none; }
 .crumbs .picker { font-family: var(--oq-font-mono); background: rgb(var(--oq-state) / .07); }
-.crumbs .picker span { overflow: hidden; text-overflow: ellipsis; }
-.crumbs .picker svg { color: var(--oq-ink-2); }
+.crumbs .cur { display: block; line-height: 34px; overflow: hidden; text-overflow: ellipsis; }
 
 /* the Beacon floats over the right end of the bar; topbar.js pads .cx-right by its width */
 .cx-right { position: relative; height: 44px; flex: none; z-index: 35; }
@@ -33,7 +32,7 @@
   .bar .sp { display: none; }
   .crumbs { flex: 1; }
   .crumbs .home-c, .crumbs > .sep { display: none; }
-  .crumbs .picker { flex: 1; justify-content: space-between; }
+  .crumbs .picker { flex: 1; }
   .crumbs .ttl, .crumbs .on { padding-left: 10px; color: var(--oq-ink); font-size: 15px; }
   .beacon .bc-lb { max-width: 110px; }
   .cx-right .beacon .bc-open { width: min(350px, calc(100vw - 20px)); }

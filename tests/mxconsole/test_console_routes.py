@@ -78,6 +78,10 @@ def test_the_new_routes():
 def test_unknown_routes_go_home_and_the_api_page_redirects():
     for bad in ("#/nonsense", "#/keys/extra", "#/models", "#/models/", "#/models//logs", "#nonsense"):
         assert route(bad) == {"page": "home"}, bad
+    for inherited in ("#/__proto__/x", "#/constructor/x", "#/toString", "#hasOwnProperty/x", "#/models/x/__proto__"):
+        assert route(inherited)["page"] in ("home", "model"), inherited
+        assert route(inherited).get("tab", "overview") in ("overview", "benchmark", "logs", "notebook"), inherited
+    assert route("#/__proto__/x") == {"page": "home"} and route("#/constructor/x") == {"page": "home"} and route("#/toString") == {"page": "home"}
     assert route("#api") == {"redirect": "/docs"}
     assert route("#network") == {"page": "gateway"} and route("#pull") == {"page": "add"} and route("#daemon") == {"page": "settings"}
 

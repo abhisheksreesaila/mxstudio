@@ -7,7 +7,7 @@ import { parseRoute, hashFor, routeForBlade } from "./routes.js";
 
 const WAIT_FOR_MODELS_MS = 4000;
 const listeners = new Set();
-let host = null, live = null, route = parseRoute(""), steps = 0;
+let host = null, live = null, route = parseRoute("");
 
 export const currentRoute = () => route;
 /** Called with the route after every page change (and once now); returns an unsubscribe function. */
@@ -53,7 +53,7 @@ function modelsLoaded() {
 
 /** Back on a page that has a parent: the browser's Back when we came from inside the console, else the parent page. */
 function backButton(parent) {
-  return h("button", { class: "btn text sm back", type: "button", "data-act": "back", "aria-label": "Back", onClick: () => (steps > 0 ? history.back() : go(parent)) },
+  return h("button", { class: "btn text sm back", type: "button", "data-act": "back", "aria-label": "Back", onClick: () => (history.state && history.state.mxc === 1 ? history.back() : go(parent)) },
     icon("chevron-left", 15, "currentColor", 2), "Back");
 }
 
@@ -80,11 +80,12 @@ async function open(hash) {
   if (r.redirect) { location.replace(r.redirect); return; }
   if (r.needsModel) {
     await modelsLoaded();
+    if (location.hash !== hash) return;  // the person went somewhere else while we waited: that navigation wins
     const first = store.models && store.models[0];
     r = first ? { page: "model", model: first.name, tab: r.tab } : { page: "home" };
   }
   const canon = hashFor(r);
-  if (!sameHash(location.hash, canon)) history.replaceState(null, "", `${location.pathname}${location.search}${canon}`);  // junk or an old shape: tidy it, no history entry
+  if (!sameHash(location.hash, canon)) history.replaceState(history.state, "", `${location.pathname}${location.search}${canon}`);  // junk or an old shape: tidy it, no history entry
   render(r);
 }
 
@@ -94,6 +95,12 @@ export function startPages(el) {
     push: (name, opts) => go(routeForBlade(name, opts)),
     truncate: () => go({ page: "home" }),  // the only caller left is "this model was removed"
   });
-  window.addEventListener("hashchange", () => { steps++; open(location.hash); });
+  // Stamp every entry: {mxc: 0} = the first one (what is before it is not ours), {mxc: 1} = reached from inside the console.
+  // A hashchange to an unstamped entry is a new entry we just navigated to; a stamped one is the browser going back or forward.
+  if (history.state === null) history.replaceState({ mxc: 0 }, "");
+  window.addEventListener("hashchange", () => {
+    if (history.state === null) history.replaceState({ mxc: 1 }, "");
+    open(location.hash);
+  });
   return open(location.hash);
 }

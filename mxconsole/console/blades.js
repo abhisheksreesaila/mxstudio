@@ -62,6 +62,8 @@ export function hueSquare(name, hue, size = 28) {
   return h("span", { class: "sq", style: { "--h": hue, width: `${size}px`, height: `${size}px` } }, icon(name, 16, "currentColor", 1.75));
 }
 
+// F-052: pages.js now shows one blade at a time (makeBlade + setNavigator). mountJourney, layout, onStackChange and the
+// stacking half of push/truncate are no longer used by the console; F-057 deletes them with blade-stack.js and blade-layout.js.
 export function mountJourney(el) {
   journey = el;
   if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => layout()).observe(el);

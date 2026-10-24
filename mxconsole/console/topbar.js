@@ -17,9 +17,10 @@ export function mountTopbar(bar) {
     const list = crumbsFor(route), last = list.length - 1;
     crumbs.replaceChildren(...list.flatMap((c, i) => {
       const cls = [i === last ? "on" : "", c.home ? "home-c" : "", c.picker ? "picker" : i === last ? "ttl" : ""].filter(Boolean).join(" ");
-      const label = c.picker ? [h("span", {}, c.label), icon("chevron-down", 14, "currentColor", 2)] : c.label;
+      // where you are is text, not a button; the ▾ comes with the picker (F-053/F-056)
       return [i ? h("span", { class: "sep" }, icon("chevron-right", 14, "currentColor", 2)) : null,
-        h("button", { type: "button", class: cls, "aria-current": i === last ? "page" : false, onClick: () => { if (c.to) go(c.to); } }, label)];
+        i === last ? h("span", { class: `cur ${cls}`, "aria-current": "page" }, c.label)
+          : h("button", { type: "button", class: cls, onClick: () => go(c.to) }, c.label)];
     }).filter(Boolean));
   });
 }
