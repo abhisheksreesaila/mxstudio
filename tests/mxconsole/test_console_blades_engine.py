@@ -132,9 +132,9 @@ def test_the_topbar_marks_the_current_crumb_and_stays_on_tokens():
     assert "Appearance" in (CONSOLE_DIR / "blade-settings.js").read_text()
 
 
-def test_rows_and_cards_are_real_buttons_and_rails_can_be_focused():
+def test_rows_are_real_buttons_and_rails_can_be_focused():
     home = (CONSOLE_DIR / "blade-home.js").read_text()
-    assert 'h("button", { class: "card' in home and 'class: "namebtn' in home
+    assert 'class: "cb"' in home and 'class: "namebtn' in home
     assert "tabindex" in (CONSOLE_DIR / "blades.js").read_text() and "Enter" in (CONSOLE_DIR / "blades.js").read_text()
 
 

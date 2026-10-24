@@ -1,0 +1,116 @@
+/* omxconsole, the library (F-055): search bar, groups column, tick-and-label bar. Matches docs/design/console-pages/mock.html (v4).
+   Used by My models now and by the switcher in F-056. At 760 px and under the column becomes a scrolling chip row. */
+.psearch { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; border-radius: 12px; background: rgb(var(--oq-state) / .06); color: var(--text-2); }
+.psearch input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--text); font: 500 14px var(--sans); height: 100%; }
+.psearch input::placeholder { color: var(--faint); }
+.psearch:focus-within { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.psearch input:focus-visible { outline: none; }
+.psearch kbd { font: 11px var(--mono); color: var(--faint); padding: 2px 6px; border-radius: 6px; background: rgb(var(--oq-state) / .06); }
+.psearch.big { height: 46px; }
+.psearch.big input { font-size: 15px; }
+.hbar { padding: 12px 18px; border-bottom: 1px solid var(--card-line-2); flex: none; }
+
+/* the library: a groups column beside the results */
+.lib { flex: 1; min-height: 0; display: grid; grid-template-columns: 228px minmax(0, 1fr); }
+.groups { overflow: auto; padding: 6px 10px 16px; border-right: 1px solid var(--card-line-2); display: flex; flex-direction: column; gap: 1px; scrollbar-width: thin; overscroll-behavior: contain; }
+.gh { display: flex; align-items: center; gap: 6px; font: 500 10.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--faint); padding: 14px 10px 6px; flex: none; }
+.gh em { font-style: normal; text-transform: none; letter-spacing: 0; opacity: .75; }
+.gh .ed { margin-left: auto; border: 0; background: none; font: 600 12px var(--sans); color: var(--accent); text-transform: none; letter-spacing: 0; padding: 4px 8px; border-radius: 8px; touch-action: manipulation; }
+.gh .ed:hover { background: rgb(var(--oq-state) / .06); }
+.gi { box-sizing: border-box; flex: none; border: 0; background: none; min-height: 36px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 10px; font: 550 13.5px var(--sans); color: var(--text-2); text-align: left; width: 100%; transition: background .15s, color .15s; touch-action: manipulation; }
+.gi:hover { background: rgb(var(--oq-state) / .05); color: var(--text); }
+.gi.on { background: rgb(var(--oq-state) / .1); color: var(--text); }
+.gi svg { flex: none; }
+.gi .l { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gi small { font: 11.5px var(--mono); color: var(--faint); }
+.gi .d { width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin: 0 4px; flex: none; }
+.gi .hash { width: 16px; text-align: center; color: var(--faint); font: 600 14px var(--mono); flex: none; }
+.gi.new { color: var(--faint); }
+.gi.new input { flex: 1; min-width: 0; height: 30px; border: 0; border-radius: 8px; background: rgb(var(--oq-state) / .06); color: var(--text); font: 550 13px var(--sans); padding: 0 8px; outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.gi.drop { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.gi.got { animation: lib-got .6s; }
+@keyframes lib-got { 30% { background: color-mix(in srgb, var(--ok) 25%, transparent); } }
+/* edit mode: each label is a rename field with a drag handle and a delete */
+.gi.edit { gap: 4px; padding: 0 2px; }
+.gi.edit input { flex: 1; min-width: 0; height: 32px; border: 0; border-radius: 8px; background: rgb(var(--oq-state) / .06); color: var(--text); font: 550 13px var(--sans); padding: 0 9px; outline: none; }
+.gi.edit input:focus { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.hdl { border: 0; background: none; padding: 0; cursor: grab; touch-action: none; width: 34px; height: 40px; display: grid; place-items: center; color: var(--faint); flex: none; border-radius: 8px; }
+.hdl:hover { color: var(--text-2); }
+.hdl:active { cursor: grabbing; }
+.gi .x { border: 0; background: none; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; color: var(--faint); flex: none; }
+.gi .x:hover { color: var(--bad-fg); background: rgb(var(--oq-state) / .05); }
+.gi.dragging { background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); position: relative; z-index: 2; transform: scale(1.02); }
+
+/* results */
+.res { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.res .body2 { flex: 1; min-height: 0; overflow: auto; padding-top: 4px; overscroll-behavior: contain; }
+.cnt { display: flex; gap: 10px; font: 11.5px var(--mono); color: var(--text-2); padding: 12px 18px 0; }
+.cnt .ht { margin-left: auto; color: var(--faint); }
+.none { padding: 30px 18px; color: var(--text-2); font-size: 13px; }
+.cb { width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid var(--card-line); background: none; display: grid; place-items: center; color: transparent; padding: 0; flex: none; touch-action: manipulation; }
+.cb.on { background: var(--accent); border-color: var(--accent); color: var(--inv-text); }
+.cb:not(.on) svg { opacity: 0; }
+.cx-tbl .ck { width: 30px; padding-right: 0; }
+.cx-tbl tr.sel td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.tags { display: inline-flex; gap: 4px; align-items: center; }
+.tag { display: inline-flex; align-items: center; font: 500 11.5px var(--sans); padding: 3px 9px; border-radius: 999px; background: rgb(var(--oq-state) / .06); color: var(--text-2); white-space: nowrap; }
+.tag.k { color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); }
+
+/* the bar that labels the ticked models */
+.selbar { display: none; align-items: center; gap: 6px; padding: 10px 18px; border-top: 1px solid var(--card-line-2); background: var(--oq-surface-2); overflow-x: auto; scrollbar-width: none; flex: none; }
+.selbar.on { display: flex; animation: lib-settle .22s cubic-bezier(.2, .8, .2, 1); }
+@keyframes lib-settle { from { opacity: 0; transform: translateY(12px); } }
+.selbar b { font: 650 13px var(--sans); white-space: nowrap; margin-right: 6px; }
+.selbar .lbl { color: var(--text-2); font-size: 12.5px; white-space: nowrap; }
+.selbar .sp { flex: 1; }
+.chip { flex: none; border: 0; height: 32px; padding: 0 12px; border-radius: 999px; background: rgb(var(--oq-state) / .06); color: var(--text-2); font: 600 12.5px var(--sans); display: inline-flex; align-items: center; gap: 4px; transition: background .15s, color .15s; touch-action: manipulation; }
+.chip:hover { background: rgb(var(--oq-state) / .1); }
+.chip .hash { opacity: .5; }
+.chip.on { background: var(--oq-ink); color: var(--oq-surface-0); }
+.chip.part { box-shadow: inset 0 0 0 1.5px var(--text-2); color: var(--text); }
+.fb { white-space: nowrap; height: 32px; padding: 0 14px; border-radius: 999px; border: 0; background: rgb(var(--oq-state) / .06); color: var(--text); font: 600 13px var(--sans); flex: none; touch-action: manipulation; }
+.fb:hover { background: rgb(var(--oq-state) / .1); }
+
+/* My models page frame */
+.b-home .bb { display: flex; flex-direction: column; overflow: hidden; container-type: normal; }
+.home { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.notes > :not(:empty) { margin: 12px 16px 0; }
+.notes > .attn { margin-bottom: 0; }
+.notes > .stale { margin-bottom: 0; }
+
+/* phone: the column is a scrolling chip row; Edit labels takes the whole page */
+@media (max-width: 760px) {
+  .lib { display: flex; flex-direction: column; }
+  .groups { flex: none; flex-direction: row; align-items: center; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--card-line-2); padding: 8px 12px 10px; gap: 6px; scrollbar-width: none; }
+  .groups .gh { display: none; }
+  .groups .gh.mine { display: flex; padding: 0 0 0 4px; }
+  .groups .gh.mine .t { display: none; }
+  .groups .gh.mine .ed { background: rgb(var(--oq-state) / .06); height: 36px; padding: 0 12px; border-radius: 999px; }
+  .groups .gi { width: auto; border-radius: 999px; background: rgb(var(--oq-state) / .06); padding: 0 13px; gap: 6px; font-size: 13px; min-height: 36px; white-space: nowrap; }
+  .groups .gi.on { background: var(--oq-ink); color: var(--oq-surface-0); }
+  .groups .gi.on small { color: inherit; opacity: .6; }
+  .groups .gi > svg { display: none; }
+  .groups .gi .d { margin: 0; }
+  .groups.editing { flex: 1; flex-direction: column; align-items: stretch; overflow-x: hidden; overflow-y: auto; padding-top: 4px; }
+  .lib:has(.groups.editing) .res { display: none; }
+  .groups.editing > .gi:not(.edit):not(.new), .groups.editing .gh:not(.mine) { display: none; }
+  .groups.editing .gi { width: 100%; border-radius: 10px; background: none; }
+  .groups.editing .gi.new { padding: 0 10px; }
+  .groups.editing .gh.mine { padding: 6px 0; justify-content: flex-end; }
+  .hbar { padding: 10px 12px; }
+  .psearch kbd, .cnt .ht { display: none; }
+  .cnt { padding: 10px 14px 0; }
+  .selbar { padding: 10px 12px; }
+  .cb { width: 26px; height: 26px; }
+  .cx-tbl .ck { width: 46px; }
+  /* touch: every target is at least 44 px to hit, without changing how big it looks (the visible box stays) */
+  .cb, .chip, .gh .ed, .hdl, .gi .x, .gi:not(.edit):not(.new) { position: relative; }
+  .cb::after, .chip::after, .gh .ed::after, .hdl::after, .gi .x::after, .gi:not(.edit):not(.new)::after { content: ""; position: absolute; }
+  .cb::after { inset: -10.5px; }                           /* 26 (1.5 px border inside) -> 44 */
+  .chip::after { inset: -6px 0; }                          /* 32 -> 44 high */
+  .gi:not(.edit):not(.new)::after { inset: -4px 0; }       /* 36 -> 44 high */
+  .gh .ed::after { inset: -4px 0; }                        /* 36 -> 44 high */
+  .hdl::after { inset: -2px -5px; }                        /* 34 x 40 -> 44 x 44 */
+  .gi .x::after { inset: -4px; }                           /* 36 -> 44 */
+}
+@media (prefers-reduced-motion: reduce) { .selbar.on, .gi.got { animation: none; } }
