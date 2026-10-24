@@ -199,8 +199,8 @@ def test_access_is_secure_when_the_lan_endpoint_is_open_and_idle_and_crashed_are
 @needs_node
 def test_the_list_is_filtered_by_name_or_repo():
     rows = "[{name:'qwen',repo_id:'Qwen/Q'},{name:'gemma',repo_id:'google/gemma-3'}]"
-    assert node(f"m.filterModels({rows}, 'GOOG').map(r => r.name)", "blade-home.js") == ["gemma"]
-    assert node(f"m.filterModels({rows}, '  ').length", "blade-home.js") == 2
+    assert node(f"m.visibleModels({rows}, {{q: 'GOOG'}}).map(r => r.name)", "library-logic.js") == ["gemma"]
+    assert node(f"m.visibleModels({rows}, {{q: '  '}}).length", "library-logic.js") == 2
 
 
 @needs_node

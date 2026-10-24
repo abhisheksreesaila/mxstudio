@@ -35,10 +35,10 @@ CONSOLE_SCRIPTS = {"theme.js", "main.js", "core.js", "icons.js", "routes.js",
                    "blade-model.js", "blade-add.js", "blade-security.js", "blade-keys.js", "blade-bench.js", "blade-logs.js",
                    "blade-notebook.js", "blade-gateway.js", "blade-settings.js",
                    # plain pages (ADR 0005): the router, the one nav
-                   "pages.js", "nav.js"}
+                   "pages.js", "nav.js", "library-logic.js", "library.js"}
 CONSOLE_STYLES = {"blades.css", "shell.css", "topbar.css", "docs.css", "blade-home.css", "blade-model.css", "blade-add.css",
                   "blade-security.css", "blade-keys.css", "blade-bench.css", "blade-logs.css", "blade-notebook.css",
-                  "blade-gateway.css", "blade-settings.css"}
+                  "blade-gateway.css", "blade-settings.css", "library.css"}
 CONSOLE_IMAGES = {"favicon.svg"}
 CONSOLE_ASSETS = CONSOLE_STYLES | CONSOLE_SCRIPTS | CONSOLE_IMAGES
 # omxqua, the design language (F-042), vendored with `omxqua-sync mxconsole/console --ref <tag>`. Only these files are served;
