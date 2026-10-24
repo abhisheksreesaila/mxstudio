@@ -44,6 +44,8 @@ export class FakeEl extends FakeNode {
   get textContent() { return this.children.map((c) => c.textContent).join(""); }
   set textContent(v) { this.replaceChildren(new FakeText(v)); }
   focus() { document.activeElement = this; }
+  blur() { if (document.activeElement === this) document.activeElement = null; }
+  contains(n) { for (; n; n = n.parentNode) if (n === this) return true; return false; }
   getBoundingClientRect() { return { left: 0, right: 100, top: 0, bottom: 30, width: 100, height: 30 }; }
   get offsetWidth() { return 80; }
   get offsetLeft() { return 0; }
@@ -68,7 +70,7 @@ globalThis.document = {
   addEventListener: (t, fn) => { (listeners[t] ||= []).push(fn); },
   removeEventListener: (t, fn) => { listeners[t] = (listeners[t] || []).filter((f) => f !== fn); },
   /** Press a key at document level (like the browser does for a keydown that nothing stopped). */
-  key(key) { const e = { key, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } }; (listeners.keydown || []).slice().forEach((fn) => fn(e)); return e; },
+  key(key, extra = {}) { const e = { key, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...extra }; (listeners.keydown || []).slice().forEach((fn) => fn(e)); return e; },
 };
 const winListeners = {};
 globalThis.window = {

@@ -6,6 +6,7 @@
 import { h, s, icon, store, onData, fmt, dur, colorOf, api, refresh, toast, copyText, reducedMotion } from "./core.js";
 import { register, makeBlade, truncate } from "./blades.js";
 import { go } from "./pages.js";
+import { labelsEditor } from "./library.js";
 import { tabRoute } from "./routes.js";
 import { modelView } from "./blade-home.js";
 import { hardwareView } from "./hardware.js";
@@ -222,7 +223,9 @@ register("model", (blade) => {
       const accessLink = h("a", { href: "#/security" }, "Security ›");
       const reach = h("dd", {});
       const chart = h("div", { class: "chart" });
-      const about = h("dl", { class: "dl" }, ["Repository", "Architecture", "Source", "Unloads", "Endpoint", "Reachable", "GPU memory", "State"].flatMap((l, i) => [h("dt", {}, l), i === 5 ? reach : dds[i]]));
+      const labels = labelsEditor(() => name);
+      const about = h("dl", { class: "dl" }, ["Repository", "Architecture", "Source", "Unloads", "Endpoint", "Reachable", "GPU memory", "State"].flatMap((l, i) => [h("dt", {}, l), i === 5 ? reach : dds[i]]),
+        h("dt", {}, "Labels"), h("dd", {}, labels));
       const fitBar = h("div", { class: "fit" }), fitCap = h("div", { class: "fitk" });
       const urlTag = h("span", { class: "tag" }), urlText = h("span", { class: "u" });
       const urlRow = h("div", { class: "urlrow" }, urlTag, urlText, h("button", { class: "ib", type: "button", "aria-label": "Copy URL", title: "Copy URL", onClick: async () => toast((await copyText(urlText.textContent)) ? "Endpoint copied" : "Could not reach the clipboard") }, icon("copy", 14)));
@@ -359,6 +362,7 @@ register("model", (blade) => {
         chart.replaceChildren(v.tokens.points.length > 1 ? areaChart(v.tokens.points, colorOf(name))
           : ((q) => h("div", { class: "nodata" }, h("b", {}, q.title), q.text))(quietNote(v.state, v.tokens.requests || 0)));
         // About
+        labels.update();
         const essSig = JSON.stringify(v.essentials);
         if (essSig !== essigPrev) {
           essigPrev = essSig;
