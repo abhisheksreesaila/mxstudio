@@ -14,20 +14,20 @@ Status: draft (2026-10-23)
 ## What it does
 - Core job: one page at a time, with the model as something you switch, not something you open.
 - v1:
-  1. **Plain pages, no blades:** My models is home (list or cards, as today). Add a model stays as it is: its stages, then the model joins the list. API keys, Gateway, Settings and Security become plain pages, reached from the top bar, with Back.
-  2. **One model page with a picker:** clicking a model opens one page. A model picker at the top ("Model: qwen2.5-0.5b ▾") swaps the model in place. The left menu (Overview, Security, Benchmark, Logs, Notebook) stays, and switching models **keeps you on the same section** (A's Benchmark → B's Benchmark). The notebook is the same: pick a model, and its metadata loads. The URL holds the model and the section, so Back and links work.
+  1. **Plain pages, one nav, every destination once:** five places (Models, API keys, Gateway, Security, Settings) live in one nav: a left rail on desktop, a bottom tab bar on the phone (the same nav, two shapes). My models is home (list or cards, as today). Add a model stays as it is, as a page under Models with Back. The top bar only says where you are ("My models › model ▾") plus the Beacon. Theme moves into Settings.
+  2. **One model page with a picker:** clicking a model opens one page. The model picker in the top bar swaps the model in place. The model's sections (Overview, Benchmark, Logs, Notebook) are tabs inside the page, and switching models **keeps you on the same tab** (A's Benchmark → B's Benchmark). The notebook is the same: pick a model, and its metadata loads. The page's buttons are only the model's verbs (Start/Stop, Restart, Copy endpoint, Remove); a section's own action (Run benchmark, Open in Jupyter) lives inside that section. Security is one place for all models, so it is not a model tab; Overview links to it. The URL holds the model and the section, so Back and links work.
   3. **Cosmetic fixes:** every button is flat, with no elevation, and the overview's metric tiles use a regular 2×2 grid with one surface treatment.
   4. **Front door:**
      - The README is half a page: the one-line mission, a screenshot, "see it live", then links to the user guide, API reference, CLI reference and porting.
      - `site/index.html` becomes an omxcode-style story page: a hero, live demos, how a request travels, an FAQ, and "available today".
      - The clickable console tour stays as the user guide.
-- Won't do: new features, per-model custom screens (later, as an addition), the phone bottom dock (still deferred), renaming anything.
+- Won't do: new features, per-model custom screens (later, as an addition), renaming anything.
 
 ## How it should look and feel
 - The same omxqua skin and Beacon as the omxconsole brief. Three words: calm, alive, precise.
 - A model switch **morphs** the numbers in place (gentle, 220 ms). No page flash, and you keep your scroll position and section.
 - The screen that matters most: the model page, with the picker open.
-- Phone: the same pages one at a time. The picker is a sheet.
+- Phone: the same pages one at a time, touch first (targets 40 px or more). The nav is a bottom tab bar, the model tabs a segmented control, the picker a bottom sheet.
 
 ## Success
 - Comparing a section across two models takes two taps (open the picker, pick), down from about five today.
@@ -44,5 +44,5 @@ Status: draft (2026-10-23)
 - Riskiest assumption: one page with a picker covers everything blades did. The cheapest test is the mock, before any code is written.
 
 ## Open questions
-- (assumed) The breadcrumb becomes "My models › qwen2.5-0.5b › Benchmark", where the model part is the picker.
+- (assumed) The breadcrumb is "My models › qwen2.5-0.5b ▾"; the section shows only as the active tab (mock v2, after "sidebar and top bar conflict").
 - (assumed) The Beacon's details and the Add-a-model flow keep their current behaviour, as pages.
