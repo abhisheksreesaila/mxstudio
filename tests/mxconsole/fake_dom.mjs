@@ -68,7 +68,7 @@ globalThis.document = {
   addEventListener: (t, fn) => { (listeners[t] ||= []).push(fn); },
   removeEventListener: (t, fn) => { listeners[t] = (listeners[t] || []).filter((f) => f !== fn); },
   /** Press a key at document level (like the browser does for a keydown that nothing stopped). */
-  key(key) { const e = { key, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } }; (listeners.keydown || []).slice().forEach((fn) => fn(e)); return e; },
+  key(key, extra = {}) { const e = { key, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...extra }; (listeners.keydown || []).slice().forEach((fn) => fn(e)); return e; },
 };
 const winListeners = {};
 globalThis.window = {

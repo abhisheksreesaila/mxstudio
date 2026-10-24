@@ -2,7 +2,7 @@
 // ticking models and labelling them. My models uses it now; F-056's switcher reuses the same parts.
 // The rules live in library-logic.js (pure); this file draws them and talks to /admin/labels.
 // Everything goes in as text nodes. Changes are shown at once and put back, with the server's reason, if refused.
-import { h, icon, api, store, refresh, toast } from "./core.js";
+import { h, icon, api, store, refresh, toast, emitData } from "./core.js";
 import { KINDS, counts, visibleModels, bulkState, toggleOn, added, removed, created, renamed, deleted, ordered, restoredLabel, restoredOrder, cleanLabel, reorder, dragNames, optimistic } from "./library-logic.js";
 
 const enc = encodeURIComponent;
@@ -232,4 +232,55 @@ export function createLibrary({ onChange, placeholder = "Search by name, kind or
   };
   lib.loadLabels();
   return lib;
+}
+
+// -- labels on one model (a model's Overview, F-056) -------------------------------------------------
+/** Put a label on a model (on = true) or take it off, shown at once and put back, with the daemon's reason, if refused. */
+export async function setModelLabel(model, label, on) {
+  const have = ((store.models || []).find((m) => m.name === model)?.labels || []).includes(label);
+  if (have === on) return true;
+  const ok = await optimistic({
+    get: () => ({ labels: [], models: store.models || [] }), set: (s) => { store.models = s.models; emitData(); },
+    next: (s) => (on ? added : removed)(s, [model], label), undo: (s) => (on ? removed : added)(s, [model], label),
+    request: () => api("POST", `/admin/labels/${enc(label)}/${on ? "add" : "remove"}`, { models: [model] }), onError: toast,
+  });
+  if (ok) await refresh();
+  return ok;
+}
+
+/** The model's #labels as removable tags and a "+ label" that opens a field (suggesting your existing labels). A new name creates the label.
+ *  getName: the model now shown (the page swaps models in place). Call update() after every poll. */
+export function labelsEditor(getName) {
+  const el = h("span", { class: "lbls" });
+  let adding = false, known = [];
+  const redraw = () => {
+    const m = (store.models || []).find((x) => x.name === getName());
+    if (!m) { el.replaceChildren(); return; }
+    const mine = m.labels || [];
+    const field = adding ? h("input", { class: "lbl-in", list: "lbl-known", placeholder: "label, then Enter", "aria-label": "Add a label", maxlength: "40",
+      onKeydown: (e) => { if (e.key === "Enter") { e.preventDefault(); commit(field.value); } else if (e.key === "Escape") { e.stopPropagation(); adding = false; redraw(); } },
+      onBlur: () => { if (adding && !field.value.trim()) { adding = false; redraw(); } } }) : null;
+    el.replaceChildren(
+      ...mine.map((l) => h("span", { class: "tag lab", "data-lab": l }, `#${l}`,
+        h("button", { type: "button", class: "x", "aria-label": `Remove label ${l}`, onClick: () => setModelLabel(m.name, l, false) }, icon("x", 12)))),
+      ...(field ? [h("datalist", { id: "lbl-known" }, known.filter((l) => !mine.includes(l)).map((l) => h("option", { value: l})))] : []),
+      field || h("button", { type: "button", class: "tag add", "data-act": "add-label", onClick: async () => {
+        adding = true; redraw(); el.querySelector("input")?.focus();
+        try {
+          known = (await api("GET", "/admin/labels")).map((x) => x.name);
+          const mine = ((store.models || []).find((x) => x.name === getName())?.labels) || [];
+          // fill the suggestions in place: replacing the field would blur it, and a blurred empty field closes itself
+          el.querySelector("datalist")?.replaceChildren(...known.filter((l) => !mine.includes(l)).map((l) => h("option", { value: l })));
+        } catch (_) { /* no suggestions: typing a name still works */ }
+      } }, icon("plus", 12), "label"));
+  };
+  function commit(raw) {
+    const name = cleanLabel(raw), model = getName();
+    adding = false;
+    redraw();
+    if (name) setModelLabel(model, name, true);
+  }
+  el.update = () => { if (!adding) redraw(); };
+  el.update();
+  return el;
 }
