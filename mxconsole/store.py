@@ -174,10 +174,11 @@ class Store:
         if "custom_arch_path" not in cols:
             self.db.execute("ALTER TABLE models ADD COLUMN custom_arch_path TEXT")
         if "kind" not in cols:  # once, offline: the name and architecture are all we have for old models
-            self.db.execute("ALTER TABLE models ADD COLUMN kind TEXT NOT NULL DEFAULT 'chat'")
-            for r in self.db.execute("SELECT name, architecture FROM models").fetchall():
-                self.db.execute("UPDATE models SET kind = ? WHERE name = ?",
-                                (derive_kind(name=r["name"], architecture=r["architecture"]), r["name"]))
+            with self._tx():  # all or nothing: a crash must not leave the column without its backfill
+                self.db.execute("ALTER TABLE models ADD COLUMN kind TEXT NOT NULL DEFAULT 'chat'")
+                for r in self.db.execute("SELECT name, architecture FROM models").fetchall():
+                    self.db.execute("UPDATE models SET kind = ? WHERE name = ?",
+                                    (derive_kind(name=r["name"], architecture=r["architecture"]), r["name"]))
 
     @contextmanager
     def _tx(self):
@@ -199,16 +200,19 @@ class Store:
         """Registers (or re-registers) a model. `kind` is derived from the name and architecture when not
         given; a re-pull never changes a kind that is already set."""
         kind = check_kind(kind) if kind else derive_kind(name=name, architecture=architecture)
-        self.db.execute(
-            """INSERT INTO models (name, repo_id, revision, source, architecture, weights_path,
-                                   custom_arch_path, kind, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-               ON CONFLICT(name) DO UPDATE SET repo_id=excluded.repo_id, revision=excluded.revision,
-                 source=excluded.source, architecture=excluded.architecture,
-                 weights_path=excluded.weights_path,
-                 custom_arch_path=excluded.custom_arch_path""",
-            (name, repo_id, revision, source, architecture, weights_path, custom_arch_path, kind, time.time()),
-        )
+        with self._tx():
+            if self.db.execute("SELECT 1 FROM models WHERE name = ?", (name,)).fetchone() is None:
+                self.db.execute("DELETE FROM model_labels WHERE model = ?", (name,))  # strays from an older daemon
+            self.db.execute(
+                """INSERT INTO models (name, repo_id, revision, source, architecture, weights_path,
+                                       custom_arch_path, kind, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(name) DO UPDATE SET repo_id=excluded.repo_id, revision=excluded.revision,
+                     source=excluded.source, architecture=excluded.architecture,
+                     weights_path=excluded.weights_path,
+                     custom_arch_path=excluded.custom_arch_path""",
+                (name, repo_id, revision, source, architecture, weights_path, custom_arch_path, kind, time.time()),
+            )
         return self.get_model(name)
 
     def get_model(self, name: str) -> Model | None:
@@ -247,8 +251,9 @@ class Store:
 
     def labels(self) -> list[Label]:
         return [Label(r["name"], r["position"], r["n"]) for r in self.db.execute(
-            """SELECT l.name, l.position, COUNT(m.model) AS n FROM labels l
-               LEFT JOIN model_labels m ON m.label = l.name GROUP BY l.name ORDER BY l.position""")]
+            """SELECT l.name, l.position, COUNT(x.name) AS n FROM labels l
+               LEFT JOIN model_labels m ON m.label = l.name
+               LEFT JOIN models x ON x.name = m.model GROUP BY l.name ORDER BY l.position""")]
 
     def _label_exists(self, name: str) -> bool:
         return self.db.execute("SELECT 1 FROM labels WHERE name = ?", (name,)).fetchone() is not None
