@@ -98,6 +98,13 @@ The console works only on this machine. It isn't exposed on the LAN, even after 
 
 Panels (blades) open side by side from left to right; older ones fold into rails on the left. The breadcrumb island at the top shows the parent and the open blade; click the **omx** logo to go back to My models.
 
+| | |
+|---|---|
+| ![A model's overview: live throughput, endpoint, a ready-to-paste curl](assets/screens/model.png) | ![Add a model: search MAX and Hugging Face, checked against your GPU memory](assets/screens/add.png) |
+| **A model:** live numbers, its endpoint and a `curl` to paste | **Add a model:** search MAX's catalog and Hugging Face; every result is checked against your GPU memory |
+| ![The notebook, running in Jupyter inside the console](assets/screens/jupyter.png) | ![A model MAX can't run yet, with Port it](assets/screens/port-offer.png) |
+| **Notebook:** how the model is built; runs in Jupyter in the page | **Needs porting:** one click hands it to the porting agent |
+
 ### My models
 
 Everything this machine serves, as a list or as cards (the choice is remembered in this browser). A filter box narrows it by name.

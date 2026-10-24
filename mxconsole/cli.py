@@ -11,6 +11,7 @@ import typer
 
 from mxconsole import expose, keys
 from mxconsole import report, resolve
+from mxconsole.kinds import KINDS, LabelError
 from mxconsole.store import Store, format_duration, parse_duration
 
 app = typer.Typer(help="omxconsole: local models on Modular MAX you can see into and reshape.",
@@ -36,23 +37,95 @@ def _root() -> None:
 
 
 @app.command("ls")
-def list_models(as_json: bool = JSON) -> None:
-    """List registered models."""
+def list_models(label: str = typer.Option(None, "--label", help="Only models with this label."),
+                kind: str = typer.Option(None, "--kind", help="Only models of this kind: " + ", ".join(KINDS) + "."),
+                as_json: bool = JSON) -> None:
+    """List registered models, with their kind and your labels."""
     from mxconsole import serve
-    models = Store.open().models()
+    store = Store.open()
+    if kind and kind not in KINDS:
+        _fail(f"kind must be one of: {', '.join(KINDS)}; got {kind!r}")
+    if label and label not in {l.name for l in store.labels()}:
+        _fail(f"no label named {label}. See: mxc labels")
+    models = [m for m in store.models() if (not kind or m.kind == kind) and (not label or label in m.labels)]
     states = serve.live_states()
     if as_json:
         typer.echo(report.dump(report.models_data(models, states, serve.daemon_running())))
         return
     if not models:
-        typer.echo("no models yet. Try: mxc serve qwen2.5-0.5b")
+        typer.echo("no models match those filters. See: mxc ls" if kind or label
+                   else "no models yet. Try: mxc serve qwen2.5-0.5b")
         return
-    typer.echo(f"{'NAME':<24} {'STATE':<9} {'SOURCE':<13} {'PINNED':<7} {'KEEP-ALIVE':<10} REPO")
+    tags = {m.name: ",".join(m.labels) or "-" for m in models}
+    wide = max(len("LABELS"), *map(len, tags.values()))
+    typer.echo(f"{'NAME':<24} {'KIND':<11} {'STATE':<9} {'SOURCE':<13} {'PINNED':<7} {'KEEP-ALIVE':<10} {'LABELS':<{wide}} REPO")
     for m in models:
         keep = "-" if m.pinned else format_duration(m.keep_alive)
         state = states.get(m.name, "-")
-        typer.echo(f"{m.name:<24} {state:<9} {m.source:<13} {'yes' if m.pinned else 'no':<7} {keep:<10} {m.repo_id}")
+        typer.echo(f"{m.name:<24} {m.kind:<11} {state:<9} {m.source:<13} {'yes' if m.pinned else 'no':<7} "
+                   f"{keep:<10} {tags[m.name]:<{wide}} {m.repo_id}")
     typer.echo(f"\nconsole  {report.console_link('models')}")
+
+
+def _labels_line(store: Store, model: str) -> None:
+    labels = store.get_model(model).labels
+    typer.echo(f"{model}: {', '.join(labels) if labels else 'no labels'}")
+
+
+@app.command("label")
+def label_model(model: str = typer.Argument(..., help="A registered model name"),
+                labels: list[str] = typer.Argument(..., metavar="LABEL...", help="Lower-case letters, digits and hyphens; created when new.")) -> None:
+    """Put your own labels on a model (no daemon needed). Change its kind with: mxc set MODEL --kind coder."""
+    store = Store.open()
+    try:
+        store.add_labels([model], labels)
+    except LabelError as e:
+        _fail(str(e))
+    _labels_line(store, model)
+
+
+@app.command("unlabel")
+def unlabel_model(model: str = typer.Argument(..., help="A registered model name"),
+                  labels: list[str] = typer.Argument(..., metavar="LABEL...")) -> None:
+    """Take labels off a model (no daemon needed). The labels themselves stay; delete one with: mxc labels --delete NAME."""
+    store = Store.open()
+    try:
+        store.remove_labels([model], labels)
+    except LabelError as e:
+        _fail(str(e))
+    _labels_line(store, model)
+
+
+@app.command("labels")
+def labels_cmd(rename: tuple[str, str] = typer.Option(None, "--rename", metavar="OLD NEW", help="Rename a label on every model."),
+               delete: str = typer.Option(None, "--delete", metavar="NAME", help="Delete a label and take it off its models."),
+               as_json: bool = JSON) -> None:
+    """List your labels in order with how many models have each; rename or delete one (no daemon needed)."""
+    store = Store.open()
+    if rename and delete:
+        _fail("use --rename or --delete, one at a time")
+    try:
+        if rename:
+            store.rename_label(*rename)
+            typer.echo(f"renamed {rename[0]} to {rename[1]}")
+            return
+        if delete:
+            count = next((l.count for l in store.labels() if l.name == delete), 0)
+            store.delete_label(delete)
+            typer.echo(f"deleted {delete} (it was on {count} model{'s' if count != 1 else ''})")
+            return
+    except LabelError as e:
+        _fail(str(e))
+    rows = store.labels()
+    if as_json:
+        typer.echo(report.dump([{"name": l.name, "position": l.position, "count": l.count} for l in rows]))
+        return
+    if not rows:
+        typer.echo("no labels yet. Try: mxc label <model> <label>")
+        return
+    typer.echo(f"{'LABEL':<40} MODELS")
+    for l in rows:
+        typer.echo(f"{l.name:<40} {l.count}")
 
 
 @app.command("search")
@@ -125,12 +198,13 @@ def set_model(model: str = typer.Argument(..., help="A registered model name"),
               pin: bool = typer.Option(False, "--pin", help="Keep it loaded; never unload when idle."),
               unpin: bool = typer.Option(False, "--unpin", help="Let it unload when idle again."),
               keep_alive: str = typer.Option(None, "--keep-alive", help="Unload after this idle time: 90s, 10m, 1h."),
+              kind: str = typer.Option(None, "--kind", help="Correct its kind: " + ", ".join(KINDS) + "."),
               as_json: bool = JSON) -> None:
-    """Change a model's pin and keep-alive (what the console's model blade and Settings show)."""
+    """Change a model's pin, keep-alive and kind (what the console's model blade and Settings show)."""
     if pin and unpin:
         _fail("--pin and --unpin together make no sense")
-    if not (pin or unpin or keep_alive):
-        _fail("nothing to change. Use --pin, --unpin or --keep-alive 10m")
+    if not (pin or unpin or keep_alive or kind):
+        _fail("nothing to change. Use --pin, --unpin, --keep-alive 10m or --kind coder")
     try:
         seconds = parse_duration(keep_alive) if keep_alive else None
     except ValueError:
@@ -138,6 +212,11 @@ def set_model(model: str = typer.Argument(..., help="A registered model name"),
     store = Store.open()
     if store.get_model(model) is None:
         _fail(f"no model named {model}. See: mxc ls")
+    try:
+        if kind:
+            store.set_kind(model, kind)
+    except LabelError as e:
+        _fail(str(e))
     store.set_lifecycle(model, pinned=True if pin else False if unpin else None, keep_alive=seconds)
     m = store.get_model(model)
     if as_json:
@@ -145,7 +224,7 @@ def set_model(model: str = typer.Argument(..., help="A registered model name"),
         running = serve.daemon_running()
         typer.echo(report.dump(report.model_row(m, serve.live_states() if running else {}, running)))
         return
-    typer.echo(f"{m.name}: {report.lifecycle(m)}")
+    typer.echo(f"{m.name}: {report.lifecycle(m)}" + (f", kind {m.kind}" if kind else ""))
     typer.echo(f"console  {report.console_link('model', m.name)}")
 
 
