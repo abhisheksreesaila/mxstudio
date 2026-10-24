@@ -19,8 +19,8 @@ export function openPicker(anchor, env = DEFAULT_ENV) {
   const route = env.currentRoute();
   if (route.page !== "model") return;
   const host = document.querySelector(".app") || document.body;
-  const page = document.querySelector(".model-page .bb");
-  const sheet = usesSheet(page ? page.getBoundingClientRect().width : host.getBoundingClientRect().width);
+  const widthNow = () => (document.querySelector(".model-page .bb") || host).getBoundingClientRect().width;
+  const sheet = usesSheet(widthNow());
   const list = h("div", { class: "plist", role: "listbox", "aria-label": "Your models" });
   const scrim = h("div", { class: "scrim2" });
   const panel = h("div", { class: `pmenu${sheet ? " sheet" : ""}`, role: "dialog", "aria-modal": "true", "aria-label": "Pick a model" },
@@ -54,7 +54,7 @@ export function openPicker(anchor, env = DEFAULT_ENV) {
     open = null;
     offData(); offRoute();
     document.removeEventListener("keydown", key);
-    window.removeEventListener("resize", close);
+    window.removeEventListener("resize", onResize);
     panel.classList.remove("open"); scrim.classList.remove("on");
     setTimeout(() => { panel.remove(); scrim.remove(); }, 260);
     if (anchor && anchor.isConnected) anchor.focus();
@@ -63,7 +63,10 @@ export function openPicker(anchor, env = DEFAULT_ENV) {
   open = handle;
   scrim.addEventListener("click", close);
   document.addEventListener("keydown", key);
-  window.addEventListener("resize", close);  // the sheet/menu choice was made for this width
+  // Stale only when the menu/sheet choice flips. A phone's keyboard or URL bar changes the height and fires resize too;
+  // that must not close the list (F-056 puts a search box in it).
+  function onResize() { if (usesSheet(widthNow()) !== sheet) close(); }
+  window.addEventListener("resize", onResize);
   const box = anchor.getBoundingClientRect(), app = host.getBoundingClientRect();
   panel.style.setProperty("--px", `${Math.max(8, box.left - app.left)}px`);
   panel.style.setProperty("--py", `${box.bottom - app.top + 6}px`);

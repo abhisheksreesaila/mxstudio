@@ -70,7 +70,15 @@ globalThis.document = {
   /** Press a key at document level (like the browser does for a keydown that nothing stopped). */
   key(key) { const e = { key, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } }; (listeners.keydown || []).slice().forEach((fn) => fn(e)); return e; },
 };
-globalThis.window = { matchMedia: () => ({ matches: false }), addEventListener() {}, removeEventListener() {} };
+const winListeners = {};
+globalThis.window = {
+  matchMedia: () => ({ matches: false }),
+  addEventListener: (t, fn) => { (winListeners[t] ||= []).push(fn); },
+  removeEventListener: (t, fn) => { winListeners[t] = (winListeners[t] || []).filter((f) => f !== fn); },
+  /** Fire a window resize (the test changes what getBoundingClientRect returns first). */
+  resize() { (winListeners.resize || []).slice().forEach((fn) => fn({ type: "resize" })); },
+  listening: (t) => (winListeners[t] || []).length,
+};
 globalThis.requestAnimationFrame = (fn) => { fn(0); return 1; };
 globalThis.cancelAnimationFrame = () => {};
 globalThis.location = { origin: "http://x", hash: "" };

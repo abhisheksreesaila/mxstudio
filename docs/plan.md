@@ -401,13 +401,16 @@ Brief: docs/briefs/console-pages.md · Needs: none · Files: index.html, main.js
 - Interim until F-053: a model's Benchmark, Logs and Notebook are their own pages with Back; the model crumb has no ▾ until the picker exists. Old hash shapes (`#keys`, `#model/x`, `#bench/x`) still land on the right page, so CLI links work. Back goes to the parent route unless the previous history entry is inside the console (`routes.backUsesHistory`).
 - Reviewer: round 1 NEEDS WORK (inherited-key routes like `#/__proto__/x` crashed; loosened tests; no-op crumb buttons; Back could leave the console; a slow lookup could overwrite a newer page) → fixed; round 2 PASS; its two test should-fixes done (exact route results, Back decision tested under node). Checked live on a scratch daemon: rail, crumbs, Keys page, Back. 953 tests.
 
-## F-053 The model page: tabs, verbs, flat buttons, 2×2 metrics [todo]
+## F-053 The model page: tabs, verbs, flat buttons, 2×2 metrics [done]
 Brief: docs/briefs/console-pages.md · Needs: F-052 · Files: blade-model.* → model-page.*, blade-bench/logs/notebook bodies
-- [ ] one model page: tabs Overview · Benchmark · Logs · Notebook (sliding pill), with the model picker in the top bar; switching model keeps the tab and morphs the numbers (≈ 220 ms, no page flash)
-- [ ] the command bar holds only the model's verbs (Start/Stop, Restart, Copy endpoint, Remove); Run benchmark lives in Benchmark, Open in Jupyter in Notebook; Security is not a tab, Overview links to it
-- [ ] every button is flat (no shadow or lift); "Right now" is a regular 2×2 grid (Requests, Speed, Latency p50, Memory) with one surface treatment
-- [ ] the picker here is a simple list (the wide switcher is F-056); a stopped model shows each tab's empty state
-- [ ] checked in the running console with a running and a stopped model, both themes, 1280 and 390 px
+- [x] one model page: tabs Overview · Benchmark · Logs · Notebook (sliding pill), with the model picker in the top bar; switching model keeps the tab and morphs the numbers (≈ 220 ms, no page flash)
+- [x] the command bar holds only the model's verbs (Start/Stop, Restart, Copy endpoint, Remove); Run benchmark lives in Benchmark, Open in Jupyter in Notebook; Security is not a tab, Overview links to it
+- [x] every button is flat (no shadow or lift); "Right now" is a regular 2×2 grid (Requests, Speed, Latency p50, Memory) with one surface treatment
+- [x] the picker here is a simple list (the wide switcher is F-056); a stopped model shows each tab's empty state
+- [x] checked in the running console with a running and a stopped model, both themes, 1280 and 390 px
+- Built: `model-page.js` (was blade-model.js), `picker.js`; Benchmark/Logs/Notebook mount the existing bodies inside the page; Overview keeps a "Call it" curl card and a GPU fit card; the old Security card is gone (Overview's Reachable row links the Security page, which still has "Make it secure"). Latency p50 is time to first token; each Right-now tile has a visible caption.
+- Reviewer: round 1 NEEDS WORK (tabs had no keyboard; picker stayed open on Back, no focus trap; small touch targets; weak source-grep tests) → fixed with a fake-DOM test harness (`tests/mxconsole/fake_dom.mjs`); round 2 PASS. Its forward-looking should-fix done: the picker closes only when a resize flips menu↔sheet, so a phone keyboard won't close F-056's search.
+- Checked live on a scratch daemon with the fake max: 1280 light and dark, 390 dark; Notebook couldn't build in the agent's sandbox (no Hugging Face access), so a built notebook in the new tab is still to be seen on the real machine.
 
 ## F-054 Labels: kind, your labels, store, API and CLI [done]
 Brief: docs/briefs/console-pages.md · Needs: none · Files: store.py, resolve.py, admin_api.py, cli.py

@@ -155,3 +155,18 @@ def test_a_route_change_closes_the_picker_and_it_leaves_no_listeners_behind():
 
 def test_the_picker_is_a_sheet_when_the_page_is_760px_or_narrower_the_same_cut_as_the_page_css():
     assert run("console.log(JSON.stringify([pk.usesSheet(390), pk.usesSheet(760), pk.usesSheet(761), pk.usesSheet(1068)]));") == [True, True, False, False]
+
+
+def test_a_height_only_resize_keeps_the_picker_open_and_a_menu_sheet_flip_closes_it():
+    """A phone's keyboard or URL bar fires resize with the same width: the list must stay open. Crossing 760 px closes it."""
+    got = run(PICKER + """
+      app.getBoundingClientRect = () => ({ left: 0, top: 0, bottom: 700, width: 390, height: 700 });
+      window.resize();
+      const afterHeight = document.key("Escape").defaultPrevented === false ? "closed" : "open";
+      pk.openPicker(anchor, env);
+      app.getBoundingClientRect = () => ({ left: 0, top: 0, bottom: 800, width: 1068, height: 800 });
+      window.resize();
+      const afterFlip = { open: document.key("Escape").defaultPrevented, listening: window.listening("resize") };
+      console.log(JSON.stringify({ afterHeight, afterFlip }));
+    """)
+    assert got == {"afterHeight": "open", "afterFlip": {"open": False, "listening": 0}}
