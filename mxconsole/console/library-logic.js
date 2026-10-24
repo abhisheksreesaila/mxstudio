@@ -123,10 +123,10 @@ export const pushRecent = (recent, name, max = RECENT_MAX) => [name, ...recent.f
 /** The switcher's results as sections. Unfiltered: Recent first, then every model grouped by kind. With a search or a group
  *  chosen: one flat section of what matches. Recent holds only models that still exist. */
 export function switcherSections(models, { group = "all", q = "", recent = [] } = {}) {
-  const hits = visibleModels(models, { group, q });
-  if (q.trim() || group !== "all") return hits.length ? [{ id: "results", models: hits }] : [];
   const byName = new Map(models.map((m) => [m.name, m]));
   const seen = recent.map((n) => byName.get(n)).filter(Boolean);
+  const hits = group === "recent" ? seen.filter((m) => matchesQuery(m, q)) : visibleModels(models, { group, q });
+  if (q.trim() || group !== "all") return hits.length ? [{ id: "results", models: hits }] : [];
   const kinds = [...KINDS.map(([k]) => k), null];
   return [
     ...(seen.length ? [{ id: "recent", models: seen }] : []),

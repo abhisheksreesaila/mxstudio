@@ -261,6 +261,116 @@ def test_visiting_models_fills_recent_and_other_pages_do_not():
     assert got == ["a", "b"]
 
 
+# -- review round 1 ---------------------------------------------------------------------------------
+def test_the_search_is_a_combobox_over_one_listbox_and_points_at_the_highlighted_card():
+    got = run(SETUP + """
+      const attrs = Object.fromEntries(["role", "aria-controls", "aria-expanded", "aria-autocomplete"].map((k) => [k, input().getAttribute(k)]));
+      document.key("ArrowDown");
+      const lists = panel().querySelectorAll(".plist").concat(panel().querySelectorAll(".pgrid")).map((e) => e.getAttribute("role"));
+      const kbCard = panel().querySelectorAll(".pr").filter((c) => c.classList.contains("kb"))[0];
+      const target = panel().querySelectorAll(".plist")[0];
+      console.log(JSON.stringify({ attrs, listbox: [target.getAttribute("id"), target.getAttribute("role")], lists, active: input().getAttribute("aria-activedescendant") === kbCard.getAttribute("id"),
+        groups: panel().querySelectorAll(".plist")[0].children.map((g) => g.getAttribute("aria-label")) }));
+    """)
+    assert got["attrs"] == {"role": "combobox", "aria-controls": "pk-list", "aria-expanded": "true", "aria-autocomplete": "list"}
+    assert got["listbox"] == ["pk-list", "listbox"] and got["lists"] == ["listbox", None, None, None, None] and got["active"] is True
+    assert got["groups"] == ["Recent", "Chat · 2", "Coder · 1", "Vision · 1"]
+
+
+def test_a_poll_that_changes_nothing_leaves_the_cards_and_scroll_alone_and_a_change_does_not_scroll():
+    got = run(SETUP + """
+      let scrolls = 0;
+      Object.getPrototypeOf(anchor).scrollIntoView = () => { scrolls++; };
+      document.key("ArrowDown");              // the keyboard moved: this one scrolls
+      const afterKey = scrolls;
+      const list = panel().querySelector(".plist");
+      list.scrollTop = 120;
+      const before = panel().querySelectorAll(".pr");
+      core.emitData(); core.emitData();
+      const same = panel().querySelectorAll(".pr").every((c, i) => c === before[i]);
+      core.store.metrics = { by_model: { alpha: { decode_tps_p50: 77 } } };   // a real change: the card text moves, the scroll does not
+      core.emitData();
+      console.log(JSON.stringify({ afterKey, scrolls, same, top: list.scrollTop, text: panel().querySelectorAll(".pr").filter((c) => c.getAttribute("data-pick") === "alpha")[0].textContent }));
+    """)
+    assert got == {"afterKey": 1, "scrolls": 1, "same": True, "top": 120, "text": "alphaChat#work77 tok/s"}
+
+
+def test_a_poll_during_a_drag_does_not_rebuild_the_dragged_card_and_catches_up_after():
+    got = run(SETUP + """
+      const card = panel().querySelectorAll(".pr")[1];
+      card.dispatch("dragstart", { dataTransfer: { setData() {}, effectAllowed: "" } });
+      core.store.models = [...core.store.models, { name: "late", state: "cold", kind: "chat", labels: [] }]; core.emitData();
+      const during = { kept: card.isConnected, late: cardNames().includes("late") };
+      card.dispatch("dragend");
+      console.log(JSON.stringify({ during, after: cardNames().includes("late") }));
+    """)
+    assert got == {"during": {"kept": True, "late": False}, "after": True}
+
+
+def test_recent_is_a_group_in_the_column_with_its_count_and_filters_in_recent_order():
+    got = run(SETUP + """
+      const item = panel().querySelector('[data-group="recent"]');
+      item.click();
+      console.log(JSON.stringify({ label: item.textContent, heads: heads(), cards: cardNames() }));
+    """)
+    assert got == {"label": "Recent2", "heads": ["Recent · 2"], "cards": ["gamma", "alpha"]}
+
+
+def test_my_models_has_no_recent_group_in_its_column():
+    got = run(SETUP.replace("await open();", "") + """
+      const l = lib.createLibrary({ onChange() {} });
+      l.update();
+      console.log(JSON.stringify(l.groups.querySelectorAll(".gi").map((g) => g.getAttribute("data-group")).filter((g) => g === "recent")));
+    """)
+    assert got == []
+
+
+def test_escape_in_the_new_label_field_does_not_close_the_switcher_and_in_the_search_clears_first_then_closes():
+    got = run(SETUP + """
+      panel().querySelector('[data-act="new-label"]').click();
+      const field = panel().querySelectorAll("input").filter((i) => i.getAttribute("aria-label") === "New label name")[0]; field.focus();
+      const inField = document.key("Escape");
+      const stillOpen = !!panel() && panel().classList.contains("open");
+      type("gam"); input().focus();
+      const first = document.key("Escape");
+      const afterFirst = { value: input().value, cards: cardNames().length, open: panel().classList.contains("open") };
+      const second = document.key("Escape");
+      console.log(JSON.stringify({ inFieldPrevented: inField.defaultPrevented, stillOpen, afterFirst, secondClosed: second.defaultPrevented, closedClass: panel().classList.contains("open") }));
+    """)
+    assert got == {"inFieldPrevented": False, "stillOpen": True, "afterFirst": {"value": "", "cards": 6, "open": True}, "secondClosed": True, "closedClass": False}
+
+
+def test_on_a_phone_shift_tab_from_the_panel_goes_to_the_last_control_and_slash_focuses_the_search():
+    got = run(SETUP.replace("await open();", "") + """
+      app.getBoundingClientRect = () => ({ left: 0, top: 0, bottom: 800, width: 390, height: 800 });
+      await open();
+      const back = document.key("Tab", { shiftKey: true });
+      const last = document.activeElement.getAttribute("data-act");
+      panel().focus();
+      const fwd = document.key("Tab");
+      const first = document.activeElement === input();
+      panel().focus();
+      document.key("/");
+      console.log(JSON.stringify({ last, first, slash: document.activeElement === input() }));
+    """)
+    assert got == {"last": "add-model", "first": True, "slash": True}
+
+
+def test_up_and_down_move_by_row_and_left_right_by_one_card():
+    got = run(SETUP + """
+      globalThis.getComputedStyle = () => ({ gridTemplateColumns: "100px 100px" });
+      const at = () => panel().querySelectorAll(".pr").findIndex((c) => c.classList.contains("kb"));
+      const path = [at()];                       // Recent: gamma alpha | Chat: alpha gamma | Coder: beta | Vision: delta
+      for (const k of ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowRight", "ArrowLeft", "ArrowLeft"]) {
+        if (k === "ArrowRight" || k === "ArrowLeft") input().blur();
+        if (k === "ArrowRight" || k === "ArrowLeft") panel().focus();
+        document.key(k); path.push(at());
+      }
+      console.log(JSON.stringify(path));
+    """)
+    assert got == [1, 3, 4, 5, 5, 4, 2, 0, 1, 0, 0]
+
+
 # -- opening it from the keyboard --------------------------------------------------------------------
 def test_slash_and_ctrl_k_open_it_on_a_model_page_but_slash_never_steals_typing():
     got = run(SETUP.replace("await open();", "") + """
@@ -275,6 +385,20 @@ def test_slash_and_ctrl_k_open_it_on_a_model_page_but_slash_never_steals_typing(
       console.log(JSON.stringify({ whileTyping, ctrlK: ctrlK.defaultPrevented, viaCtrlK, slash: slash.defaultPrevented, viaSlash: !!panel() }));
     """)
     assert got == {"whileTyping": False, "ctrlK": True, "viaCtrlK": True, "slash": True, "viaSlash": True}
+
+
+def test_ctrl_k_opens_from_anywhere_except_a_multi_line_editor():
+    got = run(SETUP.replace("await open();", "") + """
+      pk.listenForSwitcher(() => anchor, env);
+      const area = document.createElement("textarea"); document.body.append(area); area.focus();
+      const inTextarea = document.key("k", { ctrlKey: true });
+      const editable = document.createElement("div"); editable.isContentEditable = true; document.body.append(editable); editable.focus();
+      const inEditable = document.key("k", { metaKey: true });
+      const line = document.createElement("input"); document.body.append(line); line.focus();
+      const inInput = document.key("k", { ctrlKey: true });
+      console.log(JSON.stringify({ textarea: inTextarea.defaultPrevented, editable: inEditable.defaultPrevented, input: inInput.defaultPrevented, open: !!panel() }));
+    """)
+    assert got == {"textarea": False, "editable": False, "input": True, "open": True}
 
 
 def test_the_keys_do_nothing_off_a_model_page():
