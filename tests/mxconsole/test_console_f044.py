@@ -23,9 +23,8 @@ def test_local_models_get_a_laptop_and_secure_ones_a_lock():
 
 
 @pytest.mark.parametrize("state", ["ready", "cold", "crashed", "starting"])
-@pytest.mark.parametrize("secure", [False, True])
-def test_a_command_bar_has_exactly_one_filled_verb_and_it_is_the_power_one(state, secure):
-    cmds = node(f"m.commandsFor('{state}', {str(secure).lower()})", "blade-model.js")
+def test_a_command_bar_has_exactly_one_filled_verb_and_it_is_the_power_one(state):
+    cmds = node(f"m.commandsFor('{state}')", "model-page.js")
     filled = [c["key"] for c in cmds if c.get("primary")]
     assert len(filled) == 1 and filled[0] in ("start", "stop", "restart")
     assert filled[0] == cmds[0]["key"]

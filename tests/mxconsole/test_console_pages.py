@@ -57,10 +57,10 @@ def test_main_routes_pages_and_no_longer_stacks_blades():
     assert "setNavigator" in pages and "hashchange" in pages and "history.replaceState" in pages  # unknown routes are tidied, not stacked
 
 
-def test_where_you_are_is_text_not_a_button_and_the_picker_chevron_waits_for_the_picker():
+def test_where_you_are_is_text_and_only_the_model_crumb_is_a_picker_with_a_chevron():
     js = text("topbar.js")
     assert 'h("span", { class: `cur ${cls}`, "aria-current": "page" }' in js
-    assert "chevron-down" not in js and 'aria-current": i === last' not in js
+    assert js.count("chevron-down") == 1 and "c.picker" in js and 'aria-current": i === last' not in js
 
 
 def test_back_only_uses_history_when_the_previous_entry_is_in_the_console():

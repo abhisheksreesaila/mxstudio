@@ -1,0 +1,95 @@
+/* omxconsole, the model page (F-053) in omxqua: tabs with a sliding pill, the model's verbs as flat buttons, cards, a 2x2 "Right now".
+   Matches docs/design/console-pages/mock.html (v4): .mhead, .tabs, .cmdbar, .sec, .cardx, .m4, .fb.
+   Shared pieces (url rows, code blocks, link buttons) are in blade-model.css. */
+.model-page .bb { overflow: hidden; background: var(--oq-surface-1); }
+.mpage { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.tpanel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.main2 { flex: 1; overflow: auto; min-height: 0; }
+.main2[hidden] { display: none; }
+.subhost { display: flex; flex-direction: column; overflow: hidden; }
+
+/* ---- header: section tabs (a segmented control with a sliding pill) + the model's verbs ---- */
+.mhead { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--oq-line-2); flex: none; }
+.tabs { position: relative; display: flex; padding: 4px; border-radius: 999px; background: rgb(var(--oq-state) / .05); flex: none; }
+.tabs button { position: relative; z-index: 1; border: 0; background: none; height: 34px; padding: 0 14px; border-radius: 999px; display: flex; align-items: center; gap: 7px; font: 600 13px var(--oq-font); color: var(--oq-ink-2); white-space: nowrap; transition: color .2s; }
+.tabs button svg { color: var(--c); }
+.tabs button.on { color: var(--oq-ink); }
+.tabs .pill { position: absolute; z-index: 0; top: 4px; left: 0; width: 0; height: 34px; border-radius: 999px; background: var(--oq-surface-2); transition: left .32s cubic-bezier(.3, 1.4, .5, 1), width .32s cubic-bezier(.3, 1.4, .5, 1); }
+.tabs button:focus-visible, .fb:focus-visible { outline: 2px solid var(--oq-accent); outline-offset: 2px; }
+.cmdbar { display: flex; gap: 6px; margin-left: auto; }
+
+/* ---- flat buttons: tonal tint on the surface, no shadow, no lift; one filled verb ---- */
+.fb { white-space: nowrap; height: 36px; padding: 0 14px; border-radius: 999px; border: 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font: 600 13px var(--oq-font); background: rgb(var(--oq-state) / .06); color: var(--oq-ink); box-shadow: none; transition: background .15s, transform .12s; flex: none; }
+.fb:hover { background: rgb(var(--oq-state) / .1); }
+.fb:active { transform: scale(.97); }
+.fb svg { color: var(--c, currentColor); }
+.fb.fill { background: var(--oq-accent); color: var(--oq-on-accent); }
+.fb.fill svg { color: inherit; }
+.fb.danger { color: var(--oq-bad); }
+.fb.danger svg { color: inherit; }
+.fb.ic { width: 36px; padding: 0; }
+.fb.ic .t { display: none; }
+.fb.ic.armed { width: auto; padding: 0 14px; background: color-mix(in srgb, var(--oq-bad) 12%, transparent); }
+.fb.ic.armed .t { display: inline; }
+.fb:disabled { opacity: .45; }
+
+/* ---- Overview: cards on a 2-column grid ---- */
+.sec { padding: 16px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-content: start; }
+.sec .wide { grid-column: 1 / -1; }
+.sec .wide:empty { display: none; }
+.cardx { background: var(--oq-surface-2); border-radius: 14px; padding: 14px 16px; min-width: 0; }
+.cardx h3 { margin: 0 0 10px; font-size: 13.5px; font-weight: 650; display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.cardx h3 svg { color: var(--c); }
+.cardx .src { border-top: 0; padding: 0; margin-top: 10px; font-size: 11.5px; }
+.sec .attn { margin-bottom: 0; }
+.twins { display: grid; gap: 3px; }
+
+/* metrics: a regular 2x2, every tile the same surface, no elevation */
+.m4 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.m4 > div { background: rgb(var(--oq-state) / .045); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.m4 small { display: block; font: 500 11px var(--oq-font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--oq-ink-2); }
+.m4 b { display: block; margin-top: 4px; font: 600 24px var(--oq-font-mono); letter-spacing: -.02em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.m4 .cap { display: block; margin-top: 2px; font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); }
+.m4 b em { font: 500 12px var(--oq-font-mono); color: var(--oq-ink-2); font-style: normal; margin-left: 3px; }
+
+.dl { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 9px 14px; margin: 0; font-size: 13.5px; }
+.dl dt { color: var(--oq-ink-2); }
+.dl dd { margin: 0; font: 13px var(--oq-font-mono); overflow-wrap: anywhere; min-width: 0; }
+.dl a { color: var(--oq-accent); text-decoration: none; }
+.dl a:hover { text-decoration: underline; }
+.area { display: block; width: 100%; height: 76px; }
+.nodata { padding: 14px 0 4px; color: var(--oq-ink-2); font-size: 13px; }
+.nodata b { display: block; color: var(--oq-ink); font-size: 13.5px; margin-bottom: 2px; }
+.fit { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: rgb(var(--oq-state) / .08); margin: 4px 0 6px; }
+.fit i { display: block; height: 100%; transition: width .6s var(--oq-ease-in); }
+.fit i.o { background: var(--oq-ink-faint); }
+.fitk { display: flex; justify-content: space-between; gap: 8px; font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); flex-wrap: wrap; }
+.keyrow { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12.5px; color: var(--oq-ink-2); }
+.keyrow .klabel { color: var(--oq-ink-2); }
+.keyrow .kval { color: var(--oq-ink); }
+
+/* ---- the other tabs: the existing blade bodies, mounted inside the page (header reduced to its sub line and tools) ---- */
+.blade.embed { flex: 1; min-height: 0; box-shadow: none; background: none; border-radius: 0; animation: none; }
+.blade.embed > .bh { min-height: 0; padding: 10px 18px 0; border-bottom: 0; background: none; gap: 10px; }
+.blade.embed > .bh .sq, .blade.embed > .bh .t { display: none; }
+.blade.embed > .bh .s { margin: 0; font: 12px var(--oq-font-mono); }
+.blade.embed .bb { background: none; }
+
+/* ---- a phone (or a narrow window): tabs over verbs, one column ---- */
+@container (max-width: 760px) {
+  .mhead { flex-direction: column; align-items: stretch; padding: 10px; gap: 8px; }
+  .tabs { overflow-x: auto; scrollbar-width: none; }
+  .tabs button { flex: 1; justify-content: center; padding: 0 10px; height: 44px; }
+  .tabs .pill { height: 44px; }
+  .tabs button svg { display: none; }
+  .cmdbar { margin: 0; }
+  .cmdbar .fb { flex: 1; height: 44px; }
+  .cmdbar .fb.ic { flex: none; width: 44px; }
+  .cmdbar .fb.ic.armed { flex: 1; }
+  .cmdbar .fb.cp { flex: none; width: 44px; padding: 0; }
+  .cmdbar .fb.cp .t { display: none; }
+  .sec { grid-template-columns: 1fr; padding: 10px; gap: 10px; }
+  .dl { grid-template-columns: 96px minmax(0, 1fr); }
+  .blade.embed > .bh { padding: 8px 12px 0; }
+}
+@media (prefers-reduced-motion: reduce) { .tabs .pill, .fb { transition: none; } }

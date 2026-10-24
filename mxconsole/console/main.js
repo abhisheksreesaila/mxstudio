@@ -7,7 +7,7 @@ import { mountTopbar } from "./topbar.js";
 import { startPages } from "./pages.js";
 import { startSystemPolling } from "./system-data.js";
 import "./blade-home.js";
-import "./blade-model.js";
+import "./model-page.js";
 import "./blade-add.js";
 import "./blade-security.js";
 import "./blade-keys.js";

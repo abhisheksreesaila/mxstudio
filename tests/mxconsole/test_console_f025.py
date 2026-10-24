@@ -34,32 +34,25 @@ CTX = {
 
 
 def overview(model=None, ctx=None):
-    return node(f"m.overviewView({json.dumps({**MODEL, **(model or {})})}, {json.dumps({**CTX, **(ctx or {})})})", "blade-model.js")
+    return node(f"m.overviewView({json.dumps({**MODEL, **(model or {})})}, {json.dumps({**CTX, **(ctx or {})})})", "model-page.js")
 
 
-def commands(state, secure=False):
-    return node(f"m.commandsFor({json.dumps(state)}, {json.dumps(secure)})", "blade-model.js")
+def commands(state):
+    return node(f"m.commandsFor({json.dumps(state)})", "model-page.js")
 
 
 # -- command bar ---------------------------------------------------------------------------------
-def test_logs_stay_one_click_away_in_the_model_menu():
-    from mxconsole.gateway import CONSOLE_DIR
-    assert '["logs", "Logs", "scroll-text", "logs"]' in (CONSOLE_DIR / "blade-model.js").read_text()
-
-
 def test_commands_by_state():
-    def keys(state, secure=False):
-        return [c["key"] for c in commands(state, secure)]
+    def keys(state):
+        return [c["key"] for c in commands(state)]
     assert keys("ready")[:2] == ["stop", "restart"]
     assert keys("cold")[0] == "start"
     assert keys("crashed")[0] == "restart"
     assert keys("starting")[0] == "stop"
     for state in ("ready", "cold", "crashed", "starting"):
         k = keys(state)
-        assert "secure" in k and "bench" in k and "notebook" in k and "copy" in k
-        assert "logs" not in k  # since the omxconsole finish (D-04): Logs is in the left menu, so the bar fits one line
-        assert k[-1] == "rm"
-    assert "secure" not in keys("ready", True)
+        assert "copy" in k and k[-1] == "rm"
+        assert not {"secure", "bench", "notebook", "logs"} & set(k)  # F-053: those are tabs or live inside them
 
 
 def test_every_command_has_label_icon_and_the_remove_is_danger():
@@ -70,12 +63,12 @@ def test_every_command_has_label_icon_and_the_remove_is_danger():
 
 
 def test_twin_names_the_model():
-    assert node("m.cliTwin('stop', 'qwen')", "blade-model.js") == "mxc stop qwen"
-    assert node("m.cliTwin('start', 'qwen')", "blade-model.js") == "mxc serve qwen"
-    assert node("m.cliTwin('restart', 'qwen')", "blade-model.js") == "mxc stop qwen && mxc serve qwen"
-    assert node("m.cliTwin('rm', 'qwen')", "blade-model.js") == "mxc rm qwen"
-    assert node("m.cliTwin('secure', 'qwen')", "blade-model.js") == "mxc expose"
-    assert node("m.cliTwin('bench', 'qwen')", "blade-model.js") == "mxc bench"
+    assert node("m.cliTwin('stop', 'qwen')", "model-page.js") == "mxc stop qwen"
+    assert node("m.cliTwin('start', 'qwen')", "model-page.js") == "mxc serve qwen"
+    assert node("m.cliTwin('restart', 'qwen')", "model-page.js") == "mxc stop qwen && mxc serve qwen"
+    assert node("m.cliTwin('rm', 'qwen')", "model-page.js") == "mxc rm qwen"
+    assert node("m.cliTwin('secure', 'qwen')", "model-page.js") == "mxc expose"
+    assert node("m.cliTwin('bench', 'qwen')", "model-page.js") == "mxc bench"
 
 
 # -- overview ------------------------------------------------------------------------------------
@@ -172,7 +165,7 @@ def test_css_braces_balance(name):
     assert css.count("{") == css.count("}") and len(css) > 400
 
 
-@pytest.mark.parametrize("name", ["blade-model.js", "blade-security.js", "blade-keys.js"])
+@pytest.mark.parametrize("name", ["model-page.js", "blade-security.js", "blade-keys.js"])
 def test_no_innerhtml_or_style_attributes(name):
     src = (CONSOLE_DIR / name).read_text()
     assert "innerHTML" not in src and "insertAdjacentHTML" not in src and 'setAttribute("style"' not in src
