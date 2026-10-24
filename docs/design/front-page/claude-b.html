@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en" class="oq-root oq-light oq-family-dev">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F-060 · Claude · Option B · Bento (light)</title>
+<link rel="stylesheet" href="../../site/omxqua/tokens.css">
+<link rel="stylesheet" href="omxqua/components.css">
+<link rel="stylesheet" href="fp.css">
+<script src="fp.js"></script>
+<script src="omxqua/omxqua.js" defer></script>
+<style>
+  /* Option B · Bento: light, product-first. A split hero with a live terminal, then every section as a bento of tiles
+     holding real parts (states, keys, routes, the request demo, real screenshots). Phone: tiles swipe in one row. */
+  .B-hero { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 48px; align-items: center; padding-top: 64px; }
+  .B-hero .L-hero-h { font-size: clamp(48px, 5.6vw, 82px); }
+  .B-badge { display: inline-flex; gap: 8px; align-items: center; font: 500 12px var(--oq-font-mono); color: var(--oq-ink-2); padding: 6px 10px; border-radius: var(--oq-radius-xs); background: var(--oq-surface-1); box-shadow: var(--oq-shadow-1); margin-bottom: 24px; }
+  .B-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--oq-ok); }
+  .B-term .h { display: flex; align-items: center; gap: 7px; padding: 10px 12px; border-bottom: 1px solid var(--oq-line); }
+  .B-term .h i { width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--oq-state) / .12); }
+  .B-term .h span { font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); margin-left: 6px; }
+  .B-term pre { margin: 0; padding: 16px 18px; font: 12.5px/1.85 var(--oq-font-mono); white-space: pre-wrap; word-break: break-all; min-height: 232px; }
+  .B-term pre .p { color: var(--oq-ink-2); }
+  .B-term pre .ok { color: var(--oq-ok); }
+  .B-term pre .dim { color: var(--oq-ink-2); }
+  .B-term pre .cur { display: inline-block; width: 8px; height: 15px; background: var(--oq-ink); vertical-align: -3px; }
+  .B-shot { position: relative; margin-top: 72px; }
+  .B-float { position: absolute; display: inline-flex; gap: 8px; align-items: center; height: 40px; padding: 0 16px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-3); font: 500 12.5px var(--oq-font-mono); white-space: nowrap; z-index: 2; }
+  .B-float small { color: var(--oq-ink-2); }
+  .B-float i { width: 8px; height: 8px; border-radius: 50%; background: var(--oq-ok); }
+  .B-float.a { left: -18px; bottom: 56px; } .B-float.b { right: 36px; top: 20px; }
+
+  .B-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
+  .B-head .L-lede { max-width: 40ch; margin: 0; font-size: 19px; }
+  .B-head .L-h2 { font-size: clamp(40px, 5.2vw, 68px); }
+  .B-bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; margin-top: 40px; }
+  .s2 { grid-column: span 2; } .s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s6 { grid-column: span 6; } .r2 { grid-row: span 2; }
+  .B-tile .b { display: flex; flex-direction: column; gap: 12px; }
+  .B-tile .k { font: 500 11.5px var(--oq-font-mono); color: var(--oq-ink-2); display: flex; align-items: center; gap: 8px; }
+  .B-tile .k .ic-tile { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+  .B-tile .k .ic-tile .ico { width: 15px; height: 15px; }
+
+  /* lifecycle lanes */
+  .B-life { display: grid; gap: 12px; font: 12px var(--oq-font-mono); }
+  .B-life .lane { display: grid; grid-template-columns: 110px 1fr; gap: 12px; align-items: center; }
+  .B-life .track { display: grid; grid-template-columns: 1fr 1.2fr 3fr 2fr 2fr; height: 30px; border-radius: 8px; overflow: hidden; gap: 2px; }
+  .B-life .track span { display: grid; place-items: center; font-size: 11px; background: rgb(var(--oq-state) / .06); color: var(--oq-ink-2); }
+  .B-life .track .st { background: color-mix(in srgb, var(--oq-warn) 18%, transparent); color: var(--oq-ink); }
+  .B-life .track .rd { background: color-mix(in srgb, var(--oq-ok) 20%, transparent); color: var(--oq-ink); font-weight: 600; }
+  .B-life .track .id { background: color-mix(in srgb, var(--oq-ok) 8%, transparent); color: var(--oq-ink); }
+  .B-life .track.pin { grid-template-columns: 1fr; }
+  .B-life .track.pin span { background: color-mix(in srgb, var(--oq-ok) 20%, transparent); color: var(--oq-ink); }
+  .B-life .ticks { display: grid; grid-template-columns: 110px 1fr; gap: 12px; color: var(--oq-ink-2); font-size: 10.5px; }
+  .B-life .ticks div { display: flex; justify-content: space-between; }
+
+  .B-rows { display: grid; font: 12.5px var(--oq-font-mono); }
+  .B-rows > div { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--oq-line-2); }
+  .B-rows > div:last-child { border-bottom: 0; }
+  .B-rows .muted { color: var(--oq-ink-2); }
+  .B-pinrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 10px; background: var(--oq-surface-0); font-size: 14px; }
+
+  .B-lan { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; font: 12.5px var(--oq-font-mono); }
+  .B-lan .devs { display: grid; gap: 8px; }
+  .B-lan .devs span, .B-lan .gw { display: flex; gap: 8px; align-items: center; padding: 9px 11px; border-radius: 10px; background: var(--oq-surface-0); }
+  .B-lan .gw { box-shadow: inset 0 0 0 1.5px var(--oq-ink); background: none; font-weight: 600; }
+  .B-lan .ln { height: 1.5px; background: var(--oq-ink-2); opacity: .4; }
+
+  .B-steps { display: grid; gap: 8px; counter-reset: s; }
+  .B-steps > div { display: grid; grid-template-columns: 32px 1fr; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--oq-surface-0); counter-increment: s; }
+  .B-steps > div::before { content: "0" counter(s); font: 600 12px var(--oq-font-mono); color: var(--oq-ink-2); padding-top: 2px; }
+  .B-steps b { display: block; font-size: 14.5px; } .B-steps span { font-size: 13px; color: var(--oq-ink-2); }
+
+  .B-shot-tile { padding: 0; }
+  .B-shot-tile .L-frame { box-shadow: none; border-radius: 0; }
+  .B-shot-tile .cap { padding: 12px 16px 0; font-size: 14px; font-weight: 600; }
+  .B-shot-tile .cap span { display: block; font-weight: 400; color: var(--oq-ink-2); font-size: 13px; margin-top: 2px; }
+
+  /* FAQ: accordion; the answer is a small visual */
+  .B-faq { margin-top: 40px; display: grid; gap: 10px; }
+  .B-q { background: var(--oq-surface-1); border-radius: var(--oq-radius-card); box-shadow: var(--oq-shadow-1); overflow: hidden; }
+  .B-q summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px; cursor: pointer; font-size: 17px; font-weight: 600; min-height: 56px; }
+  .B-q summary::-webkit-details-marker { display: none; }
+  .B-q summary::after { content: "+"; font: 400 22px var(--oq-font-mono); color: var(--oq-ink-2); transition: transform var(--oq-spring-fast-dur) var(--oq-spring-fast); }
+  .B-q[open] summary::after { transform: rotate(45deg); }
+  .B-q .a { padding: 0 20px 20px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: center; }
+  .B-q .a p { margin: 0; color: var(--oq-ink-2); font-size: 15px; }
+  .B-q[open] .a { animation: qIn .28s var(--oq-ease-in) both; }
+  @keyframes qIn { from { opacity: 0; transform: translateY(-4px); } }
+
+  @media (max-width: 900px) {
+    .B-hero { grid-template-columns: 1fr; gap: 32px; }
+    .B-head { display: block; } .B-head .L-lede { margin-top: 16px; }
+    .B-float { display: none; }
+    .B-q .a { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .B-hero { padding-top: 40px; }
+    .B-hero .L-cta-row .btn { flex: 1 1 100%; }
+    .B-term pre { min-height: 0; font-size: 11.5px; }
+    .B-shot { margin-top: 40px; }
+    .B-bento { margin-top: 28px; }
+    .B-bento.wide-first > :first-child { grid-column: 1 / -1; }
+    .B-bento:not(.L-swipe) { grid-template-columns: 1fr; }
+    .B-bento:not(.L-swipe) > * { grid-column: auto; grid-row: auto; }
+    .B-life .lane, .B-life .ticks { grid-template-columns: 76px 1fr; }
+    .B-life .track span { font-size: 9.5px; }
+    .B-lan { grid-template-columns: 1fr; } .B-lan .ln { width: 1.5px; height: 14px; justify-self: center; }
+  }
+</style>
+</head>
+<body>
+
+<header class="L-nav">
+  <div class="in">
+    <a class="L-brand" href="#top"><span class="mark">omx</span>omxconsole</a>
+    <nav class="L-links" aria-label="Sections">
+      <a href="#endpoint">Endpoint</a><a href="#share">Sharing</a><a href="#request">Request</a><a href="#porting">Porting</a><a href="#console">Console</a><a href="#faq">FAQ</a>
+    </nav>
+    <div class="cta"><a class="btn fill" href="#get"><svg class="ico"><use href="#i-github"/></svg>Get it</a></div>
+  </div>
+</header>
+
+<main id="top" class="L-wrap">
+<section class="B-hero">
+  <div>
+    <span class="B-badge"><i></i>Public alpha · free, MIT</span>
+    <h1 class="L-hero-h w-rise">Local AI on Modular MAX, <em>made easy.</em></h1>
+    <p class="L-lede rv" style="--d:300ms">One command gives you an OpenAI-compatible endpoint. Models load when called and unload when idle. If MAX can't run a model yet, omxconsole can port it.</p>
+    <div class="L-cta-row rv" style="--d:400ms">
+      <a class="btn fill lg" href="#get">Serve your first model<svg class="ico"><use href="#i-arrow"/></svg></a>
+      <a class="btn text lg" href="../../site/console.html">Tour the console ›</a>
+    </div>
+  </div>
+  <div class="L-card B-term rv" style="--d:200ms">
+    <div class="h"><i></i><i></i><i></i><span>~/mxstudio · output abbreviated</span></div>
+    <pre id="typed" aria-label="mxc serve output"></pre>
+    <div class="src">pixi run mxc serve qwen2.5-0.5b <button class="cp">copy</button></div>
+  </div>
+</section>
+
+<div class="B-shot L-unfold">
+  <div class="L-frame"><div class="bar"><i></i><i></i><i></i><span>127.0.0.1:11435/console · My models</span></div>
+    <img src="../../assets/screens/home.png" alt="The omxconsole console, My models"></div>
+  <div class="B-float a"><i></i>http://127.0.0.1:11435/v1 <small>one endpoint</small></div>
+  <div class="B-float b">mxc keys new my-app <small>one key per app</small></div>
+</div>
+
+<div class="L-stats">
+  <div class="rv"><b data-count="8">8</b><span>architectures ported</span><em>incl. OLMoE, Granite MoE</em></div>
+  <div class="rv" style="--d:80ms"><b><span data-count="7–40">7–40</span><small>min</small></b><span>per port</span><em>$2–5 of Claude usage</em></div>
+  <div class="rv" style="--d:160ms"><b><span data-count="5">5</span><small>min</small></b><span>idle, then unload</span><em>keep_alive default</em></div>
+  <div class="rv" style="--d:240ms"><b data-count="4">4</b><span>/v1 routes reach the LAN</span><em>nothing else does</em></div>
+</div>
+
+<!-- endpoint -->
+<section class="L-sec" id="endpoint">
+  <div class="B-head"><div><span class="L-status rv"><i></i>works today</span><h2 class="L-h2 rv">One endpoint. <em>Many models.</em></h2></div>
+    <p class="L-lede rv">Models start on their first request and unload after five idle minutes. GPU memory goes only to what's in use.</p></div>
+  <div class="B-bento wide-first">
+    <div class="L-card B-tile s4 r2 rv"><div class="b">
+      <div class="k"><span class="ic-tile" style="--c:var(--oq-data-1)"><svg class="ico"><use href="#i-layers"/></svg></span>A model's day <span class="L-illus">illustrative</span></div>
+      <div class="B-life">
+        <div class="lane">qwen2.5-0.5b<div class="track"><span>cold</span><span class="st">starting</span><span class="rd">ready · requests</span><span class="id">idle 5 min</span><span>unloaded</span></div></div>
+        <div class="lane">smollm3-3b<div class="track"><span>cold</span><span>cold</span><span>cold</span><span class="st">starting</span><span class="rd">ready</span></div></div>
+        <div class="lane">all-minilm-l6<div class="track pin"><span>pinned · stays loaded</span></div></div>
+        <div class="ticks"><span></span><div><span>first call</span><span>last call</span><span>+5 min</span></div></div>
+      </div>
+      <p>The first call to a cold model waits for it to start; after that it's warm until it sits idle for <code>keep_alive</code>.</p>
+    </div><div class="src">mxc serve qwen2.5-0.5b --keep-alive 10m <button class="cp">copy</button></div></div>
+    <div class="L-card B-tile s2 rv" style="--d:80ms"><div class="b">
+      <div class="k"><span class="ic-tile" style="--c:var(--oq-data-3)"><svg class="ico"><use href="#i-pin"/></svg></span>Pin</div>
+      <div class="B-pinrow">Keep loaded<button class="switch on" aria-pressed="true" aria-label="Keep loaded"></button></div>
+    </div><div class="src">mxc serve all-minilm-l6 --pin</div></div>
+    <div class="L-card B-tile s2 rv" style="--d:160ms"><div class="b">
+      <div class="k"><span class="ic-tile" style="--c:var(--oq-data-2)"><svg class="ico"><use href="#i-server"/></svg></span>States</div>
+      <div class="B-rows"><div>qwen2.5-0.5b<span class="badge ok"><i></i>ready</span></div><div>smollm3-3b<span class="badge warn"><i></i>starting</span></div><div>phi-2<span class="badge"><i></i>cold</span></div></div>
+    </div><div class="src">curl …/v1/models</div></div>
+  </div>
+</section>
+
+<!-- share -->
+<section class="L-sec" id="share">
+  <div class="B-head"><div><span class="L-status rv"><i></i>works today</span><h2 class="L-h2 rv">Safe to share.</h2></div>
+    <p class="L-lede rv">One revocable key per app, stored only as a hash. HTTPS on your LAN with one command.</p></div>
+  <div class="B-bento L-swipe">
+    <div class="L-card B-tile s2 rv"><div class="b">
+      <div class="k"><span class="ic-tile" style="--c:var(--oq-data-4)"><svg class="ico"><use href="#i-key"/></svg></span>One key per app</div>
+      <div class="B-rows"><div>my-app<span class="muted">mst-…a91c</span></div><div>notebook<span class="muted">mst-…07fe</span></div><div>phone-shortcut<span class="muted">mst-…c3d2</span></div></div>
+      <p class="L-ink2" style="margin:0;font-size:14px">Shown once. Revoke one and only that app stops.</p>
+    </div><div class="src">mxc keys new my-app</div></div>
+    <div class="L-card B-tile s2 rv" style="--d:80ms"><div class="b">
+      <div class="k"><span class="ic-tile" style="--c:var(--oq-ok)"><svg class="ico"><use href="#i-lock"/></svg></span>HTTPS on your LAN</div>
+      <div class="B-lan"><div class="devs"><span><svg class="ico"><use href="#i-phone"/></svg>phone</span><span><svg class="ico"><use href="#i-laptop"/></svg>laptop</span></div><div class="ln"></div><div class="gw"><svg class="ico"><use href="#i-lock"/></svg>box.local:8443</div></div>
+      <p class="L-ink2" style="margin:0;font-size:14px">Caddy with its own certificate authority, then LiteLLM.</p>
+    </div><div class="src">mxc expose</div></div>
+    <div class="L-card B-tile s2 rv" style="--d:160ms"><div class="b">
+      <div class="k"><span class="ic-tile" style="--c:var(--oq-data-5)"><svg class="ico"><use href="#i-shield"/></svg></span>Only /v1 leaves the box</div>
+      <div class="B-rows"><div>/v1/models<span class="badge ok"><i></i>LAN</span></div><div>/v1/chat/completions<span class="badge ok"><i></i>LAN</span></div><div>/v1/completions<span class="badge ok"><i></i>LAN</span></div><div>/v1/embeddings<span class="badge ok"><i></i>LAN</span></div><div>/console, /admin<span class="badge"><i></i>this machine</span></div></div>
+    </div><div class="src note">the console's Security page shows the same</div></div>
+  </div>
+</section>
+
+<!-- request -->
+<section class="L-sec" id="request">
+  <div class="B-head"><div><span class="L-status play rv"><i></i>interactive</span><h2 class="L-h2 rv">How a request travels.</h2></div>
+    <p class="L-lede rv">Pick where the call comes from and whether the model is loaded, then press Play.</p></div>
+  <div class="B-bento"><div class="L-card s6 rv"><div class="b" data-rt></div></div></div>
+</section>
+
+<!-- porting -->
+<section class="L-sec" id="porting">
+  <div class="B-head"><div><span class="L-status rv"><i></i>works today</span><h2 class="L-h2 rv">Porting, <em>when MAX can't.</em></h2></div>
+    <p class="L-lede rv">Claude Code writes a MAX version in a bubblewrap sandbox; omxconsole checks it against the Hugging Face original.</p></div>
+  <div class="B-bento wide-first">
+    <div class="L-card B-tile s3 rv"><div class="b">
+      <div class="k"><span class="ic-tile" style="--c:var(--oq-data-1)"><svg class="ico"><use href="#i-branch"/></svg></span>mxc port &lt;repo&gt; --auto</div>
+      <div class="B-steps">
+        <div><div><b>Workspace</b><span>Closest architecture MAX supports; weights once.</span></div></div>
+        <div><div><b>Generate in a sandbox</b><span>Following Modular's porting skill.</span></div></div>
+        <div><div><b>Try against Hugging Face</b><span>Compile, serve, compare. Up to 4 tries.</span></div></div>
+        <div><div><b>Final check</b><span>Re-run independently, within tolerance.</span></div></div>
+        <div><div><b>Register and serve</b><span>Same endpoint, keys and idle unload.</span></div></div>
+      </div>
+    </div><div class="src">mxc port allenai/OLMoE-1B-7B-0924 --auto</div></div>
+    <div class="L-card B-tile B-shot-tile s3 rv" style="--d:80ms">
+      <div class="L-frame"><div class="bar"><i></i><i></i><i></i><span>Add a model · needs porting</span></div><img src="../../assets/screens/port-offer.png" alt="Add a model offering Port it" loading="lazy"></div>
+      <div class="b" style="padding:14px 16px">
+        <div class="L-chips"><span class="chip"><i></i>GPT-2</span><span class="chip"><i></i>Pythia</span><span class="chip"><i></i>Phi-2</span><span class="chip"><i></i>StarCoder2</span><span class="chip"><i></i>StableLM 2</span><span class="chip"><i></i>SmolLM3</span><span class="chip"><i></i>Granite MoE</span><span class="chip"><i></i>OLMoE</span><span class="chip park" style="--c:var(--oq-warn)"><i></i>BLOOM · parked</span><span class="chip park" style="--c:var(--oq-warn)"><i></i>EXAONE · parked</span></div>
+      </div>
+      <div class="src note">2× RTX 3090, MAX 26.7, text LLMs · docs/PORTING.md</div>
+    </div>
+  </div>
+</section>
+
+<!-- console -->
+<section class="L-sec" id="console">
+  <div class="B-head"><div><span class="L-status rv"><i></i>works today</span><h2 class="L-h2 rv">The console.</h2></div>
+    <p class="L-lede rv">Every screen is a command too. The tour walks through each one.</p></div>
+  <div class="B-bento L-swipe">
+    <div class="L-card B-tile B-shot-tile s4 r2 rv"><div class="L-frame"><div class="bar"><i></i><i></i><i></i><span>#/models/qwen2.5-0.5b/overview</span></div><img src="../../assets/screens/model.png" alt="A model's page" loading="lazy"></div>
+      <div class="cap">A model's page<span>Overview · Benchmark · Logs · Notebook as tabs; switching models keeps the tab.</span></div><div class="src" style="margin-top:12px">mxc ls</div></div>
+    <div class="L-card B-tile B-shot-tile s2 rv" style="--d:80ms"><div class="L-frame"><div class="bar"><i></i><i></i><i></i><span>benchmark</span></div><img src="../../assets/screens/bench.png" alt="Benchmark" loading="lazy"></div>
+      <div class="cap">Benchmark<span>Decode tok/s and time to first token.</span></div><div class="src" style="margin-top:12px">mxc bench --all</div></div>
+    <div class="L-card B-tile B-shot-tile s2 rv" style="--d:160ms"><div class="L-frame"><div class="bar"><i></i><i></i><i></i><span>notebook</span></div><img src="../../assets/screens/jupyter.png" alt="Jupyter in the page" loading="lazy"></div>
+      <div class="cap">Jupyter in the page<span>See how the model is built.</span></div><div class="src" style="margin-top:12px">mxc learn qwen2.5-0.5b</div></div>
+    <div class="L-card B-tile B-shot-tile s3 rv"><div class="L-frame"><div class="bar"><i></i><i></i><i></i><span>logs</span></div><img src="../../assets/screens/logs.png" alt="Logs" loading="lazy"></div>
+      <div class="cap">Logs<span>Live, per model.</span></div><div class="src" style="margin-top:12px">mxc logs qwen2.5-0.5b</div></div>
+    <div class="L-card B-tile B-shot-tile s3 rv" style="--d:80ms"><div class="L-frame"><div class="bar"><i></i><i></i><i></i><span>keys</span></div><img src="../../assets/screens/keys.png" alt="API keys" loading="lazy"></div>
+      <div class="cap">API keys<span>One per app, revocable.</span></div><div class="src" style="margin-top:12px">mxc keys ls</div></div>
+  </div>
+  <div class="L-cta-row rv"><a class="btn tonal" href="../../site/console.html">Take the console tour<svg class="ico"><use href="#i-arrow"/></svg></a></div>
+</section>
+
+<!-- FAQ -->
+<section class="L-sec" id="faq">
+  <h2 class="L-h2 rv">Go on, ask.</h2>
+  <div class="B-faq">
+    <details class="B-q rv" open><summary>Why MAX?</summary><div class="a"><p>MAX already serves models fast. omxconsole is the convenience around it: one endpoint, idle unload, keys and a console.</p>
+      <div class="L-pills"><span>max serve</span><span>OpenAI-compatible</span><span>Modular's porting skill</span><span>MAX 26.7 nightly</span></div></div></details>
+    <details class="B-q rv"><summary>Why not Ollama or vLLM?</summary><div class="a"><p>Use them if you want their engines. Use omxconsole if you want MAX, served that easily, plus a way to port what it can't run.</p>
+      <div class="L-vs"><div><b>Ollama / vLLM</b>their own engines</div><div class="us"><b>omxconsole</b>MAX, made easy · ports what's missing</div></div></div></details>
+    <details class="B-q rv"><summary>Does it need the cloud?</summary><div class="a"><p>Serving is entirely local. Only porting calls out, to your own Claude account, and only when you ask.</p>
+      <div class="L-rows"><div>serving<span class="y">local only</span></div><div>weights<span class="n">Hugging Face, once</span></div><div>porting<span class="w">your Claude account</span></div></div></div></details>
+    <details class="B-q rv"><summary>What does porting cost?</summary><div class="a"><p>About $2–5 of Claude usage and 7–40 minutes per model in our tests. It never starts on its own.</p>
+      <div class="L-pills"><span>$2–5</span><span>7–40 min</span><span>3 attempts</span><span>stops on a repeat failure</span></div></div></details>
+    <details class="B-q rv"><summary>Mac?</summary><div class="a"><p>Linux with an NVIDIA GPU today. Whether MAX serves our models on Apple silicon is being checked; the Mac app waits on it.</p>
+      <div class="L-lineage"><span>Linux + NVIDIA</span><i></i><span>Mac check</span><i></i><span class="us">omxconsole.app</span></div></div></details>
+    <details class="B-q rv"><summary>What's next?</summary><div class="a"><p>Small, verifiable steps, one at a time.</p>
+      <div class="L-rows"><div>01 · Mac app<span class="w">in review</span></div><div>02 · finished-ports catalog<span class="n">planned</span></div><div>03 · swappable porting agent<span class="n">planned</span></div></div></div></details>
+  </div>
+</section>
+
+<!-- get -->
+<section class="L-sec" id="get">
+  <h2 class="L-h2 rv">Available today.</h2>
+  <div class="L-get">
+    <div class="L-card rv"><div class="h">Three commands<button class="cp" data-copy="cmdsB"><svg class="ico" style="width:13px;height:13px"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre class="L-term" id="cmdsB"><span class="p">$ </span><span data-line>git clone https://github.com/abhisheksreesaila/mxstudio.git && cd mxstudio</span>
+<span class="p">$ </span><span data-line>pixi install</span>
+<span class="p">$ </span><span data-line>pixi run mxc serve qwen2.5-0.5b</span></pre>
+      <div class="src note">Linux · NVIDIA · free, MIT</div></div>
+    <div class="rv" style="--d:100ms">
+      <p class="L-lede" style="margin-top:0">Any OpenAI client works. Point <code>base_url</code> at it and use your key.</p>
+      <div class="L-cta-row"><a class="btn fill lg" href="https://github.com/abhisheksreesaila/mxstudio"><svg class="ico"><use href="#i-github"/></svg>Get it on GitHub</a>
+        <a class="btn tonal lg" href="https://github.com/abhisheksreesaila/mxstudio/blob/main/docs/USER_GUIDE.md">Read the user guide</a></div>
+      <p class="L-note">Port numbers: one Linux machine, 2× RTX 3090, MAX 26.7.</p>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="L-foot"><div class="L-wrap">
+  <div class="cols">
+    <div><a class="L-brand" href="#top"><span class="mark">omx</span>omxconsole</a><p class="L-note">Local AI on Modular MAX, made easy.</p></div>
+    <div><h4>Start</h4><a href="https://github.com/abhisheksreesaila/mxstudio">GitHub</a><a href="#">README</a><a href="#">Releases</a></div>
+    <div><h4>See it</h4><a href="../../site/console.html">Console tour</a><a href="../../site/porting.html">Porting</a></div>
+    <div><h4>Build</h4><a href="#">CLI reference</a><a href="#">HTTP API</a><a href="#">Architecture</a></div>
+    <div><h4>Follow along</h4><a href="#">Changelog</a><a href="#">Issues</a></div>
+  </div>
+  <div class="base"><span>Public alpha · MIT · built on Modular MAX · styled with omxqua</span><a href="#">Report an issue</a></div>
+</div></footer>
+
+<script>
+// The hero terminal types the real first-run output once (instantly under reduced motion). Key and timings are placeholders.
+addEventListener("DOMContentLoaded", () => {
+  const pre = document.getElementById("typed"); if (!pre) return;
+  const lines = [
+    ['<span class="p">$ </span>', "pixi run mxc serve qwen2.5-0.5b"],
+    ['<span class="dim">', "pulling qwen2.5-0.5b … done", "</span>"],
+    ['<span class="ok">', "ready  http://127.0.0.1:11435/v1", "</span>"],
+    ['<span class="dim">', "key    mst-…  (shown once, app: default)", "</span>"],
+    ["", "curl http://127.0.0.1:11435/v1/chat/completions \\"],
+    ["", "  -H \"Authorization: Bearer $MXC_API_KEY\" -d '{…}'"],
+  ];
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce || !document.documentElement.classList.contains("mo-on")) { pre.innerHTML = lines.map(l => l[0] + l[1] + (l[2] || "")).join("\n"); return; }
+  let li = 0, ci = 0, done = "";
+  const tick = () => {
+    if (li >= lines.length) { pre.innerHTML = done + '<span class="cur"></span>'; return; }
+    const [a, txt, z = ""] = lines[li];
+    const typing = li === 0;
+    ci = typing ? ci + 1 : txt.length;
+    pre.innerHTML = done + a + txt.slice(0, ci) + z + '<span class="cur"></span>';
+    if (ci >= txt.length) { done += a + txt + z + "\n"; li++; ci = 0; setTimeout(tick, li === 1 ? 380 : 260); }
+    else setTimeout(tick, 38);
+  };
+  setTimeout(tick, 500);
+});
+</script>
+</body>
+</html>

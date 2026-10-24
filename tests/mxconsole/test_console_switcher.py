@@ -264,7 +264,7 @@ def test_visiting_models_fills_recent_and_other_pages_do_not():
 # -- review round 1 ---------------------------------------------------------------------------------
 def test_the_search_is_a_combobox_over_one_listbox_and_points_at_the_highlighted_card():
     got = run(SETUP + """
-      const attrs = Object.fromEntries(["role", "aria-controls", "aria-expanded", "aria-autocomplete"].map((k) => [k, input().getAttribute(k)]));
+      const attrs = Object.fromEntries(["role", "aria-controls", "aria-expanded", "aria-autocomplete", "aria-haspopup"].map((k) => [k, input().getAttribute(k)]));
       document.key("ArrowDown");
       const lists = panel().querySelectorAll(".plist").concat(panel().querySelectorAll(".pgrid")).map((e) => e.getAttribute("role"));
       const kbCard = panel().querySelectorAll(".pr").filter((c) => c.classList.contains("kb"))[0];
@@ -272,7 +272,7 @@ def test_the_search_is_a_combobox_over_one_listbox_and_points_at_the_highlighted
       console.log(JSON.stringify({ attrs, listbox: [target.getAttribute("id"), target.getAttribute("role")], lists, active: input().getAttribute("aria-activedescendant") === kbCard.getAttribute("id"),
         groups: panel().querySelectorAll(".plist")[0].children.map((g) => g.getAttribute("aria-label")) }));
     """)
-    assert got["attrs"] == {"role": "combobox", "aria-controls": "pk-list", "aria-expanded": "true", "aria-autocomplete": "list"}
+    assert got["attrs"] == {"role": "combobox", "aria-controls": "pk-list", "aria-expanded": "true", "aria-autocomplete": "list", "aria-haspopup": "listbox"}
     assert got["listbox"] == ["pk-list", "listbox"] and got["lists"] == ["listbox", None, None, None, None] and got["active"] is True
     assert got["groups"] == ["Recent", "Chat · 2", "Coder · 1", "Vision · 1"]
 

@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>omxconsole — Local AI on Modular MAX</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Fonts: Geist and Geist Mono -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600;700&amp;family=Geist:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS with configuration -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-background": "#e5e1e4",
+            "on-tertiary-fixed": "#1f1b17",
+            "on-primary-container": "#636466",
+            "data-orange": "#ff8a3d",
+            "surface-2": "#1d1d21",
+            "data-teal": "#2bc3ad",
+            "line": "#2a2a30",
+            "on-secondary": "#303034",
+            "on-primary-fixed-variant": "#454749",
+            "secondary": "#c8c5cb",
+            "data-red": "#f2555a",
+            "tertiary-fixed": "#ebe0db",
+            "surface-container-high": "#2a2a2c",
+            "outline-variant": "#44474a",
+            "data-violet": "#8b7bff",
+            "primary-fixed-dim": "#c6c6c8",
+            "on-surface": "#e5e1e4",
+            "tertiary-container": "#ebe0db",
+            "surface-dim": "#131315",
+            "surface-container-low": "#1c1b1d",
+            "ink": "#ededef",
+            "on-primary-fixed": "#1a1c1d",
+            "ink-2": "#a9a9b1",
+            "surface-container-lowest": "#0e0e10",
+            "inverse-surface": "#e5e1e4",
+            "on-tertiary-fixed-variant": "#4c4541",
+            "surface-variant": "#353437",
+            "error-container": "#93000a",
+            "secondary-fixed": "#e4e1e7",
+            "on-primary": "#2f3132",
+            "ink-faint": "#3a3a40",
+            "bad": "#f2555a",
+            "line-2": "#202025",
+            "on-error": "#690005",
+            "tertiary-fixed-dim": "#cfc5bf",
+            "surface-0": "#0b0b0d",
+            "ok": "#3ccf6e",
+            "data-blue": "#3aa0ff",
+            "inverse-on-surface": "#313032",
+            "on-tertiary": "#352f2b",
+            "on-secondary-fixed": "#1b1b1f",
+            "secondary-container": "#47464b",
+            "on-secondary-container": "#b6b4b9",
+            "surface-3": "#25252a",
+            "tertiary": "#ffffff",
+            "surface-tint": "#c6c6c8",
+            "secondary-fixed-dim": "#c8c5cb",
+            "primary-fixed": "#e2e2e4",
+            "inverse-primary": "#5d5e60",
+            "surface-bright": "#39393b",
+            "surface": "#131315",
+            "warn": "#f5a524",
+            "error": "#ffb4ab",
+            "primary": "#ffffff",
+            "primary-container": "#e2e2e4",
+            "on-tertiary-container": "#6a635e",
+            "on-error-container": "#ffdad6",
+            "surface-container": "#201f21",
+            "on-surface-variant": "#c5c6c9",
+            "background": "#131315",
+            "on-secondary-fixed-variant": "#47464b",
+            "surface-container-highest": "#353437",
+            "info": "#52a9ff",
+            "data-yellow": "#e0b400",
+            "surface-1": "#151518",
+            "outline": "#8f9194"
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          fontFamily: {
+            "headline-sm": ["Geist", "sans-serif"],
+            "body-md": ["Geist", "sans-serif"],
+            "headline-md": ["Geist", "sans-serif"],
+            "app-text": ["Geist", "sans-serif"],
+            "headline-lg": ["Geist", "sans-serif"],
+            "headline-hero": ["Geist", "sans-serif"],
+            "label-sm": ["Geist Mono", "monospace"],
+            "title-card": ["Geist", "sans-serif"],
+            "mono-code": ["Geist Mono", "monospace"],
+            "body-lg": ["Geist", "sans-serif"]
+          },
+          fontSize: {
+            "headline-sm": ["24px", { lineHeight: "1.2", fontWeight: "600" }],
+            "body-md": ["17px", { lineHeight: "1.5", fontWeight: "400" }],
+            "headline-md": ["48px", { lineHeight: "1.1", letterSpacing: "-0.04em", fontWeight: "750" }],
+            "app-text": ["13.5px", { lineHeight: "1.4", fontWeight: "400" }],
+            "headline-lg": ["64px", { lineHeight: "1.0", letterSpacing: "-0.045em", fontWeight: "750" }],
+            "headline-hero": ["120px", { lineHeight: "0.95", letterSpacing: "-0.05em", fontWeight: "800" }],
+            "label-sm": ["12px", { lineHeight: "1.3", fontWeight: "400" }],
+            "title-card": ["15px", { lineHeight: "1.3", fontWeight: "600" }],
+            "mono-code": ["13px", { lineHeight: "1.4", fontWeight: "400" }],
+            "body-lg": ["24px", { lineHeight: "1.4", fontWeight: "400" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-0 text-ink antialiased font-app-text text-app-text min-h-screen flex flex-col items-center justify-start selection:bg-surface-3 selection:text-primary">
+<!-- Responsive Container restricted strictly to 390px mobile view with crisp borders -->
+<div class="w-full max-w-[390px] min-h-screen bg-surface-0 border-x border-line flex flex-col relative pb-12 shadow-2xl">
+<!-- 1. STICKY TOP BAR & HORIZONTAL CHIP ROW -->
+<header class="sticky top-0 z-50 bg-surface-0/95 backdrop-blur-md border-b border-line">
+<!-- Main Brand Row (min touch target: 44px) -->
+<div class="flex items-center justify-between px-4 h-14">
+<a class="flex items-center gap-2 min-h-[44px] items-center" href="#">
+<div class="w-7 h-7 rounded bg-surface-2 border border-line flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">terminal</span>
+</div>
+<span class="font-headline-sm text-headline-sm text-primary tracking-tight font-bold">omxconsole</span>
+</a>
+<a class="h-9 px-3.5 rounded bg-primary text-on-primary font-title-card text-title-card flex items-center justify-center font-medium hover:bg-neutral-200 active:scale-95 transition-all min-h-[44px]" href="https://github.com/modular/omxconsole" rel="noopener" target="_blank">
+          Get it on GitHub
+        </a>
+</div>
+<!-- Scrolling Section Chips without Hamburger Menu (touch targets >= 44px) -->
+<nav aria-label="Section navigation" class="flex items-center gap-1.5 px-3 py-1.5 overflow-x-auto no-scrollbar border-t border-line-2 bg-surface-1/70">
+<a class="shrink-0 h-[44px] px-3.5 rounded flex items-center justify-center font-label-sm text-label-sm text-primary bg-surface-2 border border-line" href="#endpoint">Endpoint</a>
+<a class="shrink-0 h-[44px] px-3.5 rounded flex items-center justify-center font-label-sm text-label-sm text-ink-2 hover:text-primary transition-colors" href="#sharing">Sharing</a>
+<a class="shrink-0 h-[44px] px-3.5 rounded flex items-center justify-center font-label-sm text-label-sm text-ink-2 hover:text-primary transition-colors" href="#request">Request</a>
+<a class="shrink-0 h-[44px] px-3.5 rounded flex items-center justify-center font-label-sm text-label-sm text-ink-2 hover:text-primary transition-colors" href="#porting">Porting</a>
+<a class="shrink-0 h-[44px] px-3.5 rounded flex items-center justify-center font-label-sm text-label-sm text-ink-2 hover:text-primary transition-colors" href="#console">Console</a>
+<a class="shrink-0 h-[44px] px-3.5 rounded flex items-center justify-center font-label-sm text-label-sm text-ink-2 hover:text-primary transition-colors" href="#faq">FAQ</a>
+</nav>
+</header>
+<!-- MAIN SCROLLABLE CONTENT (One Idea Per Section) -->
+<main class="flex flex-col gap-16 px-4 pt-8">
+<!-- 2. HERO (Centred) -->
+<section class="flex flex-col items-center text-center pt-2">
+<!-- Square cornered badge (4px radius) -->
+<div class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-surface-1 border border-line mb-6">
+<span class="w-2 h-2 rounded-full bg-ok animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-ink-2">Public alpha · Linux + NVIDIA</span>
+</div>
+<!-- Giant two-line headline -->
+<h1 class="text-left w-full flex flex-col font-headline-md text-headline-md tracking-tight mb-4">
+<span class="text-ink">Local AI on MAX.</span>
+<span class="text-ink-2">Made easy.</span>
+</h1>
+<!-- Crisp one-line lede -->
+<p class="font-app-text text-app-text text-ink-2 text-left w-full leading-relaxed mb-6">
+          One command gives you an OpenAI-compatible endpoint. Models load on their first request and unload when idle.
+        </p>
+<!-- CTAs -->
+<div class="flex flex-col w-full gap-3 mb-8">
+<a class="w-full h-11 min-h-[44px] rounded-lg bg-primary text-on-primary font-title-card text-title-card flex items-center justify-center font-semibold hover:bg-neutral-200 active:scale-[0.98] transition-transform" href="#get-started">
+            Serve your first model
+          </a>
+<a class="w-full h-11 min-h-[44px] rounded-lg bg-surface-1 border border-line text-ink-2 hover:text-primary font-mono-code text-mono-code flex items-center justify-center gap-1 transition-colors" href="#console">
+            Tour the console <span class="text-primary">›</span>
+</a>
+</div>
+<!-- Stacked Mobile Diagram -->
+<div class="w-full bg-surface-1 border border-line rounded-xl p-3.5 flex flex-col gap-2.5 text-left mb-6">
+<!-- Terminal Chip -->
+<div class="flex items-center justify-between bg-surface-0 border border-line px-3 py-2 rounded">
+<div class="flex items-center gap-2 font-mono-code text-mono-code text-ink">
+<span class="text-ink-2">$</span>
+<span>mxc serve qwen2.5-0.5b</span>
+</div>
+<span class="material-symbols-outlined text-ink-2 text-[16px]">content_copy</span>
+</div>
+<!-- Connector -->
+<div class="flex justify-center items-center py-0.5 text-ink-2">
+<span class="material-symbols-outlined text-[18px]">arrow_downward</span>
+</div>
+<!-- Endpoint Box -->
+<div class="bg-surface-2 border border-line rounded p-2.5 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-data-teal"></span>
+<span class="font-mono-code text-mono-code text-primary font-medium">http://127.0.0.1:11435/v1</span>
+</div>
+<span class="font-label-sm text-label-sm text-ink-2">unified</span>
+</div>
+<!-- Branch connectors -->
+<div class="flex justify-center items-center text-ink-2 py-0.5">
+<span class="material-symbols-outlined text-[18px]">subdirectory_arrow_right</span>
+</div>
+<!-- 3 Model Status Cards -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between bg-surface-0 border border-line px-2.5 py-2 rounded">
+<span class="font-mono-code text-mono-code text-ink">qwen2.5-0.5b</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-ok/10 text-ok border border-ok/30 flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-ok"></span> ready
+              </span>
+</div>
+<div class="flex items-center justify-between bg-surface-0 border border-line px-2.5 py-2 rounded opacity-75">
+<span class="font-mono-code text-mono-code text-ink-2">smollm3</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-2 text-ink-2 border border-line">cold</span>
+</div>
+<div class="flex items-center justify-between bg-surface-0 border border-line px-2.5 py-2 rounded opacity-75">
+<span class="font-mono-code text-mono-code text-ink-2">all-minilm-l6</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-2 text-ink-2 border border-line">cold</span>
+</div>
+</div>
+</div>
+<!-- Browser Mockup Card of "My models" -->
+<div class="w-full bg-surface-1 border border-line rounded-xl overflow-hidden text-left">
+<div class="bg-surface-2 px-3 py-2 border-b border-line flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-bad/80"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-warn/80"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-ok/80"></span>
+</div>
+<span class="font-label-sm text-label-sm text-ink-2">console.local:11435</span>
+<span class="material-symbols-outlined text-ink-2 text-[14px]">tune</span>
+</div>
+<div class="p-3.5 flex flex-col gap-3">
+<div class="flex justify-between items-center">
+<div>
+<span class="font-title-card text-title-card text-ink block">My Models</span>
+<span class="font-label-sm text-label-sm text-ink-2">MAX Engine Tensor Core v24.4</span>
+</div>
+<div class="text-right">
+<span class="font-mono-code text-mono-code text-primary block">1.2 GB <span class="text-ink-2">/ 24 GB</span></span>
+<span class="font-label-sm text-label-sm text-ok">VRAM healthy</span>
+</div>
+</div>
+<div class="w-full bg-surface-0 h-1.5 rounded-full overflow-hidden border border-line">
+<div class="bg-ok h-full w-[5%]"></div>
+</div>
+<div class="flex items-center justify-between pt-1 border-t border-line font-mono-code text-mono-code text-ink-2">
+<span>qwen2.5-0.5b</span>
+<span class="text-ok font-semibold">LOADED (0s TTFT)</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. SECTION: ONE ENDPOINT -->
+<section class="flex flex-col gap-4 scroll-mt-20" id="endpoint">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-2 text-ink-2 border border-line">works today</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-ink">
+          One endpoint. Every model you've pulled.
+        </h2>
+<p class="font-app-text text-app-text text-ink-2">
+          Dynamic model multiplexing with zero cold-start delay. Stop running fragile multiple port mappings.
+        </p>
+<!-- Two Comparison Cards -->
+<div class="flex flex-col gap-3">
+<!-- The usual way -->
+<div class="bg-surface-1 border border-line rounded-xl p-3.5 flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="font-title-card text-title-card text-bad flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px]">close</span> The usual way
+              </span>
+<span class="font-label-sm text-label-sm text-bad bg-bad/10 px-2 py-0.5 rounded border border-bad/20">CUDA OOM risk</span>
+</div>
+<p class="font-app-text text-app-text text-ink-2">
+              3 models need 3 ports (<code class="font-mono-code text-primary">:8000</code>, <code class="font-mono-code text-primary">:8001</code>, <code class="font-mono-code text-primary">:8002</code>).
+            </p>
+<div class="bg-surface-0 p-2.5 rounded border border-line flex justify-between font-mono-code text-mono-code">
+<span class="text-ink-2">Pinned VRAM</span>
+<span class="text-bad">14.2 GB locked</span>
+</div>
+</div>
+<!-- With mxc -->
+<div class="bg-surface-1 border border-ok/40 rounded-xl p-3.5 flex flex-col gap-2 relative">
+<div class="flex items-center justify-between">
+<span class="font-title-card text-title-card text-ok flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px]">check</span> With mxc
+              </span>
+<span class="font-label-sm text-label-sm text-ok bg-ok/10 px-2 py-0.5 rounded border border-ok/20">Optimal</span>
+</div>
+<p class="font-app-text text-app-text text-ink-2">
+              Dynamic multiplexer on unified <code class="font-mono-code text-primary">:11435/v1</code>. Automatic 5-min idle eviction.
+            </p>
+<div class="bg-surface-0 p-2.5 rounded border border-line flex justify-between font-mono-code text-mono-code">
+<span class="text-ink-2">Active VRAM</span>
+<span class="text-ok">1.2 GB active</span>
+</div>
+</div>
+</div>
+<!-- Stat Strip 2x2 Grid -->
+<div class="grid grid-cols-2 gap-2 mt-2">
+<div class="bg-surface-1 border border-line p-3 rounded-lg flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary">1</span>
+<span class="font-label-sm text-label-sm text-ink-2 mt-1">endpoint (OpenAI-compatible)</span>
+</div>
+<div class="bg-surface-1 border border-line p-3 rounded-lg flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary">5 min</span>
+<span class="font-label-sm text-label-sm text-ink-2 mt-1">idle unload (default)</span>
+</div>
+<div class="bg-surface-1 border border-line p-3 rounded-lg flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary">0</span>
+<span class="font-label-sm text-label-sm text-ink-2 mt-1">models loaded until called</span>
+</div>
+<div class="bg-surface-1 border border-line p-3 rounded-lg flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary">1 key</span>
+<span class="font-label-sm text-label-sm text-ink-2 mt-1">per app (granular rate limit)</span>
+</div>
+</div>
+</section>
+<!-- 4. SECTION: SAFE TO SHARE -->
+<section class="flex flex-col gap-4 scroll-mt-20" id="sharing">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-2 text-ink-2 border border-line">works today</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-ink">
+          Safe to share.
+        </h2>
+<p class="font-app-text text-app-text text-ink-2">
+          Granular keys and automatic TLS certificates for your entire local network without opening firewall holes.
+        </p>
+<!-- API Keys Card -->
+<div class="bg-surface-1 border border-line rounded-xl p-3.5 flex flex-col gap-3">
+<div class="flex justify-between items-center">
+<span class="font-title-card text-title-card text-ink">API Key Tokens</span>
+<span class="font-label-sm text-label-sm text-ink-2">3 active</span>
+</div>
+<div class="flex flex-col gap-2">
+<!-- Row 1 -->
+<div class="flex items-center justify-between p-2 rounded bg-surface-0 border border-line">
+<div>
+<span class="font-mono-code text-mono-code text-ink block">my-app</span>
+<span class="font-label-sm text-label-sm text-ink-2">128 req/s · full access</span>
+</div>
+<button class="font-label-sm text-label-sm text-bad hover:underline px-2 py-1 min-h-[44px] flex items-center">Revoke</button>
+</div>
+<!-- Row 2 -->
+<div class="flex items-center justify-between p-2 rounded bg-surface-0 border border-line">
+<div>
+<span class="font-mono-code text-mono-code text-ink block">notebook</span>
+<span class="font-label-sm text-label-sm text-ink-2">read-only · /v1/models</span>
+</div>
+<button class="font-label-sm text-label-sm text-bad hover:underline px-2 py-1 min-h-[44px] flex items-center">Revoke</button>
+</div>
+<!-- Row 3 -->
+<div class="flex items-center justify-between p-2 rounded bg-surface-0 border border-line">
+<div>
+<span class="font-mono-code text-mono-code text-ink block">phone-shortcut</span>
+<span class="font-label-sm text-label-sm text-ink-2">10 req/m · qwen only</span>
+</div>
+<button class="font-label-sm text-label-sm text-bad hover:underline px-2 py-1 min-h-[44px] flex items-center">Revoke</button>
+</div>
+</div>
+<!-- Terminal Source line & copy pill -->
+<div class="mt-1 pt-2 border-t border-line flex items-center justify-between">
+<span class="font-mono-code text-mono-code text-ink-2">$ mxc keys new my-app</span>
+<button class="h-7 px-2.5 rounded bg-surface-2 border border-line text-ink font-label-sm text-label-sm flex items-center gap-1 active:scale-95">
+<span class="material-symbols-outlined text-[14px]">content_copy</span> copy
+            </button>
+</div>
+</div>
+<!-- mxc expose LAN security card -->
+<div class="bg-surface-1 border border-line rounded-xl p-3.5 flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-ok text-[20px]">lock</span>
+<span class="font-mono-code text-mono-code text-primary font-medium">https://box.local:8443</span>
+</div>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-ok/10 text-ok border border-ok/30">TLS Active</span>
+</div>
+<p class="font-app-text text-app-text text-ink-2">
+            Integrated Caddy + LiteLLM stack. HTTPS on your LAN without manual port forwarding or self-signed cert warnings.
+          </p>
+<div class="pt-2 border-t border-line flex items-center justify-between">
+<span class="font-mono-code text-mono-code text-ink-2">$ mxc expose --port 8443</span>
+<button class="h-7 px-2.5 rounded bg-surface-2 border border-line text-ink font-label-sm text-label-sm flex items-center gap-1 active:scale-95">
+<span class="material-symbols-outlined text-[14px]">content_copy</span> copy
+            </button>
+</div>
+</div>
+</section>
+<!-- 5. SECTION: HOW A REQUEST TRAVELS -->
+<section class="flex flex-col gap-4 scroll-mt-20" id="request">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-2 text-data-teal border border-line">interactive</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-ink">
+          How a request travels.
+        </h2>
+<p class="font-app-text text-app-text text-ink-2">
+          Trace packets through every hop of the runtime pipeline with full observability.
+        </p>
+<!-- Segmented Controls -->
+<div class="flex flex-col gap-2">
+<div class="grid grid-cols-2 p-1 bg-surface-1 rounded-lg border border-line text-center">
+<button class="py-2 rounded font-label-sm text-label-sm bg-surface-3 text-primary font-medium min-h-[44px]">This machine</button>
+<button class="py-2 rounded font-label-sm text-label-sm text-ink-2 min-h-[44px]">Another device on LAN</button>
+</div>
+<div class="grid grid-cols-2 p-1 bg-surface-1 rounded-lg border border-line text-center">
+<button class="py-2 rounded font-label-sm text-label-sm text-ink-2 min-h-[44px]">Model idle (cold)</button>
+<button class="py-2 rounded font-label-sm text-label-sm bg-surface-3 text-primary font-medium min-h-[44px]">Model loaded</button>
+</div>
+<button class="w-full h-11 min-h-[44px] rounded-lg bg-primary text-on-primary font-title-card text-title-card flex items-center justify-center gap-2 font-medium active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span> Play trace simulation
+          </button>
+</div>
+<!-- 5-Step Vertical Chain with Ports -->
+<div class="flex flex-col gap-1.5 relative py-2">
+<!-- Step 1 -->
+<div class="bg-surface-1 border border-line p-3 rounded-lg flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm w-5 h-5 rounded bg-surface-2 flex items-center justify-center text-ink-2">1</span>
+<span class="font-title-card text-title-card text-ink">OpenAI client</span>
+</div>
+<span class="font-label-sm text-label-sm text-ink-2">Cursor / Python SDK</span>
+</div>
+<div class="h-3 flex items-center justify-center text-ink-faint"><span class="material-symbols-outlined text-[14px]">south</span></div>
+<!-- Step 2 -->
+<div class="bg-surface-1 border border-line p-3 rounded-lg flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm w-5 h-5 rounded bg-surface-2 flex items-center justify-center text-ink-2">2</span>
+<span class="font-title-card text-title-card text-ink">Caddy TLS</span>
+</div>
+<span class="font-mono-code text-mono-code text-data-teal bg-data-teal/10 px-2 py-0.5 rounded border border-data-teal/20">:8443</span>
+</div>
+<div class="h-3 flex items-center justify-center text-ink-faint"><span class="material-symbols-outlined text-[14px]">south</span></div>
+<!-- Step 3 -->
+<div class="bg-surface-1 border border-line p-3 rounded-lg flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm w-5 h-5 rounded bg-surface-2 flex items-center justify-center text-ink-2">3</span>
+<span class="font-title-card text-title-card text-ink">LiteLLM Proxy</span>
+</div>
+<span class="font-mono-code text-mono-code text-data-blue bg-data-blue/10 px-2 py-0.5 rounded border border-data-blue/20">:4000</span>
+</div>
+<div class="h-3 flex items-center justify-center text-ink-faint"><span class="material-symbols-outlined text-[14px]">south</span></div>
+<!-- Step 4 -->
+<div class="bg-surface-1 border border-line p-3 rounded-lg flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm w-5 h-5 rounded bg-surface-2 flex items-center justify-center text-ink-2">4</span>
+<span class="font-title-card text-title-card text-ink">mxc daemon</span>
+</div>
+<span class="font-mono-code text-mono-code text-ok bg-ok/10 px-2 py-0.5 rounded border border-ok/20">:11435</span>
+</div>
+<div class="h-3 flex items-center justify-center text-ink-faint"><span class="material-symbols-outlined text-[14px]">south</span></div>
+<!-- Step 5 -->
+<div class="bg-surface-2 border border-ok/50 p-3 rounded-lg flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm w-5 h-5 rounded bg-ok text-on-primary font-bold flex items-center justify-center">5</span>
+<span class="font-title-card text-title-card text-primary font-bold">MAX Serve</span>
+</div>
+<span class="font-label-sm text-label-sm text-ok">GPU Tensor Kernels</span>
+</div>
+</div>
+<!-- Monospace Trace Log Panel -->
+<div class="bg-surface-0 border border-line rounded-lg p-3 font-mono-code text-mono-code flex flex-col gap-1.5">
+<div class="flex items-center justify-between pb-1.5 border-b border-line text-ink-2 font-label-sm text-label-sm">
+<span>LIVE TRACE</span>
+<span class="text-ok">● 0 errors</span>
+</div>
+<p class="text-ink-2 text-[11px] leading-tight">[14:02:01.284] <span class="text-primary">POST</span> /v1/chat/completions model=qwen2.5-0.5b</p>
+<p class="text-ink-2 text-[11px] leading-tight">[14:02:01.291] Auth passed (token: sk-app-***)</p>
+<p class="text-data-teal text-[11px] leading-tight">[14:02:01.332] MAX kernel graph hit (0.5b context=2048)</p>
+<p class="text-ok text-[11px] font-semibold leading-tight">[14:02:01.380] First token in 48ms (214 tok/s)</p>
+</div>
+</section>
+<!-- 6. SECTION: WHEN MAX CAN'T RUN IT, PORT IT -->
+<section class="flex flex-col gap-4 scroll-mt-20" id="porting">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-2 text-ink-2 border border-line">works today</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-ink">
+          When MAX can't run it, port it.
+        </h2>
+<p class="font-app-text text-app-text text-ink-2">
+          An automated agentic porting toolchain that compiles unsupported HuggingFace architectures into native Mojo MAX kernels.
+        </p>
+<!-- 5-Step Horizontal/Stacked Flow -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center gap-3 bg-surface-1 border border-line p-2.5 rounded-lg">
+<span class="font-mono-code text-mono-code text-ink-2 bg-surface-0 px-2 py-1 rounded border border-line">01</span>
+<span class="font-title-card text-title-card text-ink">Workspace init &amp; weights dump</span>
+</div>
+<div class="flex items-center gap-3 bg-surface-1 border border-line p-2.5 rounded-lg">
+<span class="font-mono-code text-mono-code text-ink-2 bg-surface-0 px-2 py-1 rounded border border-line">02</span>
+<span class="font-title-card text-title-card text-ink">Generate MAX Mojo Graph</span>
+</div>
+<div class="flex items-center gap-3 bg-surface-1 border border-line p-2.5 rounded-lg">
+<span class="font-mono-code text-mono-code text-ink-2 bg-surface-0 px-2 py-1 rounded border border-line">03</span>
+<span class="font-title-card text-title-card text-ink">Try unit tensors &amp; numerical tests</span>
+</div>
+<div class="flex items-center gap-3 bg-surface-1 border border-line p-2.5 rounded-lg">
+<span class="font-mono-code text-mono-code text-ink-2 bg-surface-0 px-2 py-1 rounded border border-line">04</span>
+<span class="font-title-card text-title-card text-ink">Final accuracy check &amp; parity</span>
+</div>
+<div class="flex items-center gap-3 bg-surface-2 border border-ok/40 p-2.5 rounded-lg">
+<span class="font-mono-code text-mono-code text-ok bg-surface-0 px-2 py-1 rounded border border-ok/30">05</span>
+<span class="font-title-card text-title-card text-primary font-semibold">Serve on :11435 instantly</span>
+</div>
+</div>
+<!-- 2x2 Stat Grid -->
+<div class="grid grid-cols-2 gap-2 mt-2">
+<div class="bg-surface-1 border border-line p-3 rounded-lg flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary">8</span>
+<span class="font-label-sm text-label-sm text-ink-2 mt-1">architectures ported</span>
+</div>
+<div class="bg-surface-1 border border-line p-3 rounded-lg flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary">7–40 min</span>
+<span class="font-label-sm text-label-sm text-ink-2 mt-1">per port runtime</span>
+</div>
+<div class="bg-surface-1 border border-line p-3 rounded-lg flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary">$2–5</span>
+<span class="font-label-sm text-label-sm text-ink-2 mt-1">Claude usage via API</span>
+</div>
+<div class="bg-surface-1 border border-line p-3 rounded-lg flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary">3</span>
+<span class="font-label-sm text-label-sm text-ink-2 mt-1">attempts by default</span>
+</div>
+</div>
+<!-- Supported Architecture Chips -->
+<div class="flex flex-col gap-2 mt-1">
+<span class="font-label-sm text-label-sm text-ink-2">SUPPORTED RUNTIMES</span>
+<div class="flex flex-wrap gap-1.5">
+<span class="px-2.5 py-1 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">GPT-2</span>
+<span class="px-2.5 py-1 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">Pythia</span>
+<span class="px-2.5 py-1 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">Phi-2</span>
+<span class="px-2.5 py-1 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">StarCoder2</span>
+<span class="px-2.5 py-1 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">StableLM 2</span>
+<span class="px-2.5 py-1 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">SmolLM3</span>
+<span class="px-2.5 py-1 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">Granite MoE</span>
+<span class="px-2.5 py-1 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">OLMoE</span>
+</div>
+</div>
+</section>
+<!-- 7. SECTION: THE CONSOLE -->
+<section class="flex flex-col gap-4 scroll-mt-20" id="console">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-2 text-ink-2 border border-line">works today</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-ink">
+          The console.
+        </h2>
+<p class="font-app-text text-app-text text-ink-2">
+          A zero-latency, local-first web UI packaged right inside the binary.
+        </p>
+<!-- Horizontal Peek Cards / Vertical Stack -->
+<div class="flex flex-col gap-3">
+<!-- View 1 -->
+<div class="bg-surface-1 border border-line rounded-xl p-4 flex flex-col gap-2.5">
+<div class="flex items-center justify-between">
+<span class="font-title-card text-title-card text-ink flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-data-teal">layers</span> Model Catalog &amp; Management
+              </span>
+<span class="font-label-sm text-label-sm text-ok">Hot/Cold Status</span>
+</div>
+<p class="font-app-text text-app-text text-ink-2">
+              Granular VRAM allocation views, one-click load/stop, and immediate health metrics for every weight matrix.
+            </p>
+<div class="bg-surface-0 p-2.5 rounded border border-line flex items-center justify-between font-mono-code text-mono-code">
+<span>qwen2.5-0.5b</span>
+<button class="px-2.5 py-1 bg-surface-2 border border-line text-ink rounded hover:text-bad text-[12px] min-h-[36px]">Stop &amp; evict</button>
+</div>
+</div>
+<!-- View 2 -->
+<div class="bg-surface-1 border border-line rounded-xl p-4 flex flex-col gap-2.5">
+<div class="flex items-center justify-between">
+<span class="font-title-card text-title-card text-ink flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-data-orange">speed</span> Kernel Benchmarking
+              </span>
+<span class="font-label-sm text-label-sm text-primary font-mono-code">214 tok/s</span>
+</div>
+<p class="font-app-text text-app-text text-ink-2">
+              Real-time Time-To-First-Token (TTFT 38.2ms), decode rate metrics, and batch size sweep latency charts.
+            </p>
+<div class="grid grid-cols-2 gap-2 text-center font-mono-code text-mono-code">
+<div class="bg-surface-0 p-2 rounded border border-line">
+<span class="text-ink-2 text-[11px] block">TTFT</span>
+<span class="text-ok font-semibold">38.2 ms</span>
+</div>
+<div class="bg-surface-0 p-2 rounded border border-line">
+<span class="text-ink-2 text-[11px] block">DECODE RATE</span>
+<span class="text-primary font-semibold">214 tok/s</span>
+</div>
+</div>
+</div>
+<!-- View 3 -->
+<div class="bg-surface-1 border border-line rounded-xl p-4 flex flex-col gap-2.5">
+<div class="flex items-center justify-between">
+<span class="font-title-card text-title-card text-ink flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-data-violet">terminal</span> Jupyter &amp; Playground
+              </span>
+<span class="font-label-sm text-label-sm text-ink-2 font-mono-code">SSE Stream</span>
+</div>
+<p class="font-app-text text-app-text text-ink-2">
+              Live streaming markdown prompt testing, interactive logits inspection, and custom temperature tuning.
+            </p>
+<div class="bg-surface-0 p-2.5 rounded border border-line font-mono-code text-mono-code text-[12px] text-ink-2">
+<span class="text-ink">&gt; What is MAX?</span><br/>
+              Modular MAX is a unified AI runtime engine...
+            </div>
+</div>
+</div>
+</section>
+<!-- 8. FAQ: "GO ON, ASK." -->
+<section class="flex flex-col gap-4 scroll-mt-20" id="faq">
+<h2 class="font-headline-sm text-headline-sm text-ink">
+          Go on, ask.
+        </h2>
+<p class="font-app-text text-app-text text-ink-2">
+          Everything you need to know about the architecture, licensing, and hardware support.
+        </p>
+<div class="flex flex-col gap-3">
+<!-- Q1 -->
+<div class="bg-surface-1 border border-line rounded-xl p-3.5 flex flex-col gap-2">
+<span class="font-title-card text-title-card text-ink">Why MAX?</span>
+<p class="font-app-text text-app-text text-ink-2">
+              Modular's hardware graph engine provides sub-millisecond dispatch and bare-metal compilation with zero Python runtime overhead.
+            </p>
+<div class="flex gap-2 pt-1">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-0 border border-line text-data-teal">graph compiler</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-0 border border-line text-ok">&lt;0.5ms dispatch</span>
+</div>
+</div>
+<!-- Q2 -->
+<div class="bg-surface-1 border border-line rounded-xl p-3.5 flex flex-col gap-2">
+<span class="font-title-card text-title-card text-ink">Why not Ollama or vLLM?</span>
+<p class="font-app-text text-app-text text-ink-2">
+              vLLM locks entire GPU memory tables immediately. Ollama is great for single runs but lacks dynamic multi-app API key control and automatic cold unloading.
+            </p>
+<div class="bg-surface-0 p-2 rounded border border-line font-mono-code text-mono-code text-[11px] flex justify-between">
+<span class="text-bad">vLLM: 100% VRAM pinned</span>
+<span class="text-ok">mxc: 0-mem idle drop</span>
+</div>
+</div>
+<!-- Q3 -->
+<div class="bg-surface-1 border border-line rounded-xl p-3.5 flex flex-col gap-2">
+<span class="font-title-card text-title-card text-ink">Does it need the cloud?</span>
+<div class="flex items-center gap-2 pt-0.5">
+<span class="material-symbols-outlined text-bad text-[20px]">cloud_off</span>
+<span class="font-app-text text-app-text text-ink font-medium">100% air-gapped local runtime.</span>
+</div>
+<p class="font-app-text text-app-text text-ink-2">
+              No telemetry, no phoning home. Only the optional porting CLI utility connects to the Claude API to translate graph code.
+            </p>
+</div>
+<!-- Q4 -->
+<div class="bg-surface-1 border border-line rounded-xl p-3.5 flex flex-col gap-2">
+<span class="font-title-card text-title-card text-ink">What does porting cost?</span>
+<p class="font-app-text text-app-text text-ink-2">
+              The agent uses Claude 3.5 Sonnet to inspect PyTorch weights and synthesize Mojo kernel definitions.
+            </p>
+<div class="flex items-center gap-2 pt-1 font-mono-code text-mono-code">
+<span class="px-2 py-1 bg-surface-0 border border-line rounded text-ok font-semibold">$2–5 API cost</span>
+<span class="px-2 py-1 bg-surface-0 border border-line rounded text-ink-2">7–40 min runtime</span>
+</div>
+</div>
+<!-- Q5 -->
+<div class="bg-surface-1 border border-line rounded-xl p-3.5 flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="font-title-card text-title-card text-ink">Mac support?</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-warn/10 text-warn border border-warn/30">being checked</span>
+</div>
+<p class="font-app-text text-app-text text-ink-2">
+              Apple Silicon Metal backend integration is actively underway in coordination with the Modular core MAX engine release cycle.
+            </p>
+</div>
+<!-- Q6 -->
+<div class="bg-surface-1 border border-line rounded-xl p-3.5 flex flex-col gap-2.5">
+<span class="font-title-card text-title-card text-ink">What's next?</span>
+<div class="grid grid-cols-1 gap-1.5">
+<div class="bg-surface-0 border border-line p-2 rounded flex items-center gap-2">
+<span class="font-mono-code text-mono-code text-ink-2">01</span>
+<span class="font-title-card text-title-card text-ink">Multi-GPU pooling</span>
+</div>
+<div class="bg-surface-0 border border-line p-2 rounded flex items-center gap-2">
+<span class="font-mono-code text-mono-code text-ink-2">02</span>
+<span class="font-title-card text-title-card text-ink">LoRA hot-swapping on unified context</span>
+</div>
+<div class="bg-surface-0 border border-line p-2 rounded flex items-center gap-2">
+<span class="font-mono-code text-mono-code text-ink-2">03</span>
+<span class="font-title-card text-title-card text-ink">Native in-memory vector search</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 9. "AVAILABLE TODAY." BLOCK -->
+<section class="flex flex-col gap-4 scroll-mt-20" id="get-started">
+<h2 class="font-headline-sm text-headline-sm text-ink">
+          Available today.
+        </h2>
+<!-- Terminal Card -->
+<div class="w-full bg-surface-1 border border-line rounded-xl overflow-hidden shadow-lg">
+<div class="bg-surface-2 px-3 py-2 border-b border-line flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-line-2 border border-line"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-line-2 border border-line"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-line-2 border border-line"></span>
+</div>
+<button class="h-6 px-2 rounded bg-surface-0 border border-line text-ink-2 hover:text-primary font-label-sm text-label-sm flex items-center gap-1 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[13px]">content_copy</span> copy all
+            </button>
+</div>
+<div class="p-3.5 bg-surface-0 font-mono-code text-mono-code flex flex-col gap-2 overflow-x-auto text-[12.5px]">
+<p class="text-ink"><span class="text-ink-2">$</span> git clone https://github.com/modular/omxconsole.git</p>
+<p class="text-ink"><span class="text-ink-2">$</span> cd omxconsole &amp;&amp; pixi install</p>
+<p class="text-ok font-semibold"><span class="text-ink-2">$</span> pixi run mxc serve qwen2.5-0.5b</p>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-ink-2 text-center block">Linux · NVIDIA (Ampere+) · free, MIT</span>
+<div class="flex flex-col gap-2.5 mt-2">
+<a class="w-full h-11 min-h-[44px] rounded-lg bg-primary text-on-primary font-title-card text-title-card flex items-center justify-center font-semibold active:scale-[0.98] transition-transform" href="https://github.com/modular/omxconsole" rel="noopener" target="_blank">
+            Get it on GitHub
+          </a>
+<a class="w-full h-11 min-h-[44px] rounded-lg bg-surface-2 border border-line text-ink font-title-card text-title-card flex items-center justify-center font-medium active:scale-[0.98] transition-transform" href="#console">
+            Read the user guide
+          </a>
+</div>
+</section>
+<!-- 10. FOOTER -->
+<footer class="flex flex-col gap-8 pt-8 border-t border-line text-left">
+<!-- 4 Stacked Link Groups -->
+<div class="grid grid-cols-2 gap-6">
+<div class="flex flex-col gap-2">
+<span class="font-title-card text-title-card text-ink font-semibold">Start</span>
+<a class="font-app-text text-app-text text-ink-2 hover:text-primary min-h-[36px] flex items-center" href="https://github.com/modular/omxconsole">GitHub</a>
+<a class="font-app-text text-app-text text-ink-2 hover:text-primary min-h-[36px] flex items-center" href="#">README</a>
+<a class="font-app-text text-app-text text-ink-2 hover:text-primary min-h-[36px] flex items-center" href="#">Releases</a>
+</div>
+<div class="flex flex-col gap-2">
+<span class="font-title-card text-title-card text-ink font-semibold">See it</span>
+<a class="font-app-text text-app-text text-ink-2 hover:text-primary min-h-[36px] flex items-center" href="#console">Console tour</a>
+<a class="font-app-text text-app-text text-ink-2 hover:text-primary min-h-[36px] flex items-center" href="#endpoint">Architecture</a>
+<a class="font-app-text text-app-text text-ink-2 hover:text-primary min-h-[36px] flex items-center" href="#">Benchmarks</a>
+</div>
+<div class="flex flex-col gap-2">
+<span class="font-title-card text-title-card text-ink font-semibold">Build</span>
+<a class="font-app-text text-app-text text-ink-2 hover:text-primary min-h-[36px] flex items-center" href="#">CLI reference</a>
+<a class="font-app-text text-app-text text-ink-2 hover:text-primary min-h-[36px] flex items-center" href="#">HTTP API</a>
+<a class="font-app-text text-app-text text-ink-2 hover:text-primary min-h-[36px] flex items-center" href="#">MAX Engine</a>
+</div>
+<div class="flex flex-col gap-2">
+<span class="font-title-card text-title-card text-ink font-semibold">Follow along</span>
+<a class="font-app-text text-app-text text-ink-2 hover:text-primary min-h-[36px] flex items-center" href="#">Changelog</a>
+<a class="font-app-text text-app-text text-ink-2 hover:text-primary min-h-[36px] flex items-center" href="#">Discord community</a>
+<a class="font-app-text text-app-text text-ink-2 hover:text-primary min-h-[36px] flex items-center" href="#">Security</a>
+</div>
+</div>
+<!-- Bottom Line and Operational status -->
+<div class="pt-6 border-t border-line-2 flex flex-col gap-3">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-ok"></span>
+<span class="font-label-sm text-label-sm text-ink-2">All systems operational · MAX v24.4</span>
+</div>
+<p class="font-label-sm text-label-sm text-ink-faint">
+            omxconsole · MIT License · Built on Modular MAX
+          </p>
+</div>
+</footer>
+</main>
+</div>
+</body></html>

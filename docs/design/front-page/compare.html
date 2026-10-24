@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en" class="oq-root oq-light oq-family-dev">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F-060 · Front page · compare Stitch and Claude</title>
+<link rel="stylesheet" href="../../site/omxqua/tokens.css">
+<link rel="stylesheet" href="omxqua/components.css">
+<script src="omxqua/omxqua.js" defer></script>
+<style>
+  @font-face { font-family: "Geist"; src: url("../../site/fonts/geist-variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Geist Mono"; src: url("../../site/fonts/geist-mono-variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 var(--oq-font); background: var(--oq-surface-0); color: var(--oq-ink); }
+  a { color: var(--oq-info); }
+  .top { position: sticky; top: 0; z-index: 5; background: var(--oq-surface-0); border-bottom: 1px solid var(--oq-line); padding: 14px 28px; display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+  .top h1 { font-size: 17px; margin: 0; letter-spacing: -.01em; }
+  .top h1 small { display: block; font: 12px var(--oq-font-mono); color: var(--oq-ink-2); font-weight: 400; }
+  .picks { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
+  .pk { display: inline-flex; gap: 8px; align-items: center; height: 32px; padding: 0 12px; border-radius: 999px; background: var(--oq-surface-1); box-shadow: var(--oq-shadow-1); font: 12.5px var(--oq-font-mono); }
+  .pk b { font-weight: 600; }
+  .pk.none b { color: var(--oq-ink-2); font-weight: 400; }
+  .pk.merge b { color: var(--oq-info); }
+  .wrap { padding: 24px 28px 80px; }
+  .intro { max-width: 900px; color: var(--oq-ink-2); margin: 0 0 8px; }
+  .opt { margin-top: 36px; }
+  .opt > h2 { font-size: 24px; letter-spacing: -.02em; margin: 0; }
+  .opt > p { margin: 4px 0 0; color: var(--oq-ink-2); max-width: 900px; }
+  .opt .links { font: 12px var(--oq-font-mono); margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .dev { margin-top: 20px; }
+  .dev h3 { font: 600 12px var(--oq-font-mono); color: var(--oq-ink-2); margin: 0 0 10px; letter-spacing: .03em; text-transform: uppercase; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .pair.phone { grid-template-columns: repeat(2, 406px); justify-content: start; gap: 40px; }
+  .col { min-width: 0; }
+  .lab { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .lab .who { font-weight: 600; } .lab .who small { font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); font-weight: 400; margin-left: 6px; }
+  .tick { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px 0 10px; border-radius: 999px; border: 0; background: var(--oq-surface-1); box-shadow: var(--oq-shadow-1); font: 500 13px var(--oq-font); color: var(--oq-ink); }
+  .tick .check { pointer-events: none; }
+  .tick.on { background: var(--oq-accent); color: var(--oq-on-accent); }
+  .tick.on .check { background: var(--oq-on-accent); }
+  .screen { position: relative; overflow: hidden; border-radius: 12px; background: var(--oq-surface-1); box-shadow: var(--oq-shadow-2); outline: 2px solid transparent; outline-offset: 3px; transition: outline-color .2s; }
+  .screen.picked { outline-color: var(--oq-ink); }
+  .screen.img { overflow-y: auto; overscroll-behavior: contain; }
+  .screen.img img { display: block; width: 100%; height: auto; }
+  .screen iframe { border: 0; display: block; transform-origin: 0 0; }
+  .phone .screen { width: 390px; height: 844px; border-radius: 36px; box-shadow: var(--oq-shadow-2), 0 0 0 8px var(--oq-surface-2); margin: 8px; }
+  .note { font: 12px var(--oq-font-mono); color: var(--oq-ink-2); margin-top: 6px; }
+  .reset { margin-left: auto; }
+  @media (max-width: 1100px) { .pair { grid-template-columns: 1fr; } .pair.phone { grid-template-columns: 406px; } }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>F-060 · Front page<small>Stitch next to Claude · tick what you'd keep (both = merge)</small></h1>
+  <div class="picks" id="picks"></div>
+  <button class="btn text sm reset" id="reset">Clear picks</button>
+</div>
+<div class="wrap">
+  <p class="intro">Each option drawn twice: Stitch (static screenshot, scroll inside it) and Claude (live HTML: scroll inside it, the request demo plays, the console tabs switch, motion runs on scroll). Desktop at 1440 × 900 scaled to fit, phone at 390 × 844. Your ticks are kept in this browser.</p>
+  <div id="opts"></div>
+</div>
+
+<script>
+const STITCH = "https://stitch.google.com/projects/5461452906425196744?node-id=";
+const OPTS = [
+  { id: "a", name: "A · Statement (night)",
+    line: "omxcode's structure most faithfully: dark, centred, one idea per screen, huge two-tone type, a hero diagram (command → endpoint → models), 'usual way vs mxc' timelines, stat strips that count up, FAQ cards with small visuals.",
+    stitch: { desktop: "a345b5e607cd4733b101e2efd45d9fe6", phone: "9596208b04774475aa7eb9165e74f9ae" } },
+  { id: "b", name: "B · Bento (light)",
+    line: "Product-first: light, split hero with a live terminal typing the first run, the real console under it, a measured-number strip, then each section as a bento of tiles holding real parts (states, keys, routes, screenshots); FAQ as an accordion; on the phone the tiles swipe.",
+    stitch: { desktop: "62ddc3eeef9a4511b55ef684ab9542d9", phone: "54d9410faf7e43fdbc3ee387dd88a2a0" } },
+];
+const KEY = "f060-front-page-picks";
+let picks = JSON.parse(localStorage.getItem(KEY) || "{}");
+const save = () => localStorage.setItem(KEY, JSON.stringify(picks));
+
+function render() {
+  const root = document.getElementById("opts");
+  root.innerHTML = OPTS.map(o => `
+    <section class="opt" id="opt-${o.id}">
+      <h2>${o.name}</h2><p>${o.line}</p>
+      <div class="links"><a href="claude-${o.id}.html">Claude draft, framed</a><a href="claude-${o.id}.html?bare=1">Claude, full page</a>
+        <a href="${STITCH + o.stitch.desktop}">Stitch desktop</a><a href="${STITCH + o.stitch.phone}">Stitch phone</a>
+        <a href="stitch/${o.id}-desktop.html">Stitch HTML (desktop)</a><a href="stitch/${o.id}-phone.html">Stitch HTML (phone)</a></div>
+      ${["desktop", "phone"].map(d => `
+        <div class="dev"><h3>${d === "desktop" ? "Desktop · 1440" : "Phone · 390"}</h3>
+          <div class="pair ${d}">
+            ${["stitch", "claude"].map(e => `
+              <div class="col">
+                <div class="lab"><span class="who">${e === "stitch" ? "Stitch" : "Claude"}<small>${e === "stitch" ? "screenshot" : "live HTML"}</small></span>
+                  <button class="tick" data-k="${o.id}.${d}.${e}" aria-pressed="false"><span class="check"></span>Keep</button></div>
+                ${e === "stitch"
+                  ? `<div class="screen img" data-k="${o.id}.${d}.${e}" ${d === "desktop" ? 'data-fit="1440x900"' : ""}><img src="stitch/${o.id}-${d}.png" alt="Stitch ${o.name} ${d}" loading="lazy"></div>`
+                  : `<div class="screen" data-k="${o.id}.${d}.${e}" ${d === "desktop" ? 'data-fit="1440x900"' : ""}><iframe title="Claude ${o.name} ${d}" src="claude-${o.id}.html?bare=1" width="${d === "desktop" ? 1440 : 390}" height="${d === "desktop" ? 900 : 844}" loading="lazy"></iframe></div>`}
+              </div>`).join("")}
+          </div></div>`).join("")}
+    </section>`).join("");
+  root.querySelectorAll(".tick").forEach(b => b.addEventListener("click", () => { picks[b.dataset.k] = !picks[b.dataset.k]; if (!picks[b.dataset.k]) delete picks[b.dataset.k]; save(); paint(); }));
+  fit(); paint();
+}
+
+function fit() {
+  document.querySelectorAll("[data-fit]").forEach(s => {
+    const w = s.clientWidth, sc = w / 1440;
+    s.style.height = 900 * sc + "px";
+    const f = s.querySelector("iframe"); if (f) f.style.transform = `scale(${sc})`;
+  });
+}
+
+function paint() {
+  document.querySelectorAll(".tick").forEach(b => { const on = !!picks[b.dataset.k]; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); b.querySelector(".check").classList.toggle("on", on); });
+  document.querySelectorAll(".screen").forEach(s => s.classList.toggle("picked", !!picks[s.dataset.k]));
+  document.getElementById("picks").innerHTML = OPTS.flatMap(o => ["desktop", "phone"].map(d => {
+    const s = picks[`${o.id}.${d}.stitch`], c = picks[`${o.id}.${d}.claude`];
+    const v = s && c ? "both = merge" : s ? "Stitch" : c ? "Claude" : "—";
+    return `<span class="pk ${!s && !c ? "none" : s && c ? "merge" : ""}">${o.id.toUpperCase()} ${d}: <b>${v}</b></span>`;
+  })).join("");
+}
+
+document.getElementById("reset").addEventListener("click", () => { picks = {}; save(); paint(); });
+addEventListener("resize", fit);
+render();
+</script>
+</body>
+</html>

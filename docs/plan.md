@@ -433,13 +433,15 @@ Brief: docs/briefs/console-pages.md · Needs: F-052, F-054 · Files: blade-home.
 - Built: `library-logic.js` (pure: search, groups, label ops and their inverses), `library.js`, `library.css`; `blade-home.*` is the library page; `scripts/fake_models.py` fills a scratch MXC_HOME (refuses ~/.mxc). Per the mock, the stats card and the list/cards toggle are gone (stats sit in the header line) and the table is tick · Model · Labels · State · VRAM · tok/s (Access, first-token, requests and architecture columns dropped) — flagged to the owner; reversible if wanted.
 - Reviewer: round 1 NEEDS WORK (small: rollback restored a whole snapshot; select-all aria; phone hit areas; a refused rename reset the group) → fixed; round 2 PASS. Checked live after merging with F-053 on a scratch daemon with 100 fake models (1280 light): groups, counts, labels, search; the model page's tabs and picker alongside. 996 tests.
 
-## F-056 The wide switcher [todo]
+## F-056 The wide switcher [done]
 Brief: docs/briefs/console-pages.md · Needs: F-053, F-055 · Files: picker.* (reuses library.*)
-- [ ] the model name in the top bar (or `/`, Ctrl+K on a model page) opens a wide panel over the content: search across the top, the groups column (plus Recent), models as a grid of cards (name, state, kind and labels, tok/s), Recent first then grouped by kind
-- [ ] arrow keys and Enter; Esc closes; switching keeps the tab; Add a model in the footer
-- [ ] "+ label" on a model's Overview (moved here from F-055 so F-053 and F-055 don't share the model page)
-- [ ] phone: a full-height sheet with the same search and chip row
-- [ ] checked with 100 fake models, both themes, 1280 and 390 px
+- [x] the model name in the top bar (or `/`, Ctrl+K on a model page) opens a wide panel over the content: search across the top, the groups column (plus Recent), models as a grid of cards (name, state, kind and labels, tok/s), Recent first then grouped by kind
+- [x] arrow keys and Enter; Esc closes; switching keeps the tab; Add a model in the footer
+- [x] "+ label" on a model's Overview (moved here from F-055 so F-053 and F-055 don't share the model page)
+- [x] phone: a full-height sheet with the same search and chip row
+- [x] checked with 100 fake models, both themes, 1280 and 390 px
+- Built: `picker.js` is the wide switcher on the library's `createLibrary` (groups column incl. Recent with a count, label editing and drag-to-label work inside it); Recent = last 3 in localStorage `mxc-recent`; one combobox + one listbox with a group per section; cards repaint only when what they show changes (scroll kept; held during a drag); Up/Down by row; Esc cancels a label edit first; Ctrl/Cmd+K from anywhere except multi-line editors (owner's call delegated: made by the main session). Overview's About card has a Labels row with suggestions.
+- Reviewer: round 1 NEEDS WORK (no combobox semantics; 3 s poll rebuilt every card, snapping scroll and killing drags; Recent missing from the column; Esc lost edits) → fixed; round 2 PASS; its test should-fix (aria-haspopup asserted) done. Checked live by the developer at 1280 light/dark and 390 light/dark with 100 fake models; drag-to-label across a poll via synthetic drag events. 1023 tests.
 
 ## F-057 Remove the blade engine [todo]
 Brief: docs/briefs/console-pages.md · Needs: F-056
@@ -459,6 +461,6 @@ Brief: docs/briefs/console-pages.md · Needs: none
 
 ## F-060 Front page in the omxcode style [todo]
 Brief: docs/briefs/console-pages.md · Needs: none (design approved first)
-- [ ] designed with the designer skill (desktop and phone) and approved before building
+- [ ] designed with the designer skill (desktop and phone) and approved before building — drafts ready: two directions (A Statement dark, B Bento light), each by Stitch and Claude, on `docs/design/front-page/compare.html`; handoff draft `docs/design/front-page.md`; pick pending
 - [ ] `docs/site/index.html`: hero, live demos, how a request travels, FAQ, available today; links to the tour as the user guide
 - [ ] checked live on GitHub Pages after the push you approve

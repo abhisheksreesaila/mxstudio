@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>omxconsole — Local AI on Modular MAX, made easy</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "inverse-on-surface": "#f0f0f3",
+            "on-secondary-fixed": "#1a1b22",
+            "secondary-fixed": "#e3e1eb",
+            "secondary-fixed-dim": "#c7c5cf",
+            "on-tertiary": "#ffffff",
+            "on-error": "#ffffff",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-highest": "#e2e2e5",
+            "tertiary": "#000000",
+            "on-primary": "#ffffff",
+            "tertiary-container": "#1e1b18",
+            "primary-container": "#1c1b1d",
+            "on-secondary-container": "#64646c",
+            "surface-bright": "#f9f9fc",
+            "on-tertiary-fixed": "#1e1b18",
+            "surface-container-low": "#f3f3f6",
+            "error-container": "#ffdad6",
+            "surface": "#f9f9fc",
+            "surface-variant": "#e2e2e5",
+            "surface-container-high": "#e8e8eb",
+            "on-primary-fixed-variant": "#474649",
+            "primary-fixed-dim": "#c8c6c8",
+            "on-error-container": "#93000a",
+            "outline-variant": "#c8c5ca",
+            "on-primary-container": "#858386",
+            "on-secondary-fixed-variant": "#46464e",
+            "inverse-surface": "#2f3133",
+            "primary-fixed": "#e5e1e4",
+            "surface-tint": "#5f5e60",
+            "secondary": "#5e5e66",
+            "on-surface-variant": "#47464a",
+            "tertiary-fixed": "#e8e1db",
+            "tertiary-fixed-dim": "#ccc5c0",
+            "inverse-primary": "#c8c6c8",
+            "on-tertiary-container": "#88837e",
+            "primary": "#000000",
+            "surface-container": "#edeef1",
+            "secondary-container": "#e3e1eb",
+            "on-tertiary-fixed-variant": "#4a4642",
+            "error": "#ba1a1a",
+            "background": "#f9f9fc",
+            "outline": "#78767b",
+            "on-secondary": "#ffffff",
+            "on-surface": "#1a1c1e",
+            "on-primary-fixed": "#1c1b1d",
+            "on-background": "#1a1c1e",
+            "surface-dim": "#d9dadd"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "margin-lg": "1.5rem",
+            "space-xs": "0.25rem",
+            "space-md": "0.75rem",
+            "gutter-lg": "1rem",
+            "space-sm": "0.5rem",
+            "space-lg": "1rem",
+            "margin": "1rem",
+            "space-xl": "1.5rem",
+            "gutter": "0.75rem"
+          },
+          "fontFamily": {
+            "body-sm": ["Geist", "sans-serif"],
+            "mono-sm": ["Geist Mono", "monospace"],
+            "body-lg": ["Geist", "sans-serif"],
+            "mono-lg": ["Geist Mono", "monospace"],
+            "headline-sm": ["Geist", "sans-serif"],
+            "headline-lg": ["Geist", "sans-serif"],
+            "mono-md": ["Geist Mono", "monospace"],
+            "label-caps": ["Geist Mono", "monospace"],
+            "headline-xl": ["Geist", "sans-serif"],
+            "body-md": ["Geist", "sans-serif"]
+          },
+          "fontSize": {
+            "body-sm": ["13px", { "lineHeight": "18px", "letterSpacing": "0", "fontWeight": "400" }],
+            "mono-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "mono-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+            "headline-sm": ["18px", { "lineHeight": "24px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+            "headline-lg": ["24px", { "lineHeight": "30px", "letterSpacing": "-0.025em", "fontWeight": "600" }],
+            "mono-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0", "fontWeight": "500" }],
+            "label-caps": ["10px", { "lineHeight": "12px", "letterSpacing": "0.06em", "fontWeight": "600" }],
+            "headline-xl": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.03em", "fontWeight": "600" }],
+            "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "-0.005em", "fontWeight": "400" }]
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-container text-on-surface antialiased font-body-sm min-h-screen flex flex-col items-center">
+<!-- Mobile Screen Wrapper (390px Canvas) -->
+<div class="w-full max-w-[390px] bg-surface min-h-screen border-x border-surface-variant flex flex-col shadow-sm relative">
+<!-- 1. STICKY TOP BAR -->
+<header class="sticky top-0 z-50 bg-surface/95 backdrop-blur-md border-b border-surface-variant">
+<!-- Top Row -->
+<div class="flex items-center justify-between px-space-lg h-14">
+<a class="flex items-center gap-space-xs tracking-tight" href="#">
+<span class="w-6 h-6 rounded bg-primary text-on-primary flex items-center justify-center font-mono-md text-mono-md font-semibold">omx</span>
+<span class="font-headline-sm text-headline-sm font-semibold tracking-tight text-on-surface">omxconsole</span>
+</a>
+<a class="inline-flex items-center gap-1.5 bg-primary text-on-primary px-space-md py-1.5 rounded-full font-mono-sm text-mono-sm font-medium hover:bg-neutral-800 transition-colors" href="https://github.com">
+<span class="material-symbols-outlined text-[14px]">terminal</span>
+<span>Get it on GitHub</span>
+</a>
+</div>
+<!-- Horizontally Scrollable Chips (No Hamburger) -->
+<div class="flex items-center gap-1.5 px-space-lg pb-2.5 overflow-x-auto no-scrollbar">
+<a class="whitespace-nowrap px-space-md py-1 rounded-full font-mono-sm text-mono-sm font-medium bg-surface-container-highest text-on-surface border border-outline-variant/60" href="#endpoint">Endpoint</a>
+<a class="whitespace-nowrap px-space-md py-1 rounded-full font-mono-sm text-mono-sm font-medium text-secondary hover:text-on-surface hover:bg-surface-container transition-colors" href="#sharing">Sharing</a>
+<a class="whitespace-nowrap px-space-md py-1 rounded-full font-mono-sm text-mono-sm font-medium text-secondary hover:text-on-surface hover:bg-surface-container transition-colors" href="#request-chain">Request</a>
+<a class="whitespace-nowrap px-space-md py-1 rounded-full font-mono-sm text-mono-sm font-medium text-secondary hover:text-on-surface hover:bg-surface-container transition-colors" href="#porting">Porting</a>
+<a class="whitespace-nowrap px-space-md py-1 rounded-full font-mono-sm text-mono-sm font-medium text-secondary hover:text-on-surface hover:bg-surface-container transition-colors" href="#console">Console</a>
+<a class="whitespace-nowrap px-space-md py-1 rounded-full font-mono-sm text-mono-sm font-medium text-secondary hover:text-on-surface hover:bg-surface-container transition-colors" href="#faq">FAQ</a>
+</div>
+</header>
+<!-- MAIN CONTENT CANVAS -->
+<main class="flex-1 flex flex-col p-space-lg gap-y-space-xl">
+<!-- 2. HERO SECTION -->
+<section class="flex flex-col gap-space-md pt-space-xs">
+<!-- Status Pill -->
+<div class="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-full bg-surface-container-lowest border border-surface-variant font-mono-sm text-mono-sm text-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-[#137036] animate-pulse"></span>
+<span>Public alpha · v0.4.1</span>
+</div>
+<!-- Headline -->
+<h1 class="font-headline-xl text-headline-xl tracking-tight text-on-surface font-semibold leading-[1.12]">
+          Local AI on Modular MAX, <span class="text-secondary font-normal">made easy.</span>
+</h1>
+<!-- Lede -->
+<p class="font-body-md text-body-md text-secondary leading-snug">
+          The high-throughput runtime shell for Modular MAX engines. Unified OpenAI-compatible routing, automatic GPU memory paging, zero-config LAN exposure, and kernel-level performance out of the box.
+        </p>
+<!-- CTA Buttons -->
+<div class="flex flex-col gap-2.5 pt-1">
+<button class="w-full h-11 bg-primary text-on-primary font-body-sm text-body-sm font-medium rounded-full flex items-center justify-center gap-2 hover:bg-neutral-800 transition-transform active:scale-[0.98]">
+<span>Serve your first model</span>
+<span class="material-symbols-outlined text-[15px]">arrow_forward</span>
+</button>
+<a class="w-full h-10 bg-surface-container-lowest border border-surface-variant text-on-surface font-mono-sm text-mono-sm font-medium rounded-full flex items-center justify-center gap-1.5 hover:bg-surface-container transition-colors" href="#console">
+<span>Tour the console</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+</a>
+</div>
+<!-- Terminal Card -->
+<div class="rounded border border-surface-variant bg-surface-container-lowest overflow-hidden shadow-sm mt-space-xs">
+<!-- Terminal Header -->
+<div class="bg-surface-container-low px-space-md py-2 flex items-center justify-between border-b border-surface-variant">
+<div class="flex items-center gap-1.5 font-mono-sm text-mono-sm text-secondary">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="ml-1 text-[11px]">bash - omxconsole v0.4.1</span>
+</div>
+<button class="p-1 text-secondary hover:text-on-surface flex items-center">
+<span class="material-symbols-outlined text-[13px]">content_copy</span>
+</button>
+</div>
+<!-- Terminal Body -->
+<div class="p-space-md font-mono-sm text-mono-sm text-on-surface space-y-1.5 leading-relaxed bg-[#ffffff]">
+<p class="text-on-surface font-medium flex items-center gap-1.5">
+<span class="text-secondary select-none">$</span>
+<span>pixi run mxc serve qwen2.5-0.5b</span>
+</p>
+<p class="text-[#137036] flex items-center gap-1.5">
+<span class="select-none">[+]</span>
+<span>Engine pool: 12,288 MB allocated</span>
+</p>
+<p class="text-secondary text-[11px] font-mono-sm">
+              # ROUTE ONLINE: <span class="text-on-surface underline">http://127.0.0.1:11435/v1</span>
+</p>
+<p class="text-secondary text-[10px] break-all">
+              # Test query: curl http://127.0.0.1:11435/v1/chat/completions ...
+            </p>
+</div>
+</div>
+<!-- Active Model Matrix Browser Card -->
+<div class="rounded-xl border border-surface-variant bg-surface-container-lowest overflow-hidden shadow-sm">
+<!-- Browser Chrome -->
+<div class="h-9 px-3 bg-surface-container-low border-b border-surface-variant flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+</div>
+<div class="px-2.5 py-0.5 rounded-full bg-surface-container text-secondary font-mono-sm text-[10px] border border-surface-variant truncate max-w-[200px]">
+              localhost:11435/ui/matrix
+            </div>
+<span class="material-symbols-outlined text-secondary text-[14px]">refresh</span>
+</div>
+<!-- Browser Card Content -->
+<div class="p-space-md space-y-2.5">
+<div class="flex items-center justify-between border-b border-surface-container-high pb-2">
+<span class="font-label-caps text-label-caps text-secondary uppercase tracking-wider">Active Model Matrix</span>
+<span class="font-mono-sm text-[10px] text-[#137036] font-medium">3 engines registered</span>
+</div>
+<!-- Model Row 1 -->
+<div class="flex items-center justify-between p-2 rounded bg-surface-bright border border-surface-variant">
+<div>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface">qwen2.5-0.5b</p>
+<p class="font-mono-sm text-[10px] text-secondary">FP16 · 1.2 GB VRAM</p>
+</div>
+<div class="text-right">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface-container border border-outline-variant/50 font-mono-sm text-[10px] text-[#137036] font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-[#137036]"></span> ready
+                </span>
+<p class="font-mono-sm text-[10px] text-secondary mt-0.5">38ms TTFT</p>
+</div>
+</div>
+<!-- Model Row 2 -->
+<div class="flex items-center justify-between p-2 rounded bg-surface-bright border border-surface-variant">
+<div>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface">mistral-7b-v0.3</p>
+<p class="font-mono-sm text-[10px] text-secondary">AWQ-4 · 4.8 GB VRAM</p>
+</div>
+<div class="text-right">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface-container border border-outline-variant/50 font-mono-sm text-[10px] text-[#137036] font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-[#137036]"></span> ready
+                </span>
+<p class="font-mono-sm text-[10px] text-secondary mt-0.5">94ms TTFT</p>
+</div>
+</div>
+<!-- Model Row 3 -->
+<div class="flex items-center justify-between p-2 rounded bg-surface-bright border border-surface-variant">
+<div>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface">deepseek-r1-distill</p>
+<p class="font-mono-sm text-[10px] text-secondary">AWQ · Paging in</p>
+</div>
+<div class="text-right">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface-container border border-outline-variant/50 font-mono-sm text-[10px] text-[#8f5400] font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-[#8f5400] animate-pulse"></span> starting
+                </span>
+<p class="font-mono-sm text-[10px] text-secondary mt-0.5">warmup</p>
+</div>
+</div>
+<!-- Floating Micro Badges -->
+<div class="pt-1 flex flex-col gap-1.5">
+<div class="px-2 py-1 rounded bg-surface-container font-mono-sm text-[10px] text-secondary flex items-center justify-between border border-surface-variant">
+<span>http://127.0.0.1:11435/v1</span>
+<span class="text-on-surface font-semibold">one endpoint</span>
+</div>
+<div class="px-2 py-1 rounded bg-surface-container font-mono-sm text-[10px] text-secondary flex items-center justify-between border border-surface-variant">
+<span>$ mxc keys new my-app</span>
+<span class="text-on-surface font-semibold">one key per app</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. STAT STRIP (2x2 GRID ON MOBILE) -->
+<section class="grid grid-cols-2 gap-2.5">
+<div class="p-3 bg-surface-container-lowest border border-surface-variant rounded flex flex-col justify-between">
+<div class="font-headline-lg text-headline-lg font-semibold text-on-surface tracking-tight">8</div>
+<div class="mt-1">
+<p class="font-body-sm text-body-sm font-medium text-on-surface">architectures ported</p>
+<p class="font-mono-sm text-[10px] text-secondary truncate mt-0.5">src: /arch/manifest.json</p>
+</div>
+</div>
+<div class="p-3 bg-surface-container-lowest border border-surface-variant rounded flex flex-col justify-between">
+<div class="font-headline-lg text-headline-lg font-semibold text-on-surface tracking-tight">7–40m</div>
+<div class="mt-1">
+<p class="font-body-sm text-body-sm font-medium text-on-surface">per port turnaround</p>
+<p class="font-mono-sm text-[10px] text-secondary truncate mt-0.5">telemetry/porting_runs</p>
+</div>
+</div>
+<div class="p-3 bg-surface-container-lowest border border-surface-variant rounded flex flex-col justify-between">
+<div class="font-headline-lg text-headline-lg font-semibold text-on-surface tracking-tight">5 min</div>
+<div class="mt-1">
+<p class="font-body-sm text-body-sm font-medium text-on-surface">idle VRAM unload</p>
+<p class="font-mono-sm text-[10px] text-secondary truncate mt-0.5">keep_alive: 300s</p>
+</div>
+</div>
+<div class="p-3 bg-surface-container-lowest border border-surface-variant rounded flex flex-col justify-between">
+<div class="font-headline-lg text-headline-lg font-semibold text-on-surface tracking-tight">4 /v1</div>
+<div class="mt-1">
+<p class="font-body-sm text-body-sm font-medium text-on-surface">routes on LAN</p>
+<p class="font-mono-sm text-[10px] text-secondary truncate mt-0.5">bind: safe-lan-only</p>
+</div>
+</div>
+</section>
+<!-- 4. SECTION: ONE ENDPOINT. MANY MODELS. -->
+<section class="flex flex-col gap-space-md pt-2" id="endpoint">
+<div class="inline-flex items-center gap-1.5 self-start px-2 py-0.5 rounded-full bg-surface-container-lowest border border-surface-variant font-mono-sm text-mono-sm text-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-[#137036]"></span>
+<span>works today</span>
+</div>
+<div>
+<h2 class="font-headline-lg text-headline-lg tracking-tight font-semibold text-on-surface">
+            One endpoint. <span class="text-secondary font-normal">Many models.</span>
+</h2>
+<p class="font-body-sm text-body-sm text-secondary mt-1">
+            Dynamic model multiplexing with automated lifecycle management and pinning.
+          </p>
+</div>
+<!-- Bento Card: Lifecycle Flow -->
+<div class="p-space-lg rounded border border-surface-variant bg-surface-container-lowest flex flex-col gap-3">
+<div class="flex items-center justify-between border-b border-surface-container-high pb-2">
+<span class="font-label-caps text-label-caps text-secondary uppercase">Lifecycle Pipeline</span>
+<span class="font-mono-sm text-[10px] text-on-surface font-medium">auto memory paging</span>
+</div>
+<!-- Flow States -->
+<div class="grid grid-cols-5 gap-1 text-center font-mono-sm text-[10px]">
+<div class="p-1.5 rounded bg-surface-bright border border-surface-variant text-secondary">cold</div>
+<div class="p-1.5 rounded bg-[#fff8eb] border border-[#d97706]/40 text-[#8f5400] font-medium">starting</div>
+<div class="p-1.5 rounded bg-[#f0fdf4] border border-[#137036]/40 text-[#137036] font-semibold">ready</div>
+<div class="p-1.5 rounded bg-surface-bright border border-surface-variant text-secondary">idle</div>
+<div class="p-1.5 rounded bg-surface-bright border border-surface-variant text-secondary">unloaded</div>
+</div>
+<!-- Keep Alive Indicator -->
+<div class="p-2 rounded bg-surface-container border border-surface-variant flex items-center justify-between font-mono-sm text-[11px]">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-[#137036]"></span>
+<span class="text-on-surface font-medium">keep_alive 5m active</span>
+</div>
+<span class="text-secondary">T-180s left</span>
+</div>
+<!-- Resident VRAM Pinning Lane -->
+<div class="p-2.5 rounded border border-dashed border-outline-variant bg-surface-bright flex items-center justify-between">
+<div>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface">Resident VRAM Locked</p>
+<p class="font-mono-sm text-[10px] text-secondary">Zero cold-start delay for primary worker</p>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-primary text-on-primary font-mono-sm text-[10px]">PINNED</span>
+</div>
+</div>
+<!-- Bento Card: Pin Tile -->
+<div class="p-space-lg rounded border border-surface-variant bg-surface-container-lowest flex items-center justify-between">
+<div>
+<span class="font-label-caps text-label-caps text-secondary uppercase">Pinned Workload</span>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface mt-0.5">qwen2.5-0.5b</p>
+<p class="font-mono-sm text-[10px] text-secondary">VRAM reservation: 1.2 GB static</p>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-mono-sm text-[11px] text-on-surface font-medium">Keep loaded</span>
+<div class="w-10 h-6 bg-primary rounded-full relative p-0.5 cursor-pointer">
+<div class="w-5 h-5 bg-white rounded-full translate-x-4 transition-transform shadow-xs"></div>
+</div>
+</div>
+</div>
+<!-- Bento Card: Endpoint Matrix -->
+<div class="p-space-lg rounded border border-surface-variant bg-surface-container-lowest flex flex-col gap-2.5">
+<div class="flex items-center justify-between border-b border-surface-container-high pb-2">
+<span class="font-mono-sm text-mono-sm font-semibold text-on-surface">GET /v1/models</span>
+<span class="font-mono-sm text-[10px] text-secondary">OpenAI Spec 1.0</span>
+</div>
+<div class="space-y-1.5 font-mono-sm text-mono-sm">
+<div class="flex items-center justify-between py-1 border-b border-surface-container">
+<span class="text-on-surface">llama-3.1-8b</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-secondary text-[10px]">cold</span>
+</div>
+<div class="flex items-center justify-between py-1 border-b border-surface-container">
+<span class="text-on-surface">qwen2.5-0.5b</span>
+<span class="px-2 py-0.5 rounded bg-[#fff8eb] text-[#8f5400] text-[10px] font-medium">starting</span>
+</div>
+<div class="flex items-center justify-between py-1">
+<span class="text-on-surface">mistral-7b-v0.3</span>
+<span class="px-2 py-0.5 rounded bg-[#f0fdf4] text-[#137036] text-[10px] font-semibold">ready</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. SECTION: SAFE TO SHARE -->
+<section class="flex flex-col gap-space-md pt-2" id="sharing">
+<div class="inline-flex items-center gap-1.5 self-start px-2 py-0.5 rounded-full bg-surface-container-lowest border border-surface-variant font-mono-sm text-mono-sm text-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-[#137036]"></span>
+<span>works today</span>
+</div>
+<div>
+<h2 class="font-headline-lg text-headline-lg tracking-tight font-semibold text-on-surface">
+            Safe to share.
+          </h2>
+<p class="font-body-sm text-body-sm text-secondary mt-1">
+            Scoped security, per-app credential tokens, and network boundary defense.
+          </p>
+</div>
+<!-- Bento Card: API Keys -->
+<div class="p-space-lg rounded border border-surface-variant bg-surface-container-lowest flex flex-col gap-2.5">
+<div class="flex items-center justify-between border-b border-surface-container-high pb-2">
+<span class="font-label-caps text-label-caps text-secondary uppercase">Client App Tokens</span>
+<span class="font-mono-sm text-[10px] text-secondary">$ mxc keys new</span>
+</div>
+<div class="space-y-2">
+<!-- Token 1 -->
+<div class="flex items-center justify-between p-2 rounded bg-surface-bright border border-surface-variant">
+<div>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface">libsearch</p>
+<p class="font-mono-sm text-[10px] text-secondary">mxc_sec_7a9f... · read/write</p>
+</div>
+<button class="px-2 py-1 rounded border border-surface-variant text-[11px] font-mono-sm text-error hover:bg-error-container/20">revoke</button>
+</div>
+<!-- Token 2 -->
+<div class="flex items-center justify-between p-2 rounded bg-surface-bright border border-surface-variant">
+<div>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface">cursor-agent</p>
+<p class="font-mono-sm text-[10px] text-secondary">mxc_sec_410c... · completions</p>
+</div>
+<button class="px-2 py-1 rounded border border-surface-variant text-[11px] font-mono-sm text-error hover:bg-error-container/20">revoke</button>
+</div>
+<!-- Token 3 -->
+<div class="flex items-center justify-between p-2 rounded bg-surface-bright border border-surface-variant">
+<div>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface">open-webui</p>
+<p class="font-mono-sm text-[10px] text-secondary">mxc_sec_99bc... · full</p>
+</div>
+<button class="px-2 py-1 rounded border border-surface-variant text-[11px] font-mono-sm text-error hover:bg-error-container/20">revoke</button>
+</div>
+</div>
+<div class="pt-1">
+<code class="font-mono-sm text-[11px] text-secondary bg-surface-container px-2 py-1 rounded block truncate">$ mxc keys new &lt;app-name&gt;</code>
+</div>
+</div>
+<!-- Bento Card: HTTPS on LAN -->
+<div class="p-space-lg rounded border border-surface-variant bg-surface-container-lowest flex flex-col gap-2.5">
+<div class="flex items-center justify-between border-b border-surface-container-high pb-2">
+<span class="font-label-caps text-label-caps text-secondary uppercase">LAN Edge Proxy</span>
+<span class="font-mono-sm text-[10px] text-[#137036] font-medium">Caddy TLS active</span>
+</div>
+<div class="grid grid-cols-2 gap-2 text-center font-mono-sm text-mono-sm">
+<div class="p-2.5 rounded bg-surface-bright border border-surface-variant">
+<span class="material-symbols-outlined text-[18px] text-secondary">smartphone</span>
+<p class="font-medium text-on-surface mt-1">Phone / iPad</p>
+<p class="text-[10px] text-secondary">box.local:8443</p>
+</div>
+<div class="p-2.5 rounded bg-surface-bright border border-surface-variant">
+<span class="material-symbols-outlined text-[18px] text-secondary">desktop_windows</span>
+<p class="font-medium text-on-surface mt-1">Workstation</p>
+<p class="text-[10px] text-secondary">box.local:8443</p>
+</div>
+</div>
+<p class="font-body-sm text-[12px] text-secondary">Automatic local CA installation for iOS/Android trusted self-signed certificates without browser warnings.</p>
+</div>
+<!-- Bento Card: Route Isolation Table -->
+<div class="p-space-lg rounded border border-surface-variant bg-surface-container-lowest flex flex-col gap-2">
+<div class="flex items-center justify-between border-b border-surface-container-high pb-2">
+<span class="font-label-caps text-label-caps text-secondary uppercase">Only /v1 leaves the machine</span>
+<span class="font-mono-sm text-[10px] text-secondary">Boundary rule</span>
+</div>
+<div class="space-y-1.5 font-mono-sm text-mono-sm">
+<div class="flex items-center justify-between py-1 border-b border-surface-container">
+<span class="text-on-surface text-[12px]">/v1/chat/completions</span>
+<span class="px-1.5 py-0.5 rounded bg-[#f0fdf4] text-[#137036] text-[10px] font-semibold">EXPORTED</span>
+</div>
+<div class="flex items-center justify-between py-1 border-b border-surface-container">
+<span class="text-on-surface text-[12px]">/v1/completions</span>
+<span class="px-1.5 py-0.5 rounded bg-[#f0fdf4] text-[#137036] text-[10px] font-semibold">EXPORTED</span>
+</div>
+<div class="flex items-center justify-between py-1 border-b border-surface-container">
+<span class="text-on-surface text-[12px]">/v1/models</span>
+<span class="px-1.5 py-0.5 rounded bg-[#f0fdf4] text-[#137036] text-[10px] font-semibold">EXPORTED</span>
+</div>
+<div class="flex items-center justify-between py-1 border-b border-surface-container">
+<span class="text-on-surface text-[12px]">/v1/embeddings</span>
+<span class="px-1.5 py-0.5 rounded bg-[#f0fdf4] text-[#137036] text-[10px] font-semibold">EXPORTED</span>
+</div>
+<div class="flex items-center justify-between py-1">
+<span class="text-secondary text-[12px]">/admin &amp; raw :11435</span>
+<span class="px-1.5 py-0.5 rounded bg-[#ffdad6] text-[#ba1a1a] text-[10px] font-semibold">BLOCKED HOST</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 6. SECTION: HOW A REQUEST TRAVELS -->
+<section class="flex flex-col gap-space-md pt-2" id="request-chain">
+<div class="inline-flex items-center gap-1.5 self-start px-2 py-0.5 rounded-full bg-surface-container-lowest border border-surface-variant font-mono-sm text-mono-sm text-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-[#0960b5]"></span>
+<span>interactive trace</span>
+</div>
+<div>
+<h2 class="font-headline-lg text-headline-lg tracking-tight font-semibold text-on-surface">
+            How a request travels.
+          </h2>
+<p class="font-body-sm text-body-sm text-secondary mt-1">
+            End-to-end telemetry through the zero-overhead inference conduit.
+          </p>
+</div>
+<!-- Simulation Controls -->
+<div class="p-space-md bg-surface-container-lowest border border-surface-variant rounded flex flex-col gap-2.5">
+<div class="grid grid-cols-2 gap-2">
+<div>
+<span class="font-label-caps text-label-caps text-secondary block mb-1">ORIGIN</span>
+<div class="grid grid-cols-2 bg-surface-container p-0.5 rounded border border-surface-variant font-mono-sm text-[10px]">
+<button class="py-1 rounded bg-surface-bright font-medium text-on-surface">Localhost</button>
+<button class="py-1 text-secondary">LAN Client</button>
+</div>
+</div>
+<div>
+<span class="font-label-caps text-label-caps text-secondary block mb-1">MODEL STATE</span>
+<div class="grid grid-cols-2 bg-surface-container p-0.5 rounded border border-surface-variant font-mono-sm text-[10px]">
+<button class="py-1 rounded bg-surface-bright font-medium text-on-surface">Ready</button>
+<button class="py-1 text-secondary">Cold start</button>
+</div>
+</div>
+</div>
+<button class="w-full py-2 bg-surface-container border border-surface-variant hover:bg-surface-variant rounded font-mono-sm text-mono-sm text-on-surface font-medium flex items-center justify-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-[15px]">play_arrow</span>
+<span>Simulate Map</span>
+</button>
+</div>
+<!-- Mobile Hop Chain -->
+<div class="relative pl-5 border-l-2 border-surface-variant space-y-3.5 my-1 ml-2">
+<!-- Hop 01 -->
+<div class="relative">
+<div class="absolute -left-[27px] top-1 w-3.5 h-3.5 rounded-full bg-surface-bright border-2 border-primary"></div>
+<div class="p-2.5 bg-surface-container-lowest border border-surface-variant rounded">
+<div class="flex items-center justify-between font-mono-sm text-mono-sm">
+<span class="font-semibold text-on-surface">01. OpenAI Client</span>
+<span class="text-secondary text-[10px]">0.0 ms</span>
+</div>
+<p class="font-mono-sm text-[11px] text-secondary mt-0.5">Cursor / SDK → POST /chat/completions</p>
+</div>
+</div>
+<!-- Hop 02 -->
+<div class="relative">
+<div class="absolute -left-[27px] top-1 w-3.5 h-3.5 rounded-full bg-surface-bright border-2 border-primary"></div>
+<div class="p-2.5 bg-surface-container-lowest border border-surface-variant rounded">
+<div class="flex items-center justify-between font-mono-sm text-mono-sm">
+<span class="font-semibold text-on-surface">02. Caddy Proxy</span>
+<span class="text-secondary text-[10px]">+0.4 ms</span>
+</div>
+<p class="font-mono-sm text-[11px] text-secondary mt-0.5">Port :8443 → TLS Terminate &amp; LAN Trust</p>
+</div>
+</div>
+<!-- Hop 03 -->
+<div class="relative">
+<div class="absolute -left-[27px] top-1 w-3.5 h-3.5 rounded-full bg-surface-bright border-2 border-primary"></div>
+<div class="p-2.5 bg-surface-container-lowest border border-surface-variant rounded">
+<div class="flex items-center justify-between font-mono-sm text-mono-sm">
+<span class="font-semibold text-on-surface">03. LiteLLM Router</span>
+<span class="text-secondary text-[10px]">+1.1 ms</span>
+</div>
+<p class="font-mono-sm text-[11px] text-secondary mt-0.5">Port :4000 → Token validation &amp; Model Map</p>
+</div>
+</div>
+<!-- Hop 04 -->
+<div class="relative">
+<div class="absolute -left-[27px] top-1 w-3.5 h-3.5 rounded-full bg-surface-bright border-2 border-primary"></div>
+<div class="p-2.5 bg-surface-container-lowest border border-surface-variant rounded">
+<div class="flex items-center justify-between font-mono-sm text-mono-sm">
+<span class="font-semibold text-on-surface">04. mxc Daemon</span>
+<span class="text-secondary text-[10px]">+0.8 ms</span>
+</div>
+<p class="font-mono-sm text-[11px] text-secondary mt-0.5">Port :11435 → Page In / VRAM Resident Wake</p>
+</div>
+</div>
+<!-- Hop 05 -->
+<div class="relative">
+<div class="absolute -left-[27px] top-1 w-3.5 h-3.5 rounded-full bg-surface-bright border-2 border-[#137036]"></div>
+<div class="p-2.5 bg-[#f0fdf4] border border-[#137036]/40 rounded">
+<div class="flex items-center justify-between font-mono-sm text-mono-sm">
+<span class="font-semibold text-[#137036]">05. MAX Serve</span>
+<span class="text-[#137036] font-semibold text-[10px]">38.2 ms TTFT</span>
+</div>
+<p class="font-mono-sm text-[11px] text-on-surface mt-0.5">NVIDIA Tensor Core → FlashInfer FP16 execution</p>
+</div>
+</div>
+</div>
+<!-- Trace Terminal Box -->
+<div class="rounded border border-surface-variant bg-surface-container-lowest p-space-md font-mono-sm text-[11px] space-y-1">
+<div class="text-secondary text-[10px] pb-1 border-b border-surface-container flex justify-between">
+<span>LIVE TRACE STREAM</span>
+<span>200 OK</span>
+</div>
+<p class="text-on-surface">recv 48 tokens → kernel:flashinfer_f16</p>
+<p class="text-[#137036]">gpu:0 vram_util 68% · temp 49C · pstate P0</p>
+<p class="text-secondary">stream flush chunk 0..47 in 218ms</p>
+</div>
+</section>
+<!-- 7. SECTION: PORTING, WHEN MAX CAN'T -->
+<section class="flex flex-col gap-space-md pt-2" id="porting">
+<div class="inline-flex items-center gap-1.5 self-start px-2 py-0.5 rounded-full bg-surface-container-lowest border border-surface-variant font-mono-sm text-mono-sm text-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-[#137036]"></span>
+<span>works today</span>
+</div>
+<div>
+<h2 class="font-headline-lg text-headline-lg tracking-tight font-semibold text-on-surface">
+            Porting, when MAX can't.
+          </h2>
+<p class="font-body-sm text-body-sm text-secondary mt-1">
+            Automated compiler synthesis pipeline for exotic and novel architectures.
+          </p>
+</div>
+<!-- 5 Numbered Steps -->
+<div class="space-y-2">
+<div class="p-space-md bg-surface-container-lowest border border-surface-variant rounded flex gap-3">
+<span class="font-mono-sm text-mono-sm font-semibold text-secondary">01</span>
+<div>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface">Workspace setup</p>
+<p class="font-body-sm text-[12px] text-secondary">Isolate environment with pixi and install compiler runtime flags.</p>
+</div>
+</div>
+<div class="p-space-md bg-surface-container-lowest border border-surface-variant rounded flex gap-3">
+<span class="font-mono-sm text-mono-sm font-semibold text-secondary">02</span>
+<div>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface">Generate in a sandbox</p>
+<p class="font-body-sm text-[12px] text-secondary">Synthesize Mojo execution graph from standard Hugging Face safetensors.</p>
+</div>
+</div>
+<div class="p-space-md bg-surface-container-lowest border border-surface-variant rounded flex gap-3">
+<span class="font-mono-sm text-mono-sm font-semibold text-secondary">03</span>
+<div>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface">Try against Hugging Face</p>
+<p class="font-body-sm text-[12px] text-secondary">Validate numerical outputs against reference PyTorch logits.</p>
+</div>
+</div>
+<div class="p-space-md bg-surface-container-lowest border border-surface-variant rounded flex gap-3">
+<span class="font-mono-sm text-mono-sm font-semibold text-secondary">04</span>
+<div>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface">Final check</p>
+<p class="font-body-sm text-[12px] text-secondary">Run memory leak inspection and token generation stress loop.</p>
+</div>
+</div>
+<div class="p-space-md bg-surface-container-lowest border border-surface-variant rounded flex gap-3">
+<span class="font-mono-sm text-mono-sm font-semibold text-secondary">05</span>
+<div>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface">Register and serve</p>
+<p class="font-body-sm text-[12px] text-secondary">Export into omxconsole runtime pool for instantaneous routing.</p>
+</div>
+</div>
+</div>
+<!-- Compiler Graph Synth Box -->
+<div class="rounded border border-surface-variant bg-surface-container-lowest p-space-md font-mono-sm text-[11px] space-y-1">
+<div class="flex justify-between text-secondary text-[10px] border-b border-surface-container pb-1">
+<span>MOJO KERNEL SYNTHESIS</span>
+<span class="text-[#137036]">PASS</span>
+</div>
+<p class="text-on-surface">fn qwen_attention[dtype: DType](q: Tensor, k: Tensor) -&gt; Tensor:</p>
+<p class="text-secondary pl-2">let fused = flash_infer_rope_cached(q, k, head_dim=128)</p>
+<p class="text-secondary pl-2">return vectorize[simd_width](fused)</p>
+</div>
+<!-- Validated Chips Cluster -->
+<div class="p-space-md bg-surface-container-lowest border border-surface-variant rounded space-y-2">
+<span class="font-label-caps text-label-caps text-secondary uppercase block">Validated Architectures</span>
+<div class="flex flex-wrap gap-1.5 font-mono-sm text-mono-sm">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant/40">Llama 3 / 3.1</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant/40">Mistral 0.3</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant/40">Qwen 2.5</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant/40">Gemma 2</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant/40">Phi 3.5</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant/40">DeepSeek-R1</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant/40">StarCoder2</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant/40">Yi-Coder</span>
+</div>
+<span class="font-label-caps text-label-caps text-secondary uppercase block pt-1.5">Parked / Upstream Pending</span>
+<div class="flex flex-wrap gap-1.5 font-mono-sm text-[11px]">
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-secondary border border-dashed border-outline-variant">BLOOM (parked)</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-secondary border border-dashed border-outline-variant">EXAONE (parked)</span>
+</div>
+</div>
+</section>
+<!-- 8. SECTION: THE CONSOLE -->
+<section class="flex flex-col gap-space-md pt-2" id="console">
+<div class="inline-flex items-center gap-1.5 self-start px-2 py-0.5 rounded-full bg-surface-container-lowest border border-surface-variant font-mono-sm text-mono-sm text-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-[#137036]"></span>
+<span>works today</span>
+</div>
+<div>
+<h2 class="font-headline-lg text-headline-lg tracking-tight font-semibold text-on-surface">
+            The console.
+          </h2>
+<p class="font-body-sm text-body-sm text-secondary mt-1">
+            Complete operational visibility over weights, latencies, tokens, and hardware counters.
+          </p>
+</div>
+<!-- Bento Card: Throughput Monitor -->
+<div class="p-space-lg rounded border border-surface-variant bg-surface-container-lowest flex flex-col gap-3">
+<div class="flex items-center justify-between border-b border-surface-container-high pb-2">
+<span class="font-label-caps text-label-caps text-secondary uppercase">Live Hardware Counters</span>
+<span class="font-mono-sm text-[10px] text-[#137036] font-medium">Telemetry active</span>
+</div>
+<div class="grid grid-cols-3 gap-2 text-center">
+<div class="p-2 bg-surface-bright border border-surface-variant rounded">
+<p class="font-headline-sm text-headline-sm font-semibold text-on-surface">218.4</p>
+<p class="font-mono-sm text-[10px] text-secondary">tok / sec</p>
+</div>
+<div class="p-2 bg-surface-bright border border-surface-variant rounded">
+<p class="font-headline-sm text-headline-sm font-semibold text-on-surface">38.2</p>
+<p class="font-mono-sm text-[10px] text-secondary">TTFT (ms)</p>
+</div>
+<div class="p-2 bg-surface-bright border border-surface-variant rounded">
+<p class="font-headline-sm text-headline-sm font-semibold text-on-surface">480</p>
+<p class="font-mono-sm text-[10px] text-secondary">KV-cache MB</p>
+</div>
+</div>
+<!-- Micro Sparkline / Bar Chart -->
+<div class="space-y-1">
+<div class="flex justify-between font-mono-sm text-[10px] text-secondary">
+<span>Token Generation Burst</span>
+<span>100% Core Load</span>
+</div>
+<div class="flex items-end gap-1 h-10 w-full pt-2">
+<div class="flex-1 bg-surface-variant h-3 rounded-xs"></div>
+<div class="flex-1 bg-surface-variant h-4 rounded-xs"></div>
+<div class="flex-1 bg-surface-variant h-5 rounded-xs"></div>
+<div class="flex-1 bg-surface-variant h-4 rounded-xs"></div>
+<div class="flex-1 bg-primary h-8 rounded-xs"></div>
+<div class="flex-1 bg-primary h-9 rounded-xs"></div>
+<div class="flex-1 bg-primary h-10 rounded-xs"></div>
+<div class="flex-1 bg-primary h-8 rounded-xs"></div>
+<div class="flex-1 bg-surface-variant h-6 rounded-xs"></div>
+<div class="flex-1 bg-surface-variant h-7 rounded-xs"></div>
+<div class="flex-1 bg-primary h-9 rounded-xs"></div>
+<div class="flex-1 bg-primary h-10 rounded-xs"></div>
+</div>
+</div>
+</div>
+<!-- 4 Sub Console Bento Modules -->
+<div class="grid grid-cols-2 gap-2.5">
+<!-- Benchmark Suite -->
+<div class="p-3 bg-surface-container-lowest border border-surface-variant rounded flex flex-col justify-between">
+<div>
+<span class="material-symbols-outlined text-secondary text-[18px]">speed</span>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface mt-1">Benchmark</p>
+<p class="font-body-sm text-[11px] text-secondary mt-0.5">Stress latency &amp; tok/s</p>
+</div>
+<span class="font-mono-sm text-[10px] text-secondary pt-2">mxc bench</span>
+</div>
+<!-- Log Streamer -->
+<div class="p-3 bg-surface-container-lowest border border-surface-variant rounded flex flex-col justify-between">
+<div>
+<span class="material-symbols-outlined text-secondary text-[18px]">receipt_long</span>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface mt-1">Log Streamer</p>
+<p class="font-body-sm text-[11px] text-secondary mt-0.5">Raw kernel trace buffer</p>
+</div>
+<span class="font-mono-sm text-[10px] text-secondary pt-2">$ mxc logs -f</span>
+</div>
+<!-- Notebook Kernel -->
+<div class="p-3 bg-surface-container-lowest border border-surface-variant rounded flex flex-col justify-between">
+<div>
+<span class="material-symbols-outlined text-secondary text-[18px]">science</span>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface mt-1">Lab Kernel</p>
+<p class="font-body-sm text-[11px] text-secondary mt-0.5">Mojo REPL integration</p>
+</div>
+<span class="font-mono-sm text-[10px] text-secondary pt-2">$ mxc lab</span>
+</div>
+<!-- Key Authority -->
+<div class="p-3 bg-surface-container-lowest border border-surface-variant rounded flex flex-col justify-between">
+<div>
+<span class="material-symbols-outlined text-secondary text-[18px]">key</span>
+<p class="font-mono-sm text-mono-sm font-semibold text-on-surface mt-1">Key Auth</p>
+<p class="font-body-sm text-[11px] text-secondary mt-0.5">Issue &amp; rotate tokens</p>
+</div>
+<span class="font-mono-sm text-[10px] text-secondary pt-2">$ mxc keys ls</span>
+</div>
+</div>
+</section>
+<!-- 9. FAQ ACCORDION: GO ON, ASK. -->
+<section class="flex flex-col gap-space-md pt-2" id="faq">
+<h2 class="font-headline-lg text-headline-lg tracking-tight font-semibold text-on-surface">
+          Go on, ask.
+        </h2>
+<div class="space-y-2">
+<!-- Accordion 1 (Expanded) -->
+<div class="border border-surface-variant rounded bg-surface-container-lowest overflow-hidden">
+<button class="w-full p-space-md text-left flex items-center justify-between font-mono-sm text-mono-sm font-semibold text-on-surface bg-surface-container-low">
+<span>Why MAX?</span>
+<span class="material-symbols-outlined text-[16px] text-secondary">expand_less</span>
+</button>
+<div class="p-space-md border-t border-surface-variant text-secondary font-body-sm text-body-sm space-y-2">
+<p>Modular MAX compiles computation graphs into native hardware kernels, avoiding PyTorch runtime interpreter tax entirely.</p>
+<div class="grid grid-cols-2 gap-1.5 pt-1 font-mono-sm text-[11px]">
+<div class="p-1.5 rounded bg-surface-container text-on-surface">Kernel Latency: -34%</div>
+<div class="p-1.5 rounded bg-surface-container text-on-surface">Zero-Copy Pinned Paging</div>
+</div>
+</div>
+</div>
+<!-- Accordion 2 -->
+<div class="border border-surface-variant rounded bg-surface-container-lowest overflow-hidden">
+<button class="w-full p-space-md text-left flex items-center justify-between font-mono-sm text-mono-sm font-semibold text-on-surface">
+<span>Why not Ollama or vLLM?</span>
+<span class="material-symbols-outlined text-[16px] text-secondary">expand_more</span>
+</button>
+</div>
+<!-- Accordion 3 -->
+<div class="border border-surface-variant rounded bg-surface-container-lowest overflow-hidden">
+<button class="w-full p-space-md text-left flex items-center justify-between font-mono-sm text-mono-sm font-semibold text-on-surface">
+<span>Does it need the cloud?</span>
+<span class="material-symbols-outlined text-[16px] text-secondary">expand_more</span>
+</button>
+</div>
+<!-- Accordion 4 -->
+<div class="border border-surface-variant rounded bg-surface-container-lowest overflow-hidden">
+<button class="w-full p-space-md text-left flex items-center justify-between font-mono-sm text-mono-sm font-semibold text-on-surface">
+<span>What does porting cost?</span>
+<span class="material-symbols-outlined text-[16px] text-secondary">expand_more</span>
+</button>
+</div>
+<!-- Accordion 5 -->
+<div class="border border-surface-variant rounded bg-surface-container-lowest overflow-hidden">
+<button class="w-full p-space-md text-left flex items-center justify-between font-mono-sm text-mono-sm font-semibold text-on-surface">
+<span>Mac?</span>
+<span class="material-symbols-outlined text-[16px] text-secondary">expand_more</span>
+</button>
+</div>
+<!-- Accordion 6 -->
+<div class="border border-surface-variant rounded bg-surface-container-lowest overflow-hidden">
+<button class="w-full p-space-md text-left flex items-center justify-between font-mono-sm text-mono-sm font-semibold text-on-surface">
+<span>What's next?</span>
+<span class="material-symbols-outlined text-[16px] text-secondary">expand_more</span>
+</button>
+</div>
+</div>
+</section>
+<!-- 10. 'AVAILABLE TODAY.' CTA CARD -->
+<section class="p-space-lg rounded border border-surface-variant bg-surface-container-lowest flex flex-col gap-space-md mt-2 shadow-sm">
+<div class="inline-flex items-center gap-1.5 self-start px-2 py-0.5 rounded-full bg-surface-container border border-surface-variant font-mono-sm text-mono-sm text-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-[#137036]"></span>
+<span>Open source · MIT licensed</span>
+</div>
+<div>
+<h2 class="font-headline-xl text-headline-xl font-semibold tracking-tight text-on-surface">
+            Available today.
+          </h2>
+<p class="font-body-sm text-body-sm text-secondary mt-1">
+            Install the runtime shell and serve state-of-the-art models locally in under two minutes.
+          </p>
+</div>
+<!-- Terminal Commands -->
+<div class="space-y-1.5 font-mono-sm text-[11px]">
+<div class="flex items-center justify-between p-2 rounded bg-surface-bright border border-surface-variant">
+<span class="text-on-surface truncate">$ curl -fsSL https://omx.sh | bash</span>
+<span class="material-symbols-outlined text-secondary text-[14px]">content_copy</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded bg-surface-bright border border-surface-variant">
+<span class="text-on-surface truncate">$ mxc init</span>
+<span class="material-symbols-outlined text-secondary text-[14px]">content_copy</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded bg-surface-bright border border-surface-variant">
+<span class="text-on-surface truncate">$ mxc serve qwen2.5-0.5b</span>
+<span class="material-symbols-outlined text-secondary text-[14px]">content_copy</span>
+</div>
+</div>
+<!-- CTA Action Buttons -->
+<div class="flex flex-col gap-2 pt-1">
+<button class="w-full h-11 bg-primary text-on-primary font-body-sm text-body-sm font-medium rounded-full flex items-center justify-center gap-2 hover:bg-neutral-800 transition-transform active:scale-[0.98]">
+<span class="material-symbols-outlined text-[15px]">terminal</span>
+<span>Get it on GitHub</span>
+</button>
+<button class="w-full h-10 bg-surface-container text-on-surface font-body-sm text-body-sm font-medium rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors">
+<span>Read the user guide</span>
+</button>
+</div>
+</section>
+</main>
+<!-- 11. FOOTER -->
+<footer class="w-full bg-surface border-t border-surface-variant px-space-lg py-space-xl flex flex-col gap-space-lg">
+<div class="grid grid-cols-2 gap-4">
+<div>
+<span class="font-label-caps text-label-caps text-secondary uppercase block mb-2">Start</span>
+<ul class="space-y-1.5 font-mono-sm text-mono-sm text-secondary">
+<li><a class="hover:text-on-surface transition-colors" href="#">Quickstart</a></li>
+<li><a class="hover:text-on-surface transition-colors" href="#">CLI Reference</a></li>
+<li><a class="hover:text-on-surface transition-colors" href="#">Hardware specs</a></li>
+</ul>
+</div>
+<div>
+<span class="font-label-caps text-label-caps text-secondary uppercase block mb-2">See it</span>
+<ul class="space-y-1.5 font-mono-sm text-mono-sm text-secondary">
+<li><a class="hover:text-on-surface transition-colors" href="#">Architecture</a></li>
+<li><a class="hover:text-on-surface transition-colors" href="#">Benchmarks</a></li>
+<li><a class="hover:text-on-surface transition-colors" href="#">Porting guide</a></li>
+</ul>
+</div>
+<div>
+<span class="font-label-caps text-label-caps text-secondary uppercase block mb-2">Build</span>
+<ul class="space-y-1.5 font-mono-sm text-mono-sm text-secondary">
+<li><a class="hover:text-on-surface transition-colors" href="#">GitHub Repository</a></li>
+<li><a class="hover:text-on-surface transition-colors" href="#">Custom Mojo Kernels</a></li>
+<li><a class="hover:text-on-surface transition-colors" href="#">Contributing</a></li>
+</ul>
+</div>
+<div>
+<span class="font-label-caps text-label-caps text-secondary uppercase block mb-2">Follow along</span>
+<ul class="space-y-1.5 font-mono-sm text-mono-sm text-secondary">
+<li><a class="hover:text-on-surface transition-colors" href="#">Discord Community</a></li>
+<li><a class="hover:text-on-surface transition-colors" href="#">Changelog</a></li>
+<li><a class="hover:text-on-surface transition-colors" href="#">System Status</a></li>
+</ul>
+</div>
+</div>
+<!-- Copyright & System Status -->
+<div class="pt-space-md border-t border-surface-variant flex flex-col gap-2">
+<div class="inline-flex items-center gap-1.5 self-start font-mono-sm text-[11px] text-[#137036]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#137036]"></span>
+<span>All systems operational</span>
+</div>
+<p class="font-mono-sm text-[11px] text-secondary leading-normal">
+          © 2025 omxconsole Inc. High-throughput distributed telemetry &amp; runtime shell. Apache 2.0 / MIT.
+        </p>
+</div>
+</footer>
+</div>
+</body></html>

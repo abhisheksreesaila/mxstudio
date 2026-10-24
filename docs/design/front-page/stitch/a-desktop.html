@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>omxconsole — Local AI on Modular MAX</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&amp;family=Geist+Mono:wght@400;500;600;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "surface-container-low": "#1c1b1d",
+            "surface-2": "#1d1d21",
+            "ink-2": "#a9a9b1",
+            "on-secondary-fixed": "#1b1b1f",
+            "surface-variant": "#353437",
+            "primary": "#ffffff",
+            "on-secondary-container": "#b6b4b9",
+            "on-tertiary-container": "#6a635e",
+            "secondary-fixed-dim": "#c8c5cb",
+            "data-orange": "#ff8a3d",
+            "primary-fixed": "#e2e2e4",
+            "line-2": "#202025",
+            "secondary-fixed": "#e4e1e7",
+            "surface-container-lowest": "#0e0e10",
+            "ink-faint": "#3a3a40",
+            "inverse-surface": "#e5e1e4",
+            "surface-bright": "#39393b",
+            "secondary-container": "#47464b",
+            "on-primary-fixed": "#1a1c1d",
+            "background": "#131315",
+            "on-error": "#690005",
+            "on-tertiary-fixed": "#1f1b17",
+            "primary-fixed-dim": "#c6c6c8",
+            "inverse-primary": "#5d5e60",
+            "tertiary": "#ffffff",
+            "on-secondary": "#303034",
+            "surface-0": "#0b0b0d",
+            "surface-dim": "#131315",
+            "on-surface-variant": "#c5c6c9",
+            "error": "#ffb4ab",
+            "surface-container-high": "#2a2a2c",
+            "on-primary": "#2f3132",
+            "line": "#2a2a30",
+            "on-error-container": "#ffdad6",
+            "data-violet": "#8b7bff",
+            "secondary": "#c8c5cb",
+            "info": "#52a9ff",
+            "on-surface": "#e5e1e4",
+            "on-tertiary": "#352f2b",
+            "data-teal": "#2bc3ad",
+            "outline-variant": "#44474a",
+            "surface": "#131315",
+            "bad": "#f2555a",
+            "on-tertiary-fixed-variant": "#4c4541",
+            "ok": "#3ccf6e",
+            "tertiary-fixed-dim": "#cfc5bf",
+            "on-background": "#e5e1e4",
+            "surface-container": "#201f21",
+            "warn": "#f5a524",
+            "tertiary-container": "#ebe0db",
+            "surface-container-highest": "#353437",
+            "data-yellow": "#e0b400",
+            "on-secondary-fixed-variant": "#47464b",
+            "tertiary-fixed": "#ebe0db",
+            "error-container": "#93000a",
+            "on-primary-container": "#636466",
+            "on-primary-fixed-variant": "#454749",
+            "inverse-on-surface": "#313032",
+            "surface-1": "#151518",
+            "data-blue": "#3aa0ff",
+            "surface-3": "#25252a",
+            "ink": "#ededef",
+            "primary-container": "#e2e2e4",
+            "data-red": "#f2555a",
+            "surface-tint": "#c6c6c8",
+            "outline": "#8f9194"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xl": "40px",
+            "space-lg": "24px",
+            "space-xs": "4px",
+            "space-sm": "8px",
+            "space-2xl": "88px",
+            "space-md": "16px",
+            "space-3xl": "140px",
+            "gutter": "24px",
+            "margin": "32px"
+          },
+          "fontFamily": {
+            "title-card": ["Geist", "sans-serif"],
+            "headline-md": ["Geist", "sans-serif"],
+            "app-text": ["Geist", "sans-serif"],
+            "headline-sm": ["Geist", "sans-serif"],
+            "headline-lg": ["Geist", "sans-serif"],
+            "mono-code": ["Geist Mono", "monospace"],
+            "headline-hero": ["Geist", "sans-serif"],
+            "body-md": ["Geist", "sans-serif"],
+            "body-lg": ["Geist", "sans-serif"],
+            "label-sm": ["Geist Mono", "monospace"]
+          },
+          "fontSize": {
+            "title-card": ["15px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-md": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.04em", "fontWeight": "750" }],
+            "app-text": ["13.5px", { "lineHeight": "1.4", "fontWeight": "400" }],
+            "headline-sm": ["24px", { "lineHeight": "1.2", "fontWeight": "600" }],
+            "headline-lg": ["64px", { "lineHeight": "1.0", "letterSpacing": "-0.045em", "fontWeight": "750" }],
+            "mono-code": ["13px", { "lineHeight": "1.4", "fontWeight": "400" }],
+            "headline-hero": ["120px", { "lineHeight": "0.95", "letterSpacing": "-0.05em", "fontWeight": "800" }],
+            "body-md": ["17px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "body-lg": ["24px", { "lineHeight": "1.4", "fontWeight": "400" }],
+            "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "400" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 16px;
+      line-height: 1;
+      display: inline-block;
+      text-transform: none;
+      letter-spacing: normal;
+      word-wrap: normal;
+      white-space: nowrap;
+      direction: ltr;
+      -webkit-font-smoothing: antialiased;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .animate-live-dot {
+      animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #2a2a30;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body class="bg-surface-0 text-ink antialiased selection:bg-surface-3 selection:text-ink min-h-screen">
+<!-- 1. TopNavBar -->
+<header class="bg-surface-0/90 dark:bg-surface-0/90 backdrop-blur-md text-primary dark:text-primary font-mono-code text-mono-code tracking-tight docked full-width top-0 sticky z-50 border-b border-line dark:border-line shadow-sm">
+<div class="max-w-[1120px] mx-auto px-6 h-14 flex items-center justify-between w-full">
+<!-- Left Brand Mark -->
+<a class="flex items-center gap-2.5 group" href="#">
+<span class="w-6 h-6 rounded-[3px] bg-primary text-surface-0 font-mono-code font-bold text-xs flex items-center justify-center">omx</span>
+<span class="font-headline-sm text-headline-sm text-ink dark:text-ink font-bold tracking-tighter">omxconsole</span>
+</a>
+<!-- Center Floating Pill Nav -->
+<nav class="hidden md:flex items-center gap-1 bg-surface-1 border border-line rounded-full px-3 py-1">
+<a class="text-ink dark:text-ink font-medium border-b border-primary dark:border-primary pb-0.5 px-3 py-1 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#endpoint">Endpoint</a>
+<a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors px-3 py-1" href="#sharing">Sharing</a>
+<a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors px-3 py-1" href="#request">Request</a>
+<a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors px-3 py-1" href="#porting">Porting</a>
+<a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors px-3 py-1" href="#console">Console</a>
+<a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors px-3 py-1" href="#faq">FAQ</a>
+</nav>
+<!-- Right Trailing Actions -->
+<div class="flex items-center gap-3">
+<a class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-surface-2 hover:bg-surface-3 border border-line text-ink font-mono-code text-mono-code transition-colors active:scale-[0.98]" href="https://github.com" rel="noopener noreferrer" target="_blank">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span>GitHub</span>
+</a>
+<a class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-primary text-surface-0 font-mono-code font-semibold text-mono-code hover:opacity-90 transition-all active:scale-[0.98]" href="#quickstart">
+<span>Deploy Quickstart</span>
+</a>
+</div>
+</div>
+</header>
+<main class="max-w-[1120px] mx-auto px-6 space-y-[140px] pt-16 pb-24">
+<!-- 2. Hero Section -->
+<section class="flex flex-col items-center text-center pt-8">
+<!-- Status Badge -->
+<div class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-surface-1 border border-line font-mono-code text-label-sm text-ink mb-8">
+<span class="w-2 h-2 rounded-full bg-ok animate-live-dot"></span>
+<span>Public alpha · Linux + NVIDIA</span>
+</div>
+<!-- Hero Headline -->
+<h1 class="font-headline-hero text-[64px] sm:text-[96px] md:text-[120px] leading-[0.95] tracking-[-0.05em] font-extrabold max-w-[1000px] mb-6">
+<span class="text-ink block">Local AI on MAX.</span>
+<span class="text-ink-2 block">Made easy.</span>
+</h1>
+<!-- Lede -->
+<p class="font-body-lg text-body-lg text-ink-2 max-w-[680px] mb-10 leading-relaxed font-normal">
+        One command gives you an OpenAI-compatible endpoint. Models load on their first request and unload when idle.
+      </p>
+<!-- Action Row -->
+<div class="flex flex-wrap items-center justify-center gap-4 mb-16">
+<a class="inline-flex items-center gap-2 px-5 py-2.5 rounded bg-primary text-surface-0 font-mono-code font-semibold text-mono-code shadow-sm hover:opacity-90 active:scale-[0.98] transition-transform" href="#quickstart">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span>Serve your first model</span>
+</a>
+<a class="inline-flex items-center gap-1.5 px-4 py-2.5 text-ink-2 hover:text-ink font-body-md text-body-md transition-colors" href="#console">
+<span>Tour the console</span>
+<span class="font-mono-code">›</span>
+</a>
+</div>
+<!-- Horizontal Architecture Flow Diagram Card -->
+<div class="w-full bg-surface-1 border border-line rounded-xl p-6 sm:p-8 text-left mb-14 shadow-sm">
+<div class="flex items-center justify-between pb-6 mb-6 border-b border-line">
+<div class="flex items-center gap-2 font-mono-code text-label-sm text-ink-2">
+<span class="w-2 h-2 rounded-full bg-ok"></span>
+<span>omx daemon listening on loopback</span>
+</div>
+<span class="font-mono-code text-label-sm text-ink-faint">flow: cold-to-warm multiplexer</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+<!-- Left: terminal trigger chip -->
+<div class="md:col-span-4 bg-surface-2 border border-line p-4 rounded-lg flex items-center justify-between">
+<div class="flex items-center gap-2 font-mono-code text-mono-code text-ink">
+<span class="text-ink-faint">$</span>
+<span>mxc serve qwen2.5-0.5b</span>
+</div>
+<button class="text-ink-2 hover:text-ink transition-colors p-1" title="Copy command">
+<span class="material-symbols-outlined" data-icon="content_copy">content_copy</span>
+</button>
+</div>
+<!-- Connector: Arrow to Router Box -->
+<div class="md:col-span-3 flex flex-col items-center justify-center">
+<div class="w-full flex items-center justify-center gap-2 text-ink-faint font-mono-code text-label-sm py-1">
+<span class="hidden md:inline-block w-8 border-t border-line"></span>
+<span class="material-symbols-outlined text-ink-2" data-icon="arrow_forward">arrow_forward</span>
+</div>
+<div class="w-full bg-surface-2 border border-line p-3.5 rounded-lg flex items-center gap-2.5">
+<span class="w-2 h-2 rounded-full bg-ok animate-pulse"></span>
+<div class="truncate">
+<div class="font-mono-code text-label-sm text-ink truncate">http://127.0.0.1:11435/v1</div>
+<div class="font-mono-code text-[11px] text-ink-2">OpenAI router proxy</div>
+</div>
+</div>
+</div>
+<!-- Fan-out Models -->
+<div class="md:col-span-5 space-y-2.5 pl-0 md:pl-2">
+<!-- Model 1 (Ready) -->
+<div class="flex items-center justify-between p-3 rounded bg-surface-2 border border-ok/40">
+<div class="flex items-center gap-2.5">
+<span class="font-mono-code text-mono-code text-ink font-medium">qwen2.5-0.5b</span>
+<span class="font-mono-code text-[11px] px-2 py-0.5 rounded bg-ok/10 text-ok border border-ok/20">● ready</span>
+</div>
+<span class="font-mono-code text-label-sm text-ink-2">0.9 GB / 16 GB</span>
+</div>
+<!-- Model 2 (Cold) -->
+<div class="flex items-center justify-between p-3 rounded bg-surface-2 border border-line">
+<div class="flex items-center gap-2.5">
+<span class="font-mono-code text-mono-code text-ink-2">smollm3</span>
+<span class="font-mono-code text-[11px] px-2 py-0.5 rounded bg-surface-3 text-ink-2 border border-line">○ cold</span>
+</div>
+<span class="font-mono-code text-label-sm text-ink-faint">0.0 GB (standby)</span>
+</div>
+<!-- Model 3 (Cold) -->
+<div class="flex items-center justify-between p-3 rounded bg-surface-2 border border-line">
+<div class="flex items-center gap-2.5">
+<span class="font-mono-code text-mono-code text-ink-2">all-minilm-l6</span>
+<span class="font-mono-code text-[11px] px-2 py-0.5 rounded bg-surface-3 text-ink-2 border border-line">○ cold</span>
+</div>
+<span class="font-mono-code text-label-sm text-ink-faint">0.0 GB (standby)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Browser-framed screenshot preview: Console "My models" -->
+<div class="w-full bg-surface-1 border border-line rounded-xl overflow-hidden shadow-2xl text-left">
+<!-- Browser Chrome Header -->
+<div class="bg-surface-2 px-4 py-3 border-b border-line flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-line"></span>
+<span class="w-3 h-3 rounded-full bg-line"></span>
+<span class="w-3 h-3 rounded-full bg-line"></span>
+</div>
+<div class="flex items-center gap-2 bg-surface-0 border border-line px-3 py-1 rounded text-ink-2 font-mono-code text-label-sm max-w-[400px] w-full justify-center">
+<span class="material-symbols-outlined text-xs text-ok" data-icon="lock">lock</span>
+<span class="truncate">http://127.0.0.1:11435/console/models</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-ok"></span>
+<span class="font-mono-code text-label-sm text-ink-2 hidden sm:inline">Daemon v0.4.1</span>
+</div>
+</div>
+<!-- Dashboard UI Mockup Inside Chrome -->
+<div class="p-6 sm:p-8 space-y-6 bg-surface-0">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line pb-4">
+<div>
+<div class="font-title-card text-title-card text-ink">Active Deployments</div>
+<div class="font-app-text text-app-text text-ink-2">Modular MAX Graph Runtime on NVIDIA RTX 4090</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-mono-code text-label-sm px-2.5 py-1 rounded bg-surface-2 border border-line text-ok">148 t/s MAX Engine</span>
+<button class="px-3 py-1 rounded bg-surface-2 border border-line font-mono-code text-label-sm text-ink hover:bg-surface-3 transition-colors">+ Pull Weights</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div class="p-4 rounded-lg bg-surface-1 border border-line space-y-3">
+<div class="flex items-center justify-between">
+<span class="font-mono-code text-mono-code text-ink font-semibold">qwen2.5-0.5b</span>
+<span class="font-mono-code text-[11px] px-2 py-0.5 rounded bg-ok/10 text-ok border border-ok/30">serving</span>
+</div>
+<div class="text-ink-2 font-mono-code text-label-sm">MAX Graph · FP16 · 494M params</div>
+<div class="w-full bg-surface-2 h-1.5 rounded-full overflow-hidden">
+<div class="bg-ok h-full w-[24%]"></div>
+</div>
+<div class="flex justify-between font-mono-code text-[11px] text-ink-faint">
+<span>VRAM: 0.9 / 24 GB</span>
+<span>Active 4m 12s</span>
+</div>
+</div>
+<div class="p-4 rounded-lg bg-surface-1 border border-line space-y-3">
+<div class="flex items-center justify-between">
+<span class="font-mono-code text-mono-code text-ink">smollm3</span>
+<span class="font-mono-code text-[11px] px-2 py-0.5 rounded bg-surface-2 text-ink-2 border border-line">standby</span>
+</div>
+<div class="text-ink-2 font-mono-code text-label-sm">MAX Graph · BF16 · 1.7B params</div>
+<div class="w-full bg-surface-2 h-1.5 rounded-full overflow-hidden">
+<div class="bg-line h-full w-0"></div>
+</div>
+<div class="flex justify-between font-mono-code text-[11px] text-ink-faint">
+<span>VRAM: 0.0 GB</span>
+<span>Cold in disk cache</span>
+</div>
+</div>
+<div class="p-4 rounded-lg bg-surface-1 border border-line space-y-3">
+<div class="flex items-center justify-between">
+<span class="font-mono-code text-mono-code text-ink">all-minilm-l6</span>
+<span class="font-mono-code text-[11px] px-2 py-0.5 rounded bg-surface-2 text-ink-2 border border-line">embeddings</span>
+</div>
+<div class="text-ink-2 font-mono-code text-label-sm">MAX Mojo Ops · 22M params</div>
+<div class="w-full bg-surface-2 h-1.5 rounded-full overflow-hidden">
+<div class="bg-line h-full w-0"></div>
+</div>
+<div class="flex justify-between font-mono-code text-[11px] text-ink-faint">
+<span>VRAM: 0.0 GB</span>
+<span>Cold in disk cache</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. Section: One endpoint. Every model you've pulled. -->
+<section class="space-y-12" id="endpoint">
+<div class="space-y-4">
+<span class="font-mono-code text-label-sm uppercase tracking-wider text-ink-2 px-2 py-1 rounded bg-surface-1 border border-line">works today</span>
+<h2 class="font-headline-md text-headline-md font-bold tracking-tight text-ink">
+          One endpoint. <span class="text-ink-2">Every model you've pulled.</span>
+</h2>
+<p class="font-body-md text-body-md text-ink-2 max-w-2xl">
+          Say goodbye to manual port bookkeeping and out-of-memory panics. mxc automatically balances memory by waking models on incoming requests and freeing idle resources.
+        </p>
+</div>
+<!-- Side-by-side comparison cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- The Usual Way -->
+<div class="p-8 rounded-xl bg-surface-1 border border-line space-y-6">
+<div class="flex items-center justify-between">
+<span class="font-mono-code text-title-card text-ink">The usual way</span>
+<span class="font-mono-code text-label-sm text-bad px-2 py-0.5 rounded bg-bad/10 border border-bad/20">OOM prone</span>
+</div>
+<div class="space-y-3 font-mono-code text-mono-code">
+<div class="p-3.5 rounded bg-surface-2 border border-line flex items-center justify-between text-ink-2">
+<span>http://127.0.0.1:8000</span>
+<span class="text-bad">6.2 GB locked</span>
+</div>
+<div class="p-3.5 rounded bg-surface-2 border border-line flex items-center justify-between text-ink-2">
+<span>http://127.0.0.1:8001</span>
+<span class="text-bad">4.8 GB locked</span>
+</div>
+<div class="p-3.5 rounded bg-surface-2 border border-line flex items-center justify-between text-ink-2">
+<span>http://127.0.0.1:8002</span>
+<span class="text-bad">3.2 GB locked</span>
+</div>
+</div>
+<div class="pt-4 border-t border-line text-ink-2 font-mono-code text-label-sm space-y-1">
+<div class="flex justify-between text-ink">
+<span>Total pinned VRAM</span>
+<span class="text-bad">14.2 GB / 16 GB</span>
+</div>
+<div>3 discrete processes · Risk of CUDA out-of-memory errors on concurrent requests.</div>
+</div>
+</div>
+<!-- With mxc -->
+<div class="p-8 rounded-xl bg-surface-1 border border-ok/50 space-y-6">
+<div class="flex items-center justify-between">
+<span class="font-mono-code text-title-card text-ink">With mxc</span>
+<span class="font-mono-code text-label-sm text-ok px-2 py-0.5 rounded bg-ok/10 border border-ok/30">Dynamic multiplexer</span>
+</div>
+<div class="space-y-3 font-mono-code text-mono-code">
+<div class="p-3.5 rounded bg-surface-2 border border-ok/30 flex items-center justify-between text-ink">
+<span class="flex items-center gap-2">
+<span class="material-symbols-outlined text-ok text-sm" data-icon="push_pin">push_pin</span>
+<span>http://127.0.0.1:11435/v1</span>
+</span>
+<span class="text-ok">1.2 GB active</span>
+</div>
+<div class="p-3.5 rounded bg-surface-2 border border-line flex items-center justify-between text-ink-2 opacity-60">
+<span>smollm3 (standby in disk cache)</span>
+<span>0 GB</span>
+</div>
+<div class="p-3.5 rounded bg-surface-2 border border-line flex items-center justify-between text-ink-2 opacity-60">
+<span>all-minilm-l6 (standby in disk cache)</span>
+<span>0 GB</span>
+</div>
+</div>
+<div class="pt-4 border-t border-line text-ink-2 font-mono-code text-label-sm space-y-1">
+<div class="flex justify-between text-ink">
+<span>Total pinned VRAM</span>
+<span class="text-ok">1.2 GB / 16 GB</span>
+</div>
+<div>Single port · Automated 5-min idle eviction · Zero memory usage at rest.</div>
+</div>
+</div>
+</div>
+<!-- 4-column Stat Strip -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
+<div class="p-5 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-headline-sm text-ink mb-1">1</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">endpoint</div>
+<div class="font-app-text text-label-sm text-ink-2">OpenAI-compatible</div>
+</div>
+<div class="p-5 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-headline-sm text-ink mb-1">5 min</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">idle unload (default)</div>
+<div class="font-app-text text-label-sm text-ink-2">Configurable per model</div>
+</div>
+<div class="p-5 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-headline-sm text-ink mb-1">0</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">models loaded until called</div>
+<div class="font-app-text text-label-sm text-ink-2">Zero VRAM at rest</div>
+</div>
+<div class="p-5 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-headline-sm text-ink mb-1">1 key</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">per app</div>
+<div class="font-app-text text-label-sm text-ink-2">Granular rate limiting</div>
+</div>
+</div>
+</section>
+<!-- 4. Section: Safe to share. -->
+<section class="space-y-12" id="sharing">
+<div class="space-y-4">
+<span class="font-mono-code text-label-sm uppercase tracking-wider text-ink-2 px-2 py-1 rounded bg-surface-1 border border-line">works today</span>
+<h2 class="font-headline-md text-headline-md font-bold tracking-tight text-ink">
+          Safe to share.
+        </h2>
+<p class="font-body-md text-body-md text-ink-2 max-w-2xl">
+          Built-in virtual keys and an integrated secure gateway mean you can safely expose endpoints to your local network, home lab, or dev teammates without exposing raw ports.
+        </p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+<!-- Left: API Keys Table -->
+<div class="p-6 sm:p-8 rounded-xl bg-surface-1 border border-line flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-6">
+<span class="font-title-card text-title-card text-ink">Local API Keys</span>
+<span class="font-mono-code text-label-sm text-ink-2">3 active</span>
+</div>
+<div class="divide-y divide-line font-mono-code text-mono-code">
+<div class="py-3 flex items-center justify-between">
+<div>
+<div class="text-ink">my-app</div>
+<div class="text-[11px] text-ink-2">1.2k req/d · No rate limit</div>
+</div>
+<button class="px-2 py-1 rounded bg-surface-2 hover:bg-surface-3 border border-line text-label-sm text-ink-2 hover:text-bad transition-colors">revoke</button>
+</div>
+<div class="py-3 flex items-center justify-between">
+<div>
+<div class="text-ink">notebook</div>
+<div class="text-[11px] text-ink-2">34 req/d · Read-only</div>
+</div>
+<button class="px-2 py-1 rounded bg-surface-2 hover:bg-surface-3 border border-line text-label-sm text-ink-2 hover:text-bad transition-colors">revoke</button>
+</div>
+<div class="py-3 flex items-center justify-between">
+<div>
+<div class="text-ink">phone-shortcut</div>
+<div class="text-[11px] text-ink-2">11 req/d · Restricted to smollm3</div>
+</div>
+<button class="px-2 py-1 rounded bg-surface-2 hover:bg-surface-3 border border-line text-label-sm text-ink-2 hover:text-bad transition-colors">revoke</button>
+</div>
+</div>
+</div>
+<div class="mt-8 pt-4 border-t border-line flex items-center justify-between font-mono-code text-label-sm">
+<span class="text-ink-2">$ mxc keys new my-app</span>
+<button class="px-2 py-1 rounded bg-surface-2 border border-line text-ink hover:bg-surface-3 transition-colors flex items-center gap-1">
+<span class="material-symbols-outlined text-xs" data-icon="content_copy">content_copy</span>
+<span>copy</span>
+</button>
+</div>
+</div>
+<!-- Right: mxc expose -->
+<div class="p-6 sm:p-8 rounded-xl bg-surface-1 border border-line flex flex-col justify-between">
+<div class="space-y-6">
+<div class="flex items-center justify-between">
+<span class="font-title-card text-title-card text-ink">Instant LAN Sharing</span>
+<span class="font-mono-code text-label-sm text-ok px-2 py-0.5 rounded bg-ok/10 border border-ok/20">TLS Active</span>
+</div>
+<div class="p-4 rounded-lg bg-surface-2 border border-line flex items-center gap-3">
+<span class="material-symbols-outlined text-ok" data-icon="lock">lock</span>
+<div class="truncate">
+<div class="font-mono-code text-mono-code text-ink font-semibold">https://box.local:8443</div>
+<div class="font-mono-code text-[11px] text-ink-2">Self-signed LAN SAN cert (automatic)</div>
+</div>
+</div>
+<p class="font-app-text text-app-text text-ink-2 leading-relaxed">
+              Caddy reverse proxy + LiteLLM gateway, automatic self-signed or Let's Encrypt TLS on your local network. No external tunneling or cloud accounts required.
+            </p>
+</div>
+<div class="mt-8 bg-surface-0 border border-line p-3.5 rounded font-mono-code text-label-sm text-ink flex items-center justify-between">
+<span class="text-ink"><span class="text-ink-faint">$</span> mxc expose --lan</span>
+<span class="text-ok">proxy ready</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. Section: How a request travels. -->
+<section class="space-y-12" id="request">
+<div class="space-y-4">
+<span class="font-mono-code text-label-sm uppercase tracking-wider text-ink-2 px-2 py-1 rounded bg-surface-1 border border-line">interactive</span>
+<h2 class="font-headline-md text-headline-md font-bold tracking-tight text-ink">
+          How a request travels.
+        </h2>
+<p class="font-body-md text-body-md text-ink-2 max-w-2xl">
+          Trace incoming inference queries through the zero-trust local stack down to bare-metal MAX graph kernels.
+        </p>
+</div>
+<!-- Control Toolbar -->
+<div class="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-surface-1 border border-line">
+<div class="flex flex-wrap items-center gap-3">
+<!-- Segmented Control 1 -->
+<div class="inline-flex p-1 rounded-full bg-surface-2 border border-line font-mono-code text-label-sm">
+<button class="px-3 py-1 rounded-full bg-primary text-surface-0 font-medium">This machine</button>
+<button class="px-3 py-1 rounded-full text-ink-2 hover:text-ink">Another device on the LAN</button>
+</div>
+<!-- Segmented Control 2 -->
+<div class="inline-flex p-1 rounded-full bg-surface-2 border border-line font-mono-code text-label-sm">
+<button class="px-3 py-1 rounded-full text-ink-2 hover:text-ink">Model idle (cold)</button>
+<button class="px-3 py-1 rounded-full bg-surface-3 text-ink font-medium">Model loaded</button>
+</div>
+</div>
+<button class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded bg-primary text-surface-0 font-mono-code text-mono-code font-semibold hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="play_arrow">play_arrow</span>
+<span>Play</span>
+</button>
+</div>
+<!-- 5-Step Horizontal Chain Diagram -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+<div class="p-4 rounded-lg bg-surface-1 border border-line space-y-2 relative">
+<div class="font-mono-code text-[11px] text-ink-faint">01 CLIENT</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">OpenAI client</div>
+<div class="font-app-text text-label-sm text-ink-2">Python, Curl, LangChain or cursor IDE</div>
+</div>
+<div class="p-4 rounded-lg bg-surface-1 border border-line space-y-2 relative">
+<div class="font-mono-code text-[11px] text-ink-faint">02 GATEWAY</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">Caddy :8443</div>
+<div class="font-app-text text-label-sm text-ink-2">TLS termination &amp; auth verification</div>
+</div>
+<div class="p-4 rounded-lg bg-surface-1 border border-line space-y-2 relative">
+<div class="font-mono-code text-[11px] text-ink-faint">03 ROUTER</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">LiteLLM :4000</div>
+<div class="font-app-text text-label-sm text-ink-2">Virtual keys &amp; model slug resolution</div>
+</div>
+<div class="p-4 rounded-lg bg-surface-1 border border-line space-y-2 relative">
+<div class="font-mono-code text-[11px] text-ink-faint">04 DAEMON</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">mxc daemon :11435</div>
+<div class="font-app-text text-label-sm text-ink-2">Lifecycle supervisor &amp; lazy spawner</div>
+</div>
+<div class="p-4 rounded-lg bg-surface-1 border border-ok/50 space-y-2 relative">
+<div class="font-mono-code text-[11px] text-ok">05 COMPILER ENGINE</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">max serve</div>
+<div class="font-app-text text-label-sm text-ink-2">Modular MAX kernel &amp; Mojo engine</div>
+</div>
+</div>
+<!-- Dark Mono Log Terminal Box -->
+<div class="rounded-xl bg-surface-0 border border-line p-6 font-mono-code text-mono-code space-y-2.5 overflow-x-auto custom-scrollbar">
+<div class="text-ink-faint pb-2 border-b border-line flex items-center justify-between text-label-sm">
+<span>daemon stdout stream</span>
+<span class="text-ok">● active tracing</span>
+</div>
+<div class="text-ink-2"><span class="text-ink-faint">[14:02:11.204]</span> <span class="text-ink font-semibold">POST</span> /v1/chat/completions model=qwen2.5-0.5b</div>
+<div class="text-ink-2"><span class="text-ink-faint">[14:02:11.206]</span> mxc: model cold in cache, spawning max serve process...</div>
+<div class="text-ink-2"><span class="text-ink-faint">[14:02:11.890]</span> max serve: weights mapped into GPU memory (<span class="text-ok">780ms</span>)</div>
+<div class="text-ink-2"><span class="text-ink-faint">[14:02:11.902]</span> stream opened: <span class="text-ink font-semibold">124 tok/sec</span> generated</div>
+<div class="text-ink-2"><span class="text-ink-faint">[14:02:16.902]</span> idle timer set: 300s remaining until eviction</div>
+</div>
+</section>
+<!-- 6. Section: When MAX can't run it, port it. -->
+<section class="space-y-12" id="porting">
+<div class="space-y-4">
+<span class="font-mono-code text-label-sm uppercase tracking-wider text-ink-2 px-2 py-1 rounded bg-surface-1 border border-line">works today</span>
+<h2 class="font-headline-md text-headline-md font-bold tracking-tight text-ink">
+          When MAX can't run it, port it.
+        </h2>
+<p class="font-body-md text-body-md text-ink-2 max-w-2xl">
+          Automated compiler translation for unsupported HuggingFace architectures. Let our guided script generate and verify custom MAX/Mojo operators automatically.
+        </p>
+</div>
+<!-- 5-step numbered process horizontal strip -->
+<div class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-3">
+<div class="p-4 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-label-sm text-ink-faint mb-1">01</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold mb-1">Workspace</div>
+<div class="font-app-text text-label-sm text-ink-2">Isolate PyTorch graph</div>
+</div>
+<div class="p-4 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-label-sm text-ink-faint mb-1">02</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold mb-1">Generate</div>
+<div class="font-app-text text-label-sm text-ink-2">Synthesize MAX Ops</div>
+</div>
+<div class="p-4 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-label-sm text-ink-faint mb-1">03</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold mb-1">Try</div>
+<div class="font-app-text text-label-sm text-ink-2">Run automated unit tests</div>
+</div>
+<div class="p-4 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-label-sm text-ink-faint mb-1">04</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold mb-1">Final check</div>
+<div class="font-app-text text-label-sm text-ink-2">Verify numerical parity</div>
+</div>
+<div class="p-4 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-label-sm text-ink-faint mb-1">05</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold mb-1">Serve</div>
+<div class="font-app-text text-label-sm text-ink-2">Register in mxc registry</div>
+</div>
+</div>
+<!-- Stat strip (4 metrics) -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+<div class="p-5 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-headline-sm text-ink mb-1">8</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">architectures ported</div>
+<div class="font-app-text text-label-sm text-ink-2">Merged upstream</div>
+</div>
+<div class="p-5 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-headline-sm text-ink mb-1">7–40 min</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">per port runtime</div>
+<div class="font-app-text text-label-sm text-ink-2">End-to-end iteration</div>
+</div>
+<div class="p-5 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-headline-sm text-ink mb-1">$2–5</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">Claude usage via API</div>
+<div class="font-app-text text-label-sm text-ink-2">Autonomous code gen</div>
+</div>
+<div class="p-5 rounded-lg bg-surface-1 border border-line">
+<div class="font-mono-code text-headline-sm text-ink mb-1">3</div>
+<div class="font-mono-code text-mono-code text-ink font-semibold">attempts by default</div>
+<div class="font-app-text text-label-sm text-ink-2">Auto-healing compile loop</div>
+</div>
+</div>
+<!-- Chips grid of ported names -->
+<div class="space-y-3">
+<div class="font-mono-code text-label-sm text-ink-2">Validated ported architectures ready to pull:</div>
+<div class="flex flex-wrap gap-2">
+<span class="px-3 py-1.5 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">GPT-2</span>
+<span class="px-3 py-1.5 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">Pythia</span>
+<span class="px-3 py-1.5 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">Phi-2</span>
+<span class="px-3 py-1.5 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">StarCoder2</span>
+<span class="px-3 py-1.5 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">StableLM 2</span>
+<span class="px-3 py-1.5 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">SmolLM3</span>
+<span class="px-3 py-1.5 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">Granite MoE</span>
+<span class="px-3 py-1.5 rounded bg-surface-1 border border-line font-mono-code text-mono-code text-ink">OLMoE</span>
+</div>
+</div>
+</section>
+<!-- 7. Section: The console. -->
+<section class="space-y-12" id="console">
+<div class="space-y-4">
+<span class="font-mono-code text-label-sm uppercase tracking-wider text-ink-2 px-2 py-1 rounded bg-surface-1 border border-line">works today</span>
+<h2 class="font-headline-md text-headline-md font-bold tracking-tight text-ink">
+          The console.
+        </h2>
+<p class="font-body-md text-body-md text-ink-2 max-w-2xl">
+          A lightweight local web UI built directly into the daemon binary. No Node.js runtime, zero extra dependencies, single-binary distribution.
+        </p>
+</div>
+<!-- Grid of 3 browser-framed screenshot cards with captions -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Card 1 -->
+<div class="bg-surface-1 border border-line rounded-xl overflow-hidden flex flex-col justify-between">
+<div class="bg-surface-2 px-3 py-2 border-b border-line flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-line"></span>
+<span class="w-2 h-2 rounded-full bg-line"></span>
+<span class="w-2 h-2 rounded-full bg-line"></span>
+<span class="font-mono-code text-[10px] text-ink-faint ml-2 truncate">/console/catalog</span>
+</div>
+<div class="p-5 space-y-4 flex-1 bg-surface-0/60">
+<div class="font-mono-code text-label-sm text-ok">● 3 active weight caches</div>
+<div class="p-3 rounded bg-surface-1 border border-line space-y-1">
+<div class="font-mono-code text-mono-code text-ink font-medium">Qwen2.5 0.5B Instruct</div>
+<div class="font-mono-code text-[11px] text-ink-2">MAX GGUF / FP16 · 0.9GB VRAM</div>
+</div>
+<div class="p-3 rounded bg-surface-1 border border-line space-y-1">
+<div class="font-mono-code text-mono-code text-ink font-medium">SmolLM3 1.7B</div>
+<div class="font-mono-code text-[11px] text-ink-2">MAX Native BF16 · 2.1GB VRAM</div>
+</div>
+</div>
+<div class="p-4 border-t border-line bg-surface-1">
+<div class="font-title-card text-title-card text-ink mb-1">Model catalog &amp; management</div>
+<div class="font-app-text text-app-text text-ink-2">Detailed view of local weights, quantization, VRAM meter, and single-click start/stop.</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-1 border border-line rounded-xl overflow-hidden flex flex-col justify-between">
+<div class="bg-surface-2 px-3 py-2 border-b border-line flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-line"></span>
+<span class="w-2 h-2 rounded-full bg-line"></span>
+<span class="w-2 h-2 rounded-full bg-line"></span>
+<span class="font-mono-code text-[10px] text-ink-faint ml-2 truncate">/console/benchmarks</span>
+</div>
+<div class="p-5 space-y-4 flex-1 bg-surface-0/60">
+<div class="flex items-center justify-between font-mono-code text-label-sm">
+<span class="text-ink">TTFT</span>
+<span class="text-ok font-semibold">18.4 ms</span>
+</div>
+<div class="flex items-center justify-between font-mono-code text-label-sm">
+<span class="text-ink">Generation Rate</span>
+<span class="text-ok font-semibold">148.2 tok/s</span>
+</div>
+<div class="p-3 rounded bg-surface-1 border border-line font-mono-code text-[11px] space-y-2">
+<div class="flex justify-between">
+<span class="text-ink-2">Modular MAX</span>
+<span class="text-ok">1.82x faster</span>
+</div>
+<div class="w-full bg-surface-2 h-1 rounded-full overflow-hidden">
+<div class="bg-ok h-full w-[85%]"></div>
+</div>
+<div class="flex justify-between text-ink-faint">
+<span>PyTorch 2.4 Eager</span>
+<span>1.0x baseline</span>
+</div>
+</div>
+</div>
+<div class="p-4 border-t border-line bg-surface-1">
+<div class="font-title-card text-title-card text-ink mb-1">Kernel Benchmarking</div>
+<div class="font-app-text text-app-text text-ink-2">Real-time TTFT, tokens/sec graph, and Modular MAX vs PyTorch speedup comparisons.</div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-1 border border-line rounded-xl overflow-hidden flex flex-col justify-between">
+<div class="bg-surface-2 px-3 py-2 border-b border-line flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-line"></span>
+<span class="w-2 h-2 rounded-full bg-line"></span>
+<span class="w-2 h-2 rounded-full bg-line"></span>
+<span class="font-mono-code text-[10px] text-ink-faint ml-2 truncate">/console/playground</span>
+</div>
+<div class="p-5 space-y-3 flex-1 bg-surface-0/60 font-mono-code text-label-sm">
+<div class="p-2.5 rounded bg-surface-1 border border-line text-ink-2">
+<span class="text-ink-faint">System:</span> You are a low-latency assistant running on MAX graph execution...
+            </div>
+<div class="p-2.5 rounded bg-surface-2 border border-line text-ink">
+<span class="text-ink-faint">Prompt:</span> Explain kernel tiling in Mojo.
+            </div>
+<div class="text-[11px] text-ok">Tokens received in 84ms ›</div>
+</div>
+<div class="p-4 border-t border-line bg-surface-1">
+<div class="font-title-card text-title-card text-ink mb-1">Jupyter &amp; client integration</div>
+<div class="font-app-text text-app-text text-ink-2">In-browser interactive playground, system prompt testing, and copyable client snippets.</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 8. FAQ Section: Go on, ask. -->
+<section class="space-y-12" id="faq">
+<div class="space-y-4">
+<h2 class="font-headline-md text-headline-md font-bold tracking-tight text-ink">
+          Go on, ask.
+        </h2>
+<p class="font-body-md text-body-md text-ink-2 max-w-2xl">
+          Everything you need to know about the architecture, local isolation, and compiler backend.
+        </p>
+</div>
+<!-- Two-column grid of 6 question cards with dedicated visual widgets -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Q1: Why MAX? -->
+<div class="p-6 rounded-xl bg-surface-1 border border-line space-y-4">
+<div class="font-title-card text-title-card text-ink">Why MAX?</div>
+<p class="font-app-text text-app-text text-ink-2">
+            Modular's MAX compiler generates fused low-level kernels tailored specifically to target GPU hardware with zero PyTorch runtime overhead.
+          </p>
+<div class="flex flex-wrap gap-2 pt-2">
+<span class="px-2.5 py-1 rounded bg-surface-2 border border-line font-mono-code text-label-sm text-ink">Sub-millisecond kernel dispatch</span>
+<span class="px-2.5 py-1 rounded bg-surface-2 border border-line font-mono-code text-label-sm text-ink">Mojo custom ops</span>
+<span class="px-2.5 py-1 rounded bg-surface-2 border border-line font-mono-code text-label-sm text-ink">Bare-metal memory efficiency</span>
+</div>
+</div>
+<!-- Q2: Why not Ollama or vLLM? -->
+<div class="p-6 rounded-xl bg-surface-1 border border-line space-y-4">
+<div class="font-title-card text-title-card text-ink">Why not Ollama or vLLM?</div>
+<p class="font-app-text text-app-text text-ink-2">
+            vLLM assumes dedicated multi-GPU serving; Ollama lacks fine-grained dynamic eviction and Mojo custom kernel execution.
+          </p>
+<div class="p-3 rounded bg-surface-2 border border-line font-mono-code text-[11px] space-y-1.5">
+<div class="grid grid-cols-3 text-ink-faint border-b border-line pb-1">
+<span>Feature</span>
+<span>omxconsole</span>
+<span>Ollama/vLLM</span>
+</div>
+<div class="grid grid-cols-3 text-ink">
+<span>Rest VRAM</span>
+<span class="text-ok">0.0 GB</span>
+<span class="text-bad">Static / High</span>
+</div>
+<div class="grid grid-cols-3 text-ink">
+<span>Engine</span>
+<span class="text-ok">MAX Graph</span>
+<span class="text-ink-2">llama.cpp / PagedAttn</span>
+</div>
+</div>
+</div>
+<!-- Q3: Does it need the cloud? -->
+<div class="p-6 rounded-xl bg-surface-1 border border-line space-y-4">
+<div class="font-title-card text-title-card text-ink">Does it need the cloud?</div>
+<p class="font-app-text text-app-text text-ink-2">
+            Never. The runtime, router, weights, and WebUI console operate completely air-gapped on your localhost.
+          </p>
+<div class="p-3 rounded bg-surface-2 border border-line flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-ink-2" data-icon="cloud_off">cloud_off</span>
+<span class="font-mono-code text-label-sm text-ink">100% offline local runtime</span>
+</div>
+<span class="font-mono-code text-[11px] text-ink-faint">Claude API porting optional</span>
+</div>
+</div>
+<!-- Q4: What does porting cost? -->
+<div class="p-6 rounded-xl bg-surface-1 border border-line space-y-4">
+<div class="font-title-card text-title-card text-ink">What does porting cost?</div>
+<p class="font-app-text text-app-text text-ink-2">
+            The automated porting pipeline only uses external LLMs if you explicitly invoke translation for an uncompiled architecture.
+          </p>
+<div class="flex gap-3">
+<div class="p-3 rounded bg-surface-2 border border-line flex-1">
+<div class="font-mono-code text-mono-code text-ink font-semibold">$2–5</div>
+<div class="font-app-text text-label-sm text-ink-2">Claude credits</div>
+</div>
+<div class="p-3 rounded bg-surface-2 border border-line flex-1">
+<div class="font-mono-code text-mono-code text-ink font-semibold">7–40 min</div>
+<div class="font-app-text text-label-sm text-ink-2">automated pass</div>
+</div>
+</div>
+</div>
+<!-- Q5: Mac support? -->
+<div class="p-6 rounded-xl bg-surface-1 border border-line space-y-4">
+<div class="font-title-card text-title-card text-ink">Mac support?</div>
+<p class="font-app-text text-app-text text-ink-2">
+            Currently targeted at Linux with NVIDIA GPUs for maximum CUDA/MAX compiler throughput.
+          </p>
+<div class="p-3 rounded bg-surface-2 border border-line flex items-center justify-between">
+<span class="font-mono-code text-label-sm text-ink-2">Apple Silicon Metal backend</span>
+<span class="font-mono-code text-label-sm text-warn px-2 py-0.5 rounded bg-warn/10 border border-warn/20">being checked</span>
+</div>
+</div>
+<!-- Q6: What's next? -->
+<div class="p-6 rounded-xl bg-surface-1 border border-line space-y-4">
+<div class="font-title-card text-title-card text-ink">What's next?</div>
+<div class="space-y-2 font-mono-code text-label-sm">
+<div class="p-2.5 rounded bg-surface-2 border border-line text-ink flex items-center gap-2">
+<span class="text-ink-faint">01</span>
+<span>Multi-GPU tensor parallelism</span>
+</div>
+<div class="p-2.5 rounded bg-surface-2 border border-line text-ink flex items-center gap-2">
+<span class="text-ink-faint">02</span>
+<span>Automatic LoRA hot-swapping</span>
+</div>
+<div class="p-2.5 rounded bg-surface-2 border border-line text-ink flex items-center gap-2">
+<span class="text-ink-faint">03</span>
+<span>Distributed LAN cluster</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 9. Quickstart CTA Block: Available today. -->
+<section class="space-y-8 text-center pt-8" id="quickstart">
+<div class="space-y-3">
+<h2 class="font-headline-md text-headline-md font-bold tracking-tight text-ink">
+          Available today.
+        </h2>
+<p class="font-body-md text-body-md text-ink-2">
+          Deploy on your local workstation or homelab in under 60 seconds.
+        </p>
+</div>
+<!-- High-impact terminal card -->
+<div class="max-w-[760px] mx-auto bg-surface-1 border border-line rounded-xl overflow-hidden shadow-2xl text-left">
+<div class="bg-surface-2 px-4 py-3 border-b border-line flex items-center justify-between">
+<div class="flex items-center gap-2 font-mono-code text-label-sm text-ink-2">
+<span class="w-2.5 h-2.5 rounded-full bg-ok"></span>
+<span>Linux · NVIDIA · free, MIT</span>
+</div>
+<button class="px-2.5 py-1 rounded bg-surface-3 hover:bg-surface-container-high border border-line text-ink font-mono-code text-label-sm flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-xs" data-icon="content_copy">content_copy</span>
+<span>Copy all</span>
+</button>
+</div>
+<div class="p-6 font-mono-code text-mono-code text-ink space-y-2 bg-surface-0">
+<div class="flex items-center gap-2">
+<span class="text-ink-faint select-none">$</span>
+<span>git clone https://github.com/modular/omxconsole.git</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-ink-faint select-none">$</span>
+<span>pixi install</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-ink-faint select-none">$</span>
+<span class="text-ok">pixi run mxc serve qwen2.5-0.5b</span>
+</div>
+</div>
+</div>
+<!-- Action Row -->
+<div class="flex flex-wrap items-center justify-center gap-4 pt-4">
+<a class="inline-flex items-center gap-2 px-6 py-3 rounded bg-primary text-surface-0 font-mono-code font-bold text-mono-code shadow-sm hover:opacity-90 active:scale-[0.98] transition-transform" href="https://github.com" rel="noopener noreferrer" target="_blank">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span>Get it on GitHub</span>
+<span class="text-surface-0/70 font-normal">★ 1.8k</span>
+</a>
+<a class="inline-flex items-center gap-1.5 px-6 py-3 rounded bg-surface-2 border border-line text-ink font-mono-code text-mono-code hover:bg-surface-3 transition-colors active:scale-[0.98]" href="#">
+<span>Read the user guide</span>
+<span class="font-mono-code">›</span>
+</a>
+</div>
+</section>
+</main>
+<!-- 10. Footer (4 Link Columns) -->
+<footer class="bg-surface-0 dark:bg-surface-0 text-primary dark:text-primary font-mono-code text-mono-code text-ink-2 dark:text-ink-2 full-width bottom border-t border-line dark:border-line flat no shadows">
+<div class="max-w-[1120px] mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-4 gap-8 w-full">
+<!-- Column 1: Start -->
+<div class="space-y-3">
+<div class="font-headline-sm text-headline-sm text-ink dark:text-ink font-bold mb-2">Start</div>
+<ul class="space-y-2">
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">GitHub</a></li>
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">README</a></li>
+<li><a class="text-ink dark:text-ink font-medium hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">Quickstart</a></li>
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">Releases</a></li>
+</ul>
+</div>
+<!-- Column 2: See it -->
+<div class="space-y-3">
+<div class="font-headline-sm text-headline-sm text-ink dark:text-ink font-bold mb-2">See it</div>
+<ul class="space-y-2">
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#console">Console tour</a></li>
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#request">Architecture diagrams</a></li>
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#porting">Porting recipes</a></li>
+</ul>
+</div>
+<!-- Column 3: Build -->
+<div class="space-y-3">
+<div class="font-headline-sm text-headline-sm text-ink dark:text-ink font-bold mb-2">Build</div>
+<ul class="space-y-2">
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">CLI reference</a></li>
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">HTTP API spec</a></li>
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">Modular MAX engine</a></li>
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">Kernel Benchmarks</a></li>
+</ul>
+</div>
+<!-- Column 4: Follow along -->
+<div class="space-y-3">
+<div class="font-headline-sm text-headline-sm text-ink dark:text-ink font-bold mb-2">Follow along</div>
+<ul class="space-y-2">
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">Changelog</a></li>
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">Issues</a></li>
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">Discord Community</a></li>
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">Security Disclosure</a></li>
+<li><a class="text-ink-2 dark:text-ink-2 hover:text-ink dark:hover:text-ink transition-colors duration-150" href="#">Telemetry Policy</a></li>
+</ul>
+</div>
+</div>
+<!-- Bottom copyright line -->
+<div class="border-t border-line dark:border-line">
+<div class="max-w-[1120px] mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between text-ink-2 text-label-sm font-mono-code gap-4">
+<div>© 2025 omxconsole on Modular MAX. Open-source local AI runtime under Apache 2.0.</div>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-ok"></span>
+<span>All systems operational</span>
+</div>
+</div>
+</div>
+</footer>
+</body></html>
