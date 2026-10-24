@@ -1,6 +1,7 @@
-"""README.md's HTTP API table is the gateway's public API: one row per method and path the app serves outside the
-console, its pages and /admin, and the same set the OpenAPI spec at /openapi.json documents. Links resolve: local
-ones, the GitHub Pages ones (docs/ is the site root), and the docs pages' own relative links and images."""
+"""docs/API.md's HTTP API table is the gateway's public API: one row per method and path the app serves outside the
+console, its pages and /admin, and the same set the OpenAPI spec at /openapi.json documents. The README stays half a
+page and links every reference page. Links resolve: local ones (README, API.md, ARCHITECTURE.md), the GitHub Pages ones
+(docs/ is the site root), and the docs pages' own relative links and images."""
 import re
 import sys
 from pathlib import Path
@@ -11,6 +12,7 @@ from mxconsole.supervisor import Supervisor
 
 ROOT = Path(__file__).parents[2]
 README = (ROOT / "README.md").read_text()
+API = (ROOT / "docs" / "API.md").read_text()
 SITE = ROOT / "docs" / "site"
 ROW = re.compile(r"^\| `(GET|POST|PUT|PATCH|DELETE) (/[^`]*)` \|", re.M)
 PAGES_URL = re.compile(r"https://abhisheksreesaila\.github\.io/mxstudio/([^)\s\"'#]*)")
@@ -18,8 +20,8 @@ NOT_API = {"/console", "/console/{asset}", "/console/omxqua/{path:path}", "/favi
 
 
 def api_section() -> str:
-    m = re.search(r"^## HTTP API$(.*?)(?=^## )", README + "\n## ", re.M | re.S)
-    assert m, "README.md has no '## HTTP API' section"
+    m = re.search(r"^## HTTP API$(.*?)(?=^## )", API + "\n## ", re.M | re.S)
+    assert m, "docs/API.md has no '## HTTP API' section"
     return m.group(1)
 
 
@@ -38,10 +40,18 @@ def test_api_table_matches_the_routes_and_the_openapi_spec():
 
 
 def test_readme_local_links_and_images_exist():
-    targets = re.findall(r"\]\(((?!https?://|#)[^)\s]+)\)", README)
-    assert targets, "README.md links nothing local"
-    missing = [t for t in targets if not (ROOT / t.split("#")[0]).exists()]
-    assert not missing, f"README.md links missing files: {missing}"
+    for doc in [ROOT / "README.md", ROOT / "docs" / "API.md", ROOT / "docs" / "ARCHITECTURE.md", ROOT / "docs" / "USER_GUIDE.md"]:
+        targets = re.findall(r"\]\(((?!https?://|#)[^)\s]+)\)", doc.read_text())
+        assert targets, f"{doc.name} links nothing local"
+        missing = [t for t in targets if not (doc.parent / t.split("#")[0]).exists()]
+        assert not missing, f"{doc.name} links missing files: {missing}"
+
+
+def test_readme_is_half_a_page_and_links_every_reference():
+    lines = [l for l in README.splitlines() if l.strip()]
+    assert len(lines) <= 30, f"README.md is {len(lines)} non-blank lines; keep it to one screen"
+    for ref in ["docs/USER_GUIDE.md", "docs/API.md", "docs/CLI.md", "docs/ARCHITECTURE.md", "site/console.html", "site/porting.html", "mxstudio/site/)"]:
+        assert ref in README, f"README.md should link {ref}"
 
 
 def test_github_pages_links_point_at_real_pages():

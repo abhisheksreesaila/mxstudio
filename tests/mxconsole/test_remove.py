@@ -99,7 +99,7 @@ def test_cli_rm_through_the_daemon(inproc_daemon, tmp_path):
     register(store, "tiny", snap)
     r = runner.invoke(cli.app, ["rm", "tiny", "--purge", "--json"])
     assert r.exit_code == 0, r.output
-    assert json.loads(r.output)["purged"] is True
+    assert json.loads(r.stdout)["purged"] is True  # stdout only: a library warning on stderr must not break the JSON
     assert store.get_model("tiny") is None and not repo_dir.exists()
     bad = runner.invoke(cli.app, ["rm", "tiny"])
     assert bad.exit_code == 1 and "not registered" in bad.output
