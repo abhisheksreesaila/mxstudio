@@ -440,10 +440,11 @@ Brief: docs/briefs/console-pages.md · Needs: F-056
 Brief: docs/briefs/console-pages.md · Needs: F-057
 - [ ] `docs/site/console.html` walks the new pages (nav, model tabs, switcher, labels) with fresh screenshots; USER_GUIDE matches
 
-## F-059 Half-page README [todo]
+## F-059 Half-page README [done]
 Brief: docs/briefs/console-pages.md · Needs: none
-- [ ] README fits on one screen: the mission line, a screenshot, "see it live" (the site), then links to the user guide, API reference, CLI reference and porting; everything else moves to those pages (nothing lost)
-- [ ] `test_readme_doc.py` updated to the new contract
+- [x] README fits on one screen: the mission line, a screenshot, "see it live" (the site), then links to the user guide, API reference, CLI reference and porting; everything else moves to those pages (nothing lost): HTTP API → docs/API.md, Behind the scenes + Development → docs/ARCHITECTURE.md, the screens gallery → USER_GUIDE's tour, commands → CLI.md, latest → CHANGELOG
+- [x] `test_readme_doc.py` updated to the new contract (API table checked in docs/API.md against routes and the OpenAPI spec; README ≤ 30 lines and links every reference; local links in README, API, ARCHITECTURE and USER_GUIDE resolve)
+- Reviewer: PASS; fixed its should-fix (the three orphaned screenshots now live in the user guide). Also fixed test_remove's JSON check to read stdout only (a Python 3.14 warning on stderr broke it, before this change too).
 
 ## F-060 Front page in the omxcode style [todo]
 Brief: docs/briefs/console-pages.md · Needs: none (design approved first)
