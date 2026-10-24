@@ -17,6 +17,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from mxconsole import admin_api, api_docs, admin_bench, admin_port, admin_pull, admin_system, expose, insights, keys, metrics, system
+from mxconsole.kinds import KINDS, LabelError
 from mxconsole.settings import DAEMON_PORT
 from mxconsole.store import Store, mxc_home
 from mxconsole.supervisor import StartFailed, Supervisor, UnknownModel
@@ -481,7 +482,8 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
     def model_row(model, live: dict) -> dict:
         return {"name": model.name, "repo_id": model.repo_id, "revision": model.revision,
                 "source": model.source, "architecture": model.architecture, "pinned": model.pinned,
-                "keep_alive": model.keep_alive, "state": live.get("state", "cold"),
+                "keep_alive": model.keep_alive, "kind": model.kind, "labels": list(model.labels),
+                "state": live.get("state", "cold"),
                 "port": live.get("port"), "idle_seconds": live.get("idle_seconds"),
                 "starting_seconds": live.get("starting_seconds"),
                 "in_flight": live.get("in_flight", 0)}
@@ -503,12 +505,18 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             body = json.loads(await request.body())
         except ValueError:
             body = None
-        allowed = {"pinned": bool, "keep_alive": int}
+        allowed = {"pinned": bool, "keep_alive": int, "kind": str}
         if (not isinstance(body, dict) or not body or set(body) - set(allowed)
                 or any(type(v) is not allowed[k] for k, v in body.items())
                 or body.get("keep_alive", 0) < 0):
             return openai_error(400, "Send JSON with `pinned` (true/false) and/or `keep_alive` "
-                                     "(seconds, 0 or more).", "invalid_request_body")
+                                     "(seconds, 0 or more) and/or `kind` (one of " + ", ".join(KINDS) + ").",
+                                "invalid_request_body")
+        if "kind" in body:
+            try:
+                store.set_kind(name, body["kind"])
+            except LabelError as e:
+                return openai_error(400, str(e), e.code)
         store.set_lifecycle(name, pinned=body.get("pinned"), keep_alive=body.get("keep_alive"))
         live = {row["name"]: row for row in supervisor.status()}
         return JSONResponse(model_row(store.get_model(name), live.get(name, {})))

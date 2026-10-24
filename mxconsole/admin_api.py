@@ -6,6 +6,7 @@ gateway.create_app. Every route is admin-only (loopback + the admin header), lik
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 
 from starlette.requests import Request
@@ -14,6 +15,7 @@ from starlette.responses import JSONResponse
 from pathlib import Path
 
 from mxconsole import expose, jupyter, keys, learn, removal, resolve, search
+from mxconsole.kinds import LabelError
 from mxconsole.store import Store
 from mxconsole.supervisor import Supervisor
 
@@ -107,3 +109,94 @@ def register(app, store: Store, supervisor: Supervisor, admin_only, *, refused, 
             log.exception("could not refresh LiteLLM after removing %s", name)
             result["lan_refreshed"] = False
         return JSONResponse(result)
+
+    # ---- your labels (F-054): the library's groups column and tick-and-label bar call these ----
+
+    STATUS = {"label_not_found": 404, "model_not_found": 404, "label_exists": 409}
+
+    async def body_of(request: Request, field: str, kind: type) -> object:
+        """The JSON body's `field`, or None when the body is not an object holding one of that type."""
+        try:
+            body = json.loads(await request.body())
+        except ValueError:
+            return None
+        value = body.get(field) if isinstance(body, dict) else None
+        return value if isinstance(value, kind) else None
+
+    def bad_body(field: str, what: str) -> JSONResponse:
+        return error(400, f"Send JSON with `{field}` ({what}).", "invalid_request_body")
+
+    def label_error(e: LabelError) -> JSONResponse:
+        return error(STATUS.get(e.code, 400), str(e), e.code)
+
+    @app.get("/admin/labels")
+    def admin_labels(request: Request):
+        if not admin_only(request):
+            return refused()
+        return JSONResponse([{"name": l.name, "position": l.position, "count": l.count} for l in store.labels()])
+
+    @app.post("/admin/labels")
+    async def admin_label_create(request: Request):
+        if not admin_only(request):
+            return refused()
+        name = await body_of(request, "name", str)
+        if name is None:
+            return bad_body("name", "the new label")
+        try:
+            store.create_label(name)
+        except LabelError as e:
+            return label_error(e)
+        return JSONResponse({"name": name})
+
+    @app.put("/admin/labels/order")
+    async def admin_label_order(request: Request):
+        if not admin_only(request):
+            return refused()
+        names = await body_of(request, "names", list)
+        if names is None or not all(isinstance(n, str) for n in names):
+            return bad_body("names", "every label, in the order you want")
+        try:
+            store.reorder_labels(names)
+        except LabelError as e:
+            return label_error(e)
+        return JSONResponse({"names": names})
+
+    @app.patch("/admin/labels/{name}")
+    async def admin_label_rename(request: Request, name: str):
+        if not admin_only(request):
+            return refused()
+        new = await body_of(request, "name", str)
+        if new is None:
+            return bad_body("name", "the new name")
+        try:
+            store.rename_label(name, new)
+        except LabelError as e:
+            return label_error(e)
+        return JSONResponse({"name": new})
+
+    @app.delete("/admin/labels/{name}")
+    def admin_label_delete(request: Request, name: str):
+        if not admin_only(request):
+            return refused()
+        try:
+            store.delete_label(name)
+        except LabelError as e:
+            return label_error(e)
+        return JSONResponse({"name": name})
+
+    def on_models(action):
+        async def route(request: Request, name: str):
+            if not admin_only(request):
+                return refused()
+            models = await body_of(request, "models", list)
+            if models is None or not all(isinstance(m, str) for m in models):
+                return bad_body("models", "a list of model names")
+            try:
+                action(models, [name])
+            except LabelError as e:
+                return label_error(e)
+            return JSONResponse({"name": name, "models": models})
+        return route
+
+    app.post("/admin/labels/{name}/add")(on_models(store.add_labels))
+    app.post("/admin/labels/{name}/remove")(on_models(store.remove_labels))
