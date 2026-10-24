@@ -298,7 +298,7 @@ class PullManager:
         # 5: register
         self._set_step(job, "register", f"adding {name} to your models…")
         model = self.store.add_model(name=name, repo_id=res.repo_id, revision=res.revision, source=res.kind,
-                                     architecture=res.architecture, weights_path=str(path))
+                                     architecture=res.architecture, weights_path=str(path), kind=res.model_kind)
         self._detail(job, "register", f"served as {model.name} · keep-alive {model.keep_alive // 60} min")
         job.model = model.name
         if self.on_registered:

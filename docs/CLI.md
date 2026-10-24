@@ -13,6 +13,7 @@ Every command, grouped by what you're doing. Run them as `pixi run mxc …` insi
 
 Contents:
 - [Serve and call a model](#serve-and-call-a-model)
+- [Kinds and labels](#kinds-and-labels)
 - [Find and add models](#find-and-add-models)
 - [Port a model MAX can't run yet](#port-a-model-max-cant-run-yet)
 - [Learn how a model works](#learn-how-a-model-works)
@@ -67,15 +68,23 @@ mxc set qwen2.5-0.5b --keep-alive 10m
 |---|---|
 | `--pin` / `--unpin` | Keep it loaded, or let it unload when idle again. |
 | `--keep-alive 90s\|10m\|1h` | Unload after this much idle time. |
+| `--kind chat\|coder\|vision\|embeddings\|image` | Correct the model's [kind](#kinds-and-labels). |
 | `--json` | JSON output. |
 
 ### `mxc ls`
 
-Registered models and their live state (cold, starting, ready, crashed). Ported models show source `port`.
+Registered models, their kind, your labels and live state (cold, starting, ready, crashed). Ported models show source `port`.
+
+```bash
+mxc ls --label work
+mxc ls --kind coder --json
+```
 
 | Option | |
 |---|---|
-| `--json` | JSON output. |
+| `--label NAME` | Only models with this label. |
+| `--kind chat\|coder\|vision\|embeddings\|image` | Only models of this kind. |
+| `--json` | JSON output (each model has `kind` and `labels`). |
 
 ### `mxc rm`
 
@@ -84,6 +93,47 @@ Stops a model, unregisters it and deletes its compiled-graph cache. The weights 
 | Option | |
 |---|---|
 | `--purge` | Also delete its weights from the Hugging Face cache. |
+| `--json` | JSON output. |
+
+---
+
+## Kinds and labels
+
+Every model has one **kind**, set when you pull it from its Hugging Face card (the task, plus the name for code
+models): `chat`, `coder`, `vision`, `embeddings` or `image`. If the guess is wrong, correct it with
+`mxc set MODEL --kind coder`. On top of the kind you add your own **labels**: any number per model, lower-case
+letters, digits and hyphens (`work`, `to-try`), kept in order. None of these commands needs the daemon.
+
+### `mxc label`
+
+Puts one or more labels on a model; a label that doesn't exist yet is created.
+
+```bash
+mxc label qwen2.5-0.5b work to-try
+```
+
+### `mxc unlabel`
+
+Takes labels off a model. The labels themselves stay (see `mxc labels --delete`).
+
+```bash
+mxc unlabel qwen2.5-0.5b to-try
+```
+
+### `mxc labels`
+
+Lists your labels in order, with how many models have each.
+
+```bash
+mxc labels
+mxc labels --rename work office
+mxc labels --delete to-try
+```
+
+| Option | |
+|---|---|
+| `--rename OLD NEW` | Rename a label on every model that has it. |
+| `--delete NAME` | Delete a label and take it off its models. |
 | `--json` | JSON output. |
 
 ---

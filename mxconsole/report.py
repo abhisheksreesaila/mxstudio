@@ -95,6 +95,7 @@ def model_row(m: Model, states: dict[str, str], daemon_running: bool) -> dict:
     """One model as `ls --json` and `set --json` print it. `state` is 'cold' unless the daemon says otherwise."""
     return {"name": m.name, "repo_id": m.repo_id, "revision": m.revision, "source": m.source,
             "architecture": m.architecture, "pinned": m.pinned, "keep_alive": m.keep_alive,
+            "kind": m.kind, "labels": list(m.labels),
             "state": states.get(m.name, "cold") if daemon_running else "cold", "daemon_running": daemon_running}
 
 

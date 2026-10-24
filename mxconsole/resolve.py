@@ -16,6 +16,7 @@ from typing import Callable
 
 import httpx
 
+from mxconsole.kinds import derive_kind
 from mxconsole.store import Model, Store, mxc_home
 
 DOWNLOAD_WORKERS = 4  # files fetched at once, like snapshot_download
@@ -64,6 +65,8 @@ class RepoInfo:
     sha: str
     architecture: str | None
     files: list[str]
+    pipeline_tag: str | None = None  # the model card's task
+    tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -75,6 +78,7 @@ class Resolution:
     encodings: list[str] = field(default_factory=list)
     message: str = ""
     files: list[str] = field(default_factory=list)
+    model_kind: str = "chat"  # chat | coder | vision | embeddings | image, from the card's task and the name
 
     @property
     def supported(self) -> bool:
@@ -140,7 +144,8 @@ class HubClient:
                 path = hf_hub_download(repo_id, "config.json", revision=info.sha, token=self.token)
                 archs = json.loads(Path(path).read_text()).get("architectures") or []
                 arch = archs[0] if archs else None
-            return RepoInfo(sha=info.sha, architecture=arch, files=files)
+            return RepoInfo(sha=info.sha, architecture=arch, files=files, pipeline_tag=info.pipeline_tag,
+                            tags=tuple(info.tags or ()))
         except GatedRepoError as e:
             raise RepoGated(repo_id) from e
         except RepositoryNotFoundError as e:
@@ -290,8 +295,10 @@ def resolve(ref: str, *, catalog: dict | None = None, hf=None) -> Resolution:
     if catalog is None:
         catalog = load_catalog()
     entry = catalog.get(arch) if arch else None
+    model_kind = derive_kind(name=repo_id.split("/")[-1], architecture=arch or "",
+                             pipeline_tag=info.pipeline_tag, tags=info.tags)
     if entry is None:
-        return Resolution("unsupported", repo_id, info.sha, arch, files=info.files, message=(
+        return Resolution("unsupported", repo_id, info.sha, arch, files=info.files, model_kind=model_kind, message=(
             f"{repo_id} uses {arch or 'an unknown architecture'}, which MAX does not support yet. "
             f"Next step: mxc port {ref}"))
     if not any(f.endswith(".safetensors") for f in info.files):
@@ -300,7 +307,7 @@ def resolve(ref: str, *, catalog: dict | None = None, hf=None) -> Resolution:
             "look for a safetensors variant of this model."))
     kind = "max-catalog" if repo_id in entry.get("example_repo_ids", []) else "hf-supported"
     encodings = list(entry.get("supported_encodings", []))
-    return Resolution(kind, repo_id, info.sha, arch, encodings, files=info.files,
+    return Resolution(kind, repo_id, info.sha, arch, encodings, files=info.files, model_kind=model_kind,
                       message=f"{repo_id} ({arch}) is supported by MAX [{kind}]")
 
 
@@ -363,4 +370,4 @@ def pull(ref: str, *, store: Store | None = None, catalog: dict | None = None, h
     check_name_free(store, name, ref, res)
     path = download_snapshot(res, hf)
     return store.add_model(name=name, repo_id=res.repo_id, revision=res.revision, source=res.kind,
-                           architecture=res.architecture, weights_path=str(path))
+                           architecture=res.architecture, weights_path=str(path), kind=res.model_kind)

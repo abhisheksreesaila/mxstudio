@@ -20,8 +20,8 @@ class FakeHF:
             raise r.RepoGated(repo_id)
         if repo_id not in self.repos:
             raise r.RepoNotFound(repo_id)
-        arch, files = self.repos[repo_id]
-        return r.RepoInfo(sha="abc123", architecture=arch, files=files)
+        arch, files, *card = self.repos[repo_id]  # an optional third item is the card: {"pipeline_tag", "tags"}
+        return r.RepoInfo(sha="abc123", architecture=arch, files=files, **(card[0] if card else {}))
 
     def read_json(self, repo_id, revision, filename):
         return {"weight_map": {"a": "model-00001.safetensors", "b": "model-00002.safetensors"}}
@@ -40,4 +40,7 @@ def make_hf(**kw):
                        "model-00001.safetensors", "model-00002.safetensors", "consolidated.safetensors"]),
                    "bob/foo": ("Qwen2ForCausalLM", FILES),
                    "alice/foo": ("Qwen2ForCausalLM", FILES),
-                   "acme/weird": ("WeirdForCausalLM", FILES)}, **kw)
+                   "acme/weird": ("WeirdForCausalLM", FILES),
+                   "acme/helper-7b": ("Qwen2ForCausalLM", FILES, {"pipeline_tag": "text-generation", "tags": ("code",)}),
+                   "acme/eyes": ("Qwen2ForCausalLM", FILES, {"pipeline_tag": "image-text-to-text"}),
+                   "acme/vectors": ("Qwen2ForCausalLM", FILES, {"pipeline_tag": "feature-extraction"})}, **kw)

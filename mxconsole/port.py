@@ -387,4 +387,4 @@ def register(ref: str, port_dir: Path, *, store: Store | None = None, catalog: d
         raise PortError(f"{res.repo_id}: {e}; MAX needs safetensors") from e
     return store.add_model(name=name, repo_id=res.repo_id,
                            revision=res.revision, source="port", architecture=res.architecture or "unknown",
-                           weights_path=str(weights), custom_arch_path=str(port_dir))
+                           weights_path=str(weights), custom_arch_path=str(port_dir), kind=res.model_kind)
