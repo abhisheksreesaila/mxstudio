@@ -103,7 +103,7 @@ def test_the_top_bar_only_says_where_you_are():
     assert crumbs({"page": "keys"}) == [("API keys", False, False)]
     assert crumbs({"page": "add"}) == [("My models", False, True), ("Add a model", False, False)]
     assert crumbs({"page": "model", "model": "tiny", "tab": "overview"}) == [("My models", False, True), ("tiny", True, False)]
-    assert crumbs({"page": "model", "model": "tiny", "tab": "logs"}) == [("My models", False, True), ("tiny", True, True), ("Logs", False, False)]
+    assert crumbs({"page": "model", "model": "tiny", "tab": "logs"}) == [("My models", False, True), ("tiny", True, False)]  # F-053: the tab is not a crumb
 
 
 @needs_node

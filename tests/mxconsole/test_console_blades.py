@@ -10,7 +10,7 @@ from test_gateway import http, key, store, sup  # noqa: F401  (shared fixtures)
 from mxconsole.gateway import CONSOLE_ASSETS, CONSOLE_DIR
 
 STUBS = ["model", "add", "security", "keys", "bench", "logs", "notebook", "gateway", "settings"]
-NEW_JS = ["blades.js", "blade-layout.js", "blade-stack.js", "keyed.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "blade-home.js", *[f"blade-{n}.js" for n in STUBS]]
+NEW_JS = ["blades.js", "blade-layout.js", "blade-stack.js", "keyed.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "blade-home.js", "model-page.js", *[f"blade-{n}.js" for n in STUBS if n != "model"]]
 NEW_CSS = ["blades.css", "topbar.css", "blade-home.css", *[f"blade-{n}.css" for n in STUBS]]
 needs_node = pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
 
@@ -65,11 +65,11 @@ def test_themes_are_tokens_light_and_dark_and_dark_follows_the_system():
 
 def test_each_stub_blade_registers_itself_with_its_own_name():
     for n in STUBS:
-        text = (CONSOLE_DIR / f"blade-{n}.js").read_text()
+        text = (CONSOLE_DIR / ("model-page.js" if n == "model" else f"blade-{n}.js")).read_text()
         assert f'register("{n}"' in text, n
     main = (CONSOLE_DIR / "main.js").read_text()
     for n in STUBS + ["home"]:
-        assert f'./blade-{n}.js' in main, n
+        assert f'./{"model-page" if n == "model" else f"blade-{n}"}.js' in main, n
 
 
 def test_the_new_code_writes_no_html_and_no_inline_style():

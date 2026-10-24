@@ -1,5 +1,4 @@
-/* omxconsole, the Model blade in omxqua: menu, command bar of flat buttons, cards (Essentials, Tokens, Call it, Security + Hardware fit).
-   Also holds the small pieces the Security and API keys blades share (boxes, url rows, code, definition lists), scoped to those three blades. */
+/* omxconsole, pieces the model page (model-page.css), Security and API keys share: boxes, url rows, code, definition lists. Scoped to those three blades. */
 .b-model .bb, .b-security .bb, .b-keys .bb { background: var(--card); }
 .b-model .bb { overflow: hidden; }
 :is(.b-security, .b-keys) .box { background: var(--card); border-radius: var(--oq-radius-card); box-shadow: var(--oq-shadow-1); padding: 14px 16px; min-width: 0; }
@@ -20,76 +19,3 @@
 :is(.b-model, .b-security, .b-keys) .code .cp { position: absolute; top: 8px; right: 8px; color: #e4e4e7; background: #27272a; border: 0; border-radius: 999px; font: 600 11.5px var(--mono); height: 26px; padding: 0 10px; display: flex; gap: 5px; align-items: center; }
 :is(.b-model, .b-security, .b-keys) .code .cp:hover { background: #3f3f46; }
 
-/* menu + content */
-.b-model .rwrap { display: grid; grid-template-columns: 184px minmax(0, 1fr); height: 100%; }
-.b-model .rmenu { border-right: 1px solid var(--card-line-2); padding: 10px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-.b-model .rmenu .grp { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 14px 10px 6px; }
-.b-model .rmenu .twins { padding: 0 10px; display: grid; gap: 3px; }
-.b-model .rmenu button { display: flex; align-items: center; gap: 10px; width: 100%; height: 36px; padding: 0 10px; border: 0; background: none; border-radius: 10px; font: 550 13.5px var(--sans); color: var(--text-2); text-align: left; white-space: nowrap; flex: none; }
-.b-model .rmenu button svg:first-child { color: var(--h, var(--muted)); }
-.b-model .rmenu button svg:last-child:not(:first-child) { margin-left: auto; opacity: .4; color: var(--muted); }
-.b-model .rmenu button:hover { background: rgb(var(--oq-state) / .05); color: var(--text); }
-.b-model .rmenu button.on { background: rgb(var(--oq-state) / .09); color: var(--text); }
-.b-model .rcontent { overflow-y: auto; container-type: inline-size; min-width: 0; height: 100%; }
-
-/* command bar: flat pills; one filled verb, tonal for the rest with the icon in the action's hue, Remove outlined and last */
-.b-model .cmdbar { display: flex; gap: 6px; padding: 12px 16px; border-bottom: 1px solid var(--card-line-2); background: var(--card); flex-wrap: wrap; position: sticky; top: 0; z-index: 2; }
-.b-model .cb.tonal svg { color: var(--c, currentColor); }
-.b-model .cb.danger { margin-left: auto; }
-.b-model .cb.danger.armed { background: color-mix(in srgb, var(--bad) 12%, transparent); }
-.b-model .cb:disabled { opacity: .45; }
-
-/* the cards */
-.b-model .ovgrid { display: grid; gap: 14px; padding: 16px; align-content: start; }
-.b-model .ovgrid .span { grid-column: 1 / -1; }
-.b-model .ovgrid .span:empty { display: none; }
-.b-model .ovgrid .attn { margin-bottom: 0; }
-.b-model .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.b-model .stats > div { padding: 4px 14px 4px 0; min-width: 0; }
-.b-model .stats > div + div { padding-left: 16px; }
-.b-model .stats b { font-size: 1.6em; white-space: nowrap; }
-.b-model .stats b small { font-size: .5em; font-weight: 500; color: var(--muted); letter-spacing: 0; }
-.b-model .chart { margin-top: 12px; }
-.b-model .area { display: block; width: 100%; height: 70px; }
-.b-model .nodata { padding: 14px 0 4px; color: var(--muted); font-size: 13px; }
-.b-model .nodata b { display: block; color: var(--text); font-size: 13.5px; margin-bottom: 2px; }
-.b-model .keyrow { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12.5px; color: var(--text-2); }
-.b-model .keyrow .klabel { color: var(--muted); }
-.b-model .keyrow .kval { color: var(--text); }
-.b-model .secsum { display: flex; gap: 12px; align-items: flex-start; }
-.b-model .secsum .tx { flex: 1; min-width: 0; }
-.b-model .secsum b { display: block; font-size: 14px; }
-.b-model .secsum .tx > span { display: block; margin: 3px 0 0; font-size: 13px; color: var(--muted); }
-.b-model .secact { margin-top: 12px; }
-.b-model .fit-h { margin-top: 18px; font-size: 13px; }
-.b-model .fitbar { height: 10px; border-radius: 5px; background: var(--sunk); display: flex; overflow: hidden; margin: 10px 0 6px; }
-.b-model .fitbar i { display: block; height: 100%; transition: width .6s var(--ease); }
-.b-model .fitbar i.o { background: var(--faint); }
-.b-model .fitcap { display: flex; justify-content: space-between; gap: 10px; font: 11.5px var(--mono); color: var(--muted); }
-@container (min-width: 720px) {
-  .b-model .ovgrid { grid-template-columns: 1fr 1fr; }
-}
-/* narrow blade (another is open beside it): the menu folds to an icon strip */
-.b-model.narrow .rwrap { grid-template-columns: 48px minmax(0, 1fr); }
-.b-model.narrow .rmenu .ml, .b-model.narrow .rmenu .grp, .b-model.narrow .rmenu .twins, .b-model.narrow .rmenu button svg:last-child:not(:first-child) { display: none; }
-.b-model.narrow .rmenu button { justify-content: center; padding: 0; }
-/* a tight content column: the tonal buttons keep only their icon */
-@container (max-width: 560px) {
-  .b-model .cb.tonal .bl { display: none; }
-  .b-model .cb.tonal { width: var(--h); padding: 0; }
-  .b-model .cb.danger { margin-left: 0; }
-  .b-model .ess { grid-template-columns: 96px minmax(0, 1fr); }
-  .b-model .stats b { font-size: 1.4em; }
-}
-/* a phone: the menu becomes a row of tabs above the content */
-@media (max-width: 860px) {
-  .b-model .rwrap { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-  .b-model .rmenu { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--card-line-2); overflow-x: auto; overflow-y: hidden; padding: 8px; }
-  .b-model .rmenu .grp, .b-model .rmenu .twins, .b-model .rmenu button svg:last-child:not(:first-child) { display: none; }
-  .b-model .rmenu button { width: auto; }
-  .b-model .ovgrid { grid-template-columns: 1fr; padding: 12px; }
-  .b-model .rcontent { min-height: 0; }
-}
-/* omxqua's narrow-container stats rule moves the divider and adds a top line; three tiles in a row keep theirs */
-.b-model .stats > div:nth-child(3) { border-left: 1px solid var(--oq-line-2); }
-.b-model .stats > div:nth-child(n+3) { border-top: 0; }

@@ -69,17 +69,21 @@ export function routeForBlade(name, opts = {}) {
 }
 
 const NAMES = { home: "My models", keys: "API keys", gateway: "Gateway", security: "Security", settings: "Settings", add: "Add a model" };
-const TAB_NAMES = { benchmark: "Benchmark", logs: "Logs", notebook: "Notebook" };
-
-/** The crumbs for a route: [{label, to?, picker?}], the last one being where you are. Pure. */
+/** The crumbs for a route: [{label, to?, picker?, home?}], the last one being where you are. Pure. */
 export function crumbsFor(route) {
   const home = { label: NAMES.home, to: { page: "home" }, home: true };
   if (route.page === "home") return [{ label: NAMES.home }];
   if (route.page === "add") return [home, { label: NAMES.add }];
   if (route.page !== "model") return [{ label: NAMES[route.page] }];
-  if (route.tab === "overview") return [home, { label: route.model, picker: true }];
-  return [home, { label: route.model, picker: true, to: { ...route, tab: "overview" } }, { label: TAB_NAMES[route.tab] }];
+  return [home, { label: route.model, picker: true }];  // the tab is the page's own control, not a crumb
 }
+
+/** The same model on another tab. */
+export const tabRoute = (route, tab) => ({ ...route, tab });
+/** Another model on the same tab (the model picker). */
+export const pickRoute = (route, model) => ({ ...route, model });
+/** Moving between two model routes changes the open page in place (tabs, picker); anything else builds a new page. */
+export const updatesInPlace = (from, to) => Boolean(from && to && from.page === "model" && to.page === "model");
 
 /** The page's Back: browser history only when the entry before this one is ours ({mxc: 1}, stamped by pages.js);
  * otherwise (a deep link, a reload mid-history, a foreign page) the parent route, so Back never leaves the console. */

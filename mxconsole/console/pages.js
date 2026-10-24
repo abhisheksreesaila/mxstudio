@@ -3,7 +3,7 @@
 // While this is running the blade engine does not stack: a blade's push() becomes "go to that page".
 import { h, icon, store, onData } from "./core.js";
 import { makeBlade, setNavigator, stack } from "./blades.js";
-import { parseRoute, hashFor, routeForBlade, backUsesHistory } from "./routes.js";
+import { parseRoute, hashFor, routeForBlade, backUsesHistory, updatesInPlace } from "./routes.js";
 
 const WAIT_FOR_MODELS_MS = 4000;
 const listeners = new Set();
@@ -17,11 +17,9 @@ export function onRoute(fn) {
   return () => listeners.delete(fn);
 }
 
-/** Which blade shows a route. */
+/** Which blade shows a route. A model is one page whatever its tab (model-page.js shows the tab). */
 export function bladeFor(r) {
-  if (r.page !== "model") return { name: r.page, opts: {} };
-  const name = { overview: "model", benchmark: "bench", logs: "logs", notebook: "notebook" }[r.tab];
-  return { name, opts: { id: r.model } };
+  return r.page === "model" ? { name: "model", opts: { id: r.model, tab: r.tab } } : { name: r.page, opts: {} };
 }
 
 const decode = (v) => { try { return decodeURIComponent(v); } catch (_) { return v; } };
@@ -58,6 +56,12 @@ function backButton(parent) {
 }
 
 function render(r) {
+  if (live && live.name === "model" && live.go && updatesInPlace(route, r)) {  // another tab or another model: the page stays, no flash
+    route = r;
+    live.go(r);
+    listeners.forEach((fn) => fn(route));
+    return;
+  }
   closeLive();
   route = r;
   const { name, opts } = bladeFor(r);
@@ -65,7 +69,6 @@ function render(r) {
   blade.el.classList.add("page");
   blade.mode = "full";
   if (r.page === "add") blade.header.prepend(backButton({ page: "home" }));
-  else if (r.page === "model" && r.tab !== "overview") blade.header.prepend(backButton({ ...r, tab: "overview" }));
   live = blade;
   stack.push(blade);
   host.replaceChildren(blade.el);

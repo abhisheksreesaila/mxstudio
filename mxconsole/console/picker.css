@@ -1,0 +1,29 @@
+/* omxconsole, the model picker (F-053): a menu under the model's name on desktop, a bottom sheet on a phone.
+   Replaced by the wide switcher in F-056. Matches docs/design/console-pages/mock.html (v4) .pmenu. */
+.scrim2 { position: absolute; inset: 0; z-index: 59; display: none; }
+.scrim2.on { display: block; }
+.pmenu { position: absolute; z-index: 60; left: var(--px, 16px); top: var(--py, 64px); width: 340px; max-width: calc(100% - 16px); max-height: min(60vh, 460px); display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 18px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-3, var(--oq-shadow-2)); color: var(--oq-ink);
+  opacity: 0; transform: translateY(-8px) scale(.985); transform-origin: top left; pointer-events: none; transition: opacity .2s, transform .26s cubic-bezier(.2, .8, .2, 1); }
+.pmenu.open { opacity: 1; transform: none; pointer-events: auto; }
+.pmenu .grab2 { display: none; width: 38px; height: 5px; border-radius: 3px; background: var(--oq-line); margin: 8px auto 0; }
+.pmenu .ptop { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--oq-line-2); font-size: 13.5px; }
+.pmenu .stay { margin-left: auto; font-size: 12px; color: var(--oq-ink-2); white-space: nowrap; }
+.pmenu .stay b { color: var(--oq-ink); font-weight: 600; text-transform: capitalize; }
+.pmenu .plist { overflow: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; overscroll-behavior: contain; min-height: 0; }
+.pmenu .pr { border: 0; background: none; color: inherit; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border-radius: 12px; text-align: left; min-width: 0; font: inherit; }
+.pmenu .pr:hover { background: rgb(var(--oq-state) / .06); }
+.pmenu .pr.on { background: rgb(var(--oq-state) / .1); }
+.pmenu .pr:focus-visible { outline: 2px solid var(--oq-accent); outline-offset: -2px; }
+.pmenu .pr b { flex: 1; min-width: 0; font: 600 13px var(--oq-font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pmenu .pr .v { font: 12px var(--oq-font-mono); color: var(--oq-ink-2); white-space: nowrap; }
+.pmenu .mdot { width: 9px; height: 9px; border-radius: 50%; background: var(--mc); flex: none; opacity: .45; }
+.pmenu .mdot.running { opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--oq-ok) 25%, transparent); }
+.pmenu .mdot.crashed { background: var(--oq-bad); opacity: 1; }
+@container (max-width: 760px) {
+  .pmenu { left: 0; right: 0; top: 36px; bottom: 0; width: auto; max-width: none; max-height: none; border-radius: 22px 22px 0 0; transform: translateY(100%); opacity: 1; }
+  .pmenu.open { transform: none; }
+  .pmenu .grab2 { display: block; }
+  .pmenu .pr { min-height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) { .pmenu { transition: none; } }
