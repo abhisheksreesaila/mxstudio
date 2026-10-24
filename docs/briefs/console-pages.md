@@ -1,6 +1,6 @@
 # Brief: omxconsole without blades, and a front door
 
-Status: draft (2026-10-23)
+Status: approved (2026-10-24)
 
 ## Why (the mission)
 - Using the reskinned console daily, the blades got in the way: pick a model, open a section, the blade closes, go back, pick the next model, open the section again. Every model's screen is the same template, so stacking blades buys nothing. There are only a handful of screens, and blades pay off when there are many.

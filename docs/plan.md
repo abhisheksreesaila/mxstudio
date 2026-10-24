@@ -386,3 +386,67 @@ Brief: docs/briefs/desktop-app.md · Needs: F-048, F-050
 - [ ] README: download, then (macOS 15+) System Settings → Privacy & Security → Open Anyway; waits for a hosted download (a release is a publish: your call)
 - [ ] on a clean Mac user account: from the zip to a chat answer from qwen2.5-0.5b: F-049's step 3 does most of it
 - Reviewer (general-purpose stand-in): round 1 FAIL → fixed (one setup at a time, adopt a late-starting install, stop a lingering page, check the download, escapes); round 2 FAIL → fixed (adopt only an install that reached its start step); round 3 PASS.
+
+## Console pages (brief: docs/briefs/console-pages.md)
+Design: mock `docs/design/console-pages/mock.html` v4 (approved 2026-10-24). ADR: docs/adr/0005-pages-not-blades.md.
+Order: F-052 (shell) and F-054 (labels backend) in parallel; F-053 after F-052; F-055 after F-052 + F-054; F-056 after F-053 + F-055; F-057 (delete blades) after F-056; F-058 (docs tour) last. F-059 (README) and F-060 (front page, designer first) any time.
+
+## F-052 Shell: one nav, routes, and the place pages [todo]
+Brief: docs/briefs/console-pages.md · Needs: none · Files: index.html, main.js, routes.js, topbar.*, new nav.* / pages.*
+- [ ] one nav with the five places (Models, Keys, Gateway, Security, Settings): a left rail on desktop, a bottom tab bar at ≤ 760 px (same DOM); targets ≥ 40 px
+- [ ] the top bar only says where you are ("My models", "My models › <model> ▾", a place's name) plus the Beacon; the theme toggle moves into Settings
+- [ ] hash routes `#/`, `#/<place>`, `#/add`, `#/models/<name>/<tab>`; browser Back and reload land on the same page; unknown routes go home
+- [ ] Keys, Gateway, Security, Settings and Add a model render their current contents as pages (Add keeps a Back button); My models is the home page; a model still opens its current screen, as a page, until F-053
+- [ ] checked in the running console, both themes, 1280 and 390 px
+
+## F-053 The model page: tabs, verbs, flat buttons, 2×2 metrics [todo]
+Brief: docs/briefs/console-pages.md · Needs: F-052 · Files: blade-model.* → model-page.*, blade-bench/logs/notebook bodies
+- [ ] one model page: tabs Overview · Benchmark · Logs · Notebook (sliding pill), with the model picker in the top bar; switching model keeps the tab and morphs the numbers (≈ 220 ms, no page flash)
+- [ ] the command bar holds only the model's verbs (Start/Stop, Restart, Copy endpoint, Remove); Run benchmark lives in Benchmark, Open in Jupyter in Notebook; Security is not a tab, Overview links to it
+- [ ] every button is flat (no shadow or lift); "Right now" is a regular 2×2 grid (Requests, Speed, Latency p50, Memory) with one surface treatment
+- [ ] the picker here is a simple list (the wide switcher is F-056); a stopped model shows each tab's empty state
+- [ ] checked in the running console with a running and a stopped model, both themes, 1280 and 390 px
+
+## F-054 Labels: kind, your labels, store, API and CLI [todo]
+Brief: docs/briefs/console-pages.md · Needs: none · Files: store.py, resolve.py, admin_api.py, cli.py
+- [ ] each model has a kind (chat, coder, vision, embeddings, image) from the model card's `pipeline_tag` and name at pull time; existing models are backfilled; the kind can be corrected
+- [ ] your labels: a `labels` table (name, position) and a model↔label table; create, rename, reorder, delete (removing it from models), add/remove on many models at once
+- [ ] admin API for all of the above; `/admin` model data includes kind and labels
+- [ ] CLI: `mxc label <model> <label>…`, `mxc unlabel <model> <label>`, `mxc labels` (list, `--rename`, `--delete`), `mxc ls --label <l>` and `--kind <k>`
+- [ ] tests over the store, API and CLI; label names are lower-case `[a-z0-9-]`, unique
+
+## F-055 My models as a library: search, groups column, labelling [todo]
+Brief: docs/briefs/console-pages.md · Needs: F-052, F-054 · Files: blade-home.* → home-page.*, new library.*
+- [ ] full-width search (`/` focuses) over name, kind and #label; groups column: Show (All, Running) · Kind · Your labels, each with a count; running models sort first
+- [ ] labels managed in the column: New label; Edit labels (rename field, drag handle to reorder with mouse or touch, delete ×)
+- [ ] tick models (and "select all shown"): a bar shows your labels as chips; tap adds to all ticked, tap again removes, a ring means some have it; desktop drag of a model (or the ticked ones) onto a label; "+ label" on a model's Overview
+- [ ] phone: the column becomes a scrolling chip row; Edit labels opens full-height
+- [ ] checked in the running console with 100 fake models (a fixture), both themes, 1280 and 390 px
+
+## F-056 The wide switcher [todo]
+Brief: docs/briefs/console-pages.md · Needs: F-053, F-055 · Files: picker.* (reuses library.*)
+- [ ] the model name in the top bar (or `/`, Ctrl+K on a model page) opens a wide panel over the content: search across the top, the groups column (plus Recent), models as a grid of cards (name, state, kind and labels, tok/s), Recent first then grouped by kind
+- [ ] arrow keys and Enter; Esc closes; switching keeps the tab; Add a model in the footer
+- [ ] phone: a full-height sheet with the same search and chip row
+- [ ] checked with 100 fake models, both themes, 1280 and 390 px
+
+## F-057 Remove the blade engine [todo]
+Brief: docs/briefs/console-pages.md · Needs: F-056
+- [ ] `blades.js`, `blade-stack.js`, `blade-layout.js`, `blades.css` and every unused `blade-*` file are gone; nothing references them; the gateway's console file list shrinks to match
+- [ ] blade tests are rewritten against pages (routes, places, model tabs, library), never deleted without a replacement; full suite green
+- [ ] ADR 0005 marked done
+
+## F-058 Retake the docs tour [todo]
+Brief: docs/briefs/console-pages.md · Needs: F-057
+- [ ] `docs/site/console.html` walks the new pages (nav, model tabs, switcher, labels) with fresh screenshots; USER_GUIDE matches
+
+## F-059 Half-page README [todo]
+Brief: docs/briefs/console-pages.md · Needs: none
+- [ ] README fits on one screen: the mission line, a screenshot, "see it live" (the site), then links to the user guide, API reference, CLI reference and porting; everything else moves to those pages (nothing lost)
+- [ ] `test_readme_doc.py` updated to the new contract
+
+## F-060 Front page in the omxcode style [todo]
+Brief: docs/briefs/console-pages.md · Needs: none (design approved first)
+- [ ] designed with the designer skill (desktop and phone) and approved before building
+- [ ] `docs/site/index.html`: hero, live demos, how a request travels, FAQ, available today; links to the tour as the user guide
+- [ ] checked live on GitHub Pages after the push you approve
