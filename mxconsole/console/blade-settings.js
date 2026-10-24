@@ -1,4 +1,4 @@
-// mxconsole, the Settings blade: the theme (shared with the top-bar toggle), how long an idle model stays loaded,
+// mxconsole, the Settings blade: the theme (its only control since F-052), how long an idle model stays loaded,
 // the daemon's own info with Stop daemon, and every port and process mxconsole owns.
 // Data: store.info (/admin/info), store.models, GET /admin/system (home; the listeners come from system-data.js).
 import { h, icon, api, store, onData, toast, dur, uptime, copyText } from "./core.js";
@@ -43,7 +43,7 @@ register("settings", (blade) => {
   let home = null, confirming = false, stopping = false;
   const cleanups = [];
 
-  // -- theme: this control and the top bar's toggle both call setTheme() and listen with onTheme() (prefs.js)
+  // -- theme: this control calls setTheme() and listens with onTheme() (prefs.js)
   const themeBtns = [["light", "sun", "Light"], ["dark", "moon", "Dark"]].map(([key, ic, label]) =>
     h("button", { type: "button", "data-theme-pick": key, onClick: () => setTheme(key) }, icon(ic, 14), label));
   const seg = h("div", { class: "seg2", role: "group", "aria-label": "Theme" }, h("i"), themeBtns);
@@ -100,7 +100,7 @@ register("settings", (blade) => {
       blade.el.classList.add("oq-flat");
       body.replaceChildren(h("div", { class: "ox-pad" },
         card("Appearance", "kept in this browser", [seg,
-          h("p", { class: "ox-note" }, "The moon button in the top bar does the same. Until you pick one, the console follows your system.")],
+          h("p", { class: "ox-note" }, "Until you pick one, the console follows your system.")],
           h("div", { class: "src note" }, "kept in this browser")),
         card("Idle unload", "per model", idle, twin("mxc set <model> --keep-alive 10m"), twin("mxc set <model> --pin")),
         card("Daemon", "", [daemon, stopArea], twin("mxc stop --all")),

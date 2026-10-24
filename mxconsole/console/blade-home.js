@@ -79,8 +79,7 @@ async function restart(name) {
   refresh();
 }
 function viewLogs(name) {
-  push("model", { id: name }, 0);
-  push("logs", { id: name }, 1);
+  push("logs", { id: name }, 0);
 }
 
 register("home", (blade) => ({
@@ -185,7 +184,7 @@ register("home", (blade) => ({
         const head = [["Model", ""], ["State", ""], ["Access", "hide-n"], ["Tokens/s", "num"], ["First token", "num hide-n"], ["Req · 5 min", "num hide-n"], ["VRAM", "num hide-n"], ["Architecture", "hide-n"]];
         host.replaceChildren(h("section", { class: "card models" }, h("div", { class: "card-b flush tablewrap" },
           h("table", { class: "tbl" }, h("thead", {}, h("tr", {}, head.map(([label, c]) => h("th", { class: c || null }, label)))), tbody)),
-          h("div", { class: "src note" }, "click a model to open its blade beside this list")));
+          h("div", { class: "src note" }, "click a model to open it")));
       } else {
         const grid = h("div", { class: "grid" }, h("button", { class: "card add", type: "button", onClick: openAdd }, icon("plus", 18, "currentColor", 2), h("span", {}, "Add a model"), h("span", { class: "mono small" }, "mxc serve <model>")));
         refs.rowsParent = grid; refs.make = makeCard; refs.update = updateCard;

@@ -33,8 +33,10 @@ CONSOLE_SCRIPTS = {"theme.js", "main.js", "core.js", "icons.js", "routes.js",
                    # the blades console: engine, shell and one file per blade, each with its own CSS
                    "blades.js", "blade-layout.js", "blade-stack.js", "keyed.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "beacon.js", "blade-home.js",
                    "blade-model.js", "blade-add.js", "blade-security.js", "blade-keys.js", "blade-bench.js", "blade-logs.js",
-                   "blade-notebook.js", "blade-gateway.js", "blade-settings.js"}
-CONSOLE_STYLES = {"blades.css", "topbar.css", "docs.css", "blade-home.css", "blade-model.css", "blade-add.css",
+                   "blade-notebook.js", "blade-gateway.js", "blade-settings.js",
+                   # plain pages (ADR 0005): the router, the one nav
+                   "pages.js", "nav.js"}
+CONSOLE_STYLES = {"blades.css", "shell.css", "topbar.css", "docs.css", "blade-home.css", "blade-model.css", "blade-add.css",
                   "blade-security.css", "blade-keys.css", "blade-bench.css", "blade-logs.css", "blade-notebook.css",
                   "blade-gateway.css", "blade-settings.css"}
 CONSOLE_IMAGES = {"favicon.svg"}
