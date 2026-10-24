@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>omxconsole · pages, not blades · mock v3</title>
+<title>omxconsole · pages, not blades · mock v4</title>
 <link rel="stylesheet" href="../omxconsole/omxqua/src/fonts.css">
 <link rel="stylesheet" href="../omxconsole/omxqua/src/tokens.css">
 <link rel="stylesheet" href="../omxconsole/omxqua/src/components.css">
@@ -49,16 +49,24 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 .bcn .mono { color: var(--oq-ink-2); font-family: var(--oq-font-mono); }
 
 /* ---- the picker: a menu on desktop, a sheet on the phone ---- */
-.pmenu { position: absolute; z-index: 40; top: 64px; width: 390px; padding: 6px; border-radius: 16px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-3, var(--oq-shadow-2));
-  opacity: 0; transform: translateY(-6px) scale(.98); transform-origin: top center; pointer-events: none; transition: opacity .22s, transform .26s cubic-bezier(.2,.8,.2,1); }
+.pmenu { position: absolute; z-index: 40; top: 64px; left: 214px; right: 16px; bottom: 16px; display: flex; flex-direction: column; overflow: hidden; border-radius: 18px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-3, var(--oq-shadow-2));
+  opacity: 0; transform: translateY(-8px) scale(.985); transform-origin: top center; pointer-events: none; transition: opacity .2s, transform .26s cubic-bezier(.2,.8,.2,1); }
 .pmenu.open { opacity: 1; transform: none; pointer-events: auto; }
-.pmenu .hd { font: 500 11px var(--oq-font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--oq-ink-2); padding: 8px 10px 6px; }
-.pmenu .pr { width: 100%; border: 0; background: none; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 10px; text-align: left; }
-.pmenu .pr:hover, .pmenu .pr.kb { background: rgb(var(--oq-state) / .06); }
+.ptop { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--oq-line-2); }
+.ptop .psearch { flex: 1; }
+.stay { font-size: 12.5px; color: var(--oq-ink-2); white-space: nowrap; } .stay b { color: var(--oq-ink); font-weight: 600; }
+.plist { overflow: auto; padding: 4px 16px 16px; overscroll-behavior: contain; min-height: 0; }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 6px; }
+.pmenu .pr { border: 0; background: rgb(var(--oq-state) / .035); display: flex; align-items: center; gap: 10px; min-height: 58px; padding: 8px 12px; border-radius: 12px; text-align: left; min-width: 0; }
+.pmenu .pr:hover { background: rgb(var(--oq-state) / .08); }
 .pmenu .pr.on { background: rgb(var(--oq-state) / .1); }
-.pmenu .pr b { flex: 1; font: 600 13px var(--oq-font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pmenu .pr > span:last-child { font: 12px var(--oq-font-mono); color: var(--oq-ink-2); }
-.pmenu .add { color: var(--oq-ink-2); font-weight: 600; font-size: 13px; border-top: 1px solid var(--oq-line-2); border-radius: 0 0 10px 10px; margin-top: 4px; }
+.pmenu .pr.kb { box-shadow: inset 0 0 0 1.5px var(--oq-accent); }
+.pr .nm2 { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.pr .nm2 b { font: 600 13px var(--oq-font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr .tg2 { display: flex; overflow: hidden; } .pr .tg2 .tag { margin: 0 4px 0 0; padding: 1px 7px; font-size: 11px; }
+.pr .v { font: 12px var(--oq-font-mono); color: var(--oq-ink-2); white-space: nowrap; }
+.pfoot { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--oq-line-2); }
+.pfoot .hint { margin-left: auto; font: 11.5px var(--oq-font-mono); color: var(--oq-ink-faint); }
 .scrim2 { position: absolute; inset: 0; z-index: 39; display: none; transition: background .2s; }
 .scrim2.on { display: block; }
 /* scale: search + label chips, shared by My models and the picker */
@@ -67,7 +75,6 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 .psearch input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--oq-ink); font: 500 14px var(--oq-font); }
 .psearch input::placeholder { color: var(--oq-ink-faint); }
 .psearch kbd { font: 11px var(--oq-font-mono); color: var(--oq-ink-faint); padding: 2px 6px; border-radius: 6px; background: rgb(var(--oq-state) / .06); }
-.pmenu .psearch { margin: 4px 4px 8px; }
 .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 4px 6px; }
 .chip { flex: none; border: 0; height: 32px; padding: 0 12px; border-radius: 999px; background: rgb(var(--oq-state) / .06); color: var(--oq-ink-2); font: 600 12.5px var(--oq-font); display: inline-flex; align-items: center; gap: 6px; transition: background .15s, color .15s; }
 .chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
@@ -75,18 +82,51 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 .chip.on { background: var(--oq-ink); color: var(--oq-surface-0); }
 .chip .h { opacity: .5; }
 .chips .div { flex: none; width: 1px; background: var(--oq-line-2); margin: 6px 2px; }
-.plist { max-height: 380px; overflow: auto; overscroll-behavior: contain; }
-.pmenu .grp { font: 500 10.5px var(--oq-font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--oq-ink-faint); padding: 10px 10px 4px; display: flex; align-items: center; gap: 6px; }
+.pmenu .grp { font: 500 10.5px var(--oq-font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--oq-ink-faint); padding: 14px 2px 8px; display: flex; align-items: center; gap: 6px; }
 .pmenu .grp i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
-.pmenu .none { padding: 18px 10px; color: var(--oq-ink-2); font-size: 13px; }
+.pmenu .none { padding: 30px 4px; color: var(--oq-ink-2); font-size: 13px; }
 .tag { display: inline-flex; align-items: center; gap: 5px; font: 500 11.5px var(--oq-font); padding: 3px 9px; border-radius: 999px; background: rgb(var(--oq-state) / .06); color: var(--oq-ink-2); margin: 0 4px 2px 0; white-space: nowrap; border: 0; }
 .tag.k { color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); }
 .tag.add { cursor: pointer; color: var(--oq-ink-faint); }
 .tag input { width: 80px; border: 0; background: none; outline: none; color: var(--oq-ink); font: inherit; }
 .dl dd.wrap { white-space: normal; overflow: visible; }
-.hbar { display: flex; flex-direction: column; gap: 10px; padding: 12px 18px 0; }
-.hbar .chips { padding: 0; }
-.cnt { font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); padding: 10px 18px 0; }
+.hbar { padding: 12px 18px; border-bottom: 1px solid var(--oq-line-2); }
+.psearch.big { height: 46px; } .psearch.big input { font-size: 15px; }
+.cnt { display: flex; gap: 10px; font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); padding: 12px 18px 0; } .cnt .ht { margin-left: auto; color: var(--oq-ink-faint); }
+/* the library: a groups column (show / kind / your labels) beside the results; same on My models and in the switcher */
+.lib { flex: 1; min-height: 0; display: grid; grid-template-columns: 228px 1fr; }
+.groups { overflow: auto; padding: 6px 10px 16px; border-right: 1px solid var(--oq-line-2); display: flex; flex-direction: column; gap: 1px; scrollbar-width: thin; }
+.gh { display: flex; align-items: center; gap: 6px; font: 500 10.5px var(--oq-font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--oq-ink-faint); padding: 14px 10px 6px; flex: none; }
+.gh em { font-style: normal; text-transform: none; letter-spacing: 0; opacity: .75; }
+.gh .ed { margin-left: auto; border: 0; background: none; font: 600 12px var(--oq-font); color: var(--oq-accent); text-transform: none; letter-spacing: 0; padding: 4px 8px; border-radius: 8px; }
+.gh .ed:hover { background: rgb(var(--oq-state) / .06); }
+.gi { box-sizing: border-box; flex: none; border: 0; background: none; min-height: 36px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 10px; font: 550 13.5px var(--oq-font); color: var(--oq-ink-2); text-align: left; width: 100%; transition: background .15s, color .15s; }
+.gi:hover { background: rgb(var(--oq-state) / .05); color: var(--oq-ink); }
+.gi.on { background: rgb(var(--oq-state) / .1); color: var(--oq-ink); }
+.gi .l { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gi small { font: 11.5px var(--oq-font-mono); color: var(--oq-ink-faint); }
+.gi .d { width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin: 0 4px; flex: none; }
+.gi .h { width: 16px; text-align: center; color: var(--oq-ink-faint); font: 600 14px var(--oq-font-mono); flex: none; }
+.gi.new { color: var(--oq-ink-faint); }
+.gi.new input { flex: 1; min-width: 0; height: 30px; border: 0; border-radius: 8px; background: rgb(var(--oq-state) / .06); color: var(--oq-ink); font: 550 13px var(--oq-font); padding: 0 8px; outline: none; box-shadow: inset 0 0 0 1.5px var(--oq-accent); }
+.gi.drop { background: color-mix(in srgb, var(--oq-accent) 16%, transparent); color: var(--oq-ink); box-shadow: inset 0 0 0 1.5px var(--oq-accent); }
+.gi.got { animation: got .6s; } @keyframes got { 30% { background: color-mix(in srgb, var(--oq-ok) 25%, transparent); } }
+.gi.edit { gap: 4px; padding: 0 2px; }
+.gi.edit input { flex: 1; min-width: 0; height: 32px; border: 0; border-radius: 8px; background: rgb(var(--oq-state) / .06); color: var(--oq-ink); font: 550 13px var(--oq-font); padding: 0 9px; outline: none; }
+.gi.edit input:focus { box-shadow: inset 0 0 0 1.5px var(--oq-accent); }
+.hdl { cursor: grab; touch-action: none; width: 30px; height: 36px; display: grid; place-items: center; color: var(--oq-ink-faint); flex: none; }
+.gi .x { border: 0; background: none; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; color: var(--oq-ink-faint); flex: none; } .gi .x:hover { color: var(--oq-bad); }
+.gi.dragging { background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); position: relative; z-index: 2; transform: scale(1.02); }
+.res { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.res .body2 { flex: 1; overflow: auto; padding-top: 4px; }
+.cb { width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid var(--oq-line); background: none; display: grid; place-items: center; color: transparent; padding: 0; }
+.cb .ico { width: 14px; height: 14px; } .cb.on { background: var(--oq-accent); border-color: var(--oq-accent); color: var(--oq-on-accent); } .cb:not(.on) .ico { opacity: 0; }
+.cx-tbl .ck { width: 30px; padding-right: 0; }
+.cx-tbl tr.sel td { background: color-mix(in srgb, var(--oq-accent) 7%, transparent); }
+.selbar { display: none; align-items: center; gap: 6px; padding: 10px 18px; border-top: 1px solid var(--oq-line-2); background: var(--oq-surface-2); overflow-x: auto; scrollbar-width: none; flex: none; }
+.selbar.on { display: flex; animation: settle .22s cubic-bezier(.2,.8,.2,1); }
+.selbar b { font: 650 13px var(--oq-font); white-space: nowrap; margin-right: 6px; } .selbar .lbl { color: var(--oq-ink-2); font-size: 12.5px; white-space: nowrap; } .selbar .sp { flex: 1; }
+.chip.part { box-shadow: inset 0 0 0 1.5px var(--oq-ink-2); color: var(--oq-ink); }
 .grab2 { display: none; width: 38px; height: 5px; border-radius: 3px; background: var(--oq-line); margin: 0 auto 8px; }
 
 /* ---- pages ---- */
@@ -206,14 +246,30 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
   .cmdbar .fb { flex: 1; } .cmdbar .fb.ic { flex: none; width: 40px; }
   .cmdbar .fb { height: 40px; } .cmdbar .fb.cp { flex: none; width: 40px; padding: 0; } .cmdbar .fb.cp .t { display: none; }
   .sec { grid-template-columns: 1fr; padding: 10px; gap: 10px; }
-  .pmenu { top: auto !important; bottom: 0; left: 0 !important; width: auto; right: 0; border-radius: 22px 22px 0 0; padding: 10px 10px 30px; transform: translateY(100%); opacity: 1; }
+  .pmenu { top: 36px; left: 0; right: 0; bottom: 0; border-radius: 22px 22px 0 0; transform: translateY(100%); opacity: 1; }
   .pmenu.open { transform: none; }
-  .pmenu .grab2 { display: block; }
-  .pmenu .pr { min-height: 52px; } .plist { max-height: 330px; } .psearch kbd { display: none; }
+  .pmenu .grab2 { display: block; margin-top: 8px; }
+  .ptop { padding: 4px 12px 10px; border: 0; } .stay, .psearch kbd, .pfoot .hint, .cnt .ht { display: none; }
+  .lib { display: flex; flex-direction: column; }
+  .groups { flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--oq-line-2); padding: 0 12px 10px; gap: 6px; scrollbar-width: none; }
+  .groups .gh { display: none; } .groups .gh.mine { display: flex; padding: 0 0 0 4px; } .groups .gh.mine .t { display: none; }
+  .groups .gh.mine .ed { background: rgb(var(--oq-state) / .06); height: 36px; padding: 0 12px; border-radius: 999px; }
+  .groups .gi { width: auto; border-radius: 999px; background: rgb(var(--oq-state) / .06); padding: 0 13px; gap: 6px; font-size: 13px; }
+  .groups .gi.on { background: var(--oq-ink); color: var(--oq-surface-0); } .groups .gi.on small { color: inherit; opacity: .6; }
+  .groups .gi > .ico { display: none; } .groups .gi .d { margin: 0; }
+  .groups { flex: none; }
+  .groups.editing { flex: 1; flex-direction: column; overflow-x: hidden; overflow-y: auto; padding-top: 4px; }
+  .lib:has(.groups.editing) .res { display: none; }
+  .groups.editing > .gi:not(.edit):not(.new), .groups.editing .gh:not(.mine) { display: none; }
+  .groups.editing .gi { width: 100%; border-radius: 10px; background: none; } .groups.editing .gh.mine { padding: 6px 0; justify-content: flex-end; }
+  .plist { padding: 4px 12px 12px; flex: 1; } .pgrid { grid-template-columns: 1fr; }
+  .pmenu .pr { min-height: 60px; } .pfoot { padding: 10px 12px 26px; }
+  .cx-tbl .ck { width: 34px; } .cb { width: 26px; height: 26px; }
+  .selbar { padding: 10px 12px; }
   .scrim2.on { background: rgb(0 0 0 / .4); }
   .cx-tbl .hide-p { display: none; }
   .ph2 { padding: 12px 14px; } .ph2 .src, .ph2 .sub { display: none; }
-  .body2 { padding: 8px 14px; } .hbar { padding: 10px 12px 0; } .cnt { padding: 8px 14px 0; } .cx-tbl .tg { display: none; }
+  .body2 { padding: 8px 14px; } .hbar { padding: 10px 12px; } .cnt { padding: 10px 14px 0; } .cx-tbl .tg { display: none; }
 }
 </style>
 </head>
@@ -240,9 +296,11 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
       <!-- My models -->
       <section class="page" data-page="home"><div class="sheet2">
         <div class="ph2"><div class="bi" style="--c:var(--oq-data-1)"><svg class="ico"><use href="#i-box"/></svg></div><div><h2>My models</h2><div class="sub" id="hsub"></div></div><div class="sp"></div><span class="src">mxc ls</span><button class="fb fill" data-go="#/add"><svg class="ico"><use href="#i-plus"/></svg>Add</button></div>
-        <div class="hbar"><label class="psearch"><svg class="ico"><use href="#i-search"/></svg><input id="hq" placeholder="Search models and labels" autocomplete="off"><kbd>/</kbd></label><div class="chips" id="hchips"></div></div>
-        <div class="cnt" id="hcnt"></div>
-        <div class="body2"><table class="cx-tbl"><thead><tr><th>Model</th><th>State</th><th class="tg">Labels</th><th class="num hide-p">Memory</th><th class="num">tok/s</th></tr></thead><tbody id="rows"></tbody></table></div>
+        <div class="hbar"><label class="psearch big"><svg class="ico"><use href="#i-search"/></svg><input id="hq" placeholder="Search 100 models by name, kind or #label" autocomplete="off"><kbd>/</kbd></label></div>
+        <div class="lib"><nav class="groups" id="hgroups"></nav>
+          <div class="res"><div class="cnt" id="hcnt"></div>
+            <div class="body2"><table class="cx-tbl"><thead><tr><th class="ck"><button class="cb" data-selall aria-label="Select all shown"><svg class="ico"><use href="#i-check"/></svg></button></th><th>Model</th><th>State</th><th class="tg">Labels</th><th class="num hide-p">Memory</th><th class="num">tok/s</th></tr></thead><tbody id="rows"></tbody></table></div></div></div>
+        <div class="selbar" id="selbar"></div>
       </div></section>
 
       <!-- the one model page -->
@@ -267,14 +325,13 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 
   <div class="scrim2" id="scrim"></div>
   <div class="pmenu" id="pmenu"><div class="grab2"></div>
-    <label class="psearch"><svg class="ico"><use href="#i-search"/></svg><input id="pq" placeholder="Find a model" autocomplete="off"><kbd>esc</kbd></label>
-    <div class="chips" id="pchips"></div>
-    <div class="hd">Switch model · stays on <span id="pmsec"></span></div><div class="plist" id="plist"></div>
-    <button class="pr add" data-go="#/add"><svg class="ico"><use href="#i-plus"/></svg>Add a model</button></div>
+    <div class="ptop"><label class="psearch big"><svg class="ico"><use href="#i-search"/></svg><input id="pq" placeholder="Find a model" autocomplete="off"><kbd>esc</kbd></label><span class="stay">Switching keeps you on <b id="pmsec"></b></span></div>
+    <div class="lib"><nav class="groups" id="pgroups"></nav><div class="plist" id="plist"></div></div>
+    <div class="pfoot"><button class="fb" data-go="#/add"><svg class="ico"><use href="#i-plus"/></svg>Add a model</button><span class="hint">↑ ↓ move · Enter open · drag a model onto a label</span></div></div>
 </div>
 </div>
 
-<div class="demo"><span>Mock v3</span><button class="on" data-dev="desk">Desktop</button><button data-dev="phone">Phone</button></div>
+<div class="demo"><span>Mock v4</span><button class="on" data-dev="desk">Desktop</button><button data-dev="phone">Phone</button></div>
 
 <svg width="0" height="0" style="position:absolute"><defs>
 <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
@@ -296,6 +353,9 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 <symbol id="i-rot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
 <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></symbol>
 <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+<symbol id="i-grip" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></symbol>
 </defs></svg>
 
 <script>
@@ -348,31 +408,50 @@ function crumbs(r) {
   else h = `<button class="on ttl">${PLACES[r.page] || "My models"}</button>`;
   $("#crumbs").innerHTML = h;
 }
-// ---- search + label chips, one filter model for My models and the picker ----
-const HF = { q: "", tag: "all" }, PF = { q: "", tag: "all" };
-const allLabels = () => [...new Set(MODELS.flatMap((m) => m.labels))].sort();
+// ---- the library: one search + a groups column, shared by My models and the switcher ----
+let LABELS = ["work", "favorites", "experiments", "client-acme"]; // your labels, in your order
+const HF = { q: "", tag: "all" }, PF = { q: "", tag: "all" }, SEL = new Set();
+let EDIT = false;
 const order = (a, b) => (b.state === "run") - (a.state === "run") || (b.state === "bad") - (a.state === "bad") || a.name.localeCompare(b.name);
+const count = (fn) => MODELS.filter(fn).length;
 function matches(m, f) {
   const q = f.q.trim().toLowerCase();
-  const tagOk = f.tag === "all" || (f.tag === "running" ? m.state === "run" : m.kind === f.tag || m.labels.includes(f.tag));
+  const tagOk = f.tag === "all" || (f.tag === "running" ? m.state === "run" : f.tag === "recent" ? RECENT.includes(m.name) : m.kind === f.tag || m.labels.includes(f.tag));
   return tagOk && (!q || q.split(/\s+/).every((w) => m.name.includes(w) || m.kind.startsWith(w) || m.labels.some((l) => l.startsWith(w.replace(/^#/, "")))));
 }
-function chips(f, who) {
-  const c = (key, label, n, extra = "") => `<button class="chip ${f.tag === key ? "on" : ""}" data-chip="${key}" data-who="${who}">${extra}${label}<small>${n}</small></button>`;
-  return c("all", "All", MODELS.length) + c("running", "Running", MODELS.filter((m) => m.state === "run").length, `<i style="--c:var(--oq-ok)"></i>`) + `<span class="div"></span>`
-    + Object.entries(KINDS).map(([k, [t, col]]) => c(k, t, MODELS.filter((m) => m.kind === k).length, `<i style="--c:${col}"></i>`)).join("") + `<span class="div"></span>`
-    + allLabels().map((l) => c(l, l, MODELS.filter((m) => m.labels.includes(l)).length, `<span class="h">#</span>`)).join("");
+const tagName = (k) => ({ all: "All models", running: "Running", recent: "Recent" })[k] || (KINDS[k] ? KINDS[k][0] : "#" + k);
+function groups(f, who) {
+  const it = (key, label, n, lead, attrs = "") => `<button class="gi ${f.tag === key ? "on" : ""}" data-chip="${key}" data-who="${who}" ${attrs}>${lead}<span class="l">${label}</span><small>${n}</small></button>`;
+  let h = `<div class="gh">Show</div>` + it("all", "All models", MODELS.length, ic("box")) + it("running", "Running", count((m) => m.state === "run"), `<i class="d" style="--c:var(--oq-ok)"></i>`)
+    + (who === "p" ? it("recent", "Recent", RECENT.length, ic("rot")) : "");
+  h += `<div class="gh">Kind <em>· automatic</em></div>` + Object.entries(KINDS).map(([k, [t, c]]) => it(k, t, count((m) => m.kind === k), `<i class="d" style="--c:${c}"></i>`)).join("");
+  h += `<div class="gh mine"><span class="t">Your labels</span><button class="ed" data-edit>${EDIT ? "Done" : "Edit labels"}</button></div>`;
+  h += LABELS.map((l) => EDIT
+    ? `<div class="gi edit lab" data-lab="${l}"><span class="hdl" aria-label="Drag to reorder">${ic("grip")}</span><input value="${l}" data-rename="${l}" aria-label="Rename ${l}"><button class="x" data-del="${l}" aria-label="Delete ${l}">${ic("x")}</button></div>`
+    : it(l, l, count((m) => m.labels.includes(l)), `<span class="h">#</span>`, `data-lab="${l}"`)).join("");
+  return h + `<button class="gi new" data-newlabel>${ic("plus")}<span class="l">New label</span></button>`;
 }
-const showOn = (sel) => { const box = $(sel), on = box.querySelector(".chip.on"); if (on) box.scrollLeft = Math.max(0, on.offsetLeft - box.offsetLeft - 40); };
+function drawGroups(sel, f, who) { const g = $(sel); g.innerHTML = groups(f, who); g.classList.toggle("editing", EDIT); const on = g.querySelector(".gi.on"); if (on && g.scrollWidth > g.clientWidth) g.scrollLeft = Math.max(0, on.offsetLeft - 40); }
 const tags = (m) => { const [t, col] = KINDS[m.kind]; return `<span class="tag k" style="--c:${col}">${t}</span>` + m.labels.map((l) => `<span class="tag">#${l}</span>`).join(""); };
+let shown = [];
 function homeRows() {
-  const list = MODELS.filter((m) => matches(m, HF)).sort(order);
-  $("#hsub").textContent = `${MODELS.length} models · ${MODELS.filter((m) => m.state === "run").length} running · 11.2 of 24 GB GPU`;
-  $("#hchips").innerHTML = chips(HF, "h"); showOn("#hchips");
-  $("#hcnt").textContent = list.length === MODELS.length ? `${list.length} models, running first` : `${list.length} of ${MODELS.length}`;
-  $("#rows").innerHTML = list.map((m) => `<tr data-go="#/models/${m.name}/overview"><td class="nm">${m.name}</td><td><span class="st ${m.state}"><i></i>${m.word}</span></td><td class="tg">${tags(m)}</td><td class="num hide-p">${m.mem ? m.mem + " GB" : "–"}</td><td class="num">${m.tps || "–"}</td></tr>`).join("")
-    || `<tr><td colspan="5" style="color:var(--oq-ink-2);padding:30px 10px">Nothing matches. Try another label or clear the search.</td></tr>`;
+  shown = MODELS.filter((m) => matches(m, HF)).sort(order);
+  $("#hsub").textContent = `${MODELS.length} models · ${count((m) => m.state === "run")} running · 11.2 of 24 GB GPU`;
+  drawGroups("#hgroups", HF, "h");
+  $("#hcnt").innerHTML = `<span>${tagName(HF.tag)} · ${shown.length}${HF.q ? ` matching “${HF.q}”` : ""}</span><span class="ht">tick models to label many at once, or drag them onto a label</span>`;
+  $(".cx-tbl [data-selall]").classList.toggle("on", shown.length > 0 && shown.every((m) => SEL.has(m.name)));
+  $("#rows").innerHTML = shown.map((m) => `<tr class="${SEL.has(m.name) ? "sel" : ""}" data-go="#/models/${m.name}/overview" draggable="true" data-drag="${m.name}"><td class="ck"><button class="cb ${SEL.has(m.name) ? "on" : ""}" data-sel="${m.name}" aria-label="Select ${m.name}">${ic("check")}</button></td><td class="nm">${m.name}</td><td><span class="st ${m.state}"><i></i>${m.word}</span></td><td class="tg">${tags(m)}</td><td class="num hide-p">${m.mem ? m.mem + " GB" : "–"}</td><td class="num">${m.tps || "–"}</td></tr>`).join("")
+    || `<tr><td colspan="6" style="color:var(--oq-ink-2);padding:30px 10px">Nothing matches. Try another group or clear the search.</td></tr>`;
+  selbar();
 }
+function selbar() {
+  const n = SEL.size, bar = $("#selbar"); bar.classList.toggle("on", n > 0); if (!n) return;
+  const sel = MODELS.filter((m) => SEL.has(m.name));
+  bar.innerHTML = `<b>${n} selected</b><span class="lbl">Labels:</span>` + LABELS.map((l) => { const k = sel.filter((m) => m.labels.includes(l)).length;
+    return `<button class="chip ${k === n ? "on" : k ? "part" : ""}" data-bulk="${l}"><span class="h">#</span>${l}</button>`; }).join("") + `<span class="sp"></span><button class="fb" data-clearsel>Clear</button>`;
+}
+function redraw() { homeRows(); if ($("#pmenu").classList.contains("open")) pickerList(); }
+function labelModels(names, l) { names.forEach((n) => { const m = find(n); if (!m.labels.includes(l)) m.labels.push(l); }); }
 // The model's verbs only. Navigation (benchmark, notebook) is the tabs; their own actions live inside their section.
 function cmds(m) {
   const b = (t, i, cls = "", c = "") => `<button class="fb ${cls}" style="--c:${c}">${ic(i)}<span class="t">${t}</span></button>`;
@@ -414,22 +493,20 @@ function modelPage(r) {
 // ---- picker ----
 let kb = 0;
 function pickerList() {
-  const r = parse(), row = (m) => `<button class="pr ${m.name === r.model ? "on" : ""}" data-pick="${m.name}"><span class="st ${m.state}"><i></i></span><b>${m.name}</b><span>${m.tps ? m.tps + " tok/s" : m.word}</span></button>`;
-  $("#pchips").innerHTML = chips(PF, "p");
-  const hits = MODELS.filter((m) => matches(m, PF)).sort(order);
-  let h = "";
-  if (!PF.q && PF.tag === "all") {
-    h += `<div class="grp">Recent</div>` + RECENT.map(find).map(row).join("");
-    h += Object.entries(KINDS).map(([k, [t, col]]) => { const g = hits.filter((m) => m.kind === k); return g.length ? `<div class="grp"><i style="--c:${col}"></i>${t} · ${g.length}</div>` + g.map(row).join("") : ""; }).join("");
-  } else h = hits.length ? `<div class="grp">${hits.length} match${hits.length === 1 ? "" : "es"}</div>` + hits.map(row).join("") : `<div class="none">No model matches “${PF.q || PF.tag}”.</div>`;
-  $("#plist").innerHTML = h; kb = 0; mark(); showOn("#pchips");
+  const r = parse(), card = (m) => `<button class="pr ${m.name === r.model ? "on" : ""}" data-pick="${m.name}" draggable="true" data-drag="${m.name}"><span class="st ${m.state}"><i></i></span><span class="nm2"><b>${m.name}</b><span class="tg2">${tags(m)}</span></span><span class="v">${m.tps ? m.tps + " tok/s" : m.word}</span></button>`;
+  drawGroups("#pgroups", PF, "p");
+  const hits = MODELS.filter((m) => matches(m, PF)).sort(order), grid = (ms) => `<div class="pgrid">${ms.map(card).join("")}</div>`;
+  let h;
+  if (!PF.q && PF.tag === "all") h = `<div class="grp">Recent</div>` + grid(RECENT.map(find))
+    + Object.entries(KINDS).map(([k, [t, col]]) => { const g = hits.filter((m) => m.kind === k); return g.length ? `<div class="grp"><i style="--c:${col}"></i>${t} · ${g.length}</div>` + grid(g) : ""; }).join("");
+  else h = hits.length ? `<div class="grp">${tagName(PF.tag)} · ${hits.length}${PF.q ? ` matching “${PF.q}”` : ""}</div>` + grid(hits) : `<div class="none">No model matches “${PF.q || tagName(PF.tag)}”.</div>`;
+  $("#plist").innerHTML = h; kb = 0; mark();
 }
 function mark() { const rows = $$("#plist .pr"); rows.forEach((b, i) => b.classList.toggle("kb", i === kb)); rows[kb]?.scrollIntoView({ block: "nearest" }); }
 function openPicker() {
   const r = parse(), p = $("#picker").getBoundingClientRect(), a = $("#app").getBoundingClientRect();
   $("#pmsec").textContent = SECS.find((x) => x[0] === r.sec)[1];
-  PF.q = ""; $("#pq").value = ""; $("#pq").placeholder = `Find a model · ${MODELS.length}`; pickerList(); $("#plist").scrollTop = 0;
-  $("#pmenu").style.left = Math.max(8, p.left - a.left + p.width / 2 - 195) + "px";
+  PF.q = ""; $("#pq").value = ""; $("#pq").placeholder = `Find any of ${MODELS.length} models by name, kind or #label`; pickerList(); $("#plist").scrollTop = 0;
   $("#pmenu").classList.add("open"); $("#scrim").classList.add("on");
   if (!document.body.classList.contains("phone")) setTimeout(() => $("#pq").focus(), 30);
 }
@@ -440,8 +517,9 @@ document.addEventListener("keydown", (e) => {
   if (open) {
     const rows = $$("#plist .pr");
     if (e.key === "Escape") return closePicker();
-    if (e.key === "ArrowDown") { kb = Math.min(rows.length - 1, kb + 1); mark(); e.preventDefault(); }
-    if (e.key === "ArrowUp") { kb = Math.max(0, kb - 1); mark(); e.preventDefault(); }
+    if (document.activeElement.matches("[data-rename], .gi.new input")) return;
+    if (e.key === "ArrowDown" || (e.key === "ArrowRight" && document.activeElement.id !== "pq")) { kb = Math.min(rows.length - 1, kb + 1); mark(); e.preventDefault(); }
+    if (e.key === "ArrowUp" || (e.key === "ArrowLeft" && document.activeElement.id !== "pq")) { kb = Math.max(0, kb - 1); mark(); e.preventDefault(); }
     if (e.key === "Enter" && rows[kb]) rows[kb].click();
     return;
   }
@@ -456,13 +534,39 @@ document.addEventListener("click", (e) => {
   const pk = t.closest("[data-pick]"); if (pk) { closePicker(); location.hash = `#/models/${pk.dataset.pick}/${parse().sec}`; return; }
   if (t.closest("#scrim")) return closePicker();
   const ch = t.closest("[data-chip]"); if (ch) { const f = ch.dataset.who === "h" ? HF : PF; f.tag = f.tag === ch.dataset.chip && ch.dataset.chip !== "all" ? "all" : ch.dataset.chip; return ch.dataset.who === "h" ? homeRows() : pickerList(); }
+  const sl = t.closest("[data-sel]"); if (sl) { const n = sl.dataset.sel; SEL.has(n) ? SEL.delete(n) : SEL.add(n); return homeRows(); }
+  if (t.closest("[data-selall]")) { const all = shown.every((m) => SEL.has(m.name)); shown.forEach((m) => all ? SEL.delete(m.name) : SEL.add(m.name)); return homeRows(); }
+  if (t.closest("[data-clearsel]")) { SEL.clear(); return homeRows(); }
+  const bk = t.closest("[data-bulk]"); if (bk) { const l = bk.dataset.bulk, sel = MODELS.filter((m) => SEL.has(m.name)), every = sel.every((m) => m.labels.includes(l));
+    sel.forEach((m) => { m.labels = m.labels.filter((x) => x !== l); if (!every) m.labels.push(l); }); return redraw(); }
+  if (t.closest("[data-edit]")) { EDIT = !EDIT; return redraw(); }
+  const dl = t.closest("[data-del]"); if (dl) { const l = dl.dataset.del; LABELS = LABELS.filter((x) => x !== l); MODELS.forEach((m) => m.labels = m.labels.filter((x) => x !== l)); [HF, PF].forEach((f) => f.tag === l && (f.tag = "all")); return redraw(); }
+  const nl = t.closest("[data-newlabel]"); if (nl && !nl.querySelector("input")) { nl.innerHTML = `${ic("plus")}<input placeholder="Name, then Enter">`; const i = nl.querySelector("input"); i.focus();
+    i.addEventListener("keydown", (ev) => { if (ev.key === "Escape") return redraw(); if (ev.key !== "Enter") return; const v = i.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+      if (v && !LABELS.includes(v)) { LABELS.push(v); if (SEL.size) labelModels([...SEL], v); } redraw(); }); return; }
+  if (t.closest(".gi.new input, .gi.edit")) return;
   const al = t.closest("[data-addlabel]"); if (al) { al.outerHTML = `<span class="tag"><input id="newlabel" placeholder="label, Enter"></span>`; const i = $("#newlabel"); i.focus();
-    i.addEventListener("keydown", (ev) => { if (ev.key !== "Enter") return; const v = i.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, ""), m = find(parse().model); if (v && !m.labels.includes(v)) m.labels.push(v); modelPage(parse()); homeRows(); }); return; }
+    i.addEventListener("keydown", (ev) => { if (ev.key !== "Enter") return; const v = i.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, ""), m = find(parse().model); if (v && !m.labels.includes(v)) m.labels.push(v); if (v && !LABELS.includes(v)) LABELS.push(v); modelPage(parse()); homeRows(); }); return; }
   const g = t.closest("[data-go]"); if (g) { closePicker(); location.hash = g.dataset.go; return; }
   if (t.closest("[data-back]")) return history.length > 1 ? history.back() : (location.hash = "#/");
   const th = t.closest("[data-theme]"); if (th) { const a = $("#app"), n = th.dataset.theme === "night"; a.classList.toggle("oq-night", n); a.classList.toggle("oq-light", !n); $$("[data-theme]").forEach((b) => b.classList.toggle("on", b === th)); return; }
   const d = t.closest("[data-dev]"); if (d) { document.body.classList.toggle("phone", d.dataset.dev === "phone"); $$("[data-dev]").forEach((b) => b.classList.toggle("on", b === d)); setTimeout(pill, 380); }
 });
+document.addEventListener("change", (e) => { const r = e.target.closest("[data-rename]"); if (!r) return; const from = r.dataset.rename, to = r.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+  if (!to || to === from || LABELS.includes(to)) return redraw();
+  LABELS = LABELS.map((x) => x === from ? to : x); MODELS.forEach((m) => m.labels = m.labels.map((x) => x === from ? to : x)); [HF, PF].forEach((f) => f.tag === from && (f.tag = to)); redraw(); });
+document.addEventListener("pointerdown", (e) => {
+  const h = e.target.closest(".hdl"); if (!h) return; e.preventDefault();
+  const row = h.closest(".gi"), box = row.parentElement; row.classList.add("dragging"); h.setPointerCapture(e.pointerId);
+  const move = (ev) => { const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".gi.edit"); if (!over || over === row || over.parentElement !== box) return;
+    const r = over.getBoundingClientRect(); box.insertBefore(row, ev.clientY < r.top + r.height / 2 ? over : over.nextSibling); };
+  const up = () => { h.removeEventListener("pointermove", move); row.classList.remove("dragging"); LABELS = [...box.querySelectorAll(".gi.edit")].map((x) => x.dataset.lab); redraw(); };
+  h.addEventListener("pointermove", move); h.addEventListener("pointerup", up, { once: true });
+});
+document.addEventListener("dragstart", (e) => { const d = e.target.closest("[data-drag]"); if (!d) return; const n = d.dataset.drag; e.dataTransfer.setData("text/plain", JSON.stringify(SEL.has(n) && SEL.size > 1 ? [...SEL] : [n])); });
+document.addEventListener("dragover", (e) => { const l = e.target.closest(".gi[data-lab]:not(.edit)"); $$(".gi.drop").forEach((x) => x !== l && x.classList.remove("drop")); if (l) { e.preventDefault(); l.classList.add("drop"); } });
+document.addEventListener("drop", (e) => { const l = e.target.closest(".gi[data-lab]:not(.edit)"); if (!l) return; e.preventDefault(); const lab = l.dataset.lab;
+  labelModels(JSON.parse(e.dataTransfer.getData("text/plain")), lab); redraw(); $$(`.gi[data-lab="${lab}"]`).forEach((x) => x.classList.add("got")); });
 addEventListener("hashchange", render);
 addEventListener("resize", pill);
 homeRows();
