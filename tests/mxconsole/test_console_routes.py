@@ -78,10 +78,9 @@ def test_the_new_routes():
 def test_unknown_routes_go_home_and_the_api_page_redirects():
     for bad in ("#/nonsense", "#/keys/extra", "#/models", "#/models/", "#/models//logs", "#nonsense"):
         assert route(bad) == {"page": "home"}, bad
-    for inherited in ("#/__proto__/x", "#/constructor/x", "#/toString", "#hasOwnProperty/x", "#/models/x/__proto__"):
-        assert route(inherited)["page"] in ("home", "model"), inherited
-        assert route(inherited).get("tab", "overview") in ("overview", "benchmark", "logs", "notebook"), inherited
-    assert route("#/__proto__/x") == {"page": "home"} and route("#/constructor/x") == {"page": "home"} and route("#/toString") == {"page": "home"}
+    for inherited in ("#/__proto__/x", "#/constructor/x", "#/toString", "#hasOwnProperty/x", "#/__proto__"):
+        assert route(inherited) == {"page": "home"}, inherited  # Object's own names are not places
+    assert route("#/models/x/__proto__") == {"page": "model", "model": "x/__proto__", "tab": "overview"}  # a name, not a lookup
     assert route("#api") == {"redirect": "/docs"}
     assert route("#network") == {"page": "gateway"} and route("#pull") == {"page": "add"} and route("#daemon") == {"page": "settings"}
 
@@ -105,3 +104,10 @@ def test_the_top_bar_only_says_where_you_are():
     assert crumbs({"page": "add"}) == [("My models", False, True), ("Add a model", False, False)]
     assert crumbs({"page": "model", "model": "tiny", "tab": "overview"}) == [("My models", False, True), ("tiny", True, False)]
     assert crumbs({"page": "model", "model": "tiny", "tab": "logs"}) == [("My models", False, True), ("tiny", True, True), ("Logs", False, False)]
+
+
+@needs_node
+def test_back_uses_history_only_after_a_step_inside_the_console():
+    assert node("r.backUsesHistory({mxc: 1})") is True
+    for state in ("null", "undefined", "{mxc: 0}", "{}", "{mxc: '1'}", "{other: 1}"):
+        assert node(f"r.backUsesHistory({state})") is False, state

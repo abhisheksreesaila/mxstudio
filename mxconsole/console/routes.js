@@ -80,3 +80,9 @@ export function crumbsFor(route) {
   if (route.tab === "overview") return [home, { label: route.model, picker: true }];
   return [home, { label: route.model, picker: true, to: { ...route, tab: "overview" } }, { label: TAB_NAMES[route.tab] }];
 }
+
+/** The page's Back: browser history only when the entry before this one is ours ({mxc: 1}, stamped by pages.js);
+ * otherwise (a deep link, a reload mid-history, a foreign page) the parent route, so Back never leaves the console. */
+export function backUsesHistory(state) {
+  return Boolean(state && state.mxc === 1);
+}

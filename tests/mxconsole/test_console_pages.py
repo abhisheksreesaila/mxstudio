@@ -64,5 +64,7 @@ def test_where_you_are_is_text_not_a_button_and_the_picker_chevron_waits_for_the
 
 
 def test_back_only_uses_history_when_the_previous_entry_is_in_the_console():
+    """The decision is routes.backUsesHistory (tested under node); pages.js stamps entries and asks it."""
     pages = text("pages.js")
-    assert "history.state" in pages and "steps" not in pages
+    assert "backUsesHistory(history.state) ? history.back() : go(parent)" in pages
+    assert 'history.replaceState({ mxc: 0 }, "")' in pages and 'history.replaceState({ mxc: 1 }, "")' in pages

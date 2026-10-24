@@ -3,7 +3,7 @@
 // While this is running the blade engine does not stack: a blade's push() becomes "go to that page".
 import { h, icon, store, onData } from "./core.js";
 import { makeBlade, setNavigator, stack } from "./blades.js";
-import { parseRoute, hashFor, routeForBlade } from "./routes.js";
+import { parseRoute, hashFor, routeForBlade, backUsesHistory } from "./routes.js";
 
 const WAIT_FOR_MODELS_MS = 4000;
 const listeners = new Set();
@@ -53,7 +53,7 @@ function modelsLoaded() {
 
 /** Back on a page that has a parent: the browser's Back when we came from inside the console, else the parent page. */
 function backButton(parent) {
-  return h("button", { class: "btn text sm back", type: "button", "data-act": "back", "aria-label": "Back", onClick: () => (history.state && history.state.mxc === 1 ? history.back() : go(parent)) },
+  return h("button", { class: "btn text sm back", type: "button", "data-act": "back", "aria-label": "Back", onClick: () => (backUsesHistory(history.state) ? history.back() : go(parent)) },
     icon("chevron-left", 15, "currentColor", 2), "Back");
 }
 

@@ -391,13 +391,15 @@ Brief: docs/briefs/desktop-app.md · Needs: F-048, F-050
 Design: mock `docs/design/console-pages/mock.html` v4 (approved 2026-10-24). ADR: docs/adr/0005-pages-not-blades.md.
 Order: F-052 (shell) and F-054 (labels backend) in parallel; F-053 after F-052; F-055 after F-052 + F-054; F-056 after F-053 + F-055; F-057 (delete blades) after F-056; F-058 (docs tour) last. F-059 (README) and F-060 (front page, designer first) any time.
 
-## F-052 Shell: one nav, routes, and the place pages [todo]
+## F-052 Shell: one nav, routes, and the place pages [done]
 Brief: docs/briefs/console-pages.md · Needs: none · Files: index.html, main.js, routes.js, topbar.*, new nav.* / pages.*
-- [ ] one nav with the five places (Models, Keys, Gateway, Security, Settings): a left rail on desktop, a bottom tab bar at ≤ 760 px (same DOM); targets ≥ 40 px
-- [ ] the top bar only says where you are ("My models", "My models › <model> ▾", a place's name) plus the Beacon; the theme toggle moves into Settings
-- [ ] hash routes `#/`, `#/<place>`, `#/add`, `#/models/<name>/<tab>`; browser Back and reload land on the same page; unknown routes go home
-- [ ] Keys, Gateway, Security, Settings and Add a model render their current contents as pages (Add keeps a Back button); My models is the home page; a model still opens its current screen, as a page, until F-053
-- [ ] checked in the running console, both themes, 1280 and 390 px
+- [x] one nav with the five places (Models, Keys, Gateway, Security, Settings): a left rail on desktop, a bottom tab bar at ≤ 760 px (same DOM); targets ≥ 40 px
+- [x] the top bar only says where you are ("My models", "My models › <model> ▾", a place's name) plus the Beacon; the theme toggle moves into Settings
+- [x] hash routes `#/`, `#/<place>`, `#/add`, `#/models/<name>/<tab>`; browser Back and reload land on the same page; unknown routes go home
+- [x] Keys, Gateway, Security, Settings and Add a model render their current contents as pages (Add keeps a Back button); My models is the home page; a model still opens its current screen, as a page, until F-053
+- [x] checked in the running console, both themes, 1280 and 390 px
+- Interim until F-053: a model's Benchmark, Logs and Notebook are their own pages with Back; the model crumb has no ▾ until the picker exists. Old hash shapes (`#keys`, `#model/x`, `#bench/x`) still land on the right page, so CLI links work. Back goes to the parent route unless the previous history entry is inside the console (`routes.backUsesHistory`).
+- Reviewer: round 1 NEEDS WORK (inherited-key routes like `#/__proto__/x` crashed; loosened tests; no-op crumb buttons; Back could leave the console; a slow lookup could overwrite a newer page) → fixed; round 2 PASS; its two test should-fixes done (exact route results, Back decision tested under node). Checked live on a scratch daemon: rail, crumbs, Keys page, Back. 953 tests.
 
 ## F-053 The model page: tabs, verbs, flat buttons, 2×2 metrics [todo]
 Brief: docs/briefs/console-pages.md · Needs: F-052 · Files: blade-model.* → model-page.*, blade-bench/logs/notebook bodies
