@@ -3,6 +3,7 @@
    Shared pieces (url rows, code blocks, link buttons) are in blade-model.css. */
 .model-page .bb { overflow: hidden; background: var(--oq-surface-1); }
 .mpage { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.tpanel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .main2 { flex: 1; overflow: auto; min-height: 0; }
 .main2[hidden] { display: none; }
 .subhost { display: flex; flex-direction: column; overflow: hidden; }
@@ -48,6 +49,7 @@
 .m4 > div { background: rgb(var(--oq-state) / .045); border-radius: 12px; padding: 12px 14px; min-width: 0; }
 .m4 small { display: block; font: 500 11px var(--oq-font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--oq-ink-2); }
 .m4 b { display: block; margin-top: 4px; font: 600 24px var(--oq-font-mono); letter-spacing: -.02em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.m4 .cap { display: block; margin-top: 2px; font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); }
 .m4 b em { font: 500 12px var(--oq-font-mono); color: var(--oq-ink-2); font-style: normal; margin-left: 3px; }
 
 .dl { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 9px 14px; margin: 0; font-size: 13.5px; }
@@ -77,14 +79,14 @@
 @container (max-width: 760px) {
   .mhead { flex-direction: column; align-items: stretch; padding: 10px; gap: 8px; }
   .tabs { overflow-x: auto; scrollbar-width: none; }
-  .tabs button { flex: 1; justify-content: center; padding: 0 10px; height: 40px; }
-  .tabs .pill { height: 40px; }
+  .tabs button { flex: 1; justify-content: center; padding: 0 10px; height: 44px; }
+  .tabs .pill { height: 44px; }
   .tabs button svg { display: none; }
   .cmdbar { margin: 0; }
-  .cmdbar .fb { flex: 1; height: 40px; }
-  .cmdbar .fb.ic { flex: none; width: 40px; }
+  .cmdbar .fb { flex: 1; height: 44px; }
+  .cmdbar .fb.ic { flex: none; width: 44px; }
   .cmdbar .fb.ic.armed { flex: 1; }
-  .cmdbar .fb.cp { flex: none; width: 40px; padding: 0; }
+  .cmdbar .fb.cp { flex: none; width: 44px; padding: 0; }
   .cmdbar .fb.cp .t { display: none; }
   .sec { grid-template-columns: 1fr; padding: 10px; gap: 10px; }
   .dl { grid-template-columns: 96px minmax(0, 1fr); }

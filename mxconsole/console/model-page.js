@@ -44,10 +44,71 @@ export function commandsFor(state) {
 /** The four "Right now" tiles, always in this order. value null = nothing to show ("—"). */
 export function metricsView(v) {
   const t = v.tokens;
-  return [{ label: "Requests", value: t.requests || 0, unit: "", digits: 0, hint: "in the last 5 minutes" },
-    { label: "Speed", value: t.tps, unit: "tok/s", digits: 0, hint: "tokens per second" },
-    { label: "Latency p50", value: t.ttft, unit: "ms", digits: 0, hint: "median time to first token" },
-    { label: "Memory", value: v.fit.thisGb || null, unit: "GB", digits: 1, hint: "GPU memory this model holds" }];
+  return [{ label: "Requests", value: t.requests || 0, unit: "", digits: 0, hint: "last 5 minutes" },
+    { label: "Speed", value: t.tps, unit: "tok/s", digits: 0, hint: "decode, median" },
+    { label: "Latency p50", value: t.ttft, unit: "ms", digits: 0, hint: "time to first token" },
+    { label: "Memory", value: v.fit.thisGb || null, unit: "GB", digits: 1, hint: "GPU, this model" }];
+}
+
+/** The tab a key moves to (Left/Right wrap, Home/End jump), or null for any other key. Pure. */
+export function tabKeyTarget(key, keys, current) {
+  const i = keys.indexOf(current);
+  if (key === "ArrowRight") return keys[(i + 1) % keys.length];
+  if (key === "ArrowLeft") return keys[(i - 1 + keys.length) % keys.length];
+  if (key === "Home") return keys[0];
+  if (key === "End") return keys[keys.length - 1];
+  return null;
+}
+
+/** What the Remove button's accessible name is: after the first click it says what the second one does. */
+export const removeLabel = (name, armed) => (armed ? `Click again to remove ${name}` : "Remove");
+
+/** The tab strip: a tablist with a roving tabindex (only the selected tab is a Tab stop; arrows, Home and End move and activate).
+ *  Each tab controls the one panel `<prefix>-panel`. onPick(key) is called when a key or click picks a tab. */
+export function tabList(defs, { prefix, onPick }) {
+  const keys = defs.map((d) => d.key);
+  const buttons = new Map(defs.map((d) => [d.key, h("button", { type: "button", role: "tab", id: `${prefix}-tab-${d.key}`, "aria-controls": `${prefix}-panel`, "data-tab": d.key, tabindex: "-1", "aria-selected": "false",
+    style: { "--c": d.hue }, onClick: () => onPick(d.key) }, icon(d.icon, 15, "currentColor", 1.75), d.label)]));
+  const pill = h("i", { class: "pill" });
+  const el = h("div", { class: "tabs", role: "tablist", "aria-label": "Model sections" }, pill, ...buttons.values());
+  let selected = null;
+  function select(key) {
+    selected = key;
+    buttons.forEach((b, k) => { b.classList.toggle("on", k === key); b.setAttribute("aria-selected", String(k === key)); b.setAttribute("tabindex", k === key ? "0" : "-1"); });
+  }
+  buttons.forEach((b) => b.addEventListener("keydown", (e) => {
+    const to = tabKeyTarget(e.key, keys, selected);
+    if (!to) return;
+    e.preventDefault();
+    select(to);
+    buttons.get(to).focus();
+    onPick(to);
+  }));
+  return { el, pill, buttons, select, selected: () => selected };
+}
+
+/** The content under the tabs for Benchmark, Logs and Notebook: one blade body at a time. Showing another (or none) tears the
+ *  old one down: alive = false and its onClose, so pollers and listeners stop. build(bladeName, model) -> {blade, def}. */
+export function subHost(el, build) {
+  let sub = null;
+  function close() {
+    if (!sub) return;
+    sub.alive = false;
+    try { if (sub.onClose) sub.onClose(); } catch (e) { console.error("model tab failed to close cleanly", e); }
+    sub.el.remove();
+    sub = null;
+  }
+  function show(bladeName, model) {
+    close();
+    if (!bladeName) return;
+    const made = build(bladeName, model);
+    sub = made.blade;
+    sub.el.classList.add("embed");
+    sub.mode = "full";
+    el.replaceChildren(sub.el);
+    if (made.def.mount) made.def.mount(sub.body, sub);
+  }
+  return { show, close };
 }
 
 /** What the Tokens card says when there is nothing to chart yet: one true line per state (running, starting, idle,
@@ -144,21 +205,19 @@ register("model", (blade) => {
       blade.header.hidden = true;  // the crumb in the top bar already says which model this is
       blade.el.classList.add("model-page");
       const ctxNow = () => ({ metrics: store.metrics, series: store.series, info: store.info, system: system.crew, endpoint: (store.info && store.info.endpoint) || `${location.origin}/v1` });
-      let essigPrev = "", crashSig = "", busy = false, confirmTimer = 0, barSig = "", gone = false, confirming = false, removing = false, sub = null;
+      let essigPrev = "", crashSig = "", busy = false, confirmTimer = 0, barSig = "", gone = false, confirming = false, removing = false;
       const currentModel = () => (store.models || []).find((m) => m.name === name);
       const path = () => `/admin/models/${encodeURIComponent(name)}`;
 
       // -- skeleton, built once -----------------------------------------------------------------
-      const pill = h("i", { class: "pill" });
-      const tabBtns = new Map(TAB_DEFS.map((t) => [t.key, h("button", { type: "button", role: "tab", "data-tab": t.key, style: { "--c": t.hue }, onClick: () => go(tabRoute({ page: "model", model: name, tab }, t.key)) },
-        icon(t.icon, 15, "currentColor", 1.75), t.label)]));
-      const tabs = h("div", { class: "tabs", role: "tablist", "aria-label": "Model sections" }, pill, ...tabBtns.values());
-      const barHost = h("div", { class: "cmdbar", role: "toolbar" });
+      const tabsUi = tabList(TAB_DEFS, { prefix: "mp", onPick: (key) => go(tabRoute({ page: "model", model: name, tab }, key)) });
+      const { el: tabs, pill, buttons: tabBtns } = tabsUi;
+      const barHost = h("div", { class: "cmdbar", role: "toolbar", "aria-label": "Model actions" });
       const mhead = h("div", { class: "mhead" }, tabs, barHost);
 
       const crash = h("div", { class: "wide" });
-      const tiles = Array.from({ length: 4 }, () => ({ label: h("small", {}), num: h("span", {}), unit: h("em", {}) }));
-      const m4 = h("div", { class: "m4" }, tiles.map((t) => h("div", {}, t.label, h("b", {}, t.num, t.unit))));
+      const tiles = Array.from({ length: 4 }, () => ({ label: h("small", {}), num: h("span", {}), unit: h("em", {}), cap: h("span", { class: "cap" }) }));
+      const m4 = h("div", { class: "m4" }, tiles.map((t) => h("div", {}, t.label, h("b", {}, t.num, t.unit), t.cap)));
       const dds = Array.from({ length: 8 }, dd);
       const accessLink = h("a", { href: "#/security" }, "Security ›");
       const reach = h("dd", {});
@@ -180,8 +239,10 @@ register("model", (blade) => {
         h("div", { class: "twins wide" }));
       const twins = sec.querySelector(".twins");
       const overview = h("div", { class: "main2 ov" }, sec);
-      const subHost = h("div", { class: "main2 subhost", hidden: true });
-      body.replaceChildren(h("div", { class: "mpage" }, mhead, overview, subHost));
+      const subHostEl = h("div", { class: "main2 subhost", hidden: true });
+      const subs = subHost(subHostEl, (bladeName, model) => makeBlade(bladeName, { id: model }, false));
+      const panel = h("div", { class: "tpanel", role: "tabpanel", id: "mp-panel" }, overview, subHostEl);
+      body.replaceChildren(h("div", { class: "mpage" }, mhead, panel));
 
       // -- tabs ---------------------------------------------------------------------------------
       function placePill(instant) {
@@ -192,27 +253,14 @@ register("model", (blade) => {
         pill.style.width = `${on.offsetWidth}px`;
         if (instant) { void pill.offsetWidth; pill.style.transition = ""; }
       }
-      function closeSub() {
-        if (!sub) return;
-        sub.alive = false;
-        try { if (sub.onClose) sub.onClose(); } catch (e) { console.error("model tab failed to close cleanly", e); }
-        sub.el.remove();
-        sub = null;
-      }
       function showTab() {
-        tabBtns.forEach((b, key) => { b.classList.toggle("on", key === tab); b.setAttribute("aria-selected", String(key === tab)); });
+        tabsUi.select(tab);
+        panel.setAttribute("aria-labelledby", `mp-tab-${tab}`);
         placePill(false);
-        closeSub();
         const def = TAB_DEFS.find((t) => t.key === tab);
         overview.hidden = Boolean(def.blade);
-        subHost.hidden = !def.blade;
-        if (!def.blade) return;
-        const made = makeBlade(def.blade, { id: name }, false);
-        sub = made.blade;
-        sub.el.classList.add("embed");
-        sub.mode = "full";
-        subHost.replaceChildren(sub.el);
-        if (made.def.mount) made.def.mount(sub.body, sub);
+        subHostEl.hidden = !def.blade;
+        subs.show(def.blade || null, name);
       }
 
       // -- actions -------------------------------------------------------------------------------
@@ -257,6 +305,7 @@ register("model", (blade) => {
         const m = currentModel();
         const gb = m ? overviewView(m, ctxNow()).fit.thisGb : 0;
         btn.lastChild.textContent = confirming ? `Click again to remove${gb ? ` (${gb} GB)` : ""}` : "Remove";
+        btn.setAttribute("aria-label", removeLabel(name, confirming));
         btn.classList.toggle("armed", confirming);
       }
       function paintBar() {
@@ -303,7 +352,7 @@ register("model", (blade) => {
         // Right now: the same four tiles, numbers morph
         metricsView(v).forEach((t, i) => {
           const el = tiles[i];
-          el.label.textContent = t.label; el.label.title = t.hint || "";
+          el.label.textContent = t.label; el.cap.textContent = t.hint || "";
           morph(el.num, t.value, t.digits);
           el.unit.textContent = t.value === null || !t.unit ? "" : t.unit;
         });
@@ -345,7 +394,7 @@ register("model", (blade) => {
       const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => placePill(true)) : null;
       if (ro) ro.observe(tabs);
       const off = onData(draw);
-      blade.onClose = () => { off(); clearTimeout(confirmTimer); closeSub(); if (ro) ro.disconnect(); };
+      blade.onClose = () => { off(); clearTimeout(confirmTimer); subs.close(); if (ro) ro.disconnect(); };
       draw();
       showTab();
       requestAnimationFrame(() => placePill(true));

@@ -20,10 +20,9 @@
 .pmenu .mdot { width: 9px; height: 9px; border-radius: 50%; background: var(--mc); flex: none; opacity: .45; }
 .pmenu .mdot.running { opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--oq-ok) 25%, transparent); }
 .pmenu .mdot.crashed { background: var(--oq-bad); opacity: 1; }
-@container (max-width: 760px) {
-  .pmenu { left: 0; right: 0; top: 36px; bottom: 0; width: auto; max-width: none; max-height: none; border-radius: 22px 22px 0 0; transform: translateY(100%); opacity: 1; }
-  .pmenu.open { transform: none; }
-  .pmenu .grab2 { display: block; }
-  .pmenu .pr { min-height: 52px; }
-}
+/* a narrow page (picker.js decides, with the same 760 px cut as the page): a bottom sheet */
+.pmenu.sheet { left: 0; right: 0; top: 36px; bottom: 0; width: auto; max-width: none; max-height: none; border-radius: 22px 22px 0 0; transform: translateY(100%); opacity: 1; }
+.pmenu.sheet.open { transform: none; }
+.pmenu.sheet .grab2 { display: block; }
+.pmenu.sheet .pr { min-height: 52px; }
 @media (prefers-reduced-motion: reduce) { .pmenu { transition: none; } }
