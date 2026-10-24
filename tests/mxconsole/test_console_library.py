@@ -119,16 +119,127 @@ def test_dragging_a_ticked_row_takes_all_ticked_but_an_unticked_row_goes_alone()
 
 
 @needs_node
-def test_a_failed_request_puts_the_old_state_back_and_says_why():
+def test_a_refused_change_is_undone_alone_and_says_why():
     got = run_node("""
-      let state = {labels: ["a"]}; const seen = []; const toasts = [];
-      const run = (request) => m.optimistic({get: () => state, set: (s) => { state = s; seen.push(s.labels.join()); },
-        next: (s) => ({labels: [...s.labels, "b"]}), request, onError: (msg) => toasts.push(msg)});
-      const ok = await run(async () => {});
-      const bad = await run(async () => { throw new Error("a label named b already exists"); });
-      console.log(JSON.stringify({ok, bad, seen, state: state.labels, toasts}));
+      let state = {labels: ["a"]}; const toasts = [];
+      const add = (name) => ({next: (s) => ({labels: [...s.labels, name]}), undo: (s) => ({labels: s.labels.filter((l) => l !== name)})});
+      const run = (name, request) => m.optimistic({get: () => state, set: (s) => { state = s; }, ...add(name), request, onError: (msg) => toasts.push(msg)});
+      const ok = await run("b", async () => {});
+      const bad = await run("c", async () => { throw new Error("label c refused"); });
+      console.log(JSON.stringify({ok, bad, state: state.labels, toasts}));
     """)
-    assert got == {"ok": True, "bad": False, "seen": ["a,b", "a,b,b", "a,b"], "state": ["a", "b"], "toasts": ["a label named b already exists"]}
+    assert got == {"ok": True, "bad": False, "state": ["a", "b"], "toasts": ["label c refused"]}
+
+
+@needs_node
+def test_when_the_first_of_two_overlapping_changes_fails_the_second_survives():
+    got = run_node("""
+      let state = {labels: ["a"]}; const toasts = [];
+      const add = (name) => ({next: (s) => ({labels: [...s.labels, name]}), undo: (s) => ({labels: s.labels.filter((l) => l !== name)})});
+      const run = (name, request) => m.optimistic({get: () => state, set: (s) => { state = s; }, ...add(name), request, onError: (msg) => toasts.push(msg)});
+      const slowFail = run("b", () => new Promise((_, no) => setTimeout(() => no(new Error("b refused")), 30)));
+      const quickOk = run("c", async () => {});
+      const during = state.labels.join();
+      await Promise.all([slowFail, quickOk]);
+      console.log(JSON.stringify({during, state: state.labels, toasts}));
+    """)
+    assert got == {"during": "a,b,c", "state": ["a", "c"], "toasts": ["b refused"]}
+
+
+@needs_node
+def test_undoing_a_delete_puts_the_label_back_where_it_was_on_the_models_that_had_it():
+    s = '{labels: ["work", "favorites", "experiments"], models: M}'
+    got = node(f'(() => {{ const s0 = {s}; const had = s0.models.filter(x => x.labels.includes("work")).map(x => x.name); '
+               f'const gone = m.deleted(s0, "work"); const back = m.restoredLabel(gone, "work", 0, had); return [back.labels, back.models.map(x => x.labels)]; }})()')
+    assert got == [["work", "favorites", "experiments"], [["favorites", "work"], ["work"], [], ["experiments"], ["experiments"]]]
+    # the same models that were added to in the meantime keep their new labels
+    extra = node(f'(() => {{ const s0 = {s}; const gone = m.deleted(s0, "work"); const later = m.added(gone, ["bge-small"], "favorites"); '
+                 f'return m.restoredLabel(later, "work", 1, ["qwen2.5-0.5b"]).models[3].labels; }})()')
+    assert extra == ["experiments", "favorites"]
+
+
+@needs_node
+def test_undoing_a_reorder_follows_the_old_order_and_keeps_labels_made_since():
+    assert node('m.restoredOrder({labels: ["c", "a", "b", "new"], models: []}, ["a", "b", "c"]).labels') == ["a", "b", "c", "new"]
+    assert node('m.restoredOrder({labels: ["c", "a"], models: []}, ["a", "b", "c"]).labels') == ["a", "c"]  # b was deleted meanwhile
+
+
+DOM_SHIM = """
+  class Node {}
+  class Text extends Node { constructor(d) { super(); this.data = String(d); } }
+  class El extends Node {
+    constructor(tag) { super(); this.tag = tag; this.children = []; this.attrs = {}; this.listeners = {}; this.cls = new Set(); this.style = { setProperty() {}, cssText: "" }; this.dataset = {}; this.scrollWidth = 0; this.clientWidth = 0;
+      this.classList = { toggle: (c, on) => { (on === undefined ? !this.cls.has(c) : on) ? this.cls.add(c) : this.cls.delete(c); }, add: (c) => this.cls.add(c), remove: (c) => this.cls.delete(c), contains: (c) => this.cls.has(c) }; }
+    setAttribute(k, v) { this.attrs[k] = v; } addEventListener(t, f) { (this.listeners[t] ||= []).push(f); } removeEventListener() {}
+    append(...c) { this.children.push(...c); } replaceChildren(...c) { this.children = c; }
+    querySelector() { return null; } querySelectorAll() { return []; } focus() { document.activeElement = this; }
+    contains(n) { return n === this || this.children.some((c) => c.contains && c.contains(n)); }
+  }
+  const docListeners = {};
+  globalThis.Node = Node;
+  globalThis.document = { activeElement: { tagName: "BODY" }, createElement: (t) => new El(t), createElementNS: (_, t) => new El(t), createTextNode: (d) => new Text(d),
+    getElementById: () => toastEl, addEventListener(t, f) { docListeners[t] = f; }, removeEventListener(t) { delete docListeners[t]; } };
+  const toastEl = new El("div");
+  const walk = (n, out = []) => { out.push(n); (n.children || []).forEach((c) => walk(c, out)); return out; };
+  const core = await import(CORE);
+  const { createLibrary, tagsEl } = await import(LIB);
+"""
+
+
+def run_dom(body: str):
+    pre = f"const CORE = {json.dumps((CONSOLE_DIR / 'core.js').as_uri())}, LIB = {json.dumps((CONSOLE_DIR / 'library.js').as_uri())};"
+    script = pre + DOM_SHIM + body
+    out = subprocess.run(["node", "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    return json.loads(out.stdout)
+
+
+@needs_node
+def test_slash_focuses_the_search_unless_you_are_already_typing():
+    got = run_dom("""
+      const lib = createLibrary({ onChange() {} }); lib.listen();
+      const press = (active) => { document.activeElement = active; const e = { key: "/", prevented: false, preventDefault() { this.prevented = true; } }; docListeners.keydown(e); return e.prevented; };
+      const a = press({ tagName: "BODY" }); const focused = document.activeElement.tag;
+      const b = press({ tagName: "INPUT" });
+      console.log(JSON.stringify({ a, focused, b }));
+    """)
+    assert got == {"a": True, "focused": "input", "b": False}
+
+
+@needs_node
+def test_a_refused_delete_or_rename_keeps_you_on_the_label_you_were_viewing():
+    got = run_dom("""
+      globalThis.fetch = async () => ({ ok: false, status: 409, headers: { get: () => "application/json" }, json: async () => ({ error: { message: "refused" } }) });
+      core.store.models = [{ name: "m", kind: "chat", state: "cold", labels: ["work"] }];
+      const lib = createLibrary({ onChange() {} });
+      const press = (label) => walk(lib.groups).find((n) => n.attrs && n.attrs["aria-label"] === label).listeners.click[0]();
+      const later = () => new Promise((r) => setTimeout(r, 20));
+      const out = {};
+      lib.labels = ["work"]; lib.group = "label:work"; lib.editing = true; lib.update();
+      press("Delete work"); out.during = lib.group; await later();
+      out.afterDelete = [lib.group, lib.labels, core.store.models[0].labels];
+      const field = walk(lib.groups).find((n) => n.attrs && n.attrs["aria-label"] === "Rename work");
+      field.value = "job"; field.listeners.change[0](); await later();
+      out.afterRename = [lib.group, lib.labels, core.store.models[0].labels];
+      console.log(JSON.stringify(out));
+    """)
+    assert got["during"] == "all"  # the column falls back to All while the delete is pending
+    assert got["afterDelete"] == ["label:work", ["work"], ["work"]]
+    assert got["afterRename"] == ["label:work", ["work"], ["work"]]
+
+
+@needs_node
+def test_label_and_model_names_render_as_text_never_as_html():
+    got = run_dom("""
+      const evil = "<img src=x onerror=alert(1)>";
+      core.store.models = [{ name: "m", kind: "chat", state: "cold", labels: [evil] }];
+      const lib = createLibrary({ onChange() {} });
+      lib.labels = [evil]; lib.ticked.add("m"); lib.update();
+      const nodes = [...walk(lib.groups), ...walk(lib.bar), ...walk(tagsEl(core.store.models[0]))];
+      console.log(JSON.stringify({ text: nodes.filter((n) => n instanceof Text).map((n) => n.data).filter((d) => d.includes("img")),
+        elements: nodes.filter((n) => n.tag).map((n) => n.tag).filter((t) => t === "img" || t === "script") }));
+    """)
+    assert got["elements"] == [] and "<img src=x onerror=alert(1)>" in got["text"] and "#<img src=x onerror=alert(1)>" in got["text"]
 
 
 async def test_the_library_files_are_served_and_linked(http):
@@ -142,6 +253,16 @@ def test_library_css_braces_balance_and_phone_rules_exist():
     assert css.count("{") == css.count("}")
     phone = css[css.index("@media (max-width: 760px)"):]
     assert ".groups.editing" in phone and ".lib:has(.groups.editing) .res { display: none; }" in phone  # Edit labels is full height
+
+
+def test_touch_targets_reach_44px_on_the_phone_through_hit_areas_not_bigger_boxes():
+    phone = (CONSOLE_DIR / "library.css").read_text().split("@media (max-width: 760px)")[1]
+    for sel, inset in ((".cb", "-10.5px"), (".chip", "-6px 0"), (".gi:not(.edit):not(.new)", "-4px 0"), (".hdl", "-2px -5px"), (".gi .x", "-4px"), (".gh .ed", "-4px 0")):
+        assert re.search(re.escape(sel) + r"::after \{ inset: " + re.escape(inset) + r"; \}", phone), sel
+
+
+def test_select_all_shown_reports_its_state_like_the_row_ticks():
+    assert 'selAll.setAttribute("aria-pressed"' in (CONSOLE_DIR / "blade-home.js").read_text()
 
 
 def test_the_fake_models_script_fills_a_scratch_store_and_refuses_the_real_one(tmp_path, monkeypatch):

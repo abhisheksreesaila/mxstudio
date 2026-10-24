@@ -102,6 +102,15 @@
   .cnt { padding: 10px 14px 0; }
   .selbar { padding: 10px 12px; }
   .cb { width: 26px; height: 26px; }
-  .cx-tbl .ck { width: 34px; }
+  .cx-tbl .ck { width: 46px; }
+  /* touch: every target is at least 44 px to hit, without changing how big it looks (the visible box stays) */
+  .cb, .chip, .gh .ed, .hdl, .gi .x, .gi:not(.edit):not(.new) { position: relative; }
+  .cb::after, .chip::after, .gh .ed::after, .hdl::after, .gi .x::after, .gi:not(.edit):not(.new)::after { content: ""; position: absolute; }
+  .cb::after { inset: -10.5px; }                           /* 26 (1.5 px border inside) -> 44 */
+  .chip::after { inset: -6px 0; }                          /* 32 -> 44 high */
+  .gi:not(.edit):not(.new)::after { inset: -4px 0; }       /* 36 -> 44 high */
+  .gh .ed::after { inset: -4px 0; }                        /* 36 -> 44 high */
+  .hdl::after { inset: -2px -5px; }                        /* 34 x 40 -> 44 x 44 */
+  .gi .x::after { inset: -4px; }                           /* 36 -> 44 */
 }
 @media (prefers-reduced-motion: reduce) { .selbar.on, .gi.got { animation: none; } }

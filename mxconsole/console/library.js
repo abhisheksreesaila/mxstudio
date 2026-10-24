@@ -3,7 +3,7 @@
 // The rules live in library-logic.js (pure); this file draws them and talks to /admin/labels.
 // Everything goes in as text nodes. Changes are shown at once and put back, with the server's reason, if refused.
 import { h, icon, api, store, refresh, toast } from "./core.js";
-import { KINDS, counts, visibleModels, bulkState, toggleOn, added, created, renamed, deleted, ordered, cleanLabel, reorder, dragNames, optimistic } from "./library-logic.js";
+import { KINDS, counts, visibleModels, bulkState, toggleOn, added, removed, created, renamed, deleted, ordered, restoredLabel, restoredOrder, cleanLabel, reorder, dragNames, optimistic } from "./library-logic.js";
 
 const enc = encodeURIComponent;
 export const kindName = (k) => (KINDS.find(([id]) => id === k) || [k, k])[1];
@@ -24,14 +24,14 @@ export function createLibrary({ onChange, placeholder = "Search by name, kind or
   let sig = "", shapeNow = "", busy = 0, adding = false;
   const models = () => store.models || [];
   const cur = () => ({ labels: lib.labels, models: models() });
-  const put = (s) => { lib.labels = s.labels; store.models = s.models; };
+  const put = (s) => { lib.loaded = true; lib.labels = s.labels; store.models = s.models; };
   const force = () => { sig = ""; shapeNow = ""; lib.update(); };
   const changed = () => { lib.update(); onChange(); };
 
-  /** Show a change now, send it, and take it back (with a toast) if the daemon says no. */
-  async function mutate(next, request) {
+  /** Show a change now, send it, and undo just that change (with a toast) if the daemon says no. */
+  async function mutate(next, undo, request, onFail) {
     busy++;
-    const ok = await optimistic({ get: cur, set: (s) => { put(s); changed(); }, next, request, onError: (m) => toast(m) });
+    const ok = await optimistic({ get: cur, set: (s) => { put(s); changed(); }, next, undo, request, onError: (m) => { if (onFail) { onFail(); changed(); } toast(m); } });
     busy--;
     if (ok) await Promise.all([refresh(), lib.loadLabels()]);
     return ok;
@@ -70,20 +70,24 @@ export function createLibrary({ onChange, placeholder = "Search by name, kind or
     if (lib.labels.includes(name)) { toast(`There is already a label called ${name}`); force(); return; }
     const ticked = [...lib.ticked];  // new label while models are ticked: it goes on them straight away
     await mutate((s) => (ticked.length ? added(created(s, name), ticked, name) : created(s, name)),
+      (s) => deleted(ticked.length ? removed(s, ticked, name) : s, name),
       () => (ticked.length ? api("POST", `/admin/labels/${enc(name)}/add`, { models: ticked }) : api("POST", "/admin/labels", { name })));
   }
   async function renameLabel(from, raw, field) {
     const to = cleanLabel(raw);
     if (!to || to === from) { field.value = from; return; }
     if (lib.labels.includes(to)) { toast(`There is already a label called ${to}`); field.value = from; return; }
-    if (lib.group === `label:${from}`) lib.group = `label:${to}`;
-    await mutate((s) => renamed(s, from, to), () => api("PATCH", `/admin/labels/${enc(from)}`, { name: to }));
+    const selected = lib.group === `label:${from}`;
+    if (selected) lib.group = `label:${to}`;
+    await mutate((s) => renamed(s, from, to), (s) => renamed(s, to, from), () => api("PATCH", `/admin/labels/${enc(from)}`, { name: to }),
+      () => { if (selected) lib.group = `label:${from}`; });
   }
   async function deleteLabel(name) {
-    if (lib.group === `label:${name}`) lib.group = "all";
-    await mutate((s) => deleted(s, name), () => api("DELETE", `/admin/labels/${enc(name)}`));
+    const group = lib.group, index = lib.labels.indexOf(name), had = models().filter((m) => (m.labels || []).includes(name)).map((m) => m.name);
+    await mutate((s) => deleted(s, name), (s) => restoredLabel(s, name, index, had), () => api("DELETE", `/admin/labels/${enc(name)}`),
+      () => { lib.group = group; });  // the group falls back to All while the delete is pending, and comes back if it is refused
   }
-  const saveOrder = (names) => mutate((s) => ordered(s, names), () => api("PUT", "/admin/labels/order", { names }));
+  const saveOrder = (names) => { const previous = [...lib.labels]; return mutate((s) => ordered(s, names), (s) => restoredOrder(s, previous), () => api("PUT", "/admin/labels/order", { names })); };
 
   function editRow(name) {
     const field = h("input", { value: name, maxlength: "40", "aria-label": `Rename ${name}`, onChange: () => renameLabel(name, field.value, field),
@@ -175,7 +179,8 @@ export function createLibrary({ onChange, placeholder = "Search by name, kind or
     names = Array.isArray(names) ? names.filter((n) => typeof n === "string") : [];
     if (!names.length) return;
     const label = t.dataset.lab;
-    const ok = await mutate((s) => added(s, names, label), () => api("POST", `/admin/labels/${enc(label)}/add`, { models: names }));
+    const lacking = names.filter((n) => !(models().find((m) => m.name === n)?.labels || []).includes(label));
+    const ok = await mutate((s) => added(s, names, label), (s) => removed(s, lacking, label), () => api("POST", `/admin/labels/${enc(label)}/add`, { models: names }));
     if (ok) {
       toast(`${names.length === 1 ? names[0] : `${names.length} models`} labelled #${label}`);
       lib.groups.querySelectorAll(`.gi[data-lab="${label}"]`).forEach((x) => { x.classList.add("got"); setTimeout(() => x.classList.remove("got"), 700); });
@@ -190,7 +195,8 @@ export function createLibrary({ onChange, placeholder = "Search by name, kind or
   async function tap(label) {
     const names = [...lib.ticked];
     const { action } = toggleOn(cur(), names, label);
-    await mutate((s) => toggleOn(s, names, label).state, () => api("POST", `/admin/labels/${enc(label)}/${action}`, { models: names }));
+    const lacking = names.filter((n) => !(models().find((m) => m.name === n)?.labels || []).includes(label));
+    await mutate((s) => toggleOn(s, names, label).state, (s) => (action === "add" ? removed(s, lacking, label) : added(s, names, label)), () => api("POST", `/admin/labels/${enc(label)}/${action}`, { models: names }));
   }
   function drawBar() {
     const names = [...lib.ticked];
@@ -212,6 +218,7 @@ export function createLibrary({ onChange, placeholder = "Search by name, kind or
       const list = await api("GET", "/admin/labels");
       if (busy) return;
       const names = list.map((l) => l.name);
+      lib.loaded = true;
       if (names.join() !== lib.labels.join()) { lib.labels = names; changed(); }
     } catch (_) { /* the page's own "daemon not answering" note covers it */ }
   };
@@ -219,7 +226,7 @@ export function createLibrary({ onChange, placeholder = "Search by name, kind or
   lib.update = () => {
     const have = new Set(models().map((m) => m.name));
     for (const n of [...lib.ticked]) if (!have.has(n)) lib.ticked.delete(n);
-    if (lib.group.startsWith("label:") && !lib.labels.includes(lib.group.slice(6)) && lib.labels.length) lib.group = "all";
+    if (lib.group.startsWith("label:") && !lib.labels.includes(lib.group.slice(6)) && lib.loaded) lib.group = "all";
     drawGroups();
     drawBar();
   };

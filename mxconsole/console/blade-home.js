@@ -189,7 +189,9 @@ register("home", (blade) => ({
       refs.stale.hidden = !store.error;
       callouts(all);
       emptyNote(all);
-      selAll.classList.toggle("on", shown.length > 0 && shown.every((v) => lib.ticked.has(v.name)));
+      const allTicked = shown.length > 0 && shown.every((v) => lib.ticked.has(v.name));
+      selAll.classList.toggle("on", allTicked);
+      selAll.setAttribute("aria-pressed", String(allTicked));
       refs.cnt.textContent = `${groupName(lib.group)} · ${shown.length}${lib.q.trim() ? ` matching “${lib.q.trim()}”` : ""}`;
       refs.none.hidden = shown.length > 0;
       refs.none.textContent = shown.length ? "" : "Nothing matches. Try another group or clear the search.";

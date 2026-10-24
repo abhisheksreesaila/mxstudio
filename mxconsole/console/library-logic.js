@@ -90,15 +90,26 @@ export function reorder(names, name, before) {
 /** A row dragged from a ticked set takes the whole set; an unticked row goes alone. */
 export const dragNames = (dragged, ticked) => (ticked.includes(dragged) ? [...ticked] : [dragged]);
 
-/** Apply a change at once, send it, and put the old state back with the server's reason when it is refused. */
-export async function optimistic({ get, set, next, request, onError }) {
-  const before = get();
-  set(next(before));
+/** Undo a delete: the label goes back at its old place on the models that had it. */
+export function restoredLabel(state, name, index, names) {
+  const labels = state.labels.includes(name) ? state.labels : [...state.labels.slice(0, index), name, ...state.labels.slice(index)];
+  return added({ ...state, labels }, names, name);
+}
+/** Undo a reorder: your labels follow the old order; labels made since go last. */
+export function restoredOrder(state, previous) {
+  const known = state.labels.filter((l) => previous.includes(l)).sort((a, b) => previous.indexOf(a) - previous.indexOf(b));
+  return { ...state, labels: [...known, ...state.labels.filter((l) => !previous.includes(l))] };
+}
+
+/** Apply a change at once and send it. When the daemon refuses, undo just that change (`undo` is its inverse, run on
+ *  the state as it is by then, so other changes and polls that landed meanwhile stay) and say why. */
+export async function optimistic({ get, set, next, undo, request, onError }) {
+  set(next(get()));
   try {
     await request();
     return true;
   } catch (e) {
-    set(before);
+    set(undo(get()));
     onError(e.message);
     return false;
   }
