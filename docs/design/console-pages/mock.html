@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>omxconsole · pages, not blades · mock v2</title>
+<title>omxconsole · pages, not blades · mock v3</title>
 <link rel="stylesheet" href="../omxconsole/omxqua/src/fonts.css">
 <link rel="stylesheet" href="../omxconsole/omxqua/src/tokens.css">
 <link rel="stylesheet" href="../omxconsole/omxqua/src/components.css">
@@ -49,18 +49,44 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 .bcn .mono { color: var(--oq-ink-2); font-family: var(--oq-font-mono); }
 
 /* ---- the picker: a menu on desktop, a sheet on the phone ---- */
-.pmenu { position: absolute; z-index: 40; top: 64px; width: 340px; padding: 6px; border-radius: 16px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-3, var(--oq-shadow-2));
+.pmenu { position: absolute; z-index: 40; top: 64px; width: 390px; padding: 6px; border-radius: 16px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-3, var(--oq-shadow-2));
   opacity: 0; transform: translateY(-6px) scale(.98); transform-origin: top center; pointer-events: none; transition: opacity .22s, transform .26s cubic-bezier(.2,.8,.2,1); }
 .pmenu.open { opacity: 1; transform: none; pointer-events: auto; }
 .pmenu .hd { font: 500 11px var(--oq-font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--oq-ink-2); padding: 8px 10px 6px; }
-.pmenu button { width: 100%; border: 0; background: none; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 10px; text-align: left; }
-.pmenu button:hover { background: rgb(var(--oq-state) / .06); }
-.pmenu button.on { background: rgb(var(--oq-state) / .1); }
-.pmenu b { flex: 1; font: 600 13px var(--oq-font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pmenu span { font: 12px var(--oq-font-mono); color: var(--oq-ink-2); }
+.pmenu .pr { width: 100%; border: 0; background: none; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 10px; text-align: left; }
+.pmenu .pr:hover, .pmenu .pr.kb { background: rgb(var(--oq-state) / .06); }
+.pmenu .pr.on { background: rgb(var(--oq-state) / .1); }
+.pmenu .pr b { flex: 1; font: 600 13px var(--oq-font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pmenu .pr > span:last-child { font: 12px var(--oq-font-mono); color: var(--oq-ink-2); }
 .pmenu .add { color: var(--oq-ink-2); font-weight: 600; font-size: 13px; border-top: 1px solid var(--oq-line-2); border-radius: 0 0 10px 10px; margin-top: 4px; }
 .scrim2 { position: absolute; inset: 0; z-index: 39; display: none; transition: background .2s; }
 .scrim2.on { display: block; }
+/* scale: search + label chips, shared by My models and the picker */
+.psearch { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; border-radius: 12px; background: rgb(var(--oq-state) / .06); }
+.psearch .ico { color: var(--oq-ink-2); }
+.psearch input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--oq-ink); font: 500 14px var(--oq-font); }
+.psearch input::placeholder { color: var(--oq-ink-faint); }
+.psearch kbd { font: 11px var(--oq-font-mono); color: var(--oq-ink-faint); padding: 2px 6px; border-radius: 6px; background: rgb(var(--oq-state) / .06); }
+.pmenu .psearch { margin: 4px 4px 8px; }
+.chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 4px 6px; }
+.chip { flex: none; border: 0; height: 32px; padding: 0 12px; border-radius: 999px; background: rgb(var(--oq-state) / .06); color: var(--oq-ink-2); font: 600 12.5px var(--oq-font); display: inline-flex; align-items: center; gap: 6px; transition: background .15s, color .15s; }
+.chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.chip small { font: 11px var(--oq-font-mono); opacity: .6; }
+.chip.on { background: var(--oq-ink); color: var(--oq-surface-0); }
+.chip .h { opacity: .5; }
+.chips .div { flex: none; width: 1px; background: var(--oq-line-2); margin: 6px 2px; }
+.plist { max-height: 380px; overflow: auto; overscroll-behavior: contain; }
+.pmenu .grp { font: 500 10.5px var(--oq-font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--oq-ink-faint); padding: 10px 10px 4px; display: flex; align-items: center; gap: 6px; }
+.pmenu .grp i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.pmenu .none { padding: 18px 10px; color: var(--oq-ink-2); font-size: 13px; }
+.tag { display: inline-flex; align-items: center; gap: 5px; font: 500 11.5px var(--oq-font); padding: 3px 9px; border-radius: 999px; background: rgb(var(--oq-state) / .06); color: var(--oq-ink-2); margin: 0 4px 2px 0; white-space: nowrap; border: 0; }
+.tag.k { color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); }
+.tag.add { cursor: pointer; color: var(--oq-ink-faint); }
+.tag input { width: 80px; border: 0; background: none; outline: none; color: var(--oq-ink); font: inherit; }
+.dl dd.wrap { white-space: normal; overflow: visible; }
+.hbar { display: flex; flex-direction: column; gap: 10px; padding: 12px 18px 0; }
+.hbar .chips { padding: 0; }
+.cnt { font: 11.5px var(--oq-font-mono); color: var(--oq-ink-2); padding: 10px 18px 0; }
 .grab2 { display: none; width: 38px; height: 5px; border-radius: 3px; background: var(--oq-line); margin: 0 auto 8px; }
 
 /* ---- pages ---- */
@@ -183,11 +209,11 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
   .pmenu { top: auto !important; bottom: 0; left: 0 !important; width: auto; right: 0; border-radius: 22px 22px 0 0; padding: 10px 10px 30px; transform: translateY(100%); opacity: 1; }
   .pmenu.open { transform: none; }
   .pmenu .grab2 { display: block; }
-  .pmenu button { min-height: 52px; }
+  .pmenu .pr { min-height: 52px; } .plist { max-height: 330px; } .psearch kbd { display: none; }
   .scrim2.on { background: rgb(0 0 0 / .4); }
   .cx-tbl .hide-p { display: none; }
   .ph2 { padding: 12px 14px; } .ph2 .src, .ph2 .sub { display: none; }
-  .body2 { padding: 8px 14px; }
+  .body2 { padding: 8px 14px; } .hbar { padding: 10px 12px 0; } .cnt { padding: 8px 14px 0; } .cx-tbl .tg { display: none; }
 }
 </style>
 </head>
@@ -213,8 +239,10 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
     <main class="pages">
       <!-- My models -->
       <section class="page" data-page="home"><div class="sheet2">
-        <div class="ph2"><div class="bi" style="--c:var(--oq-data-1)"><svg class="ico"><use href="#i-box"/></svg></div><div><h2>My models</h2><div class="sub">4 models · 2 running · 11.2 of 24 GB GPU</div></div><div class="sp"></div><span class="src">mxc ls</span><button class="fb fill" data-go="#/add"><svg class="ico"><use href="#i-plus"/></svg>Add</button></div>
-        <div class="body2"><table class="cx-tbl"><thead><tr><th>Model</th><th>State</th><th class="hide-p">Architecture</th><th class="num hide-p">Memory</th><th class="num">tok/s</th></tr></thead><tbody id="rows"></tbody></table></div>
+        <div class="ph2"><div class="bi" style="--c:var(--oq-data-1)"><svg class="ico"><use href="#i-box"/></svg></div><div><h2>My models</h2><div class="sub" id="hsub"></div></div><div class="sp"></div><span class="src">mxc ls</span><button class="fb fill" data-go="#/add"><svg class="ico"><use href="#i-plus"/></svg>Add</button></div>
+        <div class="hbar"><label class="psearch"><svg class="ico"><use href="#i-search"/></svg><input id="hq" placeholder="Search models and labels" autocomplete="off"><kbd>/</kbd></label><div class="chips" id="hchips"></div></div>
+        <div class="cnt" id="hcnt"></div>
+        <div class="body2"><table class="cx-tbl"><thead><tr><th>Model</th><th>State</th><th class="tg">Labels</th><th class="num hide-p">Memory</th><th class="num">tok/s</th></tr></thead><tbody id="rows"></tbody></table></div>
       </div></section>
 
       <!-- the one model page -->
@@ -238,12 +266,15 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
  </div>
 
   <div class="scrim2" id="scrim"></div>
-  <div class="pmenu" id="pmenu"><div class="grab2"></div><div class="hd">Switch model · stays on <span id="pmsec"></span></div><div id="plist"></div>
-    <button class="add" data-go="#/add"><svg class="ico"><use href="#i-plus"/></svg>Add a model</button></div>
+  <div class="pmenu" id="pmenu"><div class="grab2"></div>
+    <label class="psearch"><svg class="ico"><use href="#i-search"/></svg><input id="pq" placeholder="Find a model" autocomplete="off"><kbd>esc</kbd></label>
+    <div class="chips" id="pchips"></div>
+    <div class="hd">Switch model · stays on <span id="pmsec"></span></div><div class="plist" id="plist"></div>
+    <button class="pr add" data-go="#/add"><svg class="ico"><use href="#i-plus"/></svg>Add a model</button></div>
 </div>
 </div>
 
-<div class="demo"><span>Mock v2</span><button class="on" data-dev="desk">Desktop</button><button data-dev="phone">Phone</button></div>
+<div class="demo"><span>Mock v3</span><button class="on" data-dev="desk">Desktop</button><button data-dev="phone">Phone</button></div>
 
 <svg width="0" height="0" style="position:absolute"><defs>
 <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
@@ -264,6 +295,7 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 <symbol id="i-stop" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
 <symbol id="i-rot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
 <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
 </defs></svg>
 
 <script>
@@ -275,6 +307,22 @@ const MODELS = [
   { name: "qwen2.5-coder-1.5b-instruct", arch: "Qwen2", state: "", word: "stopped", mem: 0, tps: 0, req: 0, p50: 0, ctx: "32k", repo: "Qwen/Qwen2.5-Coder-1.5B-Instruct", q: "bf16", series: [], bench: [] },
   { name: "llama-3.2-1b", arch: "Llama", state: "bad", word: "crashed", mem: 0, tps: 0, req: 40, p50: 260, ctx: "128k", repo: "meta-llama/Llama-3.2-1B-Instruct", q: "bf16", series: [2,3,2,1,0,0,0,0,0,0,0,0], bench: [] },
 ];
+// Kind comes from the model card (automatic); labels are yours, any number per model.
+const KINDS = { chat: ["Chat", "var(--oq-data-1)"], coder: ["Coder", "var(--oq-data-4)"], vision: ["Vision", "var(--oq-data-2)"], embeddings: ["Embeddings", "var(--oq-data-3)"], image: ["Image", "var(--oq-warn)"] };
+Object.assign(MODELS[0], { kind: "chat", labels: ["work", "favorites"] }); Object.assign(MODELS[1], { kind: "chat", labels: ["experiments"] });
+Object.assign(MODELS[2], { kind: "coder", labels: ["work"] }); Object.assign(MODELS[3], { kind: "chat", labels: [] });
+const FAM = [["qwen2.5", "Qwen2", "chat", ["1.5b", "3b", "7b", "14b"]], ["qwen2.5-coder", "Qwen2", "coder", ["0.5b", "3b", "7b", "14b"]], ["llama-3.2", "Llama", "chat", ["3b"]], ["llama-3.1", "Llama", "chat", ["8b"]],
+  ["gemma-3", "Gemma3", "chat", ["1b", "4b", "12b"]], ["phi-4-mini", "Phi3", "chat", ["3.8b"]], ["smollm2", "Llama", "chat", ["135m", "360m", "1.7b"]], ["mistral", "Mistral", "chat", ["7b"]],
+  ["granite-3.1", "Granite", "chat", ["2b", "8b"]], ["deepseek-coder", "Llama", "coder", ["1.3b", "6.7b"]], ["starcoder2", "Starcoder2", "coder", ["3b", "7b"]], ["qwen2.5-vl", "Qwen2VL", "vision", ["3b", "7b"]],
+  ["smolvlm", "Idefics3", "vision", ["256m", "2.2b"]], ["gemma-3-vision", "Gemma3", "vision", ["4b"]], ["bge", "BERT", "embeddings", ["small", "base", "large"]], ["nomic-embed-text", "NomicBERT", "embeddings", ["v1.5"]],
+  ["e5", "BERT", "embeddings", ["small", "large"]], ["flux.1", "Flux", "image", ["schnell", "dev"]], ["sdxl", "SDXL", "image", ["turbo", "base"]]];
+const MINE = ["work", "experiments", "favorites", "client-acme"];
+let n = 0;
+for (const [f, arch, kind, sizes] of FAM) for (const z of sizes) for (const v of kind === "chat" || kind === "coder" ? ["", "-instruct", "-q4"] : ["", "-q8"]) {
+  const name = `${f}-${z}${v}`; if (MODELS.some((m) => m.name === name) || MODELS.length >= 100) continue; n++;
+  MODELS.push({ name, arch, kind, labels: MINE.filter((_, i) => n % [5, 7, 11, 13][i] === 0), state: "", word: "stopped", mem: 0, tps: 0, req: 0, p50: 0, ctx: "32k", repo: `hf/${name}`, q: "bf16", series: [], bench: [] });
+}
+let RECENT = ["qwen2.5-0.5b", "smollm3-3b", "qwen2.5-coder-1.5b-instruct"];
 // A model's sections. Security is not here: it is one place for every model (the nav), and Overview links to it.
 const SECS = [["overview", "Overview", "box", "var(--oq-data-1)"], ["bench", "Benchmark", "gauge", "var(--oq-data-4)"],
   ["logs", "Logs", "logs", "var(--oq-data-2)"], ["notebook", "Notebook", "book", "var(--oq-data-3)"]];
@@ -290,6 +338,7 @@ function render() {
   const tab = ["model", "add", "home"].includes(r.page) ? "home" : r.page;
   $$(".cx-nav .it").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
   if (r.page === "model") { if (switched) { $("#sec").classList.add("dim"); setTimeout(() => { modelPage(r); $("#sec").classList.remove("dim"); }, 120); } else modelPage(r); }
+  if (r.page === "model") RECENT = [r.model, ...RECENT.filter((x) => x !== r.model)].slice(0, 3);
   crumbs(r); cur = r;
 }
 function crumbs(r) {
@@ -299,8 +348,30 @@ function crumbs(r) {
   else h = `<button class="on ttl">${PLACES[r.page] || "My models"}</button>`;
   $("#crumbs").innerHTML = h;
 }
+// ---- search + label chips, one filter model for My models and the picker ----
+const HF = { q: "", tag: "all" }, PF = { q: "", tag: "all" };
+const allLabels = () => [...new Set(MODELS.flatMap((m) => m.labels))].sort();
+const order = (a, b) => (b.state === "run") - (a.state === "run") || (b.state === "bad") - (a.state === "bad") || a.name.localeCompare(b.name);
+function matches(m, f) {
+  const q = f.q.trim().toLowerCase();
+  const tagOk = f.tag === "all" || (f.tag === "running" ? m.state === "run" : m.kind === f.tag || m.labels.includes(f.tag));
+  return tagOk && (!q || q.split(/\s+/).every((w) => m.name.includes(w) || m.kind.startsWith(w) || m.labels.some((l) => l.startsWith(w.replace(/^#/, "")))));
+}
+function chips(f, who) {
+  const c = (key, label, n, extra = "") => `<button class="chip ${f.tag === key ? "on" : ""}" data-chip="${key}" data-who="${who}">${extra}${label}<small>${n}</small></button>`;
+  return c("all", "All", MODELS.length) + c("running", "Running", MODELS.filter((m) => m.state === "run").length, `<i style="--c:var(--oq-ok)"></i>`) + `<span class="div"></span>`
+    + Object.entries(KINDS).map(([k, [t, col]]) => c(k, t, MODELS.filter((m) => m.kind === k).length, `<i style="--c:${col}"></i>`)).join("") + `<span class="div"></span>`
+    + allLabels().map((l) => c(l, l, MODELS.filter((m) => m.labels.includes(l)).length, `<span class="h">#</span>`)).join("");
+}
+const showOn = (sel) => { const box = $(sel), on = box.querySelector(".chip.on"); if (on) box.scrollLeft = Math.max(0, on.offsetLeft - box.offsetLeft - 40); };
+const tags = (m) => { const [t, col] = KINDS[m.kind]; return `<span class="tag k" style="--c:${col}">${t}</span>` + m.labels.map((l) => `<span class="tag">#${l}</span>`).join(""); };
 function homeRows() {
-  $("#rows").innerHTML = MODELS.map((m) => `<tr data-go="#/models/${m.name}/overview"><td class="nm">${m.name}</td><td><span class="st ${m.state}"><i></i>${m.word}</span></td><td class="hide-p">${m.arch}</td><td class="num hide-p">${m.mem ? m.mem + " GB" : "–"}</td><td class="num">${m.tps || "–"}</td></tr>`).join("");
+  const list = MODELS.filter((m) => matches(m, HF)).sort(order);
+  $("#hsub").textContent = `${MODELS.length} models · ${MODELS.filter((m) => m.state === "run").length} running · 11.2 of 24 GB GPU`;
+  $("#hchips").innerHTML = chips(HF, "h"); showOn("#hchips");
+  $("#hcnt").textContent = list.length === MODELS.length ? `${list.length} models, running first` : `${list.length} of ${MODELS.length}`;
+  $("#rows").innerHTML = list.map((m) => `<tr data-go="#/models/${m.name}/overview"><td class="nm">${m.name}</td><td><span class="st ${m.state}"><i></i>${m.word}</span></td><td class="tg">${tags(m)}</td><td class="num hide-p">${m.mem ? m.mem + " GB" : "–"}</td><td class="num">${m.tps || "–"}</td></tr>`).join("")
+    || `<tr><td colspan="5" style="color:var(--oq-ink-2);padding:30px 10px">Nothing matches. Try another label or clear the search.</td></tr>`;
 }
 // The model's verbs only. Navigation (benchmark, notebook) is the tabs; their own actions live inside their section.
 function cmds(m) {
@@ -319,7 +390,7 @@ function section(m, sec) {
       <div><small>Requests</small><b data-n="${m.req}">0</b></div><div><small>Speed</small><b><span data-n="${m.tps}">0</span><em>tok/s</em></b></div>
       <div><small>Latency p50</small><b><span data-n="${m.p50}">0</span><em>ms</em></b></div><div><small>Memory</small><b><span data-n="${m.mem}" data-f="1">0</span><em>GB</em></b></div></div>`, `mxc status ${m.name}`)
     + card("Tokens", "logs", "var(--oq-data-1)", m.series.length ? spark(m.series) : `<div style="color:var(--oq-ink-2);font-size:13px;padding:22px 0">Stopped. Start it to see traffic.</div>`, "")
-    + card("About", "box", "var(--oq-data-2)", `<dl class="dl"><dt>Source</dt><dd>${m.repo}</dd><dt>Architecture</dt><dd>${m.arch}</dd><dt>Context</dt><dd>${m.ctx}</dd><dt>Weights</dt><dd>${m.q}</dd><dt>Reachable</dt><dd>LAN · HTTPS · <a data-go="#/security">Security ›</a></dd></dl>`, `mxc info ${m.name}`)
+    + card("About", "box", "var(--oq-data-2)", `<dl class="dl"><dt>Source</dt><dd>${m.repo}</dd><dt>Architecture</dt><dd>${m.arch}</dd><dt>Context</dt><dd>${m.ctx}</dd><dt>Weights</dt><dd>${m.q}</dd><dt>Labels</dt><dd class="wrap">${tags(m)}<button class="tag add" data-addlabel>+ label</button></dd><dt>Reachable</dt><dd>LAN · HTTPS · <a data-go="#/security">Security ›</a></dd></dl>`, `mxc info ${m.name}`)
     + card("GPU fit", "gauge", "var(--oq-data-3)", `<div class="fit"><i style="width:${m.mem / 24 * 100}%;background:var(--oq-data-1)"></i><i style="width:${(11.2 - m.mem) / 24 * 100}%;background:var(--oq-ink-faint)"></i></div><div class="fitk"><span>this ${m.mem || 0} GB</span><span>others ${(11.2 - m.mem).toFixed(1)} GB</span><span>24 GB</span></div>`, "");
   if (sec === "bench") return m.bench.length ? card("Throughput by concurrency", "gauge", "var(--oq-data-4)", `<dl class="dl">${m.bench.map(([c, t]) => `<dt>${c} at once</dt><dd>${t} tok/s</dd>`).join("")}</dl>`, `mxc bench ${m.name}`, true, `<button class="fb">${ic("rot")}Run again</button>`)
       : `<div class="empty2"><b>No benchmark for ${m.name} yet</b>One run takes about a minute.<br><br><button class="fb fill">${ic("gauge")}Run benchmark</button></div>`;
@@ -341,19 +412,52 @@ function modelPage(r) {
   $("#sec").innerHTML = section(m, r.sec); countUp();
 }
 // ---- picker ----
+let kb = 0;
+function pickerList() {
+  const r = parse(), row = (m) => `<button class="pr ${m.name === r.model ? "on" : ""}" data-pick="${m.name}"><span class="st ${m.state}"><i></i></span><b>${m.name}</b><span>${m.tps ? m.tps + " tok/s" : m.word}</span></button>`;
+  $("#pchips").innerHTML = chips(PF, "p");
+  const hits = MODELS.filter((m) => matches(m, PF)).sort(order);
+  let h = "";
+  if (!PF.q && PF.tag === "all") {
+    h += `<div class="grp">Recent</div>` + RECENT.map(find).map(row).join("");
+    h += Object.entries(KINDS).map(([k, [t, col]]) => { const g = hits.filter((m) => m.kind === k); return g.length ? `<div class="grp"><i style="--c:${col}"></i>${t} · ${g.length}</div>` + g.map(row).join("") : ""; }).join("");
+  } else h = hits.length ? `<div class="grp">${hits.length} match${hits.length === 1 ? "" : "es"}</div>` + hits.map(row).join("") : `<div class="none">No model matches “${PF.q || PF.tag}”.</div>`;
+  $("#plist").innerHTML = h; kb = 0; mark(); showOn("#pchips");
+}
+function mark() { const rows = $$("#plist .pr"); rows.forEach((b, i) => b.classList.toggle("kb", i === kb)); rows[kb]?.scrollIntoView({ block: "nearest" }); }
 function openPicker() {
   const r = parse(), p = $("#picker").getBoundingClientRect(), a = $("#app").getBoundingClientRect();
   $("#pmsec").textContent = SECS.find((x) => x[0] === r.sec)[1];
-  $("#plist").innerHTML = MODELS.map((m) => `<button class="${m.name === r.model ? "on" : ""}" data-pick="${m.name}"><span class="st ${m.state}"><i></i></span><b>${m.name}</b><span>${m.tps ? m.tps + " tok/s" : m.word}</span></button>`).join("");
-  $("#pmenu").style.left = Math.max(8, p.left - a.left + p.width / 2 - 170) + "px";
+  PF.q = ""; $("#pq").value = ""; $("#pq").placeholder = `Find a model · ${MODELS.length}`; pickerList(); $("#plist").scrollTop = 0;
+  $("#pmenu").style.left = Math.max(8, p.left - a.left + p.width / 2 - 195) + "px";
   $("#pmenu").classList.add("open"); $("#scrim").classList.add("on");
+  if (!document.body.classList.contains("phone")) setTimeout(() => $("#pq").focus(), 30);
 }
+$("#pq").addEventListener("input", (e) => { PF.q = e.target.value; pickerList(); });
+$("#hq").addEventListener("input", (e) => { HF.q = e.target.value; homeRows(); });
+document.addEventListener("keydown", (e) => {
+  const open = $("#pmenu").classList.contains("open");
+  if (open) {
+    const rows = $$("#plist .pr");
+    if (e.key === "Escape") return closePicker();
+    if (e.key === "ArrowDown") { kb = Math.min(rows.length - 1, kb + 1); mark(); e.preventDefault(); }
+    if (e.key === "ArrowUp") { kb = Math.max(0, kb - 1); mark(); e.preventDefault(); }
+    if (e.key === "Enter" && rows[kb]) rows[kb].click();
+    return;
+  }
+  if ((e.key === "/" || (e.key === "k" && (e.metaKey || e.ctrlKey))) && !/INPUT/.test(document.activeElement.tagName)) {
+    e.preventDefault(); if (parse().page === "model") openPicker(); else { location.hash = "#/"; $("#hq").focus(); }
+  }
+});
 const closePicker = () => { $("#pmenu").classList.remove("open"); $("#scrim").classList.remove("on"); };
 document.addEventListener("click", (e) => {
   const t = e.target;
   if (t.closest("#picker")) return openPicker();
   const pk = t.closest("[data-pick]"); if (pk) { closePicker(); location.hash = `#/models/${pk.dataset.pick}/${parse().sec}`; return; }
   if (t.closest("#scrim")) return closePicker();
+  const ch = t.closest("[data-chip]"); if (ch) { const f = ch.dataset.who === "h" ? HF : PF; f.tag = f.tag === ch.dataset.chip && ch.dataset.chip !== "all" ? "all" : ch.dataset.chip; return ch.dataset.who === "h" ? homeRows() : pickerList(); }
+  const al = t.closest("[data-addlabel]"); if (al) { al.outerHTML = `<span class="tag"><input id="newlabel" placeholder="label, Enter"></span>`; const i = $("#newlabel"); i.focus();
+    i.addEventListener("keydown", (ev) => { if (ev.key !== "Enter") return; const v = i.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, ""), m = find(parse().model); if (v && !m.labels.includes(v)) m.labels.push(v); modelPage(parse()); homeRows(); }); return; }
   const g = t.closest("[data-go]"); if (g) { closePicker(); location.hash = g.dataset.go; return; }
   if (t.closest("[data-back]")) return history.length > 1 ? history.back() : (location.hash = "#/");
   const th = t.closest("[data-theme]"); if (th) { const a = $("#app"), n = th.dataset.theme === "night"; a.classList.toggle("oq-night", n); a.classList.toggle("oq-light", !n); $$("[data-theme]").forEach((b) => b.classList.toggle("on", b === th)); return; }
