@@ -423,13 +423,15 @@ Brief: docs/briefs/console-pages.md · Needs: none · Files: store.py, resolve.p
 - Checked live on a scratch home with an old-schema database and a real daemon (migration, CLI, every admin route, 403 without the header). A real Hugging Face pull wasn't run (no network in the agent); pull→kind is covered by fake-hub tests.
 - Reviewer: PASS; fixed its should-fixes (the kind migration is one transaction; stray label links from an older daemon are cleared on first insert and not counted). 942 tests.
 
-## F-055 My models as a library: search, groups column, labelling [todo]
+## F-055 My models as a library: search, groups column, labelling [done]
 Brief: docs/briefs/console-pages.md · Needs: F-052, F-054 · Files: blade-home.* → home-page.*, new library.*
-- [ ] full-width search (`/` focuses) over name, kind and #label; groups column: Show (All, Running) · Kind · Your labels, each with a count; running models sort first
-- [ ] labels managed in the column: New label; Edit labels (rename field, drag handle to reorder with mouse or touch, delete ×)
-- [ ] tick models (and "select all shown"): a bar shows your labels as chips; tap adds to all ticked, tap again removes, a ring means some have it; desktop drag of a model (or the ticked ones) onto a label
-- [ ] phone: the column becomes a scrolling chip row; Edit labels opens full-height
-- [ ] checked in the running console with 100 fake models (a fixture), both themes, 1280 and 390 px
+- [x] full-width search (`/` focuses) over name, kind and #label; groups column: Show (All, Running) · Kind · Your labels, each with a count; running models sort first
+- [x] labels managed in the column: New label; Edit labels (rename field, drag handle to reorder with mouse or touch, delete ×)
+- [x] tick models (and "select all shown"): a bar shows your labels as chips; tap adds to all ticked, tap again removes, a ring means some have it; desktop drag of a model (or the ticked ones) onto a label
+- [x] phone: the column becomes a scrolling chip row; Edit labels opens full-height
+- [x] checked in the running console with 100 fake models (a fixture), both themes, 1280 and 390 px
+- Built: `library-logic.js` (pure: search, groups, label ops and their inverses), `library.js`, `library.css`; `blade-home.*` is the library page; `scripts/fake_models.py` fills a scratch MXC_HOME (refuses ~/.mxc). Per the mock, the stats card and the list/cards toggle are gone (stats sit in the header line) and the table is tick · Model · Labels · State · VRAM · tok/s (Access, first-token, requests and architecture columns dropped) — flagged to the owner; reversible if wanted.
+- Reviewer: round 1 NEEDS WORK (small: rollback restored a whole snapshot; select-all aria; phone hit areas; a refused rename reset the group) → fixed; round 2 PASS. Checked live after merging with F-053 on a scratch daemon with 100 fake models (1280 light): groups, counts, labels, search; the model page's tabs and picker alongside. 996 tests.
 
 ## F-056 The wide switcher [todo]
 Brief: docs/briefs/console-pages.md · Needs: F-053, F-055 · Files: picker.* (reuses library.*)
