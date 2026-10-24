@@ -39,43 +39,65 @@ def node(expr: str):
     return json.loads(out.stdout)
 
 
-def names(plan):
-    return [(s["name"], s["opts"].get("id")) for s in plan["steps"]]
+def route(hash_: str):
+    return node(f"r.parseRoute({json.dumps(hash_)})")
 
 
 @needs_node
 def test_the_console_opens_what_the_cli_links_to():
+    """F-052: every hash the CLI prints still lands on the page it means (old shapes map to the new routes)."""
     assert "routes.js" in CONSOLE_ASSETS
+    tab = {"model": "overview", "bench": "benchmark", "logs": "logs", "notebook": "notebook"}
     for page, model, want in CASES:
-        plan = node(f"r.parseHash({json.dumps('#' + want)})")
-        if model:  # the console decodes what the CLI encoded
-            kind = want.split("/")[0]
-            assert plan["steps"][0] == {"name": "model", "opts": {"id": model}}, want
-            assert names(plan)[-1] == (kind, model), want
+        got = route("#" + want)
+        if model and want.split("/")[0] in tab:
+            assert got == {"page": "model", "model": model, "tab": tab[want.split("/")[0]]}, want
+        elif model:  # security is one place for every model
+            assert got == {"page": "security"}, want
         elif want in ("keys", "gateway", "settings", "add"):
-            assert names(plan) == [(want, None)], want
+            assert got == {"page": want}, want
         elif want == "":
-            assert plan["steps"] == [] and not plan.get("needsModel"), page
+            assert got == {"page": "home"}, page
         elif want == "bench":
-            assert plan["needsModel"] == "bench", page
+            assert got == {"page": "model", "model": None, "tab": "benchmark", "needsModel": True}, page
 
 
 @needs_node
-def test_old_page_names_and_edge_cases_still_open_something_sensible():
-    assert node('r.parseHash("#network")')["steps"][0]["name"] == "gateway"
-    assert node('r.parseHash("#pull")')["steps"][0]["name"] == "add"
-    assert node('r.parseHash("#benchmarks")')["needsModel"] == "bench"
-    assert node('r.parseHash("#api")')["redirect"] == "/docs"
-    assert node('r.parseHash("#nonsense")')["steps"] == [] and node('r.parseHash("")')["steps"] == []
-    assert names(node('r.parseHash("#model/org/repo-1")')) == [("model", "org/repo-1")]  # a Hugging Face name keeps its slash
-    assert names(node('r.parseHash("#bench/tiny%20x")'))[-1] == ("bench", "tiny x")
-    assert node('r.parseHash("#bench/%E0%A4%A")')["steps"][0]["opts"]["id"] == "%E0%A4%A"  # a bad escape never throws
+def test_the_new_routes():
+    assert route("#/") == {"page": "home"} and route("") == {"page": "home"} and route("#") == {"page": "home"}
+    for place in ("keys", "gateway", "security", "settings", "add"):
+        assert route(f"#/{place}") == {"page": place}
+    assert route("#/models/tiny/logs") == {"page": "model", "model": "tiny", "tab": "logs"}
+    assert route("#/models/tiny") == {"page": "model", "model": "tiny", "tab": "overview"}
+    assert route("#/models/org/repo-1/benchmark") == {"page": "model", "model": "org/repo-1", "tab": "benchmark"}  # a Hugging Face name keeps its slash
+    assert route("#/models/my%20model/notebook")["model"] == "my model"
+    assert route("#/models/%E0%A4%A/logs")["model"] == "%E0%A4%A"  # a bad escape never throws
 
 
 @needs_node
-def test_the_hash_follows_the_newest_blade():
-    def stack(*blades):
-        return json.dumps([{"name": n, "opts": o} for n, o in blades])
-    assert node(f'r.hashFor({stack(("home", {}))})') == ""
-    assert node(f'r.hashFor({stack(("home", {}), ("keys", {}))})') == "keys"
-    assert node(f'r.hashFor({stack(("home", {}), ("model", {"id": "org/m"}), ("bench", {"id": "org/m"}))})') == "bench/org/m"
+def test_unknown_routes_go_home_and_the_api_page_redirects():
+    for bad in ("#/nonsense", "#/keys/extra", "#/models", "#/models/", "#/models//logs", "#nonsense"):
+        assert route(bad) == {"page": "home"}, bad
+    assert route("#api") == {"redirect": "/docs"}
+    assert route("#network") == {"page": "gateway"} and route("#pull") == {"page": "add"} and route("#daemon") == {"page": "settings"}
+
+
+@needs_node
+def test_the_hash_a_route_has_is_canonical_and_parses_back():
+    cases = [({"page": "home"}, "#/"), ({"page": "keys"}, "#/keys"), ({"page": "add"}, "#/add"),
+             ({"page": "model", "model": "org/m", "tab": "logs"}, "#/models/org/m/logs"),
+             ({"page": "model", "model": "my model", "tab": "overview"}, "#/models/my%20model/overview")]
+    for r, want in cases:
+        assert node(f"r.hashFor({json.dumps(r)})") == want
+        assert route(want) == r
+
+
+@needs_node
+def test_the_top_bar_only_says_where_you_are():
+    def crumbs(r):
+        return [(c["label"], bool(c.get("picker")), bool(c.get("to"))) for c in node(f"r.crumbsFor({json.dumps(r)})")]
+    assert crumbs({"page": "home"}) == [("My models", False, False)]
+    assert crumbs({"page": "keys"}) == [("API keys", False, False)]
+    assert crumbs({"page": "add"}) == [("My models", False, True), ("Add a model", False, False)]
+    assert crumbs({"page": "model", "model": "tiny", "tab": "overview"}) == [("My models", False, True), ("tiny", True, False)]
+    assert crumbs({"page": "model", "model": "tiny", "tab": "logs"}) == [("My models", False, True), ("tiny", True, True), ("Logs", False, False)]

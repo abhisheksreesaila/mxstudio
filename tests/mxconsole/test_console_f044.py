@@ -43,7 +43,7 @@ def test_a_blade_arrives_with_settle_a_12px_rise_and_no_sideways_slide():
 def test_blades_float_on_surface_1_under_the_islands():
     css = CSS("blades.css")
     journey = re.search(r"\.journey \{([^}]*)\}", css).group(1)
-    assert "top: var(--top)" in journey and "gap: 12px" in journey and "padding: 0 14px 14px" in journey
+    assert "flex: 1" in journey and "padding: 0 14px 14px" in journey  # F-052: one page beside the nav, not a row of blades
     blade = re.search(r"\n\.blade \{([^}]*)\}", css).group(1)
     assert "var(--card)" in blade and "var(--oq-radius-card)" in blade and "var(--oq-shadow-1)" in blade
     assert re.search(r"--top: 72px", css)

@@ -120,7 +120,7 @@ register("model", (blade) => {
       const menuBtns = new Map();
       const menu = h("nav", { class: "rmenu", "aria-label": name },
         MENU.map(([key, label, ic, target]) => {
-          const b = h("button", { type: "button", "data-menu": key, title: label, style: { "--h": HUE[key] }, onClick: () => (target ? (child() && child().name === target ? null : open(target)) : truncate(idx() + 1)) },
+          const b = h("button", { type: "button", "data-menu": key, title: label, style: { "--h": HUE[key] }, onClick: () => { if (target) open(target); } },
             icon(ic, 16, "currentColor", 1.75), h("span", { class: "ml" }, label), target ? icon("chevron-right", 13, "currentColor", 2) : null);
           menuBtns.set(key, b);
           return b;

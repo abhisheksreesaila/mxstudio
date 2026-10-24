@@ -123,10 +123,11 @@ def test_the_topbar_marks_the_current_crumb_and_stays_on_tokens():
     assert "aria-current" in js
     css = (CONSOLE_DIR / "topbar.css").read_text()
     assert not re.findall(r"#[0-9a-fA-F]{3,6}\b", css), "topbar.css uses omxqua tokens, not raw hex"
-    # at phone width the tools fold into one menu that still reaches API keys, Gateway, Settings and the theme
-    phone = css[css.index("@media (max-width: 760px)"):]
-    assert ".cx-crumbs" in phone and ".more { display: flex; }" in phone
-    assert all(f'"{label}"' in js for label in ("API keys", "Gateway", "Settings")) and '"Theme"' in js
+    # F-052: the bar only says where you are (the places live in the nav, the theme in Settings); at phone width the crumb fills it
+    phone = css[css.index("@container (max-width: 760px)"):]
+    assert ".crumbs" in phone and ".crumbs { flex: 1; }" in phone
+    assert '"Theme"' not in js and "setTheme" not in js
+    assert "Appearance" in (CONSOLE_DIR / "blade-settings.js").read_text()
 
 
 def test_rows_and_cards_are_real_buttons_and_rails_can_be_focused():

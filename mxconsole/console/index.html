@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="/console/omxqua/src/tokens.css">
 <link rel="stylesheet" href="/console/omxqua/src/components.css">
 <link rel="stylesheet" href="/console/blades.css">
+<link rel="stylesheet" href="/console/shell.css">
 <link rel="stylesheet" href="/console/topbar.css">
 <link rel="stylesheet" href="/console/blade-home.css">
 <link rel="stylesheet" href="/console/blade-model.css">
@@ -25,8 +26,13 @@
 <script src="/console/omxqua/src/omxqua.js" defer></script>
 </head>
 <body>
-<header class="top" id="topbar"></header>
-<main class="journey" id="journey"></main>
+<div class="app"><div class="shell">
+  <nav class="cx-nav" id="nav" aria-label="Places"></nav>
+  <div class="col">
+    <header class="bar" id="topbar"></header>
+    <main class="journey" id="journey"></main>
+  </div>
+</div></div>
 <div class="toast mono" id="toast" role="status" aria-live="polite" hidden></div>
 <script type="module" src="/console/main.js"></script>
 </body>

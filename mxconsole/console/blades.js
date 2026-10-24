@@ -75,8 +75,12 @@ export function mountJourney(el) {
   });
 }
 
-/** Open a blade. `at` is the index it docks after (default: after the newest); everything to its right closes. */
-export function push(name, opts = {}, at = stack.length - 1) {
+/** Pages (pages.js) take over navigation: while a navigator is set, push/truncate ask it to go somewhere instead of stacking. */
+let navigator = null;
+export function setNavigator(nav) { navigator = nav; }
+
+/** Build a blade's element and header from its factory, without docking it anywhere. `closable` adds the x button. */
+export function makeBlade(name, opts = {}, closable = false) {
   const factory = factories.get(name);
   if (!factory) throw new Error(`no blade registered as "${name}"`);
   const blade = { name, opts, alive: true, mode: null, railAt: 0 };
@@ -84,13 +88,21 @@ export function push(name, opts = {}, at = stack.length - 1) {
   Object.assign(blade, { crumb: crumbOf(def), wide: !!def.wide, side: def.side || 600, narrow: def.narrow || 0, min: def.min ?? 520 });
   const titleEl = h("div", { class: "t" }), subEl = h("div", { class: "s" });
   const toolsEl = h("div", { class: "tools" }, asNodes(def.tools));
-  const closeBtn = stack.length ? h("button", { class: "x", type: "button", "aria-label": "Close", title: "Close (Esc)" }, icon("x", 16, "currentColor", 2)) : null;
+  const closeBtn = closable ? h("button", { class: "x", type: "button", "aria-label": "Close", title: "Close (Esc)" }, icon("x", 16, "currentColor", 2)) : null;
   const header = h("header", { class: "bh" }, hueSquare(def.icon || "box", def.hue || "var(--accent)", 36), h("div", { class: "tt" }, titleEl, subEl), toolsEl, closeBtn);
   const body = h("div", { class: "bb" });
   const el = h("section", { class: `blade oq-flat b-${name} enter`, "aria-label": blade.crumb || name }, header, body);
   Object.assign(blade, { el, body, titleEl, subEl, toolsEl, header });
   setText(titleEl, def.title);
   setText(subEl, def.sub);
+  return { blade, def, closeBtn };
+}
+
+/** Open a blade. `at` is the index it docks after (default: after the newest); everything to its right closes. */
+export function push(name, opts = {}, at = stack.length - 1) {
+  if (navigator) return navigator.push(name, opts);
+  const { blade, def, closeBtn } = makeBlade(name, opts, stack.length > 0);
+  const { el, header, body } = blade;
   const back = () => { const i = stack.indexOf(blade); if (i < stack.length - 1) truncate(i + 1); };
   if (closeBtn) closeBtn.addEventListener("click", (e) => { e.stopPropagation(); truncate(stack.indexOf(blade)); });
   // like Azure: the header of a blade that has others to its right closes those; a rail brings its blade back
@@ -126,6 +138,7 @@ export function setHead(blade, { title, sub, crumb } = {}) {
 
 /** Keep the first n blades (the home blade always stays) and close the rest. */
 export function truncate(n) {
+  if (navigator) return navigator.truncate(n);
   closeFrom(stack, n, (gone) => gone.el.remove());
   layout();
 }

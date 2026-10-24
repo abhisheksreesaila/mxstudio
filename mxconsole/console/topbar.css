@@ -1,32 +1,21 @@
-/* omxconsole, the top islands: brand left, breadcrumb centre, tools and the Beacon right, all floating 14px from the top.
-   The island shapes come from omxqua's components.css (.brand-isl, .mark, .beacon, .menu); this file places them. */
-.top { position: fixed; top: 0; left: 0; right: 0; height: var(--top); z-index: 50; pointer-events: none; --cx-side: 230px; }
-.top > *, .top .cx-right > * { pointer-events: auto; }
+/* omxconsole, the top bar (ADR 0005): where you are on the left (a crumbs pill), the Beacon on the right.
+   The Beacon's look comes from omxqua's components.css (.beacon); this file places it and tunes it. */
+.bar { position: relative; z-index: 50; height: 64px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px 0 2px; }
+.bar .sp { flex: 1; }
 
-.top .brand-isl { display: flex; border: 0; color: var(--oq-ink); cursor: pointer; }
-.brand-isl .loc { font: 500 11px var(--oq-font-mono); color: var(--oq-ink-2); border: 1px solid var(--oq-line); border-radius: 999px; padding: 2px 7px; margin-left: 2px; }
+.crumbs { height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 5px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); min-width: 0; }
+.crumbs button { border: 0; background: none; height: 34px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; gap: 7px; font: 600 13px var(--oq-font); color: var(--oq-ink-2); white-space: nowrap; min-width: 0; }
+.crumbs button:not(.on):not(:disabled) { cursor: pointer; }
+.crumbs button:hover:not(.on) { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
+.crumbs button.on { color: var(--oq-ink); cursor: default; }
+.crumbs button:not(.on) { flex: none; }  /* the parents never shrink; only the current name truncates */
+.crumbs .sep { display: grid; color: var(--oq-ink-faint); flex: none; }
+.crumbs .picker { font-family: var(--oq-font-mono); background: rgb(var(--oq-state) / .07); }
+.crumbs .picker span { overflow: hidden; text-overflow: ellipsis; }
+.crumbs .picker svg { color: var(--oq-ink-2); }
 
-.cx-crumbs { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 30; height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 6px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); max-width: calc(100% - 2 * var(--cx-side)); }
-.cx-crumbs button { border: 0; background: none; height: 34px; padding: 0 14px; border-radius: 999px; font: 600 13.5px var(--oq-font); color: var(--oq-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.cx-crumbs button:hover { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
-.cx-crumbs button.on { color: var(--oq-ink); cursor: default; }
-.cx-crumbs button:not(.on) { flex: none; }  /* the parent never shrinks; only the current name truncates */
-.cx-crumbs svg { width: 14px; height: 14px; color: var(--oq-ink-faint); flex: none; }
-
-.cx-right { position: absolute; top: 14px; right: 16px; z-index: 35; display: flex; align-items: flex-start; gap: 8px; }
-.cx-tools { height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 5px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); }
-.cx-tools .tool { border: 0; background: none; height: 34px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; gap: 7px; font: 600 13px var(--oq-font); color: var(--oq-ink-2); white-space: nowrap; }
-.cx-tools .tool:hover { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
-.cx-tools .tool.on { background: rgb(var(--oq-state) / .1); color: var(--oq-ink); }
-.cx-tools .tool.ic { width: 34px; padding: 0; justify-content: center; }
-.cx-tools .tool svg { color: var(--hue, currentColor); }
-.cx-tools .tool.ic svg { color: inherit; }
-.cx-tools .more { display: none; }
-.cx-right .menu { top: 50px; right: 0; }
-.menu .mi svg { color: var(--oq-ink-2); }
-.menu .mi .cur { margin-left: auto; font: 11px var(--oq-font-mono); color: var(--oq-ink-2); }
-
-/* the Beacon sits at the far right over the space the tools leave (topbar.js pads .cx-right by its width) */
+/* the Beacon floats over the right end of the bar; topbar.js pads .cx-right by its width */
+.cx-right { position: relative; height: 44px; flex: none; z-index: 35; }
 .cx-right .beacon { position: absolute; top: 0; right: 0; left: auto; transform: none; }
 .beacon .bc-compact { height: 44px; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; font-size: 13px; text-align: left; }
 .beacon .bc-lb { overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
@@ -39,15 +28,13 @@
 .beacon .bbtn.armed { background: var(--oq-bad); color: var(--oq-on-accent); }
 .beacon button:focus-visible { outline: 2px solid var(--oq-beacon-accent); outline-offset: 2px; }
 
-/* .tight (set by topbar.js below 1240 px, or when a wide Beacon leaves the breadcrumb short): the tools fold to icons */
-.tight .cx-tools .tl { display: none; } .tight .cx-tools .tool { padding: 0; width: 34px; justify-content: center; }
-/* only the parent and the current crumb: the rails on the left show the older blades, and the brand goes home */
-.cx-crumbs .far, .cx-crumbs .far + svg { display: none; }
-@media (max-width: 760px) {
-  .cx-crumbs, .cx-tools .tool:not(.more) { display: none; }
-  .cx-tools .more { display: flex; }
-  .top .brand-isl .nm, .top .brand-isl .loc { display: none; }
-  .top .brand-isl { padding: 0 8px; }
-  .beacon .bc-lb { max-width: 150px; }
-  .cx-right .beacon .bc-open { width: min(350px, calc(100vw - 32px)); }
+@container (max-width: 760px) {
+  .bar { height: 60px; padding: 0 10px; }
+  .bar .sp { display: none; }
+  .crumbs { flex: 1; }
+  .crumbs .home-c, .crumbs > .sep { display: none; }
+  .crumbs .picker { flex: 1; justify-content: space-between; }
+  .crumbs .ttl, .crumbs .on { padding-left: 10px; color: var(--oq-ink); font-size: 15px; }
+  .beacon .bc-lb { max-width: 110px; }
+  .cx-right .beacon .bc-open { width: min(350px, calc(100vw - 20px)); }
 }
