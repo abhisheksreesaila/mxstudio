@@ -47,6 +47,45 @@ def hf_repo_dir(weights_path: str | None) -> Path | None:
     return None
 
 
+MAX_SIZE_FILES = 2000  # a weights folder holds a handful of files; a bigger tree is not one, and the poll must stay fast
+_sizes: dict[tuple[str, int], int | None] = {}
+
+
+def weights_size(weights_path: str | None) -> int | None:
+    """Bytes of a model's weights on disk (a folder adds up its files, links followed), or None when there is nothing to count
+    (no files, a missing folder, or more than MAX_SIZE_FILES files: not a weights folder).
+    The console polls this for every model every few seconds, so a result is kept while the folder's mtime stays the same:
+    a pull that is still adding files changes it, and the number grows with it."""
+    if not weights_path:
+        return None
+    path = Path(weights_path)
+    try:
+        key = (weights_path, path.stat().st_mtime_ns)
+    except OSError:
+        return None
+    if key in _sizes:
+        return _sizes[key]
+    try:
+        if path.is_file():
+            total = path.stat().st_size
+        else:
+            total, seen = 0, 0
+            for f in path.rglob("*"):
+                if not f.is_file():  # folders, and links that point nowhere
+                    continue
+                seen += 1
+                if seen > MAX_SIZE_FILES:
+                    total = 0
+                    break
+                total += f.stat().st_size
+    except OSError:
+        return None
+    for old in [k for k in _sizes if k[0] == weights_path]:
+        del _sizes[old]
+    _sizes[key] = total or None
+    return total or None
+
+
 def _inside(path: Path, root: Path) -> bool:
     """True when `path` resolves strictly below `root` (symlinks and `..` followed)."""
     try:

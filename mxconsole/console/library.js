@@ -1,5 +1,5 @@
 // omxconsole, the library (F-055): a search bar and a groups column (Show · Kind · Your labels), label editing,
-// ticking models and labelling them. My models uses it now; F-056's switcher reuses the same parts.
+// ticking models and labelling them. My models uses it.
 // The rules live in library-logic.js (pure); this file draws them and talks to /admin/labels.
 // Everything goes in as text nodes. Changes are shown at once and put back, with the server's reason, if refused.
 import { h, icon, api, store, refresh, toast, emitData } from "./core.js";
@@ -19,10 +19,11 @@ export const tagsEl = (m) => h("span", { class: "tags" }, h("span", { class: "ta
 
 const typing = () => { const a = document.activeElement; return !!a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable); };
 
-/** onChange: called whenever what the results show may have changed (search, group, ticks, labels). */
-export function createLibrary({ onChange, placeholder = "Search by name, kind or #label", recent = null }) {
+/** onChange: called whenever what the results show may have changed (search, group, ticks, labels).
+ *  onRemove(names): when given, the tick bar gets a "Remove N" button that hands over the ticked names (the page asks, then removes). */
+export function createLibrary({ onChange, placeholder = "Search by name, kind or #label", recent = null, onRemove = null }) {
   const lib = { q: "", group: "all", labels: [], ticked: new Set(), editing: false };
-  let sig = "", shapeNow = "", busy = 0, adding = false;
+  let sig = "", shapeNow = "", barSig = "", busy = 0, adding = false;
   const models = () => store.models || [];
   const cur = () => ({ labels: lib.labels, models: models() });
   const put = (s) => { lib.loaded = true; lib.labels = s.labels; store.models = s.models; };
@@ -205,11 +206,15 @@ export function createLibrary({ onChange, placeholder = "Search by name, kind or
   function drawBar() {
     const names = [...lib.ticked];
     lib.bar.classList.toggle("on", names.length > 0);
+    const now = JSON.stringify([names, lib.labels.map((l) => bulkState(models(), names, l))]);
+    if (now === barSig) return;  // a poll that changed nothing keeps the bar's buttons (and the focus on them)
+    barSig = now;
     if (!names.length) { lib.bar.replaceChildren(); return; }
     lib.bar.replaceChildren(h("b", {}, `${names.length} selected`), h("span", { class: "lbl" }, "Labels:"),
       ...lib.labels.map((l) => { const st = bulkState(models(), names, l); return h("button", { class: `chip${st === "all" ? " on" : st === "some" ? " part" : ""}`, type: "button", "aria-pressed": st === "all" ? "true" : st === "some" ? "mixed" : "false", "data-lab": l, onClick: () => tap(l) }, h("span", { class: "hash" }, "#"), l); }),
       ...(lib.labels.length ? [] : [h("span", { class: "lbl" }, "none yet: use New label")]),
-      h("span", { class: "sp" }), h("button", { class: "fb", type: "button", "data-act": "clear-ticks", onClick: lib.clearTicks }, "Clear"));
+      h("span", { class: "sp" }), h("button", { class: "fb", type: "button", "data-act": "clear-ticks", onClick: lib.clearTicks }, "Clear"),
+      ...(onRemove ? [h("button", { class: "fb danger", type: "button", "data-act": "remove-ticked", onClick: () => onRemove([...lib.ticked]) }, icon("trash-2", 14), `Remove ${names.length}`)] : []));
   }
 
   // -- the parts the page calls ------------------------------------------------------------------

@@ -1,5 +1,5 @@
 // omxconsole, the library's rules (F-055): what a search matches, what each group holds, how labels change.
-// Pure functions, no DOM, so they run under node. library.js draws them; F-056's switcher reuses both.
+// Pure functions, no DOM, so they run under node. library.js draws them.
 // A group is a string key: "all", "running", "kind:<kind>" or "label:<name>" (a label called "chat" is not the kind chat).
 // State is {labels: [names in your order], models: [{name, state, kind, labels}]}; every change returns a new state.
 
@@ -42,6 +42,13 @@ export function counts(models, labels) {
     kinds: Object.fromEntries(KINDS.map(([k]) => [k, models.filter((m) => m.kind === k).length])),
     labels: Object.fromEntries(labels.map((l) => [l, models.filter((m) => (m.labels || []).includes(l)).length])),
   };
+}
+
+/** A size on disk as "1.3 GB" or "360 MB" (decimal, like the Hugging Face page); "–" when the daemon has none. */
+export function sizeLabel(bytes) {
+  if (!bytes || bytes < 0) return "–";
+  if (bytes >= 1e9) return `${(Math.round(bytes / 1e8) / 10).toFixed(1)} GB`;
+  return `${Math.max(1, Math.round(bytes / 1e6))} MB`;
 }
 
 // -- labelling -------------------------------------------------------------------------------------

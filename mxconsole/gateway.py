@@ -16,7 +16,7 @@ from fasthtml.common import FastHTML
 from starlette.requests import Request
 from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 
-from mxconsole import admin_api, api_docs, admin_bench, admin_port, admin_pull, admin_system, expose, insights, keys, metrics, system
+from mxconsole import admin_api, api_docs, admin_bench, admin_port, admin_pull, admin_system, expose, insights, keys, metrics, removal, system
 from mxconsole.kinds import KINDS, LabelError
 from mxconsole.settings import DAEMON_PORT
 from mxconsole.store import Store, mxc_home
@@ -32,7 +32,7 @@ CONSOLE_DIR = Path(__file__).parent / "console"
 CONSOLE_SCRIPTS = {"theme.js", "main.js", "core.js", "icons.js", "routes.js",
                    # the blades console: engine, shell and one file per blade, each with its own CSS
                    "blades.js", "blade-layout.js", "blade-stack.js", "keyed.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "beacon.js", "blade-home.js",
-                   "model-page.js", "blade-add.js", "blade-security.js", "blade-keys.js", "blade-bench.js", "blade-logs.js",
+                   "model-page.js", "remove.js", "blade-add.js", "blade-security.js", "blade-keys.js", "blade-bench.js", "blade-logs.js",
                    "blade-notebook.js", "blade-gateway.js", "blade-settings.js",
                    # plain pages (ADR 0005): the router, the one nav
                    "pages.js", "nav.js", "picker.js", "library-logic.js", "library.js"}
@@ -484,7 +484,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
     def model_row(model, live: dict) -> dict:
         return {"name": model.name, "repo_id": model.repo_id, "revision": model.revision,
                 "source": model.source, "architecture": model.architecture, "pinned": model.pinned,
-                "keep_alive": model.keep_alive, "kind": model.kind, "labels": list(model.labels),
+                "keep_alive": model.keep_alive, "kind": model.kind, "size_bytes": removal.weights_size(model.weights_path), "labels": list(model.labels),
                 "state": live.get("state", "cold"),
                 "port": live.get("port"), "idle_seconds": live.get("idle_seconds"),
                 "starting_seconds": live.get("starting_seconds"),

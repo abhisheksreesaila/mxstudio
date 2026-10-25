@@ -58,7 +58,7 @@ def test_the_command_bar_holds_only_the_models_verbs(state, want):
     cmds = node("model-page.js", f"m.commandsFor('{state}')")
     assert [c["key"] for c in cmds] == want
     assert [c["key"] for c in cmds if c.get("primary")] == [want[0]]  # one filled verb
-    assert cmds[-1]["danger"] is True and cmds[-1]["iconOnly"] is True and cmds[-1]["label"] == "Remove"
+    assert cmds[-1]["danger"] is True and cmds[-1]["label"] == "Remove"  # a labelled button, not just an icon (F-062)
 
 
 @needs_node
@@ -104,7 +104,7 @@ def test_the_phone_rules_stack_tabs_over_verbs_and_the_picker_becomes_a_sheet():
     assert re.search(r"\.sec \{[^}]*grid-template-columns: 1fr;", phone)
     sheet = text("picker.css")
     assert re.search(r"\.pmenu\.sheet \{[^}]*translateY\(100%\)", sheet)
-    for target in (r"\.tabs button \{[^}]*height: 44px", r"\.cmdbar \.fb \{[^}]*height: 44px", r"\.cmdbar \.fb\.ic \{[^}]*width: 44px", r"\.cmdbar \.fb\.cp \{[^}]*width: 44px"):
+    for target in (r"\.tabs button \{[^}]*height: 44px", r"\.cmdbar \.fb \{[^}]*height: 44px", r"\.cmdbar \.fb\.cp \{[^}]*width: 44px"):
         assert re.search(target, phone), target  # touch targets are 44 px on a phone; desktop .fb stays 36
     assert "height: 36px" in re.search(r"\.fb \{([^}]*)\}", css).group(1)
     assert css.count("{") == css.count("}") and sheet.count("{") == sheet.count("}")

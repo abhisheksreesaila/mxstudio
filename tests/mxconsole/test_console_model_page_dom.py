@@ -95,6 +95,3 @@ def test_the_closed_tab_content_is_marked_not_alive_so_its_pollers_stop():
       console.log(JSON.stringify(blade.alive));
     """) is False
 
-
-def test_the_remove_button_says_what_a_second_click_does():
-    assert run('console.log(JSON.stringify([mp.removeLabel("tiny", false), mp.removeLabel("tiny", true)]));') == ["Remove", "Click again to remove tiny"]
