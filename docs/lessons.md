@@ -25,3 +25,4 @@ Claude reads this at the start of each session. -->
 - 2026-10-20 · A developer agent's cleanup `pkill -f "mxc daemon"` killed the owner's real daemon on 11435. Agents run a scratch daemon with their own `MXC_HOME` and port, and stop only the PID they started; never pkill by pattern.
 - 2026-10-21 · Under systemd or launchd PATH has no `~/.pixi/bin`: find pixi with `app.pixi_exe()` (PIXI_EXE, then PATH, then ~/.pixi/bin), never `which("pixi")` alone. Caught by starting the real unit, not by tests.
 - 2026-10-21 · A CLI test removed the real `~/.local/bin/mxc`: tests must never reach the real home. The autouse fixture now sets HOME as well as MXC_HOME for every test.
+- 2026-10-25 · Console CSS is one global sheet: a bare class in one page's file (model-page's `.fit` bar) squashed another page's `.fit` badge on Add a model. Give page-only classes a unique name or scope them under the page's root class.

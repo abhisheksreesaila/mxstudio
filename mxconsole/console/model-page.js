@@ -232,7 +232,7 @@ register("model", (blade) => {
       const labels = labelsEditor(() => name);
       const about = h("dl", { class: "dl" }, ["Repository", "Architecture", "Source", "Unloads", "Endpoint", "Reachable", "GPU memory", "State"].flatMap((l, i) => [h("dt", {}, l), i === 5 ? reach : dds[i]]),
         h("dt", {}, "Labels"), h("dd", {}, labels));
-      const fitBar = h("div", { class: "fit" }), fitCap = h("div", { class: "fitk" });
+      const fitBar = h("div", { class: "gpufit" }), fitCap = h("div", { class: "fitk" });
       const urlTag = h("span", { class: "tag" }), urlText = h("span", { class: "u" });
       const urlRow = h("div", { class: "urlrow" }, urlTag, urlText, h("button", { class: "ib", type: "button", "aria-label": "Copy URL", title: "Copy URL", onClick: async () => toast((await copyText(urlText.textContent)) ? "Endpoint copied" : "Could not reach the clipboard") }, icon("copy", 14)));
       const curlText = h("pre", { class: "curl mono" });
