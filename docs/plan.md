@@ -444,22 +444,26 @@ Brief: docs/briefs/console-pages.md · Needs: F-053, F-055 · Files: picker.* (r
 - Built: `picker.js` is the wide switcher on the library's `createLibrary` (groups column incl. Recent with a count, label editing and drag-to-label work inside it); Recent = last 3 in localStorage `mxc-recent`; one combobox + one listbox with a group per section; cards repaint only when what they show changes (scroll kept; held during a drag); Up/Down by row; Esc cancels a label edit first; Ctrl/Cmd+K from anywhere except multi-line editors (owner's call delegated: made by the main session). Overview's About card has a Labels row with suggestions.
 - Reviewer: round 1 NEEDS WORK (no combobox semantics; 3 s poll rebuilt every card, snapping scroll and killing drags; Recent missing from the column; Esc lost edits) → fixed; round 2 PASS; its test should-fix (aria-haspopup asserted) done. Checked live by the developer at 1280 light/dark and 390 light/dark with 100 fake models; drag-to-label across a poll via synthetic drag events. 1023 tests.
 
-## F-061 Places in the top bar, plain breadcrumb, no switcher [todo]
+## F-061 Places in the top bar, plain breadcrumb, no switcher [done]
 Brief: docs/briefs/console-pages.md (Revision v5) · Mock: docs/design/console-pages/mock.html (v5) · Needs: none · Files: nav.js, shell.css, topbar.*, pages.js, picker.* (removed), routes.js, library.js/library-logic.js (Recent only), model-page.js (crumb only)
-- [ ] no side rail: the top bar is logo (goes to My models) · breadcrumb · island · Keys, Gateway, Security, Settings as icon-and-word links on the right (the current place marked `aria-current`); pages use the full width
-- [ ] the breadcrumb is a plain trail (My models › model / My models › Add a model / the place name): earlier parts are links, the last is text with `aria-current="page"`; no pill, no ▾, no dropdown
-- [ ] the switcher is gone (picker.js, picker.css, Recent and `mxc-recent`, Ctrl+K panel); `/` and Ctrl/Cmd+K go to My models and focus its search (not in a textarea or contentEditable)
-- [ ] under 960 px the links show icons only; under 760 px they fold into one ⋯ menu (Esc and outside click close it; 44 px targets)
-- [ ] old hashes and CLI links still land on the right page; Back still works
-- [ ] checked in the running console at 1280 and 390 px, both themes
+- [x] no side rail: the top bar is logo (goes to My models) · breadcrumb · island · Keys, Gateway, Security, Settings as icon-and-word links on the right (the current place marked `aria-current`); pages use the full width
+- [x] the breadcrumb is a plain trail (My models › model / My models › Add a model / the place name): earlier parts are links, the last is text with `aria-current="page"`; no pill, no ▾, no dropdown
+- [x] the switcher is gone (picker.js, picker.css, Recent and `mxc-recent`, Ctrl+K panel); `/` and Ctrl/Cmd+K go to My models and focus its search (not in a textarea or contentEditable)
+- [x] under 960 px the links show icons only; under 760 px they fold into one ⋯ menu (Esc and outside click close it; 44 px targets)
+- [x] old hashes and CLI links still land on the right page; Back still works
+- [x] checked in the running console at 1280 and 390 px, both themes
+- Built: rail gone; `nav.js` (places, trail, ⋯ disclosure with focus handling), `topbar.*`, `shell.css`; picker.*, Recent and `mxc-recent` deleted; `/` and Ctrl/Cmd+K focus My models' search. Under 760 px the island hides its numbers so the model name fits.
+- Reviewer: round 1 NEEDS WORK (shared library poll/focus guards lost their tests with the switcher's; live check incomplete; ⋯ semantics; icon-only names) → fixed; round 2 PASS. Developer checked live at 1280 light/dark, 860, 390 light/dark. 1036 tests after merging with F-062.
 
-## F-062 My models: list or cards, more columns, Remove [todo]
+## F-062 My models: list or cards, more columns, Remove [done]
 Brief: docs/briefs/console-pages.md (Revision v5) · Mock: docs/design/console-pages/mock.html (v5) · Needs: none · Files: blade-home.*, library.*, library-logic.js, prefs.js (view), model-page.js (Remove only), admin data if a column needs it
-- [ ] a List / Cards toggle beside the search, remembered (prefs)
-- [ ] the list: tick · Model (repo under the name) · State · Kind · labels · Size · Memory · tok/s · First token · Requests · Access; the numbers come from what the daemon already measures (say which, and show "–" when there is none); narrow widths hide the secondary columns
-- [ ] cards: tick, name, state, tok/s, memory, requests, kind and labels; ticking, the tick bar and drag-to-label work the same as the list
-- [ ] Remove: the tick bar has "Remove N"; the model page's Remove is a labelled button; both open a confirm saying the model stops, leaves My models, its compiled graphs are deleted and the weights stay (same as `mxc rm`), then call the existing remove route; after removing from a model page you land on My models
-- [ ] checked in the running console with real models and with 100 fake ones, 1280 and 390 px, both themes
+- [x] a List / Cards toggle beside the search, remembered (prefs)
+- [x] the list: tick · Model (repo under the name) · State · Kind · labels · Size · Memory · tok/s · First token · Requests · Access; the numbers come from what the daemon already measures (say which, and show "–" when there is none); narrow widths hide the secondary columns
+- [x] cards: tick, name, state, tok/s, memory, requests, kind and labels; ticking, the tick bar and drag-to-label work the same as the list
+- [x] Remove: the tick bar has "Remove N"; the model page's Remove is a labelled button; both open a confirm saying the model stops, leaves My models, its compiled graphs are deleted and the weights stay (same as `mxc rm`), then call the existing remove route; after removing from a model page you land on My models
+- [x] checked in the running console with real models and with 100 fake ones, 1280 and 390 px, both themes
+- Built: List/Cards toggle (prefs), columns fed by the daemon (Size: new `size_bytes` on /admin/models from `weights_size`, cached on path + mtime, capped at 2000 files; Memory: /admin/system vram; tok/s: latest series bucket else decode p50; First token: ttft p50 for running models; Requests: last 5 min; Access: "Secure · LAN" or "This machine"); `remove.js` confirm shared by the tick bar's "Remove N" and the model page's Remove (lands on My models).
+- Reviewer: PASS; should-fixes done (partial-size cache, bounded walk, model-page Remove test, stale comments). Developer checked live with 100 fake + 3 real-weight models at 1280 and 390, both themes.
 
 ## F-057 Remove the blade engine [todo]
 Brief: docs/briefs/console-pages.md · Needs: F-061, F-062
