@@ -32,7 +32,7 @@ CONSOLE_DIR = Path(__file__).parent / "console"
 CONSOLE_SCRIPTS = {"theme.js", "main.js", "core.js", "icons.js", "routes.js",
                    # the blades console: engine, shell and one file per blade, each with its own CSS
                    "blades.js", "blade-layout.js", "blade-stack.js", "keyed.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "beacon.js", "blade-home.js",
-                   "model-page.js", "blade-add.js", "blade-security.js", "blade-keys.js", "blade-bench.js", "blade-logs.js",
+                   "model-page.js", "remove.js", "blade-add.js", "blade-security.js", "blade-keys.js", "blade-bench.js", "blade-logs.js",
                    "blade-notebook.js", "blade-gateway.js", "blade-settings.js",
                    # plain pages (ADR 0005): the router, the one nav
                    "pages.js", "nav.js", "picker.js", "library-logic.js", "library.js"}

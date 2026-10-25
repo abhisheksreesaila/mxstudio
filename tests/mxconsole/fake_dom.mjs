@@ -31,12 +31,16 @@ export class FakeEl extends FakeNode {
   addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }
   removeEventListener(type, fn) { this.listeners[type] = (this.listeners[type] || []).filter((f) => f !== fn); }
   dispatch(type, init = {}) {
-    const e = { type, target: this, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, ...init };
-    for (let n = this; n; n = n.parentNode) for (const fn of (n.listeners[type] || []).slice()) { e.currentTarget = n; fn(e); }
+    const e = { type, target: this, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; }, ...init };
+    for (let n = this; n && !e.stopped; n = n.parentNode) for (const fn of (n.listeners[type] || []).slice()) { e.currentTarget = n; fn(e); }
     return e;
   }
   click() { return this.dispatch("click"); }
-  key(key) { const e = { key, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } }; (this.listeners.keydown || []).slice().forEach((fn) => fn(e)); return e; }
+  key(key, extra = {}) {  // a keydown at this element, bubbling up to its ancestors like the browser's
+    const e = { key, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, target: this, ...extra };
+    for (let n = this; n instanceof FakeEl; n = n.parentNode) (n.listeners.keydown || []).slice().forEach((fn) => fn(e));
+    return e;
+  }
   append(...kids) { kids.forEach((k) => { if (k.parentNode) k.remove(); k.parentNode = this; this.children.push(k); }); }
   replaceChildren(...kids) { this.children.forEach((k) => { k.parentNode = null; }); this.children = []; this.append(...kids); }
   remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((c) => c !== this); this.parentNode = null; }

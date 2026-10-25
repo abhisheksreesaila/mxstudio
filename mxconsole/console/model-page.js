@@ -4,8 +4,9 @@
 // Data: the polled store (models, metrics, series, info) + /admin/system crew. Everything is updated in place, so focus,
 // hover and the 3 s poll never rebuild the page, and switching model or tab never reloads it.
 import { h, s, icon, store, onData, fmt, dur, colorOf, api, refresh, toast, copyText, reducedMotion } from "./core.js";
-import { register, makeBlade, truncate } from "./blades.js";
+import { register, makeBlade } from "./blades.js";
 import { go } from "./pages.js";
+import { removeModels } from "./remove.js";
 import { labelsEditor } from "./library.js";
 import { tabRoute } from "./routes.js";
 import { modelView } from "./blade-home.js";
@@ -31,15 +32,15 @@ export function cliTwin(action, name) {
 }
 
 /** The command bar for a state ("ready" | "starting" | "cold" | "crashed"): the model's verbs and nothing else. Navigation is the
- *  tabs; Run benchmark and Open in Jupyter live inside their tabs. Remove is the danger one, an icon, last. */
+ *  tabs; Run benchmark and Open in Jupyter live inside their tabs. Remove is the danger one, last, with its word. */
 export function commandsFor(state) {
-  const c = (key, label, ic, hue, extra = {}) => ({ key, label, icon: ic, hue: hue || null, danger: false, iconOnly: false, primary: false, ...extra });
+  const c = (key, label, ic, hue, extra = {}) => ({ key, label, icon: ic, hue: hue || null, danger: false, primary: false, ...extra });
   const power = state === "ready" ? [c("stop", "Stop", "square", HUE.stop), c("restart", "Restart", "rotate-cw", HUE.restart)]
     : state === "starting" ? [c("stop", "Stop", "square", HUE.stop)]
     : state === "crashed" ? [c("restart", "Restart", "rotate-cw", HUE.restart)]
     : [c("start", "Start", "play", HUE.start)];
   power[0].primary = true;  // one filled verb per command bar: the power one
-  return [...power, c("copy", "Copy endpoint", "copy", HUE.copy), c("rm", "Remove", "trash-2", null, { danger: true, iconOnly: true })];
+  return [...power, c("copy", "Copy endpoint", "copy", HUE.copy), c("rm", "Remove", "trash-2", null, { danger: true })];
 }
 
 /** The four "Right now" tiles, always in this order. value null = nothing to show ("—"). */
@@ -60,9 +61,6 @@ export function tabKeyTarget(key, keys, current) {
   if (key === "End") return keys[keys.length - 1];
   return null;
 }
-
-/** What the Remove button's accessible name is: after the first click it says what the second one does. */
-export const removeLabel = (name, armed) => (armed ? `Click again to remove ${name}` : "Remove");
 
 /** The tab strip: a tablist with a roving tabindex (only the selected tab is a Tab stop; arrows, Home and End move and activate).
  *  Each tab controls the one panel `<prefix>-panel`. onPick(key) is called when a key or click picks a tab. */
@@ -206,7 +204,7 @@ register("model", (blade) => {
       blade.header.hidden = true;  // the crumb in the top bar already says which model this is
       blade.el.classList.add("model-page");
       const ctxNow = () => ({ metrics: store.metrics, series: store.series, info: store.info, system: system.crew, endpoint: (store.info && store.info.endpoint) || `${location.origin}/v1` });
-      let essigPrev = "", crashSig = "", busy = false, confirmTimer = 0, barSig = "", gone = false, confirming = false, removing = false;
+      let essigPrev = "", crashSig = "", busy = false, barSig = "", gone = false, removing = false;
       const currentModel = () => (store.models || []).find((m) => m.name === name);
       const path = () => `/admin/models/${encodeURIComponent(name)}`;
 
@@ -285,41 +283,20 @@ register("model", (blade) => {
         },
         rm: () => removeModel(),
       };
-      function removeModel() {
-        if (!confirming) {  // the second click confirms
-          confirming = true; paintConfirm();
-          clearTimeout(confirmTimer);
-          confirmTimer = setTimeout(() => { confirming = false; paintConfirm(); }, 5000);
-          return;
-        }
-        clearTimeout(confirmTimer);
-        confirming = false;
+      async function removeModel() {  // asks first; then the model page has nothing left to show, so land on My models
         removing = true; paintBar();
-        api("DELETE", path()).then(() => {
-          gone = true;
-          truncate(1);
-          toast(`Removed ${name} · $ ${cliTwin("rm", name)}`);
-          refresh();
-        }).catch((e) => { toast(`Could not remove ${name}: ${e.message}`); removing = false; paintBar(); paintConfirm(); });
-      }
-      function paintConfirm() {
-        const btn = barHost.querySelector('[data-cmd="rm"]');
-        if (!btn) return;
-        const m = currentModel();
-        const gb = m ? overviewView(m, ctxNow()).fit.thisGb : 0;
-        btn.lastChild.textContent = confirming ? `Click again to remove${gb ? ` (${gb} GB)` : ""}` : "Remove";
-        btn.setAttribute("aria-label", removeLabel(name, confirming));
-        btn.classList.toggle("armed", confirming);
+        const done = await removeModels([name]);
+        if (done.length) { gone = true; go({ page: "home" }); return; }
+        removing = false; paintBar();
       }
       function paintBar() {
         barHost.querySelectorAll("button").forEach((b) => { b.disabled = busy || removing; });
       }
       function buildBar(cmds) {
         barHost.replaceChildren(...cmds.map((c) => h("button", {
-          class: `fb${c.primary ? " fill" : ""}${c.danger ? " danger" : ""}${c.iconOnly ? " ic" : ""}${c.key === "copy" ? " cp" : ""}`, type: "button", "data-cmd": c.key, "aria-label": c.label,
+          class: `fb${c.primary ? " fill" : ""}${c.danger ? " danger" : ""}${c.key === "copy" ? " cp" : ""}`, type: "button", "data-cmd": c.key, "aria-label": c.label,
           title: cliTwin(c.key, name) ? `$ ${cliTwin(c.key, name)}` : c.label, style: c.hue ? { "--c": c.hue } : null, onClick: () => ACTIONS[c.key](),
         }, icon(c.icon, 15, "currentColor", 1.75), h("span", { class: "t" }, c.label))));
-        confirming = false;
       }
 
       // -- draw: update text and attributes in place; rebuild the command bar only when its set of buttons changes
@@ -344,7 +321,7 @@ register("model", (blade) => {
         const cmds = commandsFor(m.state);
         const sig = cmds.map((c) => c.key).join();
         if (sig !== barSig) { barSig = sig; buildBar(cmds); }
-        paintBar(); paintConfirm();
+        paintBar();
         // the crashed callout (its buttons are focusable: rebuild only when the flag flips)
         if (v.crashed !== (crashSig === "1")) {
           crashSig = v.crashed ? "1" : "0";
@@ -387,8 +364,7 @@ register("model", (blade) => {
         const tabChanged = r.tab !== tab;
         tab = r.tab;
         if (swapped) {
-          clearTimeout(confirmTimer);
-          essigPrev = ""; crashSig = ""; barSig = ""; confirming = false; removing = false; busy = false;
+          essigPrev = ""; crashSig = ""; barSig = ""; removing = false; busy = false;
           blade.crumb = name;
           blade.el.setAttribute("aria-label", name);
           draw();
@@ -398,7 +374,7 @@ register("model", (blade) => {
       const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => placePill(true)) : null;
       if (ro) ro.observe(tabs);
       const off = onData(draw);
-      blade.onClose = () => { off(); clearTimeout(confirmTimer); subs.close(); if (ro) ro.disconnect(); };
+      blade.onClose = () => { off(); subs.close(); if (ro) ro.disconnect(); };
       draw();
       showTab();
       requestAnimationFrame(() => placePill(true));

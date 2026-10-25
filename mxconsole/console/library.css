@@ -115,3 +115,49 @@
   .gi .x::after { inset: -4px; }                           /* 36 -> 44 */
 }
 @media (prefers-reduced-motion: reduce) { .selbar.on, .gi.got { animation: none; } }
+
+/* F-062: List or Cards beside the search; the cards; Remove and its confirm. Matches mock v5. */
+.hbar { display: flex; gap: 10px; align-items: center; }
+.hbar .psearch { flex: 1; min-width: 0; }
+.seg { display: flex; padding: 3px; border-radius: 999px; background: rgb(var(--oq-state) / .06); flex: none; }
+.seg button { border: 0; background: none; height: 36px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; gap: 6px; font: 600 12.5px var(--sans); color: var(--text-2); touch-action: manipulation; }
+.seg button.on { background: var(--oq-surface-2); color: var(--text); }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cx-tbl .axs { font: 12px var(--mono); color: var(--text-2); white-space: nowrap; }
+.cx-tbl td.num { white-space: nowrap; }
+.cgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; padding: 4px 0 18px 18px; }
+.mc { position: relative; text-align: left; background: var(--oq-surface-2); border-radius: 14px; padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; transition: transform .15s, box-shadow .15s; }
+.mc:hover { box-shadow: var(--oq-shadow-1); }
+.mc:active { transform: scale(.985); }
+.mc.sel { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.mc .top { display: flex; align-items: center; gap: 8px; }
+.mc .top .namebtn { flex: 1; min-width: 0; }
+.mc .k3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.mc .k3 div { background: rgb(var(--oq-state) / .045); border-radius: 9px; padding: 7px 9px; min-width: 0; }
+.mc .k3 small { display: block; font: 500 10px var(--mono); text-transform: uppercase; letter-spacing: .05em; color: var(--faint); }
+.mc .k3 span { font: 600 14px var(--mono); }
+.mc .tg3 { display: flex; flex-wrap: wrap; gap: 4px; min-height: 22px; }
+.selbar .fb.danger { color: var(--bad-fg); margin-left: 6px; display: inline-flex; align-items: center; gap: 6px; }
+.fb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* the confirm: a centred box over a dim backdrop; focus is trapped in it (remove.js) */
+.confirm { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; background: rgb(0 0 0 / .45); animation: lib-settle .18s ease-out; }
+.confirm .box { width: min(420px, 90vw); background: var(--oq-surface-2); border-radius: 18px; padding: 20px; box-shadow: var(--oq-shadow-2); }
+.confirm h4 { margin: 0 0 6px; font-size: 16px; }
+.confirm p { margin: 0 0 16px; color: var(--text-2); font-size: 13.5px; line-height: 1.5; }
+.confirm .row { display: flex; gap: 8px; justify-content: flex-end; }
+.confirm .fb { height: 40px; display: inline-flex; align-items: center; }
+.confirm .fb.danger2 { background: var(--oq-bad); color: #fff; }
+.confirm .fb.danger2:hover { filter: brightness(.94); }
+@media (prefers-reduced-motion: reduce) { .confirm { animation: none; } .mc { transition: none; } }
+@media (max-width: 760px) {
+  .cgrid { grid-template-columns: 1fr; padding: 4px 0 12px 12px; }
+  .hbar .seg button { font-size: 0; gap: 0; width: 44px; justify-content: center; height: 40px; }
+  .selbar .fb.danger { margin-left: 0; }
+}
+
+/* the numbers give way to the width of the results area, not the window: first the rarely read ones, then size and memory */
+.res { container-type: inline-size; }
+.cx-tbl td.nm { max-width: 220px; }
+@container (max-width: 960px) { .cx-tbl .c2 { display: none; } }
+@container (max-width: 760px) { .cx-tbl .c3 { display: none; } }

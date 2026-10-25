@@ -27,10 +27,6 @@
 .fb.fill svg { color: inherit; }
 .fb.danger { color: var(--oq-bad); }
 .fb.danger svg { color: inherit; }
-.fb.ic { width: 36px; padding: 0; }
-.fb.ic .t { display: none; }
-.fb.ic.armed { width: auto; padding: 0 14px; background: color-mix(in srgb, var(--oq-bad) 12%, transparent); }
-.fb.ic.armed .t { display: inline; }
 .fb:disabled { opacity: .45; }
 
 /* ---- Overview: cards on a 2-column grid ---- */
@@ -84,8 +80,6 @@
   .tabs button svg { display: none; }
   .cmdbar { margin: 0; }
   .cmdbar .fb { flex: 1; height: 44px; }
-  .cmdbar .fb.ic { flex: none; width: 44px; }
-  .cmdbar .fb.ic.armed { flex: 1; }
   .cmdbar .fb.cp { flex: none; width: 44px; padding: 0; }
   .cmdbar .fb.cp .t { display: none; }
   .sec { grid-template-columns: 1fr; padding: 10px; gap: 10px; }

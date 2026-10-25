@@ -44,6 +44,13 @@ export function counts(models, labels) {
   };
 }
 
+/** A size on disk as "1.3 GB" or "360 MB" (decimal, like the Hugging Face page); "–" when the daemon has none. */
+export function sizeLabel(bytes) {
+  if (!bytes || bytes < 0) return "–";
+  if (bytes >= 1e9) return `${(Math.round(bytes / 1e8) / 10).toFixed(1)} GB`;
+  return `${Math.max(1, Math.round(bytes / 1e6))} MB`;
+}
+
 // -- labelling -------------------------------------------------------------------------------------
 const picked = (models, names) => models.filter((m) => names.includes(m.name));
 
