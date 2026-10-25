@@ -481,8 +481,9 @@ Brief: docs/briefs/console-pages.md · Needs: none
 - [x] `test_readme_doc.py` updated to the new contract (API table checked in docs/API.md against routes and the OpenAPI spec; README ≤ 30 lines and links every reference; local links in README, API, ARCHITECTURE and USER_GUIDE resolve)
 - Reviewer: PASS; fixed its should-fix (the three orphaned screenshots now live in the user guide). Also fixed test_remove's JSON check to read stdout only (a Python 3.14 warning on stderr broke it, before this change too).
 
-## F-060 Front page in the omxcode style [todo]
+## F-060 Front page in the omxcode style [review]
 Brief: docs/briefs/console-pages.md · Needs: F-058 (new screenshots)
 - [x] designed with the designer skill (desktop and phone) and approved before building — picked: Claude's A · Statement (dark), `docs/design/front-page/claude-a.html`; build with the screenshots retaken in F-058
-- [ ] `docs/site/index.html`: hero, live demos, how a request travels, FAQ, available today; links to the tour as the user guide
+- [x] `docs/site/index.html`: hero, live demos, how a request travels, FAQ, available today; links to the tour as the user guide
 - [ ] checked live on GitHub Pages after the push you approve
+- Built: `docs/site/index.html` from draft A (`front.css`, `front.js`, omxqua components.css + omxqua.js v0.1.5 vendored in `docs/site/omxqua/`); copy updated for v5 (no switcher); all 13 `docs/assets/screens/*.png` retaken from the current console on a scratch install with real models (qwen2.5-0.5b and coder-1.5b running, real benchmark). Reviewer: round 1 NEEDS WORK (dead footer links, stale note, unlabelled example keys) → fixed; round 2 PASS, 1037 tests. Not pushed: waiting for the owner's yes. The console tour (`console.html`) still describes the blades: F-058.
