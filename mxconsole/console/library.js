@@ -10,7 +10,6 @@ export const kindName = (k) => (KINDS.find(([id]) => id === k) || [k, k])[1];
 export function groupName(key) {
   if (key === "all") return "All models";
   if (key === "running") return "Running";
-  if (key === "recent") return "Recent";
   return key.startsWith("kind:") ? kindName(key.slice(5)) : `#${key.slice(6)}`;
 }
 const KIND_COLOUR = { chat: "var(--oq-data-1)", coder: "var(--oq-data-4)", vision: "var(--oq-data-2)", embeddings: "var(--oq-data-3)", image: "var(--oq-warn)" };
@@ -21,7 +20,7 @@ const typing = () => { const a = document.activeElement; return !!a && (/^(INPUT
 
 /** onChange: called whenever what the results show may have changed (search, group, ticks, labels).
  *  onRemove(names): when given, the tick bar gets a "Remove N" button that hands over the ticked names (the page asks, then removes). */
-export function createLibrary({ onChange, placeholder = "Search by name, kind or #label", recent = null, onRemove = null }) {
+export function createLibrary({ onChange, placeholder = "Search by name, kind or #label", onRemove = null }) {
   const lib = { q: "", group: "all", labels: [], ticked: new Set(), editing: false };
   let sig = "", shapeNow = "", barSig = "", busy = 0, adding = false;
   const models = () => store.models || [];
@@ -138,8 +137,7 @@ export function createLibrary({ onChange, placeholder = "Search by name, kind or
   function drawGroups() {
     const c = counts(models(), lib.labels);
     const shape = JSON.stringify([lib.group, lib.editing, adding, lib.labels]);
-    const recentN = recent ? models().filter((m) => recent.includes(m.name)).length : 0;  // the switcher passes its Recent list; My models has none
-    const now = shape + JSON.stringify(c) + recentN;
+    const now = shape + JSON.stringify(c);
     if (now === sig) return;
     const a = document.activeElement;
     if (shape === shapeNow && a && lib.groups.contains(a) && a.tagName === "INPUT") return;  // a poll only changing counts never takes a field from under your fingers
@@ -150,7 +148,6 @@ export function createLibrary({ onChange, placeholder = "Search by name, kind or
       h("div", { class: "gh" }, "Show"),
       item("all", "All models", c.all, icon("box", 16)),
       item("running", "Running", c.running, dot("var(--oq-ok)")),
-      ...(recent ? [item("recent", "Recent", recentN, icon("clock", 16))] : []),
       h("div", { class: "gh" }, "Kind ", h("em", {}, "· automatic")),
       ...KINDS.map(([k, name]) => item(`kind:${k}`, name, c.kinds[k], dot(KIND_COLOUR[k]))),
       h("div", { class: "gh mine" }, h("span", { class: "t" }, "Your labels"),

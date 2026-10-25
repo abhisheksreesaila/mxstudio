@@ -1,7 +1,6 @@
 // mxconsole, per-browser preferences. Pure: the storage is passed in, and a blocked storage never throws.
 export const VIEW_KEY = "mxc-view";
 export const THEME_KEY = "mxc-theme";
-export const RECENT_KEY = "mxc-recent";
 
 /** window.localStorage, or null when storage is blocked (reading it can throw): every caller must accept null. */
 export function safeStorage() {
@@ -63,12 +62,4 @@ export function onTheme(fn) {
   window.addEventListener(THEME_EVENT, fn);
   mq.addEventListener("change", fn);
   return () => { window.removeEventListener(THEME_EVENT, fn); mq.removeEventListener("change", fn); };
-}
-
-/** The last models visited, newest first (the switcher's Recent). Anything that is not a list of names reads as empty. */
-export function readRecent(storage) {
-  try { const v = JSON.parse(read(storage, RECENT_KEY) || "[]"); return Array.isArray(v) ? v.filter((n) => typeof n === "string") : []; } catch (_) { return []; }
-}
-export function writeRecent(storage, names) {
-  write(storage, RECENT_KEY, JSON.stringify(names));
 }

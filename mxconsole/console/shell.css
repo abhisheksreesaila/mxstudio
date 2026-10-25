@@ -1,33 +1,8 @@
-/* omxconsole, the shell (ADR 0005): the one nav and the column beside it. Matches docs/design/console-pages/mock.html (v4).
-   Desktop: a rail on the left. At 760 px and under (of the window, not the screen): the same nav is a bottom tab bar. */
+/* omxconsole, the shell (ADR 0005, F-061): the top bar over one full-width page. There is no side rail; the top bar (topbar.css)
+   holds the logo, the breadcrumb, the island and the places. Matches docs/design/console-pages/mock.html (v5). */
 .app { position: fixed; inset: 0; container-type: inline-size; background: var(--canvas); }
-.shell { height: 100%; display: grid; grid-template-columns: 212px minmax(0, 1fr); }
-.col { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-
-/* ---- the one nav: a rail ---- */
-.cx-nav { display: flex; flex-direction: column; gap: 2px; padding: 14px 10px; min-height: 0; overflow-y: auto; }
-.cx-nav a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
-.cx-nav .brand { display: flex; align-items: center; gap: 9px; padding: 6px 8px 18px; font: 650 15px var(--oq-font); }
-.cx-nav .mk { width: 28px; height: 28px; border-radius: 8px; background: var(--oq-ink); color: var(--oq-surface-0); display: grid; place-items: center; font: 700 10px var(--oq-font-mono); flex: none; }
-.cx-nav .it { height: 40px; min-height: 40px; display: flex; align-items: center; gap: 11px; padding: 0 12px; border-radius: 12px; font: 550 13.5px var(--oq-font); color: var(--oq-ink-2); transition: background .15s, color .15s, transform .15s; }
-.cx-nav .it:hover { background: rgb(var(--oq-state) / .05); color: var(--oq-ink); }
-.cx-nav .it.on { background: rgb(var(--oq-state) / .09); color: var(--oq-ink); }
-.cx-nav .it:active { transform: scale(.97); }
-.cx-nav .ico { display: grid; place-items: center; color: var(--c); width: 18px; height: 18px; flex: none; }
-.cx-nav .grow { flex: 1; }
-.cx-nav .foot { font: 11.5px var(--oq-font-mono); color: var(--oq-ink-faint); padding: 8px 12px; overflow: hidden; text-overflow: ellipsis; }
-.cx-nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-
-/* ---- phone: the same nav becomes a tab bar under the page ---- */
+.shell { height: 100%; display: flex; flex-direction: column; }
+.col { position: relative; min-width: 0; min-height: 0; flex: 1; display: flex; flex-direction: column; }
 @container (max-width: 760px) {
-  .shell { display: flex; flex-direction: column; }
-  .col { flex: 1; order: 1; }
-  .cx-nav { order: 2; flex: none; flex-direction: row; gap: 0; padding: 6px 6px max(10px, env(safe-area-inset-bottom)); background: var(--oq-surface-1); border-top: 1px solid var(--oq-line-2); overflow: visible; }
-  .cx-nav .brand, .cx-nav .grow, .cx-nav .foot { display: none; }
-  .cx-nav .it { flex: 1; min-width: 0; flex-direction: column; justify-content: center; gap: 4px; height: 54px; padding: 0; font-size: 11px; border-radius: 14px; }
-  .cx-nav .it.on { background: none; }
-  .cx-nav .it.on .ico { background: rgb(var(--oq-state) / .1); }
-  .cx-nav .ico { width: 44px; height: 28px; border-radius: 999px; transition: background .2s; }
   .journey { padding: 0 8px 8px; }
 }
-@media (prefers-reduced-motion: reduce) { .cx-nav .it { transition: none; } }

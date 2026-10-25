@@ -26,19 +26,17 @@ def text(name: str) -> str:
 ROUTE = {"page": "model", "model": "org/tiny", "tab": "logs"}
 
 
-# -- routes: tabs and the picker -------------------------------------------------------------------
+# -- routes: tabs -------------------------------------------------------------------
 @needs_node
-def test_switching_tab_keeps_the_model_and_picking_a_model_keeps_the_tab():
+def test_switching_tab_keeps_the_model():
     assert node("routes.js", f"m.tabRoute({json.dumps(ROUTE)}, 'benchmark')") == {"page": "model", "model": "org/tiny", "tab": "benchmark"}
-    assert node("routes.js", f"m.pickRoute({json.dumps(ROUTE)}, 'other')") == {"page": "model", "model": "other", "tab": "logs"}
-    assert node("routes.js", "m.hashFor(m.pickRoute({page:'model',model:'a',tab:'notebook'}, 'org/b'))") == "#/models/org/b/notebook"
 
 
 @needs_node
-def test_the_tab_is_not_a_crumb_and_the_model_crumb_is_the_picker():
+def test_the_tab_is_not_a_crumb_and_the_model_crumb_is_plain_text():
     for tab in ("overview", "benchmark", "logs", "notebook"):
         crumbs = node("routes.js", f"m.crumbsFor({{page:'model',model:'tiny',tab:'{tab}'}})")
-        assert [(c["label"], bool(c.get("picker"))) for c in crumbs] == [("My models", False), ("tiny", True)], tab
+        assert [(c["label"], bool(c.get("to"))) for c in crumbs] == [("My models", True), ("tiny", False)], tab
 
 
 @needs_node
@@ -97,27 +95,23 @@ def test_every_button_on_the_model_page_is_flat_and_the_tab_pill_slides():
     assert "btn fill" not in js and "btn tonal" not in js and "btn danger" not in js  # the page's own buttons are .fb
 
 
-def test_the_phone_rules_stack_tabs_over_verbs_and_the_picker_becomes_a_sheet():
+def test_the_phone_rules_stack_tabs_over_verbs_and_keep_touch_targets_44px():
     css = text("model-page.css")
     phone = css[css.index("@container (max-width: 760px)"):]
     assert re.search(r"\.mhead \{[^}]*flex-direction: column", phone)
     assert re.search(r"\.sec \{[^}]*grid-template-columns: 1fr;", phone)
-    sheet = text("picker.css")
-    assert re.search(r"\.pmenu\.sheet \{[^}]*translateY\(100%\)", sheet)
     for target in (r"\.tabs button \{[^}]*height: 44px", r"\.cmdbar \.fb \{[^}]*height: 44px", r"\.cmdbar \.fb\.cp \{[^}]*width: 44px"):
         assert re.search(target, phone), target  # touch targets are 44 px on a phone; desktop .fb stays 36
     assert "height: 36px" in re.search(r"\.fb \{([^}]*)\}", css).group(1)
-    assert css.count("{") == css.count("}") and sheet.count("{") == sheet.count("}")
+    assert css.count("{") == css.count("}")
 
 
-def test_numbers_morph_and_the_crumb_opens_the_picker():
+def test_numbers_morph_in_220ms():
     assert "MORPH_MS = 220" in text("model-page.js")  # the one timing the design names; the behaviour needs a real browser (checked live)
-    top = text("topbar.js")
-    assert top.count("chevron-down") == 1 and "openPicker" in top and "c.picker" in top
 
 
 def test_the_new_files_are_served_the_blade_menu_is_gone_and_the_page_has_no_back_button():
-    assert {"model-page.js", "model-page.css", "picker.js", "picker.css"} <= CONSOLE_ASSETS and "blade-model.js" not in CONSOLE_ASSETS
+    assert {"model-page.js", "model-page.css"} <= CONSOLE_ASSETS and "blade-model.js" not in CONSOLE_ASSETS
     assert "rmenu" not in text("model-page.js")
     pages = text("pages.js")
     assert 'blade.header.prepend(backButton({ page: "home" }))' in pages and 'tab !== "overview"' not in pages  # only Add keeps Back

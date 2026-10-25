@@ -98,12 +98,12 @@ def test_the_hash_a_route_has_is_canonical_and_parses_back():
 @needs_node
 def test_the_top_bar_only_says_where_you_are():
     def crumbs(r):
-        return [(c["label"], bool(c.get("picker")), bool(c.get("to"))) for c in node(f"r.crumbsFor({json.dumps(r)})")]
-    assert crumbs({"page": "home"}) == [("My models", False, False)]
-    assert crumbs({"page": "keys"}) == [("API keys", False, False)]
-    assert crumbs({"page": "add"}) == [("My models", False, True), ("Add a model", False, False)]
-    assert crumbs({"page": "model", "model": "tiny", "tab": "overview"}) == [("My models", False, True), ("tiny", True, False)]
-    assert crumbs({"page": "model", "model": "tiny", "tab": "logs"}) == [("My models", False, True), ("tiny", True, False)]  # F-053: the tab is not a crumb
+        return [(c["label"], bool(c.get("to"))) for c in node(f"r.crumbsFor({json.dumps(r)})")]
+    assert crumbs({"page": "home"}) == [("My models", False)]
+    assert crumbs({"page": "keys"}) == [("API keys", False)]
+    assert crumbs({"page": "add"}) == [("My models", True), ("Add a model", False)]
+    assert crumbs({"page": "model", "model": "tiny", "tab": "overview"}) == [("My models", True), ("tiny", False)]
+    assert crumbs({"page": "model", "model": "tiny", "tab": "logs"}) == [("My models", True), ("tiny", False)]  # F-053: the tab is not a crumb
 
 
 @needs_node
