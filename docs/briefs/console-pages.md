@@ -1,6 +1,6 @@
 # Brief: omxconsole without blades, and a front door
 
-Status: approved (2026-10-24)
+Status: approved (2026-10-24); revision v5 below proposed, awaiting approval
 
 ## Why (the mission)
 - Using the reskinned console daily, the blades got in the way: pick a model, open a section, the blade closes, go back, pick the next model, open the section again. Every model's screen is the same template, so stacking blades buys nothing. There are only a handful of screens, and blades pay off when there are many.
@@ -10,6 +10,15 @@ Status: approved (2026-10-24)
 ## Who it's for
 - Abhishek, daily, comparing and running a few local models (desktop window and phone).
 - A developer landing on the GitHub repo or the site, deciding in 30 seconds whether to try it.
+
+## Revision v5 (proposed 2026-10-24, after using the built console)
+Supersedes item 1's rail and tab bar and item 3's switcher. Mock: `docs/design/console-pages/mock.html` (v5).
+- **No side rail.** Keys, Gateway, Security and Settings apply to every model and are rarely opened, so they move to quiet icon-and-word links on the right of the top bar. My models gets the full width. On a narrow window the four fold into one ⋯ menu (desktop web first; the phone is not a priority).
+- **Top bar:** logo (home) · a plain breadcrumb (My models › model, styled as a trail, not a pill) · the island (what is running, now) · the places.
+- **No switcher.** The model name in the breadcrumb is plain text; to change model you go back to My models (the breadcrumb or the logo) and pick one. `/` and Ctrl+K jump to the My models search. Recent goes with it.
+- **My models, wider:** List or Cards toggle beside the search. The list gains Size, First token, Requests and Access columns, with the repo under the name. Cards show state, tok/s, memory, requests and labels.
+- **Remove:** on the model page (Remove, with a word, not just an icon) and in the tick bar ("Remove N"), both behind a confirm that says the weights stay (same as `mxc rm`).
+- Unchanged: the groups column, labels and how they're applied, the model page's tabs and verbs, Add a model, the island.
 
 ## What it does
 - Core job: one page at a time, with the model as something you switch, not something you open.

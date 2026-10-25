@@ -3,50 +3,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>omxconsole · pages, not blades · mock v4</title>
+<title>omxconsole · pages, not blades · mock v5</title>
 <link rel="stylesheet" href="../omxconsole/omxqua/src/fonts.css">
 <link rel="stylesheet" href="../omxconsole/omxqua/src/tokens.css">
 <link rel="stylesheet" href="../omxconsole/omxqua/src/components.css">
 <style>
-/* Mock v2 for docs/briefs/console-pages.md. One rule: every destination appears once.
-   Places (Models, API keys, Gateway, Security, Settings) live in one nav: a rail on desktop, a bottom tab bar on the phone (same DOM).
-   A model's sections are tabs inside the model page. The top bar only says where you are: My models › model ▾. */
+/* Mock v5 for docs/briefs/console-pages.md. One rule: every destination appears once.
+   No side rail: My models is home and gets the full width. The top bar holds the logo (home), a plain breadcrumb
+   (My models › model, no dropdown), the island, and the places that apply to every model (Keys, Gateway, Security, Settings).
+   A model's sections are tabs inside the model page; the breadcrumb or the logo takes you back to the list. */
 html, body { margin: 0; height: 100%; background: #050506; }
 body { display: grid; place-items: center; }
 .frame { width: 100vw; height: 100vh; transition: width .35s cubic-bezier(.2,.8,.2,1), height .35s cubic-bezier(.2,.8,.2,1), border-radius .35s; overflow: hidden; }
 body.phone .frame { width: 390px; height: 800px; border-radius: 44px; box-shadow: 0 0 0 10px #1c1c20, 0 30px 80px rgb(0 0 0 / .5); }
 .app { position: relative; height: 100%; overflow: hidden; container-type: inline-size; background: var(--oq-surface-0); color: var(--oq-ink); font-family: var(--oq-font); font-size: var(--oq-text); }
-.shell { height: 100%; display: grid; grid-template-columns: 212px 1fr; }
+.shell { height: 100%; display: flex; flex-direction: column; }
 .ico { width: 16px; height: 16px; flex: none; }
 button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
-/* ---- the one nav: rail on desktop ---- */
-.cx-nav { display: flex; flex-direction: column; gap: 2px; padding: 14px 10px; }
-.cx-nav .brand { border: 0; background: none; display: flex; align-items: center; gap: 9px; padding: 6px 8px 18px; font: 650 15px var(--oq-font); }
+/* ---- the top bar: logo · breadcrumb · island · places ---- */
+.col { position: relative; min-width: 0; min-height: 0; flex: 1; display: flex; flex-direction: column; }
+.bar { height: 60px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 14px; }
+.brand { border: 0; background: none; display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 12px; font: 650 15px var(--oq-font); flex: none; }
+.brand:hover { background: rgb(var(--oq-state) / .05); }
 .brand .mk { width: 28px; height: 28px; border-radius: 8px; background: var(--oq-ink); color: var(--oq-surface-0); display: grid; place-items: center; font: 700 10px var(--oq-font-mono); }
-.cx-nav .it { border: 0; background: none; height: 40px; display: flex; align-items: center; gap: 11px; padding: 0 12px; border-radius: 12px; font: 550 13.5px var(--oq-font); color: var(--oq-ink-2); text-align: left; transition: background .15s, color .15s; }
-.cx-nav .it:hover { background: rgb(var(--oq-state) / .05); color: var(--oq-ink); }
-.cx-nav .it.on { background: rgb(var(--oq-state) / .09); color: var(--oq-ink); }
-.cx-nav .it .ico { color: var(--c); width: 18px; height: 18px; }
-.cx-nav .it:active { transform: scale(.97); }
-.cx-nav .grow { flex: 1; }
-.cx-nav .foot { font: 11.5px var(--oq-font-mono); color: var(--oq-ink-faint); padding: 8px 12px; }
-
-/* ---- top bar: where you are ---- */
-.col { position: relative; min-width: 0; display: flex; flex-direction: column; }
-.bar { height: 64px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px 0 2px; }
-.crumbs { height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 5px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); min-width: 0; }
-.crumbs button { border: 0; background: none; height: 34px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; gap: 7px; font: 600 13px var(--oq-font); color: var(--oq-ink-2); white-space: nowrap; }
-.crumbs button:hover { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
-.crumbs button.on { color: var(--oq-ink); }
+/* the breadcrumb: plain text, like a bookmark trail. Earlier parts are links; the last part is where you are. */
+.crumbs { display: flex; align-items: center; gap: 4px; min-width: 0; padding-left: 6px; margin-left: 4px; border-left: 1px solid var(--oq-line-2); height: 22px; }
+.crumbs a { font: 550 13.5px var(--oq-font); color: var(--oq-ink-2); text-decoration: none; padding: 4px 6px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.crumbs a:hover { color: var(--oq-ink); background: rgb(var(--oq-state) / .05); }
+.crumbs .here { font: 600 13.5px var(--oq-font); color: var(--oq-ink); padding: 4px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.crumbs .here.mono { font-family: var(--oq-font-mono); font-size: 13px; }
 .crumbs .sep { color: var(--oq-ink-faint); width: 14px; height: 14px; }
-.picker { font-family: var(--oq-font-mono) !important; color: var(--oq-ink) !important; background: rgb(var(--oq-state) / .07) !important; min-width: 0; }
-.picker span { overflow: hidden; text-overflow: ellipsis; }
-.picker .cv { width: 14px; height: 14px; color: var(--oq-ink-2); }
 .bar .sp { flex: 1; }
-.bcn { border: 0; height: 44px; display: flex; align-items: center; gap: 9px; padding: 0 16px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); font: 600 13px var(--oq-font); flex: none; }
-.bcn i { width: 8px; height: 8px; border-radius: 50%; background: var(--oq-ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--oq-ok) 25%, transparent); }
-.bcn .mono { color: var(--oq-ink-2); font-family: var(--oq-font-mono); }
+.bcn { border: 0; height: 40px; display: flex; align-items: center; gap: 9px; padding: 0 16px; border-radius: 999px; background: #0b0b0d; color: #f4f4f5; box-shadow: 0 0 0 1px rgb(255 255 255 / .08); font: 600 13px var(--oq-font); flex: none; margin-right: 8px; }
+.bcn i { width: 8px; height: 8px; border-radius: 50%; background: var(--oq-ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--oq-ok) 35%, transparent); }
+.bcn .mono { opacity: .65; font-family: var(--oq-font-mono); }
+/* places: quiet links, for every model at once */
+.places { display: flex; gap: 2px; }
+.places a { height: 36px; display: flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 10px; font: 550 13px var(--oq-font); color: var(--oq-ink-2); text-decoration: none; cursor: pointer; transition: background .15s, color .15s; }
+.places a .ico { color: var(--c); width: 15px; height: 15px; }
+.places a:hover { background: rgb(var(--oq-state) / .05); color: var(--oq-ink); }
+.places a.on { background: rgb(var(--oq-state) / .09); color: var(--oq-ink); }
+.bar .more { display: none; }
 
 /* ---- the picker: a menu on desktop, a sheet on the phone ---- */
 .pmenu { position: absolute; z-index: 40; top: 64px; left: 214px; right: 16px; bottom: 16px; display: flex; flex-direction: column; overflow: hidden; border-radius: 18px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-3, var(--oq-shadow-2));
@@ -129,9 +127,30 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 .chip.part { box-shadow: inset 0 0 0 1.5px var(--oq-ink-2); color: var(--oq-ink); }
 .grab2 { display: none; width: 38px; height: 5px; border-radius: 3px; background: var(--oq-line); margin: 0 auto 8px; }
 
+/* v5: list or cards, more columns, remove from the tick bar */
+.hbar { display: flex; gap: 10px; align-items: center; } .hbar .psearch { flex: 1; }
+.seg.view { flex: none; } .seg.view button { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; } .seg.view .ico { width: 15px; height: 15px; }
+.cx-tbl td.nm { max-width: 260px; } .cx-tbl td.nm, .cx-tbl .sub2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-tbl .num { white-space: nowrap; }
+.cx-tbl .sub2 { display: block; font: 11.5px var(--oq-font-mono); color: var(--oq-ink-faint); margin-top: 3px; font-weight: 400; }
+.cx-tbl .acc { font: 12px var(--oq-font-mono); color: var(--oq-ink-2); white-space: nowrap; }
+.cx-tbl.cards { display: none; } .cgrid { display: none; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; padding: 4px 18px 18px; }
+.cgrid.on { display: grid; }
+.mc { position: relative; border: 0; text-align: left; background: var(--oq-surface-2); border-radius: 14px; padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; transition: transform .15s, box-shadow .15s; }
+.mc:hover { box-shadow: var(--oq-shadow-1); } .mc:active { transform: scale(.985); }
+.mc.sel { box-shadow: inset 0 0 0 1.5px var(--oq-accent); }
+.mc .top { display: flex; align-items: center; gap: 8px; } .mc .top b { flex: 1; min-width: 0; font: 600 13.5px var(--oq-font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc .k3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; } .mc .k3 div { background: rgb(var(--oq-state) / .045); border-radius: 9px; padding: 7px 9px; }
+.mc .k3 small { display: block; font: 500 10px var(--oq-font-mono); text-transform: uppercase; letter-spacing: .05em; color: var(--oq-ink-faint); } .mc .k3 span { font: 600 14px var(--oq-font-mono); }
+.mc .tg3 { display: flex; flex-wrap: wrap; min-height: 22px; }
+.selbar .fb.danger { margin-left: 6px; }
+.confirm { position: absolute; z-index: 50; inset: 0; display: none; place-items: center; background: rgb(0 0 0 / .45); }
+.confirm.on { display: grid; } .confirm .box { width: min(420px, 90%); background: var(--oq-surface-2); border-radius: 18px; padding: 20px; box-shadow: var(--oq-shadow-2); }
+.confirm h4 { margin: 0 0 6px; font-size: 16px; } .confirm p { margin: 0 0 16px; color: var(--oq-ink-2); font-size: 13.5px; line-height: 1.5; } .confirm .row { display: flex; gap: 8px; justify-content: flex-end; }
+
 /* ---- pages ---- */
 .pages { position: relative; flex: 1; min-height: 0; }
-.page { position: absolute; inset: 0 14px 14px 2px; display: none; }
+.page { position: absolute; inset: 0 14px 14px 14px; display: none; }
 .page.on { display: flex; animation: settle .26s cubic-bezier(.2,.8,.2,1); }
 @keyframes settle { from { opacity: 0; transform: translateY(12px); } }
 .sheet2 { flex: 1; min-width: 0; background: var(--oq-surface-1); border-radius: var(--oq-radius-card); box-shadow: var(--oq-shadow-1); display: flex; flex-direction: column; overflow: hidden; }
@@ -154,6 +173,7 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 .fb.fill .ico { color: inherit; }
 .fb.danger { color: var(--oq-bad); }
 .fb.ic { width: 36px; padding: 0; }
+.fb.danger2 { background: var(--oq-bad); color: #fff; }
 
 /* home */
 .cx-tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
@@ -219,23 +239,18 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 .demo button.on { background: #3f3f46; color: #fafafa; }
 .demo span { color: #71717a; padding: 0 8px 0 10px; align-self: center; }
 
-/* ---- phone: the same nav becomes a bottom tab bar; the top bar keeps only the picker and the Beacon dot ---- */
+/* ---- narrow (a small window, or a phone): the places fold into one menu; the breadcrumb keeps only where you are ---- */
+@container (max-width: 960px) { .places a span { display: none; } .places a { padding: 0 10px; } .bcn .mono { display: none; } }
 @container (max-width: 760px) {
-  .shell { display: block; }
-  .col { height: 100%; }
-  .cx-nav { position: absolute; z-index: 30; left: 0; right: 0; bottom: 0; flex-direction: row; gap: 0; padding: 6px 6px 22px; background: var(--oq-surface-1); border-top: 1px solid var(--oq-line-2); }
-  .cx-nav .brand, .cx-nav .grow, .cx-nav .foot { display: none; }
-  .cx-nav .it { flex: 1; flex-direction: column; justify-content: center; gap: 4px; height: 54px; padding: 0; font-size: 11px; border-radius: 14px; }
-  .cx-nav .it.on { background: none; }
-  .cx-nav .it.on .ico { background: rgb(var(--oq-state) / .1); }
-  .cx-nav .it .ico { width: 44px; height: 28px; padding: 5px 13px; box-sizing: border-box; border-radius: 999px; transition: background .2s; }
-  .bar { height: 60px; padding: 0 10px; }
+  .bar { padding: 0 8px; gap: 4px; }
+  .brand .bt { display: none; }
   .crumbs { flex: 1; } .bar .sp { display: none; }
-  .crumbs .home-c, .crumbs .sep { display: none; }
-  .crumbs .picker { flex: 1; justify-content: space-between; }
-  .crumbs .ttl { padding-left: 10px; color: var(--oq-ink); font-size: 15px; }
-  .bcn { padding: 0 14px; } .bcn .mono, .bcn .w { display: none; }
-  .pages { margin-bottom: 82px; }
+  .crumbs a, .crumbs .sep { display: none; }
+  .bcn { padding: 0 12px; margin: 0; } .bcn .w { display: none; }
+  .bar .more { display: inline-flex; }
+  .places { display: none; position: absolute; z-index: 45; top: 56px; right: 8px; flex-direction: column; padding: 6px; border-radius: 14px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); min-width: 180px; }
+  .places.open { display: flex; } .places a span { display: inline; } .places a { height: 44px; padding: 0 12px; }
+  .hbar .seg.view button { padding: 0 10px; font-size: 0; gap: 0; } .cgrid { padding: 4px 12px 12px; grid-template-columns: 1fr; }
   .page { inset: 0 8px 8px; }
   .mhead { flex-direction: column; align-items: stretch; padding: 10px; gap: 8px; }
   .tabs { overflow-x: auto; scrollbar-width: none; }
@@ -277,29 +292,27 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 <div class="frame">
 <div class="app oq-root oq-night oq-family-dev" id="app">
  <div class="shell">
-  <!-- the one nav: places, each exactly once -->
-  <nav class="cx-nav" id="nav">
-    <button class="brand" data-go="#/"><span class="mk">omx</span>omxconsole</button>
-    <button class="it" data-tab="home" data-go="#/" style="--c:var(--oq-data-1)"><svg class="ico"><use href="#i-box"/></svg><span>Models</span></button>
-    <button class="it" data-tab="keys" data-go="#/keys" style="--c:var(--oq-data-3)"><svg class="ico"><use href="#i-key"/></svg><span>Keys</span></button>
-    <button class="it" data-tab="gateway" data-go="#/gateway" style="--c:var(--oq-data-2)"><svg class="ico"><use href="#i-net"/></svg><span>Gateway</span></button>
-    <button class="it" data-tab="security" data-go="#/security" style="--c:var(--oq-warn)"><svg class="ico"><use href="#i-lock"/></svg><span>Security</span></button>
-    <button class="it" data-tab="settings" data-go="#/settings" style="--c:var(--oq-ink-2)"><svg class="ico"><use href="#i-gear"/></svg><span>Settings</span></button>
-    <div class="grow"></div>
-    <div class="foot">v0.3.0 · 127.0.0.1:11435</div>
-  </nav>
-
   <div class="col">
-    <header class="bar"><div class="crumbs" id="crumbs"></div><div class="sp"></div>
-      <button class="bcn" data-go="#/"><i></i>2 <span class="w">running</span> <span class="mono">84 tok/s</span></button></header>
+    <header class="bar">
+      <button class="brand" data-go="#/" aria-label="omxconsole home"><span class="mk">omx</span><span class="bt">omxconsole</span></button>
+      <nav class="crumbs" id="crumbs" aria-label="Where you are"></nav><div class="sp"></div>
+      <button class="bcn"><i></i>2 <span class="w">running</span> <span class="mono">84 tok/s · 11.2/24 GB</span></button>
+      <nav class="places" id="places" aria-label="For every model">
+        <a data-place="keys" data-go="#/keys" style="--c:var(--oq-data-3)"><svg class="ico"><use href="#i-key"/></svg><span>Keys</span></a>
+        <a data-place="gateway" data-go="#/gateway" style="--c:var(--oq-data-2)"><svg class="ico"><use href="#i-net"/></svg><span>Gateway</span></a>
+        <a data-place="security" data-go="#/security" style="--c:var(--oq-warn)"><svg class="ico"><use href="#i-lock"/></svg><span>Security</span></a>
+        <a data-place="settings" data-go="#/settings" style="--c:var(--oq-ink-2)"><svg class="ico"><use href="#i-gear"/></svg><span>Settings</span></a>
+      </nav>
+      <button class="fb ic more" id="more" aria-label="Keys, Gateway, Security, Settings"><svg class="ico"><use href="#i-dots"/></svg></button>
+    </header>
     <main class="pages">
       <!-- My models -->
       <section class="page" data-page="home"><div class="sheet2">
         <div class="ph2"><div class="bi" style="--c:var(--oq-data-1)"><svg class="ico"><use href="#i-box"/></svg></div><div><h2>My models</h2><div class="sub" id="hsub"></div></div><div class="sp"></div><span class="src">mxc ls</span><button class="fb fill" data-go="#/add"><svg class="ico"><use href="#i-plus"/></svg>Add</button></div>
-        <div class="hbar"><label class="psearch big"><svg class="ico"><use href="#i-search"/></svg><input id="hq" placeholder="Search 100 models by name, kind or #label" autocomplete="off"><kbd>/</kbd></label></div>
+        <div class="hbar"><label class="psearch big"><svg class="ico"><use href="#i-search"/></svg><input id="hq" placeholder="Search 100 models by name, kind or #label" autocomplete="off"><kbd>/</kbd></label><div class="seg view" id="view"><button class="on" data-view="list" aria-label="List"><svg class="ico"><use href="#i-rows"/></svg>List</button><button data-view="cards" aria-label="Cards"><svg class="ico"><use href="#i-grid"/></svg>Cards</button></div></div>
         <div class="lib"><nav class="groups" id="hgroups"></nav>
           <div class="res"><div class="cnt" id="hcnt"></div>
-            <div class="body2"><table class="cx-tbl"><thead><tr><th class="ck"><button class="cb" data-selall aria-label="Select all shown"><svg class="ico"><use href="#i-check"/></svg></button></th><th>Model</th><th>State</th><th class="tg">Labels</th><th class="num hide-p">Memory</th><th class="num">tok/s</th></tr></thead><tbody id="rows"></tbody></table></div></div></div>
+            <div class="body2"><table class="cx-tbl" id="tbl"><thead><tr><th class="ck"><button class="cb" data-selall aria-label="Select all shown"><svg class="ico"><use href="#i-check"/></svg></button></th><th>Model</th><th>State</th><th class="tg">Kind · labels</th><th class="num hide-p">Size</th><th class="num hide-p">Memory</th><th class="num">tok/s</th><th class="num hide-p">First token</th><th class="num hide-p">Requests</th><th class="hide-p">Access</th></tr></thead><tbody id="rows"></tbody></table><div class="cgrid" id="cgrid"></div></div></div></div>
         <div class="selbar" id="selbar"></div>
       </div></section>
 
@@ -323,15 +336,11 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
   </div>
  </div>
 
-  <div class="scrim2" id="scrim"></div>
-  <div class="pmenu" id="pmenu"><div class="grab2"></div>
-    <div class="ptop"><label class="psearch big"><svg class="ico"><use href="#i-search"/></svg><input id="pq" placeholder="Find a model" autocomplete="off"><kbd>esc</kbd></label><span class="stay">Switching keeps you on <b id="pmsec"></b></span></div>
-    <div class="lib"><nav class="groups" id="pgroups"></nav><div class="plist" id="plist"></div></div>
-    <div class="pfoot"><button class="fb" data-go="#/add"><svg class="ico"><use href="#i-plus"/></svg>Add a model</button><span class="hint">↑ ↓ move · Enter open · drag a model onto a label</span></div></div>
+<div class="confirm" id="confirm"><div class="box" role="dialog" aria-modal="true" aria-labelledby="cfh"><h4 id="cfh"></h4><p id="cfp"></p><div class="row"><button class="fb" data-cfno>Cancel</button><button class="fb fill danger2" data-cfyes>Remove</button></div></div></div>
 </div>
 </div>
 
-<div class="demo"><span>Mock v4</span><button class="on" data-dev="desk">Desktop</button><button data-dev="phone">Phone</button></div>
+<div class="demo"><span>Mock v5</span><button class="on" data-dev="desk">Desktop</button><button data-dev="phone">Phone</button></div>
 
 <svg width="0" height="0" style="position:absolute"><defs>
 <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
@@ -355,6 +364,9 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
 <symbol id="i-grip" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></symbol>
 <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-dots" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="i-rows" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></symbol>
 <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></symbol>
 </defs></svg>
 
@@ -382,7 +394,8 @@ for (const [f, arch, kind, sizes] of FAM) for (const z of sizes) for (const v of
   const name = `${f}-${z}${v}`; if (MODELS.some((m) => m.name === name) || MODELS.length >= 100) continue; n++;
   MODELS.push({ name, arch, kind, labels: MINE.filter((_, i) => n % [5, 7, 11, 13][i] === 0), state: "", word: "stopped", mem: 0, tps: 0, req: 0, p50: 0, ctx: "32k", repo: `hf/${name}`, q: "bf16", series: [], bench: [] });
 }
-let RECENT = ["qwen2.5-0.5b", "smollm3-3b", "qwen2.5-coder-1.5b-instruct"];
+const RECENT = [];
+MODELS.forEach((m) => { const z = m.name.match(/-(\d+(?:\.\d+)?)([bm])(?:-|$)/); m.size = z ? z[1] + z[2].toUpperCase() : "–"; m.ft = m.state === "run" ? Math.round(m.p50 * 0.3) : 0; });
 // A model's sections. Security is not here: it is one place for every model (the nav), and Overview links to it.
 const SECS = [["overview", "Overview", "box", "var(--oq-data-1)"], ["bench", "Benchmark", "gauge", "var(--oq-data-4)"],
   ["logs", "Logs", "logs", "var(--oq-data-2)"], ["notebook", "Notebook", "book", "var(--oq-data-3)"]];
@@ -396,16 +409,17 @@ function render() {
   const r = parse(), switched = cur.page === "model" && r.page === "model" && cur.model !== r.model;
   $$(".page").forEach((s) => s.classList.toggle("on", s.dataset.page === r.page));
   const tab = ["model", "add", "home"].includes(r.page) ? "home" : r.page;
-  $$(".cx-nav .it").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+  $$(".places a").forEach((b) => b.classList.toggle("on", b.dataset.place === tab)); $("#places").classList.remove("open");
   if (r.page === "model") { if (switched) { $("#sec").classList.add("dim"); setTimeout(() => { modelPage(r); $("#sec").classList.remove("dim"); }, 120); } else modelPage(r); }
-  if (r.page === "model") RECENT = [r.model, ...RECENT.filter((x) => x !== r.model)].slice(0, 3);
   crumbs(r); cur = r;
 }
+// The breadcrumb is a plain trail: My models is a link back to the list; the last part is where you are. No dropdown.
 function crumbs(r) {
+  const home = `<a data-go="#/">My models</a><svg class="ico sep"><use href="#i-right"/></svg>`;
   let h;
-  if (r.page === "model") h = `<button class="home-c" data-go="#/">My models</button><svg class="ico sep"><use href="#i-right"/></svg><button class="picker" id="picker"><span>${find(r.model).name}</span><svg class="ico cv"><use href="#i-down"/></svg></button>`;
-  else if (r.page === "add") h = `<button class="home-c" data-go="#/">My models</button><svg class="ico sep"><use href="#i-right"/></svg><button class="on ttl">Add a model</button>`;
-  else h = `<button class="on ttl">${PLACES[r.page] || "My models"}</button>`;
+  if (r.page === "model") h = home + `<span class="here mono" aria-current="page">${find(r.model).name}</span>`;
+  else if (r.page === "add") h = home + `<span class="here" aria-current="page">Add a model</span>`;
+  else h = `<span class="here" aria-current="page">${PLACES[r.page] || "My models"}</span>`;
   $("#crumbs").innerHTML = h;
 }
 // ---- the library: one search + a groups column, shared by My models and the switcher ----
@@ -423,7 +437,7 @@ const tagName = (k) => ({ all: "All models", running: "Running", recent: "Recent
 function groups(f, who) {
   const it = (key, label, n, lead, attrs = "") => `<button class="gi ${f.tag === key ? "on" : ""}" data-chip="${key}" data-who="${who}" ${attrs}>${lead}<span class="l">${label}</span><small>${n}</small></button>`;
   let h = `<div class="gh">Show</div>` + it("all", "All models", MODELS.length, ic("box")) + it("running", "Running", count((m) => m.state === "run"), `<i class="d" style="--c:var(--oq-ok)"></i>`)
-    + (who === "p" ? it("recent", "Recent", RECENT.length, ic("rot")) : "");
+;
   h += `<div class="gh">Kind <em>· automatic</em></div>` + Object.entries(KINDS).map(([k, [t, c]]) => it(k, t, count((m) => m.kind === k), `<i class="d" style="--c:${c}"></i>`)).join("");
   h += `<div class="gh mine"><span class="t">Your labels</span><button class="ed" data-edit>${EDIT ? "Done" : "Edit labels"}</button></div>`;
   h += LABELS.map((l) => EDIT
@@ -440,23 +454,29 @@ function homeRows() {
   drawGroups("#hgroups", HF, "h");
   $("#hcnt").innerHTML = `<span>${tagName(HF.tag)} · ${shown.length}${HF.q ? ` matching “${HF.q}”` : ""}</span><span class="ht">tick models to label many at once, or drag them onto a label</span>`;
   $(".cx-tbl [data-selall]").classList.toggle("on", shown.length > 0 && shown.every((m) => SEL.has(m.name)));
-  $("#rows").innerHTML = shown.map((m) => `<tr class="${SEL.has(m.name) ? "sel" : ""}" data-go="#/models/${m.name}/overview" draggable="true" data-drag="${m.name}"><td class="ck"><button class="cb ${SEL.has(m.name) ? "on" : ""}" data-sel="${m.name}" aria-label="Select ${m.name}">${ic("check")}</button></td><td class="nm">${m.name}</td><td><span class="st ${m.state}"><i></i>${m.word}</span></td><td class="tg">${tags(m)}</td><td class="num hide-p">${m.mem ? m.mem + " GB" : "–"}</td><td class="num">${m.tps || "–"}</td></tr>`).join("")
-    || `<tr><td colspan="6" style="color:var(--oq-ink-2);padding:30px 10px">Nothing matches. Try another group or clear the search.</td></tr>`;
+  const cards = VIEW === "cards"; $("#tbl").style.display = cards ? "none" : ""; $("#cgrid").classList.toggle("on", cards);
+  $$("[data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === VIEW));
+  const ck = (m) => `<button class="cb ${SEL.has(m.name) ? "on" : ""}" data-sel="${m.name}" aria-label="Select ${m.name}">${ic("check")}</button>`, dash = (v, u = "") => (v ? v.toLocaleString() + u : "–");
+  if (cards) { $("#cgrid").innerHTML = shown.map((m) => `<div class="mc ${SEL.has(m.name) ? "sel" : ""}" data-go="#/models/${m.name}/overview" draggable="true" data-drag="${m.name}"><div class="top">${ck(m)}<b>${m.name}</b><span class="st ${m.state}"><i></i>${m.word}</span></div>
+      <div class="k3"><div><small>tok/s</small><span>${dash(m.tps)}</span></div><div><small>Memory</small><span>${dash(m.mem, " GB")}</span></div><div><small>Requests</small><span>${dash(m.req)}</span></div></div><div class="tg3">${tags(m)}</div></div>`).join("")
+      || `<div style="color:var(--oq-ink-2);padding:30px 4px">Nothing matches. Try another group or clear the search.</div>`; }
+  else $("#rows").innerHTML = shown.map((m) => `<tr class="${SEL.has(m.name) ? "sel" : ""}" data-go="#/models/${m.name}/overview" draggable="true" data-drag="${m.name}"><td class="ck">${ck(m)}</td><td class="nm">${m.name}<span class="sub2">${m.repo}</span></td><td><span class="st ${m.state}"><i></i>${m.word}</span></td><td class="tg">${tags(m)}</td><td class="num hide-p">${m.size}</td><td class="num hide-p">${dash(m.mem, " GB")}</td><td class="num">${dash(m.tps)}</td><td class="num hide-p">${dash(m.ft, " ms")}</td><td class="num hide-p">${dash(m.req)}</td><td class="hide-p"><span class="acc">LAN · key</span></td></tr>`).join("")
+    || `<tr><td colspan="10" style="color:var(--oq-ink-2);padding:30px 10px">Nothing matches. Try another group or clear the search.</td></tr>`;
   selbar();
 }
 function selbar() {
   const n = SEL.size, bar = $("#selbar"); bar.classList.toggle("on", n > 0); if (!n) return;
   const sel = MODELS.filter((m) => SEL.has(m.name));
   bar.innerHTML = `<b>${n} selected</b><span class="lbl">Labels:</span>` + LABELS.map((l) => { const k = sel.filter((m) => m.labels.includes(l)).length;
-    return `<button class="chip ${k === n ? "on" : k ? "part" : ""}" data-bulk="${l}"><span class="h">#</span>${l}</button>`; }).join("") + `<span class="sp"></span><button class="fb" data-clearsel>Clear</button>`;
+    return `<button class="chip ${k === n ? "on" : k ? "part" : ""}" data-bulk="${l}"><span class="h">#</span>${l}</button>`; }).join("") + `<span class="sp"></span><button class="fb" data-clearsel>Clear</button><button class="fb danger" data-rmsel>${ic("trash")}Remove ${n}</button>`;
 }
-function redraw() { homeRows(); if ($("#pmenu").classList.contains("open")) pickerList(); }
+function redraw() { homeRows(); }
 function labelModels(names, l) { names.forEach((n) => { const m = find(n); if (!m.labels.includes(l)) m.labels.push(l); }); }
 // The model's verbs only. Navigation (benchmark, notebook) is the tabs; their own actions live inside their section.
 function cmds(m) {
   const b = (t, i, cls = "", c = "") => `<button class="fb ${cls}" style="--c:${c}">${ic(i)}<span class="t">${t}</span></button>`;
   const power = m.state === "run" ? b("Stop", "stop", "fill") + b("Restart", "rot", "", "var(--oq-warn)") : m.state === "bad" ? b("Restart", "rot", "fill") : b("Start", "play", "fill");
-  return power + b("Copy endpoint", "copy", "cp", "var(--oq-accent)") + `<button class="fb ic danger" aria-label="Remove">${ic("trash")}</button>`;
+  return power + b("Copy endpoint", "copy", "cp", "var(--oq-accent)") + `<button class="fb danger" data-rmone>${ic("trash")}<span class="t">Remove</span></button>`;
 }
 function spark(s) {
   const W = 300, H = 76, mx = Math.max(...s, 1), pts = s.map((v, i) => [i * W / (s.length - 1), H - 4 - v / mx * (H - 12)]);
@@ -490,71 +510,52 @@ function modelPage(r) {
   $("#cmdbar").innerHTML = cmds(m);
   $("#sec").innerHTML = section(m, r.sec); countUp();
 }
-// ---- picker ----
-let kb = 0;
-function pickerList() {
-  const r = parse(), card = (m) => `<button class="pr ${m.name === r.model ? "on" : ""}" data-pick="${m.name}" draggable="true" data-drag="${m.name}"><span class="st ${m.state}"><i></i></span><span class="nm2"><b>${m.name}</b><span class="tg2">${tags(m)}</span></span><span class="v">${m.tps ? m.tps + " tok/s" : m.word}</span></button>`;
-  drawGroups("#pgroups", PF, "p");
-  const hits = MODELS.filter((m) => matches(m, PF)).sort(order), grid = (ms) => `<div class="pgrid">${ms.map(card).join("")}</div>`;
-  let h;
-  if (!PF.q && PF.tag === "all") h = `<div class="grp">Recent</div>` + grid(RECENT.map(find))
-    + Object.entries(KINDS).map(([k, [t, col]]) => { const g = hits.filter((m) => m.kind === k); return g.length ? `<div class="grp"><i style="--c:${col}"></i>${t} · ${g.length}</div>` + grid(g) : ""; }).join("");
-  else h = hits.length ? `<div class="grp">${tagName(PF.tag)} · ${hits.length}${PF.q ? ` matching “${PF.q}”` : ""}</div>` + grid(hits) : `<div class="none">No model matches “${PF.q || tagName(PF.tag)}”.</div>`;
-  $("#plist").innerHTML = h; kb = 0; mark();
+let VIEW = "list";
+// Remove asks first: it unregisters the models and deletes their compiled graphs (weights stay unless purged).
+let PENDING = [];
+function askRemove(names) {
+  PENDING = names; $("#cfh").textContent = names.length === 1 ? `Remove ${names[0]}?` : `Remove ${names.length} models?`;
+  $("#cfp").textContent = "They stop, leave My models and their compiled graphs are deleted. The downloaded weights stay, so adding them back is quick. Same as mxc rm.";
+  $("#confirm").classList.add("on"); $("[data-cfno]").focus();
 }
-function mark() { const rows = $$("#plist .pr"); rows.forEach((b, i) => b.classList.toggle("kb", i === kb)); rows[kb]?.scrollIntoView({ block: "nearest" }); }
-function openPicker() {
-  const r = parse(), p = $("#picker").getBoundingClientRect(), a = $("#app").getBoundingClientRect();
-  $("#pmsec").textContent = SECS.find((x) => x[0] === r.sec)[1];
-  PF.q = ""; $("#pq").value = ""; $("#pq").placeholder = `Find any of ${MODELS.length} models by name, kind or #label`; pickerList(); $("#plist").scrollTop = 0;
-  $("#pmenu").classList.add("open"); $("#scrim").classList.add("on");
-  if (!document.body.classList.contains("phone")) setTimeout(() => $("#pq").focus(), 30);
-}
-$("#pq").addEventListener("input", (e) => { PF.q = e.target.value; pickerList(); });
 $("#hq").addEventListener("input", (e) => { HF.q = e.target.value; homeRows(); });
 document.addEventListener("keydown", (e) => {
-  const open = $("#pmenu").classList.contains("open");
-  if (open) {
-    const rows = $$("#plist .pr");
-    if (e.key === "Escape") return closePicker();
-    if (document.activeElement.matches("[data-rename], .gi.new input")) return;
-    if (e.key === "ArrowDown" || (e.key === "ArrowRight" && document.activeElement.id !== "pq")) { kb = Math.min(rows.length - 1, kb + 1); mark(); e.preventDefault(); }
-    if (e.key === "ArrowUp" || (e.key === "ArrowLeft" && document.activeElement.id !== "pq")) { kb = Math.max(0, kb - 1); mark(); e.preventDefault(); }
-    if (e.key === "Enter" && rows[kb]) rows[kb].click();
-    return;
-  }
-  if ((e.key === "/" || (e.key === "k" && (e.metaKey || e.ctrlKey))) && !/INPUT/.test(document.activeElement.tagName)) {
-    e.preventDefault(); if (parse().page === "model") openPicker(); else { location.hash = "#/"; $("#hq").focus(); }
-  }
+  if (e.key === "Escape") { $("#confirm").classList.remove("on"); $("#places").classList.remove("open"); return; }
+  if ((e.key === "/" || (e.key === "k" && (e.metaKey || e.ctrlKey))) && !/INPUT/.test(document.activeElement.tagName)) { e.preventDefault(); location.hash = "#/"; setTimeout(() => $("#hq").focus(), 0); }
 });
-const closePicker = () => { $("#pmenu").classList.remove("open"); $("#scrim").classList.remove("on"); };
 document.addEventListener("click", (e) => {
   const t = e.target;
-  if (t.closest("#picker")) return openPicker();
-  const pk = t.closest("[data-pick]"); if (pk) { closePicker(); location.hash = `#/models/${pk.dataset.pick}/${parse().sec}`; return; }
-  if (t.closest("#scrim")) return closePicker();
-  const ch = t.closest("[data-chip]"); if (ch) { const f = ch.dataset.who === "h" ? HF : PF; f.tag = f.tag === ch.dataset.chip && ch.dataset.chip !== "all" ? "all" : ch.dataset.chip; return ch.dataset.who === "h" ? homeRows() : pickerList(); }
+  if (t.closest("#more")) return $("#places").classList.toggle("open");
+  if (!t.closest("#places")) $("#places").classList.remove("open");
+  const vw = t.closest("[data-view]"); if (vw) { VIEW = vw.dataset.view; return homeRows(); }
+  if (t.closest("[data-rmsel]")) return askRemove([...SEL]);
+  if (t.closest("[data-rmone]")) return askRemove([parse().model]);
+  if (t.closest("[data-cfno]") || t.matches("#confirm")) return $("#confirm").classList.remove("on");
+  if (t.closest("[data-cfyes]")) { const gone = new Set(PENDING); for (let i = MODELS.length - 1; i >= 0; i--) if (gone.has(MODELS[i].name)) MODELS.splice(i, 1);
+    PENDING.forEach((n) => SEL.delete(n)); $("#confirm").classList.remove("on"); if (parse().page === "model") location.hash = "#/"; return homeRows(); }
+  const ch = t.closest("[data-chip]"); if (ch) { const f = HF; f.tag = f.tag === ch.dataset.chip && ch.dataset.chip !== "all" ? "all" : ch.dataset.chip; return homeRows(); }
   const sl = t.closest("[data-sel]"); if (sl) { const n = sl.dataset.sel; SEL.has(n) ? SEL.delete(n) : SEL.add(n); return homeRows(); }
   if (t.closest("[data-selall]")) { const all = shown.every((m) => SEL.has(m.name)); shown.forEach((m) => all ? SEL.delete(m.name) : SEL.add(m.name)); return homeRows(); }
   if (t.closest("[data-clearsel]")) { SEL.clear(); return homeRows(); }
   const bk = t.closest("[data-bulk]"); if (bk) { const l = bk.dataset.bulk, sel = MODELS.filter((m) => SEL.has(m.name)), every = sel.every((m) => m.labels.includes(l));
     sel.forEach((m) => { m.labels = m.labels.filter((x) => x !== l); if (!every) m.labels.push(l); }); return redraw(); }
   if (t.closest("[data-edit]")) { EDIT = !EDIT; return redraw(); }
-  const dl = t.closest("[data-del]"); if (dl) { const l = dl.dataset.del; LABELS = LABELS.filter((x) => x !== l); MODELS.forEach((m) => m.labels = m.labels.filter((x) => x !== l)); [HF, PF].forEach((f) => f.tag === l && (f.tag = "all")); return redraw(); }
+  const dl = t.closest("[data-del]"); if (dl) { const l = dl.dataset.del; LABELS = LABELS.filter((x) => x !== l); MODELS.forEach((m) => m.labels = m.labels.filter((x) => x !== l)); [HF].forEach((f) => f.tag === l && (f.tag = "all")); return redraw(); }
   const nl = t.closest("[data-newlabel]"); if (nl && !nl.querySelector("input")) { nl.innerHTML = `${ic("plus")}<input placeholder="Name, then Enter">`; const i = nl.querySelector("input"); i.focus();
     i.addEventListener("keydown", (ev) => { if (ev.key === "Escape") return redraw(); if (ev.key !== "Enter") return; const v = i.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
       if (v && !LABELS.includes(v)) { LABELS.push(v); if (SEL.size) labelModels([...SEL], v); } redraw(); }); return; }
   if (t.closest(".gi.new input, .gi.edit")) return;
   const al = t.closest("[data-addlabel]"); if (al) { al.outerHTML = `<span class="tag"><input id="newlabel" placeholder="label, Enter"></span>`; const i = $("#newlabel"); i.focus();
     i.addEventListener("keydown", (ev) => { if (ev.key !== "Enter") return; const v = i.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, ""), m = find(parse().model); if (v && !m.labels.includes(v)) m.labels.push(v); if (v && !LABELS.includes(v)) LABELS.push(v); modelPage(parse()); homeRows(); }); return; }
-  const g = t.closest("[data-go]"); if (g) { closePicker(); location.hash = g.dataset.go; return; }
+  if (t.closest("[data-sel]")) return;
+  const g = t.closest("[data-go]"); if (g) { location.hash = g.dataset.go; return; }
   if (t.closest("[data-back]")) return history.length > 1 ? history.back() : (location.hash = "#/");
   const th = t.closest("[data-theme]"); if (th) { const a = $("#app"), n = th.dataset.theme === "night"; a.classList.toggle("oq-night", n); a.classList.toggle("oq-light", !n); $$("[data-theme]").forEach((b) => b.classList.toggle("on", b === th)); return; }
   const d = t.closest("[data-dev]"); if (d) { document.body.classList.toggle("phone", d.dataset.dev === "phone"); $$("[data-dev]").forEach((b) => b.classList.toggle("on", b === d)); setTimeout(pill, 380); }
 });
 document.addEventListener("change", (e) => { const r = e.target.closest("[data-rename]"); if (!r) return; const from = r.dataset.rename, to = r.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
   if (!to || to === from || LABELS.includes(to)) return redraw();
-  LABELS = LABELS.map((x) => x === from ? to : x); MODELS.forEach((m) => m.labels = m.labels.map((x) => x === from ? to : x)); [HF, PF].forEach((f) => f.tag === from && (f.tag = to)); redraw(); });
+  LABELS = LABELS.map((x) => x === from ? to : x); MODELS.forEach((m) => m.labels = m.labels.map((x) => x === from ? to : x)); [HF].forEach((f) => f.tag === from && (f.tag = to)); redraw(); });
 document.addEventListener("pointerdown", (e) => {
   const h = e.target.closest(".hdl"); if (!h) return; e.preventDefault();
   const row = h.closest(".gi"), box = row.parentElement; row.classList.add("dragging"); h.setPointerCapture(e.pointerId);
@@ -570,7 +571,7 @@ document.addEventListener("drop", (e) => { const l = e.target.closest(".gi[data-
 addEventListener("hashchange", render);
 addEventListener("resize", pill);
 homeRows();
-if (!location.hash) location.hash = "#/models/qwen2.5-0.5b/overview"; else render();
+if (!location.hash) location.hash = "#/"; else render();
 </script>
 </body>
 </html>
