@@ -90,53 +90,57 @@ Both start the daemon if it isn't running. Closing the window stops nothing.
 
 1. On **My models**, click **Add a model**.
 2. Search for `qwen2.5-0.5b` and pick it. You watch it go through Check hardware, Fetch the model, Compile graph, Serve on localhost and Smoke test, ending on a Ready card.
-3. Click the model in **My models**. Its panel opens beside the list, with a curl command under **Call it**.
+3. Click the model in **My models**. Its page opens, with a curl command under **Call it** (scroll down).
 
 The console works only on this machine. It isn't exposed on the LAN, even after you make the endpoint secure.
 
 ## 🧭 A tour of the console
 
-Panels (blades) open side by side from left to right; older ones fold into rails on the left. The breadcrumb island at the top shows the parent and the open blade; click the **omx** logo to go back to My models.
+The console is plain pages. The top bar has the **omx** logo (home), a breadcrumb such as My models › qwen2.5-0.5b, the Beacon, and four links on the right: **Keys**, **Gateway**, **Security** and **Settings**. They apply to every model, so they are not part of a model's page. There is no model switcher: to change model, go back to My models (the breadcrumb or the logo) and pick one. Press `/` or Ctrl+K to jump to the search box. The [clickable tour](site/console.html) walks through every screen.
 
 | | |
 |---|---|
-| ![A model's overview: live throughput, endpoint, a ready-to-paste curl](assets/screens/model.png) | ![Add a model: search MAX and Hugging Face, checked against your GPU memory](assets/screens/add.png) |
+| ![A model's page: live numbers, its endpoint, a ready-to-paste curl](assets/screens/model.png) | ![Add a model: search MAX and Hugging Face, checked against your GPU memory](assets/screens/add.png) |
 | **A model:** live numbers, its endpoint and a `curl` to paste | **Add a model:** search MAX's catalog and Hugging Face; every result is checked against your GPU memory |
 | ![The notebook, running in Jupyter inside the console](assets/screens/jupyter.png) | ![A model MAX can't run yet, with Port it](assets/screens/port-offer.png) |
 | **Notebook:** how the model is built; runs in Jupyter in the page | **Needs porting:** one click hands it to the porting agent |
 
 ### My models
 
-Everything this machine serves, as a list or as cards (the choice is remembered in this browser). A filter box narrows it by name.
+Everything this machine serves, as a full-width library: a search box on top, a groups column on the left and the models on the right, as a list or as cards (List or Cards, remembered in this browser).
 
+- **Search** narrows by name, kind or `#label`. Press `/` to jump to it, Esc to clear.
+- **Groups column:** Show (All models, Running), **Kind** (Chat, Coder, Vision, Embeddings, Image; automatic, from the model card) and **Your labels**. Each has a count; click one to filter.
+- **Labels** are yours: a model can carry several. **New label** adds one; **Edit labels** renames, reorders (drag the handle) or deletes them. To label models, tick them (the box in the header ticks all shown): a bar appears at the bottom with your labels as chips. Click a chip to add that label to every ticked model, click again to remove it (a ring means only some have it). You can also drag a model, or the ticked ones, onto a label. A single model also has **+ label** on its Overview.
+- **Remove N** in that bar removes the ticked models, after a confirm that says the downloaded weights stay. Same as `mxc rm`.
 - **State:** Running, Starting (with "compiling" and the time so far), Idle or Crashed. A pinned model says "pinned"; a running one shows how long it has been idle out of its keep-alive.
-- **Access:** **Local** (localhost only) or **Secure** (HTTPS on your LAN).
-- **Tokens/s:** live decode speed, with a sparkline. Also first-token time, requests in the last 5 minutes, GPU memory and architecture.
+- **Access:** **This machine** (localhost only) or **Secure** (HTTPS on your LAN).
+- **Size, memory, tok/s, first token, requests:** the weights on disk, then GPU memory, live decode speed, time to first token and requests in the last 5 minutes while the model runs (a dash while it is idle).
 
-Above the list: how many models are serving, total throughput, requests in the last 5 minutes, and a GPU memory bar split by model. A crashed model gets a banner with **View logs** and **Restart**.
+The header says how many models there are, how many are running, how much GPU memory is in use and the endpoint. A crashed model gets a banner on its page with **View logs** and **Restart**.
 
-### The model panel
+### A model's page
 
-The left menu has **Overview**, **Security**, **Benchmark**, **Logs** and **Notebook**. The command bar on top changes with the state:
+Click a model. Its page has four tabs: **Overview**, **Benchmark**, **Logs** and **Notebook**. The buttons on the right are the model's verbs, and they change with its state:
 
 - **Start** when it's idle, **Stop** and **Restart** when it's running, **Restart** when it crashed;
-- **Make it secure** (until the endpoint is on your LAN), **Run benchmark**, **Open notebook**, **Logs**, **Copy endpoint**;
-- **Remove**, which asks for a second click. It's the same as `mxc rm`: the weights stay.
+- **Copy endpoint**;
+- **Remove**, which asks first. It's the same as `mxc rm`: the model stops and leaves My models, and the weights stay.
 
-Hover a button to see the `mxc` command that does the same thing.
+A section's own action lives inside its tab (Run again in Benchmark, Run in Jupyter in Notebook). Hover a button to see the `mxc` command that does the same thing. The address holds the model and the tab, so a link or a reload lands on the same one.
 
 **Overview** shows:
 
-- **Essentials:** repository, architecture, source, when it unloads, endpoint, access, GPU memory and state.
-- **Tokens · live:** throughput, first-token time and requests, with a 5-minute chart.
+- **Right now:** requests in the last 5 minutes, decode speed, time to first token and this model's GPU memory.
+- **Tokens:** a chart of recent throughput.
+- **About:** repository, architecture, source, when it unloads, endpoint, whether it is reachable beyond this machine (with a link to Security), GPU memory, state, and its labels.
+- **GPU fit:** this model's GPU memory next to the other models and what's free.
 - **Call it:** the endpoint URL and a curl command. The key appears as `$MXC_API_KEY`, never the real key.
-- **Security** and **Hardware fit:** this model's GPU memory next to the other models and what's free.
 
 The other tabs:
 
-- **Security:** see [Securing it on your LAN](#-securing-it-on-your-lan).
 - **Benchmark:** decode tokens/s and time to first token for the models in the latest run, with this model outlined, and past runs. Same as `mxc bench`.
-- **Logs:** the model's server log, following new lines, with a filter and copy. Same as `mxc logs <model> -f`.
+- **Logs:** the model's server log, following new lines, with a filter, Pause and Copy. Same as `mxc logs <model> -f`.
 - **Notebook:** see [Notebooks](#-notebooks).
 
 ### Add a model
@@ -154,13 +158,15 @@ The filter above the results shows All, Fits or Needs porting. The same labels i
 
 **Port it** runs `mxc port <repo> --auto`. See [Models MAX can't run yet](#-models-max-cant-run-yet).
 
-### The top islands
+### The top bar
 
-- **The Beacon** (top right): what is happening now, in one pill: a pull or port in progress, a crashed model, a model starting, or the running models with live tokens per second. With nothing running it shows the GPU and memory in use. Tap it for the details and a shortcut; cancelling a pull or port from it takes a second tap.
-- **API keys:** every app key (prefix only), with **New key**, **Rotate** and **Revoke**. A new key is shown once.
-- **Gateway:** LiteLLM's status, the route for each model, the LiteLLM log, safeguard counts for today, recent requests (kept 7 days) and a link to the API reference at `/docs`. **Restart** restarts Caddy and LiteLLM and rotates their internal key.
-- **Settings:** the theme, when each model unloads, the daemon's info with **Stop daemon**, and every port and process omxconsole owns.
-- **Theme:** the moon (or sun) button switches light and dark. Until you pick one, the console follows your system.
+- **The Beacon:** what is happening now, in one pill: a pull or port in progress, a crashed model, a model starting, or the running models with live tokens per second. With nothing running it shows the GPU and memory in use. Click it for the details and a shortcut; cancelling a pull or port from it takes a second click.
+- **Keys:** every app key (prefix only), with **New key**, **Rotate** and **Revoke**. A new key is shown once.
+- **Gateway:** LiteLLM's status, the route for each model, the LiteLLM log, safeguard counts for today, recent requests (kept 7 days) and a link to the API reference at `/docs`. **Restart** restarts Caddy and LiteLLM and rotates their internal key; it is greyed out while LiteLLM is off.
+- **Security:** see [Securing it on your LAN](#-securing-it-on-your-lan).
+- **Settings:** light or dark (kept in this browser; until you pick one the console follows your system), when each model unloads, the daemon's info with **Stop daemon**, and every port and process omxconsole owns.
+
+On a narrow window the four links fold into one ⋯ menu.
 
 ## 🔌 Calling the endpoint from your apps
 
@@ -215,11 +221,11 @@ pixi run mxc serve qwen2.5-1.5b --keep-alive 10m   # unloads after 10 idle minut
 pixi run mxc set qwen2.5-0.5b --pin                # change it later (or --unpin, --keep-alive 1h)
 ```
 
-The console's Settings panel lists each model's setting; change it with `mxc set`.
+The console's Settings page lists each model's setting; change it with `mxc set`.
 
 ## 🔒 Securing it on your LAN
 
-By default only this machine can call the endpoint. To let other devices on your network call it, click **Make it secure** in a model's Security panel, or run:
+By default only this machine can call the endpoint. To let other devices on your network call it, click **Make it secure** on the Security page, or run:
 
 ```bash
 pixi run mxc expose
@@ -241,7 +247,7 @@ Each device has to trust Caddy's CA once, or HTTPS calls fail with a certificate
 ~/.local/share/caddy/pki/authorities/local/root.crt
 ```
 
-The Security panel shows the path and how to install it on Linux, macOS, Windows, iPhone and Android. On Linux, for example:
+The Security page shows the path and how to install it on Linux, macOS, Windows, iPhone and Android. On Linux, for example:
 
 ```bash
 sudo cp root.crt /usr/local/share/ca-certificates/mxconsole.crt && sudo update-ca-certificates
@@ -257,13 +263,13 @@ The other device must also resolve `<host>.local` to this machine. If it can't, 
 
 ### Turn it off
 
-Click **Stop exposing** in the Security panel (it asks for a second click), or run:
+Click **Stop exposing** on the Security page (it asks for a second click), or run:
 
 ```bash
 pixi run mxc expose --stop
 ```
 
-The Gateway panel shows the same command. It stops Caddy and LiteLLM; the local endpoint keeps running.
+The Gateway page shows the same command. It stops Caddy and LiteLLM; the local endpoint keeps running.
 
 ## 📓 Notebooks
 
@@ -278,7 +284,7 @@ It works for a repo you haven't pulled, too. Notebooks are saved in `~/.mxc/note
 
 In the console, open a model's **Notebook** tab. It shows the saved notebook: chapters on the left, cells and saved outputs in the middle, the architecture on the right. Nothing runs there.
 
-To run it, click **Run in Jupyter**. Jupyter opens inside the panel in its single-notebook view, on this one notebook. **Saved view** switches back to the read-only view, and a link opens Jupyter in a new tab instead. Jupyter listens on `127.0.0.1` only, so this works only on this machine.
+To run it, click **Run in Jupyter**. Jupyter opens inside the tab in its single-notebook view, on this one notebook. **Saved view** switches back to the read-only view, and a link opens Jupyter in a new tab instead. Jupyter listens on `127.0.0.1` only, so this works only on this machine.
 
 The "Try it" cells call your endpoint. From the console they just work: the daemon gives its Jupyter a key of
 its own (`_notebook` in the activity log) and the endpoint's address. If the model is idle, the first cell loads it,
