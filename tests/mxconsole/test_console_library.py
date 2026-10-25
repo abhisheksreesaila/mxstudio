@@ -278,3 +278,9 @@ def test_the_fake_models_script_fills_a_scratch_store_and_refuses_the_real_one(t
     monkeypatch.delenv("MXC_HOME")
     with pytest.raises(SystemExit):
         runpy.run_path(script, run_name="not_main")["main"](100)
+
+
+@needs_node
+def test_sizes_read_like_a_file_manager_and_never_say_1000_mb():
+    got = node("[0, 360e6, 999.4e6, 999.6e6, 1e9, 1.34e9, 29.04e9].map(m.sizeLabel)")
+    assert got == ["–", "360 MB", "999 MB", "1.0 GB", "1.0 GB", "1.3 GB", "29.0 GB"]
