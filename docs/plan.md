@@ -389,6 +389,7 @@ Brief: docs/briefs/desktop-app.md · Needs: F-048, F-050
 
 ## Console pages (brief: docs/briefs/console-pages.md)
 Design: mock `docs/design/console-pages/mock.html` v4 (approved 2026-10-24). ADR: docs/adr/0005-pages-not-blades.md.
+Revision v5 (2026-10-24): F-061 and F-062 in parallel, then F-057, F-058 (screenshots), F-060 (front page A with the new screenshots).
 Order: F-052 (shell) and F-054 (labels backend) in parallel; F-053 after F-052; F-055 after F-052 + F-054; F-056 after F-053 + F-055; F-057 (delete blades) after F-056; F-058 (docs tour) last. F-059 (README) and F-060 (front page, designer first) any time.
 
 ## F-052 Shell: one nav, routes, and the place pages [done]
@@ -443,8 +444,25 @@ Brief: docs/briefs/console-pages.md · Needs: F-053, F-055 · Files: picker.* (r
 - Built: `picker.js` is the wide switcher on the library's `createLibrary` (groups column incl. Recent with a count, label editing and drag-to-label work inside it); Recent = last 3 in localStorage `mxc-recent`; one combobox + one listbox with a group per section; cards repaint only when what they show changes (scroll kept; held during a drag); Up/Down by row; Esc cancels a label edit first; Ctrl/Cmd+K from anywhere except multi-line editors (owner's call delegated: made by the main session). Overview's About card has a Labels row with suggestions.
 - Reviewer: round 1 NEEDS WORK (no combobox semantics; 3 s poll rebuilt every card, snapping scroll and killing drags; Recent missing from the column; Esc lost edits) → fixed; round 2 PASS; its test should-fix (aria-haspopup asserted) done. Checked live by the developer at 1280 light/dark and 390 light/dark with 100 fake models; drag-to-label across a poll via synthetic drag events. 1023 tests.
 
+## F-061 Places in the top bar, plain breadcrumb, no switcher [todo]
+Brief: docs/briefs/console-pages.md (Revision v5) · Mock: docs/design/console-pages/mock.html (v5) · Needs: none · Files: nav.js, shell.css, topbar.*, pages.js, picker.* (removed), routes.js, library.js/library-logic.js (Recent only), model-page.js (crumb only)
+- [ ] no side rail: the top bar is logo (goes to My models) · breadcrumb · island · Keys, Gateway, Security, Settings as icon-and-word links on the right (the current place marked `aria-current`); pages use the full width
+- [ ] the breadcrumb is a plain trail (My models › model / My models › Add a model / the place name): earlier parts are links, the last is text with `aria-current="page"`; no pill, no ▾, no dropdown
+- [ ] the switcher is gone (picker.js, picker.css, Recent and `mxc-recent`, Ctrl+K panel); `/` and Ctrl/Cmd+K go to My models and focus its search (not in a textarea or contentEditable)
+- [ ] under 960 px the links show icons only; under 760 px they fold into one ⋯ menu (Esc and outside click close it; 44 px targets)
+- [ ] old hashes and CLI links still land on the right page; Back still works
+- [ ] checked in the running console at 1280 and 390 px, both themes
+
+## F-062 My models: list or cards, more columns, Remove [todo]
+Brief: docs/briefs/console-pages.md (Revision v5) · Mock: docs/design/console-pages/mock.html (v5) · Needs: none · Files: blade-home.*, library.*, library-logic.js, prefs.js (view), model-page.js (Remove only), admin data if a column needs it
+- [ ] a List / Cards toggle beside the search, remembered (prefs)
+- [ ] the list: tick · Model (repo under the name) · State · Kind · labels · Size · Memory · tok/s · First token · Requests · Access; the numbers come from what the daemon already measures (say which, and show "–" when there is none); narrow widths hide the secondary columns
+- [ ] cards: tick, name, state, tok/s, memory, requests, kind and labels; ticking, the tick bar and drag-to-label work the same as the list
+- [ ] Remove: the tick bar has "Remove N"; the model page's Remove is a labelled button; both open a confirm saying the model stops, leaves My models, its compiled graphs are deleted and the weights stay (same as `mxc rm`), then call the existing remove route; after removing from a model page you land on My models
+- [ ] checked in the running console with real models and with 100 fake ones, 1280 and 390 px, both themes
+
 ## F-057 Remove the blade engine [todo]
-Brief: docs/briefs/console-pages.md · Needs: F-056
+Brief: docs/briefs/console-pages.md · Needs: F-061, F-062
 - [ ] `blades.js`, `blade-stack.js`, `blade-layout.js`, `blades.css` and every unused `blade-*` file are gone; nothing references them; the gateway's console file list shrinks to match
 - [ ] blade tests are rewritten against pages (routes, places, model tabs, library), never deleted without a replacement; full suite green
 - [ ] ADR 0005 marked done
@@ -460,7 +478,7 @@ Brief: docs/briefs/console-pages.md · Needs: none
 - Reviewer: PASS; fixed its should-fix (the three orphaned screenshots now live in the user guide). Also fixed test_remove's JSON check to read stdout only (a Python 3.14 warning on stderr broke it, before this change too).
 
 ## F-060 Front page in the omxcode style [todo]
-Brief: docs/briefs/console-pages.md · Needs: none (design approved first)
-- [ ] designed with the designer skill (desktop and phone) and approved before building — drafts ready: two directions (A Statement dark, B Bento light), each by Stitch and Claude, on `docs/design/front-page/compare.html`; handoff draft `docs/design/front-page.md`; pick pending
+Brief: docs/briefs/console-pages.md · Needs: F-058 (new screenshots)
+- [x] designed with the designer skill (desktop and phone) and approved before building — picked: Claude's A · Statement (dark), `docs/design/front-page/claude-a.html`; build with the screenshots retaken in F-058
 - [ ] `docs/site/index.html`: hero, live demos, how a request travels, FAQ, available today; links to the tour as the user guide
 - [ ] checked live on GitHub Pages after the push you approve

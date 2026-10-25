@@ -1,6 +1,6 @@
 # Brief: omxconsole without blades, and a front door
 
-Status: approved (2026-10-24); revision v5 below proposed, awaiting approval
+Status: approved (2026-10-24); revision v5 approved (2026-10-24)
 
 ## Why (the mission)
 - Using the reskinned console daily, the blades got in the way: pick a model, open a section, the blade closes, go back, pick the next model, open the section again. Every model's screen is the same template, so stacking blades buys nothing. There are only a handful of screens, and blades pay off when there are many.
@@ -11,7 +11,7 @@ Status: approved (2026-10-24); revision v5 below proposed, awaiting approval
 - Abhishek, daily, comparing and running a few local models (desktop window and phone).
 - A developer landing on the GitHub repo or the site, deciding in 30 seconds whether to try it.
 
-## Revision v5 (proposed 2026-10-24, after using the built console)
+## Revision v5 (approved 2026-10-24, after using the built console)
 Supersedes item 1's rail and tab bar and item 3's switcher. Mock: `docs/design/console-pages/mock.html` (v5).
 - **No side rail.** Keys, Gateway, Security and Settings apply to every model and are rarely opened, so they move to quiet icon-and-word links on the right of the top bar. My models gets the full width. On a narrow window the four fold into one ⋯ menu (desktop web first; the phone is not a priority).
 - **Top bar:** logo (home) · a plain breadcrumb (My models › model, styled as a trail, not a pill) · the island (what is running, now) · the places.
