@@ -95,3 +95,51 @@ def test_removing_a_label_takes_it_off_and_a_refusal_puts_it_back_with_the_reaso
       console.log(JSON.stringify({ start, during, after: shown(), stored: core.store.models[0].labels, said: toastEl.textContent }));
     """)
     assert got == {"start": ["work"], "during": [], "after": ["work"], "stored": ["work"], "said": "Label is locked"}
+
+
+# -- the library under My models: what a poll must not disturb (these guards were first written for the switcher) --------
+def test_a_poll_that_changes_nothing_leaves_the_groups_alone_and_a_change_only_moves_the_counts():
+    got = run(SETUP + """
+      const l = lib.createLibrary({ onChange() {} });
+      l.update();
+      const items = () => l.groups.querySelectorAll(".gi");
+      const before = items();
+      l.update(); l.update();
+      const same = items().every((g, i) => g === before[i]);
+      const countOf = (name) => items().filter((g) => g.getAttribute("data-group") === name)[0].textContent;
+      const was = countOf("running");
+      core.store.models = core.store.models.map((m) => (m.name === "beta" ? { ...m, state: "ready" } : m));
+      l.update();
+      console.log(JSON.stringify({ same, was, now: countOf("running"), all: countOf("all") }));
+    """)
+    assert got == {"same": True, "was": "Running1", "now": "Running2", "all": "All models4"}
+
+
+def test_a_poll_never_takes_the_label_rename_field_from_under_your_fingers_and_a_new_label_does_redraw():
+    got = run(SETUP + """
+      const l = lib.createLibrary({ onChange() {} });
+      await tick(); await tick();   // your labels load
+      l.update();
+      l.groups.querySelector('[data-act="edit-labels"]').click();
+      const input = () => l.groups.querySelector(".gi.edit").querySelector("input");
+      const field = input();
+      field.focus(); field.value = "wor";
+      core.store.models = [...core.store.models, { name: "late", state: "cold", kind: "chat", labels: ["work"] }];   // a poll that only changes counts
+      l.update();
+      const kept = { same: input() === field, focused: document.activeElement === field, typed: field.value };
+      l.labels = [...l.labels, "fresh"];                                                                            // a new label changes the shape
+      l.update();
+      console.log(JSON.stringify({ kept, rows: l.groups.querySelectorAll(".gi.edit").length }));
+    """)
+    assert got == {"kept": {"same": True, "focused": True, "typed": "wor"}, "rows": 3}
+
+
+def test_dragging_a_ticked_model_carries_every_ticked_one_and_an_unticked_one_goes_alone():
+    got = run(SETUP + """
+      const l = lib.createLibrary({ onChange() {} });
+      const row = (name) => { const el = document.createElement("div"); l.draggable(el, name); return el; };
+      const payload = (el) => { let data = null; el.dispatch("dragstart", { dataTransfer: { setData: (_t, v) => { data = JSON.parse(v); }, effectAllowed: "" } }); return data; };
+      l.ticked.add("alpha"); l.ticked.add("beta");
+      console.log(JSON.stringify({ ticked: payload(row("alpha")), alone: payload(row("gamma")) }));
+    """)
+    assert got == {"ticked": ["alpha", "beta"], "alone": ["gamma"]}

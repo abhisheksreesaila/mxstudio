@@ -107,6 +107,25 @@ def test_escape_an_outside_click_and_a_new_page_close_the_menu_but_a_click_insid
     assert got == {"esc": [False, "false"], "outside": [False, "false"], "inside": [True, "true"], "route": [False, "false"], "otherKey": [True, "true"]}
 
 
+@needs_node
+def test_the_menu_is_a_disclosure_opening_moves_focus_to_the_first_link_and_escape_returns_it_to_the_button():
+    got = run(PLACES + """
+      const out = { attrs: [more.getAttribute("aria-controls"), menu().getAttribute("id"), more.getAttribute("aria-haspopup"), menu().getAttribute("role")] };
+      more.click(); out.opened = document.activeElement === links()[0];
+      document.key("Escape"); out.back = document.activeElement === more;
+      more.click(); more.click(); out.toggledOff = document.activeElement === more;
+      more.click(); document.click(document.body); out.outside = [state()[0], document.activeElement === links()[0]];
+      console.log(JSON.stringify(out));
+    """)
+    assert got == {"attrs": ["places", "places", None, None], "opened": True, "back": True, "toggledOff": True, "outside": [False, True]}
+
+
+@needs_node
+def test_each_place_link_has_its_own_name_so_the_icon_only_state_still_reads():
+    got = run(PLACES + 'console.log(JSON.stringify(links().map((a) => [a.getAttribute("aria-label"), a.getAttribute("title")])));')
+    assert got == [[n, n] for n in ("Keys", "Gateway", "Security", "Settings")]
+
+
 def test_the_places_fold_to_icons_under_960px_and_into_a_menu_with_44px_targets_under_760px():
     css = text("topbar.css")
     assert re.search(r"@container \(max-width: 960px\) \{[^}]*\.places a span \{ display: none", css)
