@@ -1,20 +1,32 @@
-/* omxconsole, the top bar (ADR 0005): where you are on the left (a crumbs pill), the Beacon on the right.
+/* omxconsole, the top bar (ADR 0005, F-061): logo · breadcrumb · island · places. Matches docs/design/console-pages/mock.html (v5).
    The Beacon's look comes from omxqua's components.css (.beacon); this file places it and tunes it. */
-.bar { position: relative; z-index: 50; height: 64px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px 0 2px; }
+.bar { position: relative; z-index: 50; height: 60px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 14px; }
 .bar .sp { flex: 1; }
 
-.crumbs { height: 44px; display: flex; align-items: center; gap: 2px; padding: 0 5px; border-radius: 999px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); min-width: 0; }
-.crumbs button, .crumbs .cur { border: 0; background: none; height: 34px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; gap: 7px; font: 600 13px var(--oq-font); color: var(--oq-ink-2); white-space: nowrap; min-width: 0; }
-.crumbs button { cursor: pointer; }
-.crumbs button:hover { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
-.crumbs .on { color: var(--oq-ink); cursor: default; }
-.crumbs button { flex: none; }  /* the parents never shrink; only the current name truncates */
+/* the logo goes home; the trail is plain text, like a bookmark trail: earlier parts are links, the last is where you are */
+.brand { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 12px; font: 650 15px var(--oq-font); flex: none; color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+.brand:hover { background: rgb(var(--oq-state) / .05); }
+.brand .mk { width: 28px; height: 28px; border-radius: 8px; background: var(--oq-ink); color: var(--oq-surface-0); display: grid; place-items: center; font: 700 10px var(--oq-font-mono); flex: none; }
+.crumbs { display: flex; align-items: center; gap: 4px; min-width: 0; padding-left: 6px; margin-left: 4px; border-left: 1px solid var(--oq-line-2); height: 22px; }
+.crumbs a { font: 550 13.5px var(--oq-font); color: var(--oq-ink-2); text-decoration: none; padding: 4px 6px; border-radius: 6px; white-space: nowrap; flex: none; }
+.crumbs a:hover { color: var(--oq-ink); background: rgb(var(--oq-state) / .05); }
+.crumbs .here { font: 600 13.5px var(--oq-font); color: var(--oq-ink); padding: 4px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.crumbs .here.mono { font-family: var(--oq-font-mono); font-size: 13px; }
 .crumbs .sep { display: grid; color: var(--oq-ink-faint); flex: none; }
-.crumbs .picker { font-family: var(--oq-font-mono); background: rgb(var(--oq-state) / .07); }
-.crumbs .cur { display: block; line-height: 34px; overflow: hidden; text-overflow: ellipsis; }
+.brand:focus-visible, .crumbs a:focus-visible, .places a:focus-visible, .bar .more:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
-/* the Beacon floats over the right end of the bar; topbar.js pads .cx-right by its width */
-.cx-right { position: relative; height: 44px; flex: none; z-index: 35; }
+/* the places: quiet links for every model at once; a ⋯ menu when there is no room */
+.placebox { display: flex; align-items: center; flex: none; }
+.places { display: flex; gap: 2px; }
+.places a { height: 36px; display: flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 10px; font: 550 13px var(--oq-font); color: var(--oq-ink-2); text-decoration: none; transition: background .15s, color .15s; -webkit-tap-highlight-color: transparent; }
+.places a svg { color: var(--c); flex: none; }
+.places a:hover { background: rgb(var(--oq-state) / .05); color: var(--oq-ink); }
+.places a[aria-current="page"] { background: rgb(var(--oq-state) / .09); color: var(--oq-ink); }
+.bar .more { display: none; border: 0; background: none; color: var(--oq-ink-2); width: 40px; height: 40px; border-radius: 12px; place-items: center; cursor: pointer; }
+.bar .more:hover { background: rgb(var(--oq-state) / .06); color: var(--oq-ink); }
+
+/* the Beacon floats over the right end of the island's space; topbar.js pads .cx-right by its width */
+.cx-right { position: relative; height: 44px; flex: none; z-index: 35; margin-right: 8px; }
 .cx-right .beacon { position: absolute; top: 0; right: 0; left: auto; transform: none; }
 .beacon .bc-compact { height: 44px; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; font-size: 13px; text-align: left; }
 .beacon .bc-lb { overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
@@ -27,13 +39,22 @@
 .beacon .bbtn.armed { background: var(--oq-bad); color: var(--oq-on-accent); }
 .beacon button:focus-visible { outline: 2px solid var(--oq-beacon-accent); outline-offset: 2px; }
 
+@container (max-width: 960px) { .places a span { display: none; } .places a { padding: 0 10px; } .beacon .bc-lb { max-width: 160px; } }
 @container (max-width: 760px) {
-  .bar { height: 60px; padding: 0 10px; }
+  .bar { padding: 0 8px; gap: 4px; }
   .bar .sp { display: none; }
+  .brand .bt { display: none; }
   .crumbs { flex: 1; }
-  .crumbs .home-c, .crumbs > .sep { display: none; }
-  .crumbs .picker { flex: 1; }
-  .crumbs .ttl, .crumbs .on { padding-left: 10px; color: var(--oq-ink); font-size: 15px; }
+  .crumbs a, .crumbs .sep { display: none; }
+  .crumbs .here { font-size: 15px; }
   .beacon .bc-lb { max-width: 110px; }
+  .cx-right { margin-right: 0; }
   .cx-right .beacon .bc-open { width: min(350px, calc(100vw - 20px)); }
+  .bar .more { display: inline-flex; width: 44px; height: 44px; }
+  .placebox { position: relative; }
+  .places { display: none; position: absolute; z-index: 45; top: 50px; right: 0; flex-direction: column; padding: 6px; border-radius: 14px; background: var(--oq-surface-2); box-shadow: var(--oq-shadow-2); min-width: 180px; }
+  .places.open { display: flex; }
+  .places a span { display: inline; }
+  .places a { height: 44px; padding: 0 12px; }
 }
+@media (prefers-reduced-motion: reduce) { .places a { transition: none; } }

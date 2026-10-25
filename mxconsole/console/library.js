@@ -1,5 +1,5 @@
 // omxconsole, the library (F-055): a search bar and a groups column (Show · Kind · Your labels), label editing,
-// ticking models and labelling them. My models uses it now; F-056's switcher reuses the same parts.
+// ticking models and labelling them. My models uses it.
 // The rules live in library-logic.js (pure); this file draws them and talks to /admin/labels.
 // Everything goes in as text nodes. Changes are shown at once and put back, with the server's reason, if refused.
 import { h, icon, api, store, refresh, toast, emitData } from "./core.js";
@@ -10,7 +10,6 @@ export const kindName = (k) => (KINDS.find(([id]) => id === k) || [k, k])[1];
 export function groupName(key) {
   if (key === "all") return "All models";
   if (key === "running") return "Running";
-  if (key === "recent") return "Recent";
   return key.startsWith("kind:") ? kindName(key.slice(5)) : `#${key.slice(6)}`;
 }
 const KIND_COLOUR = { chat: "var(--oq-data-1)", coder: "var(--oq-data-4)", vision: "var(--oq-data-2)", embeddings: "var(--oq-data-3)", image: "var(--oq-warn)" };
@@ -20,7 +19,7 @@ export const tagsEl = (m) => h("span", { class: "tags" }, h("span", { class: "ta
 const typing = () => { const a = document.activeElement; return !!a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable); };
 
 /** onChange: called whenever what the results show may have changed (search, group, ticks, labels). */
-export function createLibrary({ onChange, placeholder = "Search by name, kind or #label", recent = null }) {
+export function createLibrary({ onChange, placeholder = "Search by name, kind or #label" }) {
   const lib = { q: "", group: "all", labels: [], ticked: new Set(), editing: false };
   let sig = "", shapeNow = "", busy = 0, adding = false;
   const models = () => store.models || [];
@@ -137,8 +136,7 @@ export function createLibrary({ onChange, placeholder = "Search by name, kind or
   function drawGroups() {
     const c = counts(models(), lib.labels);
     const shape = JSON.stringify([lib.group, lib.editing, adding, lib.labels]);
-    const recentN = recent ? models().filter((m) => recent.includes(m.name)).length : 0;  // the switcher passes its Recent list; My models has none
-    const now = shape + JSON.stringify(c) + recentN;
+    const now = shape + JSON.stringify(c);
     if (now === sig) return;
     const a = document.activeElement;
     if (shape === shapeNow && a && lib.groups.contains(a) && a.tagName === "INPUT") return;  // a poll only changing counts never takes a field from under your fingers
@@ -149,7 +147,6 @@ export function createLibrary({ onChange, placeholder = "Search by name, kind or
       h("div", { class: "gh" }, "Show"),
       item("all", "All models", c.all, icon("box", 16)),
       item("running", "Running", c.running, dot("var(--oq-ok)")),
-      ...(recent ? [item("recent", "Recent", recentN, icon("clock", 16))] : []),
       h("div", { class: "gh" }, "Kind ", h("em", {}, "· automatic")),
       ...KINDS.map(([k, name]) => item(`kind:${k}`, name, c.kinds[k], dot(KIND_COLOUR[k]))),
       h("div", { class: "gh mine" }, h("span", { class: "t" }, "Your labels"),

@@ -34,9 +34,9 @@ CONSOLE_SCRIPTS = {"theme.js", "main.js", "core.js", "icons.js", "routes.js",
                    "blades.js", "blade-layout.js", "blade-stack.js", "keyed.js", "prefs.js", "hardware.js", "system-data.js", "topbar.js", "beacon.js", "blade-home.js",
                    "model-page.js", "blade-add.js", "blade-security.js", "blade-keys.js", "blade-bench.js", "blade-logs.js",
                    "blade-notebook.js", "blade-gateway.js", "blade-settings.js",
-                   # plain pages (ADR 0005): the router, the one nav
-                   "pages.js", "nav.js", "picker.js", "library-logic.js", "library.js"}
-CONSOLE_STYLES = {"blades.css", "shell.css", "topbar.css", "docs.css", "blade-home.css", "model-page.css", "picker.css", "blade-model.css", "blade-add.css",
+                   # plain pages (ADR 0005): the router, the top bar's places and breadcrumb
+                   "pages.js", "nav.js", "library-logic.js", "library.js"}
+CONSOLE_STYLES = {"blades.css", "shell.css", "topbar.css", "docs.css", "blade-home.css", "model-page.css", "blade-model.css", "blade-add.css",
                   "blade-security.css", "blade-keys.css", "blade-bench.css", "blade-logs.css", "blade-notebook.css",
                   "blade-gateway.css", "blade-settings.css", "library.css"}
 CONSOLE_IMAGES = {"favicon.svg"}

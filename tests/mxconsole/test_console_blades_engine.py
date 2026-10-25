@@ -120,15 +120,15 @@ def test_every_icon_the_later_blades_need_is_already_in_icons_js():
 # -- accessibility and the contract -------------------------------------------------------------
 def test_the_topbar_marks_the_current_crumb_and_stays_on_tokens():
     js = (CONSOLE_DIR / "topbar.js").read_text()
-    assert "aria-current" in js
+    assert "aria-current" in (CONSOLE_DIR / "nav.js").read_text()
     css = (CONSOLE_DIR / "topbar.css").read_text()
     assert not re.findall(r"#[0-9a-fA-F]{3,6}\b", css), "topbar.css uses omxqua tokens, not raw hex"
-    # F-052: the bar only says where you are (the places live in the nav, the theme in Settings); at phone width the crumb fills it
+    # F-061: the places live in the bar, the theme in Settings; at phone width the crumb fills it
     phone = css[css.index("@container (max-width: 760px)"):]
     assert ".crumbs" in phone and ".crumbs { flex: 1; }" in phone
     assert '"Theme"' not in js and "setTheme" not in js
-    # the bar is the crumbs and the Beacon, nothing else: no tool buttons, no menu
-    assert 'h("nav", { class: "crumbs"' in js and "mountBeacon(right" in js and "cx-tools" not in js and "menu" not in js
+    # the bar is the logo, the crumbs, the Beacon and the four places: no tool buttons
+    assert 'h("nav", { class: "crumbs"' in js and "mountBeacon(right" in js and "placesEl()" in js and "cx-tools" not in js
     assert "Appearance" in (CONSOLE_DIR / "blade-settings.js").read_text()
 
 

@@ -72,6 +72,8 @@ globalThis.document = {
   /** Press a key at document level (like the browser does for a keydown that nothing stopped). */
   key(key, extra = {}) { const e = { key, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...extra }; (listeners.keydown || []).slice().forEach((fn) => fn(e)); return e; },
 };
+/** A click as the document's own listeners see it (an outside-click handler), with `target` as the element clicked. */
+document.click = (target) => { const e = { type: "click", target, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } }; (listeners.click || []).slice().forEach((fn) => fn(e)); return e; };
 const winListeners = {};
 globalThis.window = {
   matchMedia: () => ({ matches: false }),

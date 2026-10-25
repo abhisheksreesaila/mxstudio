@@ -69,20 +69,18 @@ export function routeForBlade(name, opts = {}) {
 }
 
 const NAMES = { home: "My models", keys: "API keys", gateway: "Gateway", security: "Security", settings: "Settings", add: "Add a model" };
-/** The crumbs for a route: [{label, to?, picker?, home?}], the last one being where you are. Pure. */
+/** The crumbs for a route: [{label, to?}], the last one being where you are (no `to`). Pure. */
 export function crumbsFor(route) {
-  const home = { label: NAMES.home, to: { page: "home" }, home: true };
+  const home = { label: NAMES.home, to: { page: "home" } };
   if (route.page === "home") return [{ label: NAMES.home }];
   if (route.page === "add") return [home, { label: NAMES.add }];
   if (route.page !== "model") return [{ label: NAMES[route.page] }];
-  return [home, { label: route.model, picker: true }];  // the tab is the page's own control, not a crumb
+  return [home, { label: route.model }];  // the tab is the page's own control, not a crumb
 }
 
 /** The same model on another tab. */
 export const tabRoute = (route, tab) => ({ ...route, tab });
-/** Another model on the same tab (the model picker). */
-export const pickRoute = (route, model) => ({ ...route, model });
-/** Moving between two model routes changes the open page in place (tabs, picker); anything else builds a new page. */
+/** Moving between two model routes changes the open page in place (tabs); anything else builds a new page. */
 export const updatesInPlace = (from, to) => Boolean(from && to && from.page === "model" && to.page === "model");
 
 /** The page's Back: browser history only when the entry before this one is ours ({mxc: 1}, stamped by pages.js);
