@@ -47,6 +47,27 @@ def hf_repo_dir(weights_path: str | None) -> Path | None:
     return None
 
 
+_sizes: dict[str, int] = {}
+
+
+def weights_size(weights_path: str | None) -> int | None:
+    """Bytes of a model's weights on disk (a folder adds up its files, links followed), or None when there are none to count.
+    The console polls this for every model every few seconds, and a snapshot never changes: found sizes are kept."""
+    if not weights_path:
+        return None
+    if weights_path in _sizes:
+        return _sizes[weights_path]
+    path = Path(weights_path)
+    try:
+        files = [path] if path.is_file() else [f for f in path.rglob("*") if f.is_file()]
+        total = sum(f.stat().st_size for f in files)
+    except OSError:
+        return None
+    if total:
+        _sizes[weights_path] = total
+    return total or None
+
+
 def _inside(path: Path, root: Path) -> bool:
     """True when `path` resolves strictly below `root` (symlinks and `..` followed)."""
     try:

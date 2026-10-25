@@ -94,3 +94,18 @@ async def test_removing_a_model_through_the_api_drops_its_labels(http, store):
     store.add_labels(["tiny", "other"], ["work"])
     assert (await http.delete("/admin/models/tiny", headers=ADMIN)).status_code == 200
     assert await labels(http) == [{"name": "work", "position": 0, "count": 1}]
+
+
+async def test_models_list_the_size_of_their_weights_on_disk(http, store, tmp_path):
+    """F-062: the My models Size column. A snapshot folder adds up its files (links followed); no weights means no number."""
+    snap = tmp_path / "snap"
+    (snap / "sub").mkdir(parents=True)
+    (snap / "a.safetensors").write_bytes(b"x" * 1000)
+    (snap / "sub" / "b.bin").write_bytes(b"y" * 234)
+    (tmp_path / "blob").write_bytes(b"z" * 66)
+    (snap / "link").symlink_to(tmp_path / "blob")
+    store.add_model(name="sized", repo_id="org/sized", revision="main", source="hf", architecture="X", weights_path=str(snap))
+    store.add_model(name="gone", repo_id="org/gone", revision="main", source="hf", architecture="X", weights_path=str(tmp_path / "missing"))
+    rows = {r["name"]: r for r in (await http.get("/admin/models", headers=ADMIN)).json()}
+    assert rows["sized"]["size_bytes"] == 1300
+    assert rows["tiny"]["size_bytes"] is None and rows["gone"]["size_bytes"] is None
