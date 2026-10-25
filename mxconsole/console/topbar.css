@@ -48,6 +48,7 @@
   .crumbs a, .crumbs .sep { display: none; }
   .crumbs .here { font-size: 15px; }
   .beacon .bc-lb { max-width: 110px; }
+  .beacon .bc-compact .mono { display: none; }
   .cx-right { margin-right: 0; }
   .cx-right .beacon .bc-open { width: min(350px, calc(100vw - 20px)); }
   .bar .more { display: inline-flex; width: 44px; height: 44px; }

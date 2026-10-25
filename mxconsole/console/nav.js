@@ -16,7 +16,7 @@ export const PLACES = [
 /** The four places plus the ⋯ button that opens them as a menu on a narrow window (topbar.css decides which shows). */
 export function placesEl(env = { onRoute }) {
   const links = PLACES.map(([key, label, hash, ic, hue]) =>
-    h("a", { href: hash, "data-place": key, style: { "--c": hue } }, icon(ic, 15, "currentColor", 1.75), h("span", {}, label)));
+    h("a", { href: hash, title: label, "data-place": key, style: { "--c": hue } }, icon(ic, 15, "currentColor", 1.75), h("span", {}, label)));
   const menu = h("nav", { class: "places", id: "places", "aria-label": "For every model" }, ...links);
   const more = h("button", { type: "button", class: "more", "aria-label": "Keys, Gateway, Security, Settings", "aria-haspopup": "menu", "aria-expanded": "false", "aria-controls": "places" }, icon("ellipsis", 18, "currentColor", 2));
   const box = h("div", { class: "placebox" }, menu, more);
