@@ -1,5 +1,5 @@
 /* omxconsole, the library (F-055): search bar, groups column, tick-and-label bar. Matches docs/design/console-pages/mock.html (v4).
-   Used by My models now and by the switcher in F-056. At 760 px and under the column becomes a scrolling chip row. */
+   Used by My models. At 760 px and under the column becomes a scrolling chip row. */
 .psearch { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; border-radius: 12px; background: rgb(var(--oq-state) / .06); color: var(--text-2); }
 .psearch input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--text); font: 500 14px var(--sans); height: 100%; }
 .psearch input::placeholder { color: var(--faint); }

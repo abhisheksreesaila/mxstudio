@@ -24,6 +24,14 @@ export const TAB_DEFS = [
 ];
 const SOURCE = { hf: "Hugging Face", max: "Modular MAX catalog" };
 
+/** Remove button: ask, remove through the daemon, and on success land on My models. Cancelling (or a refusal) stays put. */
+export async function removeThenHome(name) {
+  const done = await removeModels([name]);
+  if (!done.length) return false;
+  go({ page: "home" });
+  return true;
+}
+
 // -- pure ------------------------------------------------------------------------------------------
 /** The mxc command that does what a button does (every action shows it). */
 export function cliTwin(action, name) {
@@ -285,8 +293,7 @@ register("model", (blade) => {
       };
       async function removeModel() {  // asks first; then the model page has nothing left to show, so land on My models
         removing = true; paintBar();
-        const done = await removeModels([name]);
-        if (done.length) { gone = true; go({ page: "home" }); return; }
+        if (await removeThenHome(name)) { gone = true; return; }
         removing = false; paintBar();
       }
       function paintBar() {

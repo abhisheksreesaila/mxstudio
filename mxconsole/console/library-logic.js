@@ -1,5 +1,5 @@
 // omxconsole, the library's rules (F-055): what a search matches, what each group holds, how labels change.
-// Pure functions, no DOM, so they run under node. library.js draws them; F-056's switcher reuses both.
+// Pure functions, no DOM, so they run under node. library.js draws them.
 // A group is a string key: "all", "running", "kind:<kind>" or "label:<name>" (a label called "chat" is not the kind chat).
 // State is {labels: [names in your order], models: [{name, state, kind, labels}]}; every change returns a new state.
 

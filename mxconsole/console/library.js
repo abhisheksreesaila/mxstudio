@@ -1,5 +1,5 @@
 // omxconsole, the library (F-055): a search bar and a groups column (Show · Kind · Your labels), label editing,
-// ticking models and labelling them. My models uses it now; F-056's switcher reuses the same parts.
+// ticking models and labelling them. My models uses it.
 // The rules live in library-logic.js (pure); this file draws them and talks to /admin/labels.
 // Everything goes in as text nodes. Changes are shown at once and put back, with the server's reason, if refused.
 import { h, icon, api, store, refresh, toast, emitData } from "./core.js";

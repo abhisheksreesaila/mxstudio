@@ -111,6 +111,32 @@ def test_a_refused_removal_is_reported_and_the_others_still_go():
     assert got == {"done": ["fine"], "toast": "Could not remove broken: disk is read-only"}
 
 
+PAGE = """
+  const mp = await import(%s);
+  location.hash = "#/models/tiny/overview";
+  const p = mp.removeThenHome("tiny");
+  await settle();
+  const press = (act) => document.body.querySelector(`[data-act="${act}"]`).click();
+"""
+
+
+def test_removing_from_a_model_page_lands_on_my_models_after_confirming():
+    got = run(PAGE % json.dumps((CONSOLE_DIR / "model-page.js").as_uri()) + """
+      const before = location.hash;
+      press("ok");
+      console.log(JSON.stringify({ before, went: await p, after: location.hash, calls: calls.filter((c) => c[0] === "DELETE") }));
+    """)
+    assert got == {"before": "#/models/tiny/overview", "went": True, "after": "#/", "calls": [["DELETE", "/admin/models/tiny"]]}
+
+
+def test_cancelling_a_model_pages_remove_keeps_you_on_the_model_and_removes_nothing():
+    got = run(PAGE % json.dumps((CONSOLE_DIR / "model-page.js").as_uri()) + """
+      press("cancel");
+      console.log(JSON.stringify({ went: await p, after: location.hash, calls: calls.filter((c) => c[0] === "DELETE") }));
+    """)
+    assert got == {"went": False, "after": "#/models/tiny/overview", "calls": []}
+
+
 def test_saying_no_removes_nothing():
     got = run("""
       const p = rm.removeModels(["a"]);

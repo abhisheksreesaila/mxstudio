@@ -1,5 +1,5 @@
 // mxconsole, My models: the home page, a library (F-055). A full-width search, a groups column (Show · Kind · Your labels)
-// and the models as a table you can tick and label. The search, groups and labelling live in library.js (F-056's switcher reuses them).
+// and the models as a table you can tick and label. The search, groups and labelling live in library.js.
 // A List or Cards toggle (remembered) shows the same models either way. Data, all polled by core.js / system-data.js:
 //   Size /admin/models size_bytes · Memory /admin/system crew vram_gb · tok/s /admin/series (live) else /admin/metrics decode_tps_p50
 //   First token /admin/metrics ttft_p50_ms · Requests /admin/metrics requests (last 5 min) · Access /admin/info lan_endpoint.
