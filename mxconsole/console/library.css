@@ -147,13 +147,15 @@
 .confirm p { margin: 0 0 16px; color: var(--text-2); font-size: 13.5px; line-height: 1.5; }
 .confirm .row { display: flex; gap: 8px; justify-content: flex-end; }
 .confirm .fb { height: 40px; display: inline-flex; align-items: center; }
-.confirm .fb.danger2 { background: var(--oq-bad); color: #fff; }
-.confirm .fb.danger2:hover { filter: brightness(.94); }
+.confirm .fb.danger2 { background: color-mix(in srgb, var(--oq-bad) 16%, transparent); color: var(--bad-fg); }
+.confirm .fb.danger2:hover { background: color-mix(in srgb, var(--oq-bad) 26%, transparent); }
 @media (prefers-reduced-motion: reduce) { .confirm { animation: none; } .mc { transition: none; } }
 @media (max-width: 760px) {
   .cgrid { grid-template-columns: 1fr; padding: 4px 0 12px 12px; }
   .hbar .seg button { font-size: 0; gap: 0; width: 44px; justify-content: center; height: 40px; }
   .selbar .fb.danger { margin-left: 0; }
+  .b-home .cx-tbl td.nm { max-width: 140px; }
+  .b-home .cx-tbl th, .b-home .cx-tbl td { padding-left: 6px; padding-right: 6px; }
 }
 
 /* the numbers give way to the width of the results area, not the window: first the rarely read ones, then size and memory */

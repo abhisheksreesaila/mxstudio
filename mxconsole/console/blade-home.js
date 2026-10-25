@@ -165,7 +165,7 @@ register("home", (blade) => ({
       const check = h("button", { class: "cb", type: "button", "data-act": "tick", onClick: (e) => { e.stopPropagation(); lib.tick(v.name); } }, icon("check", 14, "currentColor", 3));
       const nameBtn = h("button", { class: "namebtn", type: "button", "data-id": v.name, onClick: (e) => { e.stopPropagation(); openModel(v.name); } });
       const rep = h("span", { class: "rep" });
-      const cells = ["", "tg", "num c3 hide-p", "num c3 hide-p", "num", "num c2 hide-p", "num c2 hide-p", "axs c2 hide-p"].map((c) => h("td", { class: c || null }));
+      const cells = ["", "tg hide-p", "num c3 hide-p", "num c3 hide-p", "num", "num c2 hide-p", "num c2 hide-p", "axs c2 hide-p"].map((c) => h("td", { class: c || null }));
       const tr = h("tr", { class: "row", "data-id": v.name, onClick: () => openModel(v.name) }, h("td", { class: "ck" }, check), h("td", { class: "nm" }, nameBtn, rep), ...cells);
       Object.assign(tr, { _check: check, _nameBtn: nameBtn, _rep: rep, _cells: cells });
       lib.draggable(tr, v.name);
@@ -193,7 +193,7 @@ register("home", (blade) => ({
       refs = { stale: h("div", { class: "stale mono", role: "status", hidden: true }, "daemon not answering: showing the last numbers"), callouts: h("div", {}), empty: h("div", {}),
         cnt: h("span", {}), rows: new Map(), rowsParent: tbody, none: h("div", { class: "none", hidden: true }), shownNames: [] };
       crashSig = "";
-      const head = [["", "ck"], ["Model", ""], ["State", ""], ["Kind · labels", "tg"], ["Size", "num c3 hide-p"], ["Memory", "num c3 hide-p"], ["tok/s", "num"], ["First token", "num c2 hide-p"], ["Requests", "num c2 hide-p", "last 5 minutes"], ["Access", "c2 hide-p"]];
+      const head = [["", "ck"], ["Model", ""], ["State", ""], ["Kind · labels", "tg hide-p"], ["Size", "num c3 hide-p"], ["Memory", "num c3 hide-p"], ["tok/s", "num"], ["First token", "num c2 hide-p"], ["Requests", "num c2 hide-p", "last 5 minutes"], ["Access", "c2 hide-p"]];
       const table = h("table", { class: "tbl cx-tbl" }, h("thead", {}, h("tr", {}, head.map(([label, c, hint], i) => h("th", { class: c || null, title: hint || null }, i === 0 ? selAll : label)))), tbody);
       const grid = h("div", { class: "cgrid" });
       refs.cards = new Map();
