@@ -161,5 +161,6 @@
 /* the numbers give way to the width of the results area, not the window: first the rarely read ones, then size and memory */
 .res { container-type: inline-size; }
 .cx-tbl td.nm { max-width: 220px; }
+.cx-tbl td.tg { white-space: normal; } .cx-tbl td.tg > span { flex-wrap: wrap; row-gap: 4px; }  /* labels wrap so the table fits its area */
 @container (max-width: 960px) { .cx-tbl .c2 { display: none; } }
 @container (max-width: 760px) { .cx-tbl .c3 { display: none; } }
