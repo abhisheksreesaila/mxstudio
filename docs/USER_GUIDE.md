@@ -234,7 +234,7 @@ This applies to every model, not just one. It runs as your user, so no password 
 
 You get an address like `https://<host>.local:8443/v1`. Use it with the same keys and model names. Only the four `/v1` routes above are reachable; the daemon's console and admin pages are not. Localhost keeps working over HTTP.
 
-If a client sends a request field `max serve` doesn't accept (a vendor extra from a client written for another server), the daemon drops it instead of letting the whole request fail, and names it in the `X-Mxc-Dropped-Params` reply header.
+If a client sends a top-level request field `max serve` doesn't accept (a vendor extra from a client written for another server), the daemon drops it instead of letting the whole request fail, and names it in the `X-Mxc-Dropped-Params` reply header (up to 20 names, then "+N more"). Only top-level fields are dropped: an unknown field inside a message or a tool still gets MAX's own error. Fields that change the answer are never dropped (`tools`, `tool_choice`, `functions`, `function_call`, `response_format`, `logprobs`, `top_logprobs`, `n`, `seed`, `stop`): if MAX can't honour one on that route, you get MAX's error rather than a different answer.
 
 ### Trust the certificate on other devices
 

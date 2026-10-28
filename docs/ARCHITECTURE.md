@@ -15,7 +15,8 @@ The moving parts, and how to develop on them. Using it: [user guide](USER_GUIDE.
 - **Daemon** (`mxconsole/gateway.py`, `supervisor.py`): checks the key, routes by the request's `model`, starts the
   model if it's cold (concurrent callers share one start), streams the answer back, and stops idle models, never in
   the middle of a request. Top-level request fields `max serve` would refuse are dropped first and named in the
-  `X-Mxc-Dropped-Params` reply header (`params.py`, read from MAX's own request schema).
+  `X-Mxc-Dropped-Params` reply header (`params.py`, read from MAX's own request schema); fields that change the
+  answer (`tools`, `response_format`, `n`, `seed`, `stop`…) are never dropped, so MAX's own error reaches the client.
 - **Keys** (`keys.py`): `mst-…`, stored only as SHA-256 hashes, shown once.
 - **Expose** (`expose.py`): runs Caddy (its own certificate authority) as your user, proxying straight to the daemon.
   Only the four `/v1` routes reach the daemon from the LAN. (LiteLLM used to sit between them; it was removed in
