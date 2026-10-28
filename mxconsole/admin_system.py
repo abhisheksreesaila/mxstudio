@@ -1,9 +1,8 @@
-"""Admin routes for the System pages: ports and the crew, the gateway's safeguards, daemon/Caddy/LiteLLM logs."""
+"""Admin routes for the System pages: ports and the crew, the gateway's safeguards, daemon and Caddy logs."""
 from __future__ import annotations
 
 import asyncio
 import os
-import threading
 import time
 
 from starlette.requests import Request
@@ -14,11 +13,10 @@ from mxconsole.store import Store
 from mxconsole.supervisor import Supervisor
 
 
-def register(app, store: Store, supervisor: Supervisor, admin_only, *, counters: system.Counters, refused, error,
+def register(app, store: Store, supervisor: Supervisor, admin_only, *, counters: system.Counters, refused,
              gpus=metrics.gpus, gpu_procs=metrics.gpu_processes, ppid=system.parent_pid) -> None:
-    """Add the System routes. `admin_only` is the gateway's guard, `refused()` its 403 answer and
-    `error(status, message, code, type_)` its OpenAI-shaped error. `gpus()`, `gpu_procs()` and `ppid(pid)`
-    are the nvidia-smi and /proc readers, replaceable in tests."""
+    """Add the System routes. `admin_only` is the gateway's guard and `refused()` its 403 answer.
+    `gpus()`, `gpu_procs()` and `ppid(pid)` are the nvidia-smi and /proc readers, replaceable in tests."""
 
     def crew_now() -> tuple[list[dict], dict | None, list[dict]]:
         crew = system.collect(supervisor.status(), daemon=os.getpid())
@@ -65,23 +63,5 @@ def register(app, store: Store, supervisor: Supervisor, admin_only, *, counters:
             return Response(system.read_tail(system.log_path(source), limit), media_type="text/plain; charset=utf-8")
         return route
 
-    for source in ("daemon", "caddy", "litellm"):
+    for source in ("daemon", "caddy"):
         app.get(f"/admin/{source}/log")(log_route(source))
-
-    restart_lock = threading.Lock()
-
-    @app.post("/admin/litellm/restart")
-    async def admin_litellm_restart(request: Request):
-        if not admin_only(request):
-            return refused()
-        if not restart_lock.acquire(blocking=False):
-            return error(409, "a restart is already running", "restart_in_progress")
-        try:
-            restarted = await asyncio.to_thread(expose.refresh_if_running, store)
-        except expose.ExposeError as e:
-            return error(500, str(e), "expose_failed", "server_error")
-        finally:
-            restart_lock.release()
-        if not restarted:
-            return error(409, "LiteLLM isn't running. Start it with `mxc expose`.", "litellm_not_running")
-        return JSONResponse({"restarted": True})

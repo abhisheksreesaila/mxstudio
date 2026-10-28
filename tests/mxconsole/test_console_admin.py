@@ -90,19 +90,18 @@ async def test_revoke_a_key(http, store, key):
     assert (await http.delete("/admin/keys/myapp", headers=ADMIN)).status_code == 200
     assert keys.verify_key(store, key) is None
     assert (await http.delete("/admin/keys/myapp", headers=ADMIN)).status_code == 404
-    keys.create_key(store, "_litellm", internal=True)
-    assert (await http.delete("/admin/keys/_litellm", headers=ADMIN)).status_code == 404  # mxc's own
+    keys.create_key(store, "_internal", internal=True)
+    assert (await http.delete("/admin/keys/_internal", headers=ADMIN)).status_code == 404  # mxc's own
 
 
 async def test_network_reports_ports_models_and_the_apps_seen(http, store, sup, key, monkeypatch):
-    monkeypatch.setattr(expose, "status", lambda: {"caddy": True, "litellm": False})
+    monkeypatch.setattr(expose, "status", lambda: {"caddy": True})
     monkeypatch.setattr(expose, "lan_endpoint", lambda: "https://box.local:8443/v1")
     await http.post("/v1/chat/completions", json=CHAT, headers=auth(key))
-    rec(store, ts=time.time(), app="_litellm")
+    rec(store, ts=time.time(), app="_internal")
     n = (await http.get("/admin/network", headers=ADMIN)).json()
-    assert n["expose"] == {"caddy": True, "litellm": False} and n["lan_endpoint"] == "https://box.local:8443/v1"
-    assert n["ports"]["daemon"] == 11435 and n["ports"]["litellm"] == expose.LITELLM_PORT
-    assert n["ports"]["caddy"] == expose.EXPOSE_PORT
+    assert n["expose"] == {"caddy": True} and n["lan_endpoint"] == "https://box.local:8443/v1"
+    assert n["ports"] == {"daemon": 11435, "caddy": expose.EXPOSE_PORT}
     tiny = next(m for m in n["models"] if m["name"] == "tiny")
     assert tiny["state"] == "ready" and isinstance(tiny["port"], int) and tiny["recent"] == 1
     assert next(m for m in n["models"] if m["name"] == "other")["port"] is None
@@ -118,10 +117,9 @@ async def test_expose_and_stop_call_expose(http, store, monkeypatch):
     monkeypatch.setattr(expose, "lan_endpoint", lambda: "https://box.local:8443/v1")
     r = await http.post("/admin/expose", headers=ADMIN, json={})
     assert r.status_code == 200 and r.json()["lan_endpoint"] == "https://box.local:8443/v1"
-    assert calls[0][0] == "start" and calls[0][1]["host"] == "box.local" and calls[0][1]["litellm"] is True
-    assert calls[0][1]["store"] is store
-    r = await http.post("/admin/expose", headers=ADMIN, json={"host": "10.0.0.5", "litellm": False})
-    assert calls[1][1]["host"] == "10.0.0.5" and calls[1][1]["litellm"] is False
+    assert calls[0] == ("start", {"host": "box.local", "store": store})
+    r = await http.post("/admin/expose", headers=ADMIN, json={"host": "10.0.0.5", "litellm": False})  # an old field is ignored
+    assert r.status_code == 200 and calls[1] == ("start", {"host": "10.0.0.5", "store": store})
     assert (await http.post("/admin/expose/stop", headers=ADMIN)).status_code == 200
     assert calls[2][0] == "stop" and calls[2][1]["store"] is store
 
@@ -132,7 +130,7 @@ async def test_expose_failures_come_back_as_messages(http, monkeypatch):
     monkeypatch.setattr(expose, "start", broken)
     r = await http.post("/admin/expose", headers=ADMIN, json={})
     assert r.status_code == 500 and "caddy not found" in r.json()["error"]["message"]
-    for body in ({"host": 5}, {"host": "bad host!"}, {"litellm": "yes"}):
+    for body in ({"host": 5}, {"host": "bad host!"}, {"host": None}):
         monkeypatch.setattr(expose, "start", lambda **kw: expose.render_caddyfile(hosts=[kw["host"]]))
         assert (await http.post("/admin/expose", headers=ADMIN, json=body)).status_code == 400, body
 

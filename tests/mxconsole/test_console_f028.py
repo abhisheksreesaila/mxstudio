@@ -145,13 +145,13 @@ def test_open_in_jupyter_problems_name_the_fix():
 # -- gateway and settings helpers ----------------------------------------------------------------------------
 @needs_node
 def test_gateway_routes_status_and_log_tail():
-    net = {"ports": {"daemon": 11435, "litellm": 4000, "caddy": 8443}, "expose": {"caddy": True, "litellm": False}, "lan_endpoint": None,
+    net = {"ports": {"daemon": 11435, "caddy": 8443}, "expose": {"caddy": True}, "lan_endpoint": None,
            "models": [{"name": "tiny", "state": "ready", "port": 8001, "recent": 3}, {"name": "big", "state": "cold", "port": None, "recent": 0}]}
     routes = node("blade-gateway", f"m.routesView({json.dumps(net)})")
     assert routes["daemon"] == "http://127.0.0.1:11435/v1"
-    assert routes["rows"][0] == {"name": "tiny", "upstream": "openai/tiny", "state": "ready", "port": 8001, "recent": 3}
+    assert routes["rows"][0] == {"name": "tiny", "state": "ready", "port": 8001, "recent": 3}
     assert routes["rows"][1]["port"] is None
-    assert node("blade-gateway", f"m.statusView({json.dumps(net)})") == {"litellm": False, "caddy": True, "lan": None, "port": 4000}
+    assert node("blade-gateway", f"m.statusView({json.dumps(net)})") == {"caddy": True, "lan": None, "port": 8443}
     assert node("blade-gateway", "m.routesView(null)") == {"daemon": None, "rows": []}
     assert node("blade-gateway", 'm.tailLines("a\\nb\\nc\\n", 2)') == ["b", "c"]
     assert node("blade-gateway", 'm.tailLines("", 5)') == [] and node("blade-gateway", "m.tailLines(undefined)") == []
@@ -207,8 +207,8 @@ def test_blades_follow_the_contract_and_the_csp():
 def test_a_link_label_can_hold_code_and_the_header_tools_are_one_node():
     kids = md("[`org/tiny`](https://huggingface.co/org/tiny)")[0]["children"]
     assert kids[0]["tag"] == "a" and kids[0]["children"] == [{"tag": "code", "children": [{"text": "org/tiny"}]}]
-    for name in ("blade-notebook", "blade-gateway"):
-        assert re.search(r"tools: (\[chipEl, modeBtn, tabLink\]|restartBtn),", (CONSOLE_DIR / f"{name}.js").read_text()), name
+    assert "tools: [chipEl, modeBtn, tabLink]," in (CONSOLE_DIR / "blade-notebook.js").read_text()
+    assert "tools:" not in (CONSOLE_DIR / "blade-gateway.js").read_text()  # F-063: no restart button left
 
 
 @needs_node

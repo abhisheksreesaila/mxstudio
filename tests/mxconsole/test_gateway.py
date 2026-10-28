@@ -218,3 +218,52 @@ async def test_unknown_v1_routes_need_a_key_and_answer_like_openai(http, key):
     r = await http.post("/v1/responses", json=CHAT, headers=auth(key))
     assert r.status_code == 404
     assert r.json()["error"]["code"] == "unknown_route"
+
+
+# -- F-063: what LiteLLM's drop_params did, now in the daemon -------------------------------------------
+async def test_max_itself_refuses_an_unknown_field(store, monkeypatch):
+    """The premise, checked against MAX's own request model: one unknown field fails the whole request."""
+    from max.serve.schemas import openai as schemas
+    assert schemas.CreateChatCompletionRequest.model_config.get("extra") == "forbid"
+    with pytest.raises(Exception):
+        schemas.CreateChatCompletionRequest.model_validate({**CHAT, "drop_me": 1})
+
+
+async def test_unknown_top_level_fields_are_dropped_and_named(http, key, monkeypatch, tmp_path):
+    monkeypatch.setenv("FAKE_MAX_STRICT", "1")
+    bodies = tmp_path / "bodies.jsonl"
+    monkeypatch.setenv("FAKE_MAX_BODY_LOG", str(bodies))
+    r = await http.post("/v1/chat/completions", headers=auth(key),
+                        json={**CHAT, "temperature": 0.2, "drop_me": 1, "another_vendor_extra": {"x": 1}})
+    assert r.status_code == 200, r.text
+    assert r.headers["x-mxc-dropped-params"] == "another_vendor_extra,drop_me"
+    sent = json.loads(bodies.read_text().splitlines()[-1])
+    assert sent == {**CHAT, "temperature": 0.2}  # known fields (and nested message fields) are untouched
+
+
+async def test_a_clean_body_passes_through_unchanged_with_no_header(http, key, monkeypatch, tmp_path):
+    monkeypatch.setenv("FAKE_MAX_STRICT", "1")
+    bodies = tmp_path / "bodies.jsonl"
+    monkeypatch.setenv("FAKE_MAX_BODY_LOG", str(bodies))
+    for path, body in (("/v1/chat/completions", {**CHAT, "stream": True}),
+                       ("/v1/completions", {"model": "tiny", "prompt": "hi", "top_k": 5}),
+                       ("/v1/embeddings", {"model": "tiny", "input": "hi"})):
+        r = await http.post(path, headers=auth(key), json=body)
+        assert r.status_code == 200, (path, r.text)
+        assert "x-mxc-dropped-params" not in r.headers
+        assert json.loads(bodies.read_text().splitlines()[-1]) == body
+
+
+async def test_embeddings_and_completions_drop_their_own_unknowns(http, key, monkeypatch):
+    monkeypatch.setenv("FAKE_MAX_STRICT", "1")
+    r = await http.post("/v1/embeddings", headers=auth(key), json={"model": "tiny", "input": "hi", "messages": []})
+    assert r.status_code == 200 and r.headers["x-mxc-dropped-params"] == "messages"
+    r = await http.post("/v1/completions", headers=auth(key), json={"model": "tiny", "prompt": "hi", "messages": []})
+    assert r.status_code == 200 and r.headers["x-mxc-dropped-params"] == "messages"
+
+
+def test_without_a_readable_max_schema_the_body_passes_through(monkeypatch):
+    from mxconsole import params
+    monkeypatch.setattr(params, "accepted", lambda path: None)
+    body = {**CHAT, "drop_me": 1}
+    assert params.drop_unknown(body, "/v1/chat/completions") == (body, [])

@@ -25,8 +25,8 @@ async def test_rotate_returns_a_new_secret_once_and_revokes_the_old(http, key):
 
 async def test_rotate_unknown_or_internal_app_is_404(http, store):
     assert (await http.post("/admin/keys/nope/rotate", headers=ADMIN)).status_code == 404
-    keys.create_key(store, "_litellm", internal=True)
-    assert (await http.post("/admin/keys/_litellm/rotate", headers=ADMIN)).status_code == 404
+    keys.create_key(store, "_internal", internal=True)
+    assert (await http.post("/admin/keys/_internal/rotate", headers=ADMIN)).status_code == 404
 
 
 async def test_rotate_is_admin_only(http, key):

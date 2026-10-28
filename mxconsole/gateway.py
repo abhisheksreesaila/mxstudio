@@ -16,7 +16,7 @@ from fasthtml.common import FastHTML
 from starlette.requests import Request
 from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 
-from mxconsole import admin_api, api_docs, admin_bench, admin_port, admin_pull, admin_system, expose, insights, keys, metrics, removal, system
+from mxconsole import admin_api, api_docs, admin_bench, admin_port, admin_pull, admin_system, expose, insights, keys, metrics, params, removal, system
 from mxconsole.kinds import KINDS, LabelError
 from mxconsole.settings import DAEMON_PORT
 from mxconsole.store import Store, mxc_home
@@ -249,6 +249,9 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             note(app_name, None, route, 400, started)
             return openai_error(400, "Request body must be JSON with a string `model` field.",
                                 "invalid_request_body")
+        body, dropped = params.drop_unknown(body, path)  # max serve refuses fields it doesn't know
+        if dropped:
+            raw = json.dumps(body).encode()
         try:
             base = await supervisor.ensure_running(name)
         except UnknownModel:
@@ -274,6 +277,8 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             return openai_error(502, f"Model `{name}` is not answering: {e}", "bad_gateway", "server_error")
 
         passthrough = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP_BY_HOP}
+        if dropped:
+            passthrough[params.HEADER] = ",".join(dropped)
 
         streamed = "text/event-stream" in upstream.headers.get("content-type", "")
         meter = metrics.StreamMeter() if streamed else metrics.JsonMeter()
@@ -421,7 +426,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             "host": socket.gethostname(), "expose": status, "exposed": status["caddy"],
             "lan_endpoint": expose.lan_endpoint(), "default_host": expose.default_host(),
             "ca_path": str(expose.ca_root_path()), "ca_exists": expose.ca_root_path().exists(),
-            "ports": {"daemon": DAEMON_PORT, "litellm": expose.LITELLM_PORT, "caddy": expose.EXPOSE_PORT},
+            "ports": {"daemon": DAEMON_PORT, "caddy": expose.EXPOSE_PORT},
             "models": [{"name": m.name, "state": live.get(m.name, {}).get("state", "cold"),
                         "port": live.get(m.name, {}).get("port"), "recent": per_model.get(m.name, 0)}
                        for m in store.models()],
@@ -438,13 +443,11 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
         except ValueError:
             body = None
         host = body.get("host", expose.default_host()) if isinstance(body, dict) else None
-        litellm = body.get("litellm", True) if isinstance(body, dict) else None
-        if not isinstance(host, str) or not isinstance(litellm, bool):
-            return openai_error(400, "Send JSON like {\"host\": \"box.local\", \"litellm\": true} (both optional).",
-                                "invalid_request_body")
+        if not isinstance(host, str):
+            return openai_error(400, "Send JSON like {\"host\": \"box.local\"} (optional).", "invalid_request_body")
         try:
-            # starting LiteLLM takes seconds: keep the event loop free
-            await asyncio.to_thread(expose.start, host=host, litellm=litellm, store=store)
+            # starting Caddy waits a moment to see it stay up: keep the event loop free
+            await asyncio.to_thread(expose.start, host=host, store=store)
         except ValueError as e:
             return openai_error(400, str(e), "invalid_host")
         except expose.ExposeError as e:
@@ -635,6 +638,6 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
 
     api_deps = dict(api_deps or {})
     admin_system.register(app, store, supervisor, admin_only, counters=counters,
-                          refused=admin_refused, error=openai_error, **api_deps.pop("system", {}))
+                          refused=admin_refused, **api_deps.pop("system", {}))
     admin_api.register(app, store, supervisor, admin_only, refused=admin_refused, error=openai_error, **api_deps)
     return app

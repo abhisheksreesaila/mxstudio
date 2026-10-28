@@ -29,7 +29,7 @@ def test_plain_command_error_leaves_stdout_empty():
     assert_refused(runner.invoke(app, ["set", "nope", "--pin"]), "nope")
 
 
-@pytest.mark.parametrize("args,word", [(["keys", "revoke", "ghost"], "ghost"), (["keys", "revoke", "_litellm"], "managed"),
+@pytest.mark.parametrize("args,word", [(["keys", "revoke", "ghost"], "ghost"), (["keys", "revoke", "_internal"], "managed"),
                                        (["stop"], "name a model"), (["console", "nowhere"], "nowhere")])
 def test_older_commands_use_the_same_error_shape(args, word):
     assert_refused(runner.invoke(app, args), word)

@@ -1,5 +1,5 @@
-// mxconsole, the Gateway blade: LiteLLM's status, its routes (model name -> upstream), restart, the log tail and
-// the CLI twins. Data: GET /admin/network and /admin/gateway (polled), GET /admin/litellm/log, POST /admin/litellm/restart.
+// mxconsole, the Gateway page: Caddy's status, the daemon's routes (model name -> its max serve), Caddy's log tail and
+// the CLI twins. Data: GET /admin/network and /admin/gateway (polled), GET /admin/caddy/log.
 import { h, icon, api, store, onData, toast, fmt, clock, appLabel, copyText } from "./core.js";
 import { register, push, stack } from "./blades.js";
 
@@ -7,18 +7,18 @@ const POLL = 4000;
 const LOG_BYTES = 8000, LOG_LINES = 60;
 
 // -- pure ----------------------------------------------------------------------------------------------
-/** The route table: each registered model is a LiteLLM route to the daemon's /v1 (see expose.render_litellm_config). */
+/** The route table: the daemon's /v1 sends each request to the `max serve` of the model it names. */
 export function routesView(net) {
   const daemon = net && net.ports ? `http://127.0.0.1:${net.ports.daemon}/v1` : null;
   const rows = ((net && net.models) || []).map((m) => ({
-    name: m.name, upstream: `openai/${m.name}`, state: m.state, port: m.port || null, recent: m.recent || 0,
+    name: m.name, state: m.state, port: m.port || null, recent: m.recent || 0,
   }));
   return { daemon, rows };
 }
-/** What is on duty: LiteLLM and Caddy, from the expose status. */
+/** What is on duty: Caddy (HTTPS on the LAN), from the expose status. */
 export function statusView(net) {
   const ex = (net && net.expose) || {};
-  return { litellm: !!ex.litellm, caddy: !!ex.caddy, lan: (net && net.lan_endpoint) || null, port: net && net.ports ? net.ports.litellm : null };
+  return { caddy: !!ex.caddy, lan: (net && net.lan_endpoint) || null, port: net && net.ports ? net.ports.caddy : null };
 }
 /** The safeguards the daemon can count (today), as short lines. */
 export function safeguardLines(gw) {
@@ -57,39 +57,35 @@ const card = (title, badge, body, flush, ...src) => h("section", { class: "card"
   h("div", { class: flush ? "card-b ox-flush" : "card-b" }, body), ...src);
 
 register("gateway", (blade) => {
-  let net = null, gw = null, failed = null, busy = false;
+  let net = null, gw = null, failed = null;
   const timers = [];
 
-  const restartBtn = h("button", { class: "btn tonal sm", type: "button", disabled: true, title: "Restarts Caddy and LiteLLM and rotates the internal key" }, icon("refresh-cw", 13), "Restart");
   const status = h("div", { class: "gw-slot" });
   const routes = h("div", { class: "gw-slot" });
   const guards = h("div", { class: "gw-slot" });
   const recent = h("div", { class: "gw-slot" });
-  const logPre = h("pre", { class: "gw-log mono", tabindex: "0", "aria-label": "LiteLLM log" }, "Loading…");
-  const logBox = card("LiteLLM log", "last lines", logPre, false, note("refreshed every few seconds"));
+  const logPre = h("pre", { class: "gw-log mono", tabindex: "0", "aria-label": "Caddy log" }, "Loading…");
+  const logBox = card("Caddy log", "last lines", logPre, false, note("refreshed every few seconds"));
   let logText = null;
 
   function drawStatus() {
     const v = statusView(net);
-    restartBtn.disabled = busy || !v.litellm;
-    restartBtn.title = v.litellm ? "Restarts Caddy and LiteLLM and rotates the internal key" : "LiteLLM is not running: start it with `mxc expose`";
     if (failed && !net) { status.replaceChildren(card("Status", "", h("div", { class: "ox-fail", role: "alert" }, icon("triangle-alert", 15), `Could not load the gateway: ${failed}`), false, twin("mxc status"))); return; }
     if (!net) { status.replaceChildren(card("Status", "", h("div", { class: "skel" }), false, twin("mxc status"))); return; }
     const info = store.info || {};
     status.replaceChildren(card("Status", "", [
       h("dl", { class: "ox-dl" },
-        h("dt", {}, "LiteLLM"), h("dd", {}, st(v.litellm, v.litellm ? `running · :${v.port}` : "off")),
-        h("dt", {}, "Caddy (HTTPS)"), h("dd", {}, st(v.caddy, v.caddy ? "running" : "off")),
+        h("dt", {}, "Caddy (HTTPS)"), h("dd", {}, st(v.caddy, v.caddy ? `running · :${v.port}` : "off")),
         h("dt", {}, "Local endpoint"), h("dd", {}, info.endpoint || "—"),
         h("dt", {}, "LAN endpoint"), h("dd", {}, v.lan || "off")),
-      !v.litellm ? h("p", { class: "ox-note" }, "LiteLLM is off, so only the daemon's own /v1 answers. The routes below apply once ", h("code", { class: "mono" }, "mxc expose"), " starts it.") : null], false, twin("mxc status")));
+      !v.caddy ? h("p", { class: "ox-note" }, "Caddy is off, so only this machine can reach /v1. ", h("code", { class: "mono" }, "mxc expose"), " shares the same routes on your LAN over HTTPS.") : null], false, twin("mxc status")));
   }
   function drawRoutes() {
     if (!net) { routes.replaceChildren(); return; }
     const { daemon, rows } = routesView(net);
     routes.replaceChildren(card("Routes", "", rows.length ? h("div", { class: "ox-scroll" }, h("table", { class: "tbl" },
-        h("thead", {}, h("tr", {}, h("th", {}, "Model name"), h("th", {}, "Upstream model"), h("th", {}, "max serve"), h("th", { class: "num" }, "Req · 1 min"))),
-        h("tbody", {}, rows.map((r) => h("tr", {}, h("td", { class: "mono" }, r.name), h("td", { class: "mono" }, r.upstream),
+        h("thead", {}, h("tr", {}, h("th", {}, "Model name"), h("th", {}, "max serve"), h("th", { class: "num" }, "Req · 1 min"))),
+        h("tbody", {}, rows.map((r) => h("tr", {}, h("td", { class: "mono" }, r.name),
           h("td", { class: "mono" }, r.port ? `:${r.port}` : r.state === "starting" ? "starting" : "idle"), h("td", { class: "num" }, fmt(r.recent))))))) :
         empty("route", "No routes yet", "Add a model and it gets a route.", h("button", { class: "btn fill sm", type: "button", onClick: () => push("add", {}, stack.indexOf(blade)) }, icon("plus", 13, "currentColor", 2), "Add a model")),
       true, note(rows.length ? `every route goes to ${daemon}` : "a route appears for each model you add")));
@@ -111,15 +107,15 @@ register("gateway", (blade) => {
     const key = failedWith ? `!${failedWith}` : text;
     if (key === logText) return;
     logText = key;
-    if (failedWith) { logPre.textContent = `Could not read the LiteLLM log: ${failedWith}`; return; }
+    if (failedWith) { logPre.textContent = `Could not read the Caddy log: ${failedWith}`; return; }
     const lines = tailLines(text);
     const atEnd = logPre.scrollHeight - logPre.scrollTop - logPre.clientHeight < 24;
-    logPre.textContent = lines.length ? lines.join("\n") : "No LiteLLM log yet: it appears once `mxc expose` starts LiteLLM.";
+    logPre.textContent = lines.length ? lines.join("\n") : "No Caddy log yet: it appears once `mxc expose` starts Caddy.";
     if (atEnd) logPre.scrollTop = logPre.scrollHeight;
   }
 
   async function load() {
-    const [n, g, l] = await Promise.allSettled([api("GET", "/admin/network"), api("GET", "/admin/gateway"), api("GET", `/admin/litellm/log?bytes=${LOG_BYTES}`)]);
+    const [n, g, l] = await Promise.allSettled([api("GET", "/admin/network"), api("GET", "/admin/gateway"), api("GET", `/admin/caddy/log?bytes=${LOG_BYTES}`)]);
     if (!blade.alive) return;
     if (n.status === "fulfilled") { net = n.value; failed = null; } else failed = n.reason.message;
     if (g.status === "fulfilled") gw = g.value;
@@ -127,19 +123,9 @@ register("gateway", (blade) => {
     drawStatus(); drawRoutes(); drawGuards();
   }
 
-  restartBtn.addEventListener("click", async () => {
-    busy = true; drawStatus();
-    toast("Restarting the gateway (Caddy + LiteLLM)… it can take up to a minute.", 6000);
-    try { await api("POST", "/admin/litellm/restart"); if (blade.alive) toast("Gateway restarted."); }
-    catch (e) { if (blade.alive) toast(`Could not restart the gateway: ${e.message}`, 7000); }
-    busy = false;
-    if (blade.alive) await load();
-  });
-
   return {
-    title: "Gateway", crumb: "Gateway", sub: "LiteLLM · one endpoint routes to every model",
+    title: "Gateway", crumb: "Gateway", sub: "Caddy → the daemon · one endpoint routes to every model",
     icon: "route", hue: "var(--hue-gateway)", side: 640, min: 520,
-    tools: restartBtn,
     mount(body) {
       blade.el.classList.add("oq-flat");
       body.replaceChildren(h("div", { class: "ox-pad" }, status, routes, recent, guards, logBox,

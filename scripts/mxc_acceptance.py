@@ -2,7 +2,7 @@
 """F-011 live acceptance: three small models behind one keyed HTTPS endpoint.
 
 Run on the real machine with memory free:  pixi run python scripts/mxc_acceptance.py
-It pulls (if needed) and serves the models, exposes them through Caddy + LiteLLM,
+It pulls (if needed) and serves the models, exposes them through Caddy (HTTPS, key check) straight to the daemon,
 then checks chat, streaming, concurrent use, idle unload and reload over HTTPS.
 """
 from __future__ import annotations
@@ -73,7 +73,7 @@ async def run(host: str, idle_wait: int) -> None:
     out = mxc("keys", "new", "acceptance", "--rotate")
     key = next(tok for tok in out.split() if tok.startswith("mst-"))
     mxc("expose", "--host", host)
-    await asyncio.sleep(15)  # LiteLLM boot
+    await asyncio.sleep(2)  # Caddy issues its local certificate
 
     base = f"https://{host}:{EXPOSE_PORT}/v1"
     http = httpx.AsyncClient(verify=str(expose.ca_root_path()), timeout=None)

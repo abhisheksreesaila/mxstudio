@@ -34,7 +34,7 @@ def _hash(plaintext: str) -> str:
 
 
 def create_key(store: Store, app: str, *, rotate: bool = False, internal: bool = False) -> str:
-    """`internal` keys (names starting with '_') belong to mxconsole itself, e.g. LiteLLM's upstream key."""
+    """`internal` keys (names starting with '_') belong to mxconsole itself, e.g. the notebook's key."""
     if not APP_NAME.fullmatch(app):
         raise ValueError(f"app name {app!r} must be letters, digits, '.', '_' or '-'")
     if app.startswith("_") and not internal:

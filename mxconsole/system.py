@@ -1,4 +1,4 @@
-"""What is running and where: the crew (daemon, Caddy, LiteLLM, each `max serve`), the listeners, the logs.
+"""What is running and where: the crew (daemon, Caddy, each `max serve`), the listeners, the logs.
 
 One data source for `mxc ps` and the console's System pages. Everything is read from pid files and /proc
 (a `proc_root` argument lets tests hand in a fake one), so it works with the daemon down. GPU memory is
@@ -14,7 +14,7 @@ from datetime import date
 from pathlib import Path
 
 from mxconsole import expose
-from mxconsole.settings import DAEMON_HOST, DAEMON_PORT, EXPOSE_PORT, LITELLM_PORT, env
+from mxconsole.settings import DAEMON_HOST, DAEMON_PORT, EXPOSE_PORT, env
 from mxconsole.store import mxc_home
 
 CLK_TCK = os.sysconf("SC_CLK_TCK")
@@ -200,10 +200,9 @@ def collect(rows: list[dict] | None = None, *, proc_root: str | Path = "/proc", 
     `health()` says whether a daemon with no readable pid (started before pids were recorded) answers."""
     daemon = daemon if daemon is not None else daemon_pid(proc_root)
     pids = expose_pids if expose_pids is not None else {n: expose._running_pid(n) for n in expose.PROCESSES}
-    ports = {"daemon": daemon_port(), "caddy": EXPOSE_PORT, "litellm": LITELLM_PORT}
+    ports = {"daemon": daemon_port(), "caddy": EXPOSE_PORT}
     crew = []
-    for kind, label, pid in (("daemon", "omxconsole daemon", daemon), ("caddy", "Caddy", pids.get("caddy")),
-                             ("litellm", "LiteLLM", pids.get("litellm"))):
+    for kind, label, pid in (("daemon", "omxconsole daemon", daemon), ("caddy", "Caddy", pids.get("caddy"))):
         stats = proc_stats(pid, proc_root) if pid else None
         unknown = kind == "daemon" and not stats and health is not None and health()
         crew.append({"id": kind, "kind": kind, "name": label, "state": "running" if stats or unknown else "stopped",
@@ -232,9 +231,7 @@ def listeners(crew: list[dict]) -> list[dict]:
     rows = [
         {"name": "omxconsole daemon", "kind": "daemon", "host": DAEMON_HOST, "port": by["daemon"]["port"],
          "exposed": False, "state": state("daemon"),
-         "talks_to": "the mxc CLI, this console, your apps on this machine, LiteLLM and Caddy's key check"},
-        {"name": "LiteLLM", "kind": "litellm", "host": "127.0.0.1", "port": by["litellm"]["port"], "exposed": False,
-         "state": state("litellm"), "talks_to": "Caddy only (its UI opens from this machine)"},
+         "talks_to": "the mxc CLI, this console, your apps on this machine, and Caddy (key check, then every LAN request)"},
         {"name": "Caddy", "kind": "caddy", "host": "0.0.0.0", "port": by["caddy"]["port"], "exposed": True,
          "state": state("caddy"), "talks_to": "LAN clients over HTTPS, each with an app key"},
         {"name": "Caddy admin", "kind": "caddy", "host": "127.0.0.1", "port": CADDY_ADMIN_PORT, "exposed": False,
@@ -250,7 +247,7 @@ def listeners(crew: list[dict]) -> list[dict]:
 
 # -- logs ----------------------------------------------------------------------------------------
 def log_path(source: str) -> Path:
-    """daemon.log lives with the models' logs; Caddy's and LiteLLM's under expose/."""
+    """daemon.log lives with the models' logs; Caddy's under expose/."""
     if source == "daemon":
         return mxc_home() / "logs" / "daemon.log"
     return expose.expose_dir() / f"{source}.log"
@@ -269,8 +266,8 @@ def read_tail(path: Path, limit: int = DEFAULT_LOG_BYTES) -> str:
 
 
 def log_sources(model_names: list[str]) -> list[dict]:
-    """Logs the viewer can pick: the daemon's, Caddy's and LiteLLM's when the files exist, every model's."""
-    labels = {"daemon": "Daemon", "caddy": "Caddy", "litellm": "LiteLLM"}
+    """Logs the viewer can pick: the daemon's and Caddy's when the files exist, every model's."""
+    labels = {"daemon": "Daemon", "caddy": "Caddy"}
     out = [{"id": s, "label": labels[s]} for s in labels if log_path(s).exists()]
     return out + [{"id": f"model:{n}", "label": n} for n in model_names]
 

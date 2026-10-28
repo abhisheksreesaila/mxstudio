@@ -1,15 +1,15 @@
-"""Admin routes for the System pages: guard, data, log tails, LiteLLM restart, and the daemon's counters."""
+"""Admin routes for the System pages: guard, data, log tails and the daemon's counters."""
 import os
 import time
 
-from mxconsole import expose, keys
+from mxconsole import keys
 from mxconsole.gateway import create_app
 from test_console import ADMIN
 from test_gateway import auth, client, http, key, store, sup  # noqa: F401  (shared fixtures)
 from test_metrics import rec
 
 SYSTEM_ROUTES = [("GET", "/admin/system"), ("GET", "/admin/gateway"), ("GET", "/admin/daemon/log"),
-                 ("GET", "/admin/caddy/log"), ("GET", "/admin/litellm/log"), ("POST", "/admin/litellm/restart")]
+                 ("GET", "/admin/caddy/log")]
 
 
 async def test_every_system_route_needs_the_admin_header_and_loopback(http, store, sup):
@@ -29,7 +29,7 @@ async def test_system_lists_the_crew_listeners_and_log_sources(http, key):
     assert by["daemon"]["pid"] == os.getpid() and by["daemon"]["rss_mb"] > 0
     assert by["model:tiny"]["state"] == "ready" and by["model:tiny"]["pid"] and by["model:tiny"]["port"]
     assert "model:other" not in by  # cold models have no process
-    assert by["caddy"]["state"] == "stopped" and by["litellm"]["state"] == "stopped"
+    assert by["caddy"]["state"] == "stopped" and "litellm" not in by
     ports = {r["name"]: r for r in body["listeners"]}
     assert ports["max serve · tiny"]["port"] == by["model:tiny"]["port"] and ports["Caddy"]["state"] == "off"
     assert {"id": "model:other", "label": "other"} in body["logs"]
@@ -75,44 +75,17 @@ async def test_daemon_log_is_a_capped_text_tail(http, mxc_home):
     assert len((await http.get("/admin/daemon/log?bytes=junk", headers=ADMIN)).text) == 16000
 
 
-async def test_caddy_and_litellm_logs_come_from_the_expose_folder(http, mxc_home):
+async def test_caddy_log_comes_from_the_expose_folder(http, mxc_home):
     (mxc_home / "expose").mkdir(parents=True)
     (mxc_home / "expose" / "caddy.log").write_text("caddy says hi")
-    (mxc_home / "expose" / "litellm.log").write_text("litellm says hi")
     assert (await http.get("/admin/caddy/log", headers=ADMIN)).text == "caddy says hi"
-    assert (await http.get("/admin/litellm/log", headers=ADMIN)).text == "litellm says hi"
 
 
-async def test_litellm_restart_refreshes_only_when_it_runs(http, monkeypatch):
-    r = await http.post("/admin/litellm/restart", headers=ADMIN)
-    assert r.status_code == 409 and r.json()["error"]["code"] == "litellm_not_running"
-    monkeypatch.setattr(expose, "refresh_if_running", lambda store=None: True)
-    assert (await http.post("/admin/litellm/restart", headers=ADMIN)).json() == {"restarted": True}
-
-    def boom(store=None):
-        raise expose.ExposeError("litellm exited")
-    monkeypatch.setattr(expose, "refresh_if_running", boom)
-    r = await http.post("/admin/litellm/restart", headers=ADMIN)
-    assert r.status_code == 500 and "litellm exited" in r.json()["error"]["message"]
-
-
-async def test_litellm_restart_refuses_a_second_one_while_one_runs(http, monkeypatch):
-    import asyncio
-    import threading
-    started, release = threading.Event(), threading.Event()
-
-    def slow(store=None):
-        started.set()
-        release.wait(5)
-        return True
-    monkeypatch.setattr(expose, "refresh_if_running", slow)
-    first = asyncio.create_task(http.post("/admin/litellm/restart", headers=ADMIN))
-    for _ in range(100):
-        if started.is_set():
-            break
-        await asyncio.sleep(0.02)
-    second = await http.post("/admin/litellm/restart", headers=ADMIN)
-    assert second.status_code == 409 and "a restart is already running" in second.json()["error"]["message"]
-    release.set()
-    assert (await first).json() == {"restarted": True}
-    assert (await http.post("/admin/litellm/restart", headers=ADMIN)).status_code == 200  # lock released
+async def test_litellm_admin_routes_are_gone(http, mxc_home):
+    """F-063: no LiteLLM log or restart; an old litellm.log left in expose/ is not offered or served."""
+    (mxc_home / "expose").mkdir(parents=True)
+    (mxc_home / "expose" / "litellm.log").write_text("old")
+    assert (await http.get("/admin/litellm/log", headers=ADMIN)).status_code == 404
+    assert (await http.post("/admin/litellm/restart", headers=ADMIN)).status_code in (404, 405)
+    logs = (await http.get("/admin/system", headers=ADMIN)).json()["logs"]
+    assert not any("litellm" in s["id"].lower() for s in logs)

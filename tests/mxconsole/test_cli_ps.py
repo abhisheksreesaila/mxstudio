@@ -42,7 +42,7 @@ def test_ps_with_a_running_daemon_shows_its_pid_and_each_model(daemon_env):  # n
 def test_ps_json_is_only_json(mxc_home, monkeypatch):
     monkeypatch.setenv("MXC_PORT", "1")
     out = runner.invoke(app, ["ps", "--json"]).output
-    assert [c["id"] for c in json.loads(out)] == ["daemon", "caddy", "litellm"]
+    assert [c["id"] for c in json.loads(out)] == ["daemon", "caddy"]
 
 
 def test_ps_never_takes_the_daemon_lock(mxc_home, monkeypatch):

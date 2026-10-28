@@ -36,11 +36,11 @@ def test_collect_with_supervisor_rows_lists_daemon_expose_and_children(tmp_path)
     fake_proc(tmp_path, 11)
     rows = [{"name": "tiny", "state": "ready", "port": 5555, "pid": 11},
             {"name": "cold-one", "state": "cold", "port": None, "pid": None}]
-    crew = system.collect(rows, proc_root=tmp_path, daemon=10, expose_pids={"caddy": None, "litellm": None})
-    assert [c["id"] for c in crew] == ["daemon", "caddy", "litellm", "model:tiny"]
+    crew = system.collect(rows, proc_root=tmp_path, daemon=10, expose_pids={"caddy": None})
+    assert [c["id"] for c in crew] == ["daemon", "caddy", "model:tiny"]
     assert crew[0]["pid"] == 10 and crew[0]["rss_mb"] == 50.0 and crew[0]["state"] == "running"
     assert crew[1]["state"] == "stopped" and crew[1]["pid"] is None and crew[1]["rss_mb"] is None
-    assert crew[3]["port"] == 5555 and "gpu" not in " ".join(crew[3])  # no invented GPU memory
+    assert crew[2]["port"] == 5555 and "gpu" not in " ".join(crew[2])  # no invented GPU memory
 
 
 def test_collect_without_the_daemon_reads_pid_files(tmp_path, mxc_home, monkeypatch):
@@ -67,10 +67,10 @@ def test_listeners_cover_every_port_and_say_who_talks_to_it(tmp_path):
     fake_proc(tmp_path, 10)
     fake_proc(tmp_path, 11)
     crew = system.collect([{"name": "tiny", "state": "ready", "port": 5555, "pid": 11}], proc_root=tmp_path,
-                          daemon=10, expose_pids={"caddy": None, "litellm": None})
+                          daemon=10, expose_pids={"caddy": None})
     rows = {r["name"]: r for r in system.listeners(crew)}
     assert rows["omxconsole daemon"]["state"] == "listening" and rows["omxconsole daemon"]["host"] == "127.0.0.1"
-    assert rows["Caddy"]["state"] == "off" and rows["Caddy"]["exposed"] and rows["LiteLLM"]["state"] == "off"
+    assert rows["Caddy"]["state"] == "off" and rows["Caddy"]["exposed"] and "LiteLLM" not in rows
     assert rows["max serve · tiny"]["port"] == 5555 and rows["max serve · tiny"]["talks_to"] == "the daemon only"
     assert all(r["talks_to"] for r in rows.values())
 

@@ -62,8 +62,8 @@ register("security", (blade) => ({
     const how = h("section", { class: "card" }, h("div", { class: "card-h" }, h("h3", {}, "What “Make it secure” does")),
       h("div", { class: "card-b" }, h("dl", { class: "ox-dl" },
         h("dt", {}, "Certificate"), h("dd", { class: "sc-text" }, "a local CA, “mxconsole local”, signs a certificate for this machine's name"),
-        h("dt", {}, "API key"), h("dd", { class: "sc-text" }, "the gateway has its own key; requests without a valid app key get 401"),
-        h("dt", {}, "HTTPS"), h("dd", { class: "sc-text" }, "Caddy and LiteLLM listen on your LAN; localhost keeps working over HTTP"))),
+        h("dt", {}, "API key"), h("dd", { class: "sc-text" }, "each app has its own key; Caddy asks the daemon to check it, and requests without a valid one get 401"),
+        h("dt", {}, "HTTPS"), h("dd", { class: "sc-text" }, "Caddy listens on your LAN and passes each request to the daemon; localhost keeps working over HTTP"))),
       h("div", { class: "src note" }, "all three happen in one request"));
     blade.el.classList.add("oq-flat");
     body.replaceChildren(h("div", { class: "ox-pad" }, box, how, after));

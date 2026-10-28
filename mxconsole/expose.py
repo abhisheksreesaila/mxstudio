@@ -1,16 +1,14 @@
-"""`mxc expose`: put the daemon on the LAN behind Caddy (HTTPS + key check) and LiteLLM.
+"""`mxc expose`: put the daemon on the LAN behind Caddy (HTTPS + key check).
 
-Request path: client → Caddy (tls internal, forward_auth → daemon /auth/check)
-→ LiteLLM (routing, master key) → daemon → max serve. With --no-litellm, Caddy
-proxies straight to the daemon, which checks the app key again. Caddy forwards only
-the OpenAI routes, so an app key never reaches LiteLLM's admin API or the daemon's
-loopback-only pages.
+Request path: client → Caddy (tls internal, forward_auth → daemon /auth/check) → daemon
+→ max serve. The daemon checks the app key again and routes by `model`. Caddy forwards
+only the OpenAI routes, so an app key never reaches the daemon's loopback-only pages.
+(Until F-063 LiteLLM sat between Caddy and the daemon; `stop()` still cleans up after it.)
 """
 from __future__ import annotations
 
 import os
 import re
-import secrets
 import shlex
 import signal
 import socket
@@ -18,21 +16,20 @@ import subprocess
 import time
 from pathlib import Path
 
-import yaml
-
 from mxconsole import keys
-from mxconsole.settings import env, DAEMON_HOST, DAEMON_PORT, EXPOSE_PORT, LITELLM_PORT, daemon_url
-from mxconsole.store import Model, Store, mxc_home
+from mxconsole.settings import env, DAEMON_HOST, DAEMON_PORT, EXPOSE_PORT
+from mxconsole.store import Store, mxc_home
 
-PROCESSES = ("caddy", "litellm")
-UPSTREAM_APP = "_litellm"  # the reserved key LiteLLM uses to call the daemon
+PROCESSES = ("caddy",)
+# Left by installs from before F-063: a LiteLLM process (litellm.pid) and its internal app key.
+LEGACY_PROCESSES = ("litellm",)
+LEGACY_KEYS = ("_litellm",)
 API_PATHS = ("/v1/models", "/v1/chat/completions", "/v1/completions", "/v1/embeddings")
 HOSTNAME = re.compile(r"[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?|\[[0-9A-Fa-f:]+\]")
 # orig_uri.path is decoded, so '%' is checked on the raw request URI instead.
 UNCLEAN = " || ".join([*(f'{{http.request.orig_uri.path}}.contains("{s}")' for s in ("/.", "//", "\\\\")),
                        '{http.request.orig_uri}.contains("%")'])
 SETTLE_SECONDS = float(env("EXPOSE_SETTLE", "1.0"))
-_upstream_key_for_tests: str | None = None
 
 
 class ExposeError(Exception):
@@ -58,17 +55,11 @@ def ca_root_path() -> Path:
     return data / "caddy" / "pki" / "authorities" / "local" / "root.crt"
 
 
-def render_caddyfile(*, hosts: list[str], port: int = EXPOSE_PORT, litellm: bool = True) -> str:
+def render_caddyfile(*, hosts: list[str], port: int = EXPOSE_PORT) -> str:
     for h in hosts:
         if not HOSTNAME.fullmatch(h):
             raise ValueError(f"{h!r} is not a hostname or IP address")
     sites = ", ".join(f"https://{h}:{port}" for h in hosts)
-    if litellm:
-        upstream = f"""		reverse_proxy 127.0.0.1:{LITELLM_PORT} {{
-			header_up Authorization "Bearer {{env.LITELLM_MASTER_KEY}}"
-		}}"""
-    else:
-        upstream = f"		reverse_proxy {DAEMON_HOST}:{DAEMON_PORT}"
     return f"""{{
 	admin 127.0.0.1:2099
 	skip_install_trust
@@ -78,7 +69,7 @@ def render_caddyfile(*, hosts: list[str], port: int = EXPOSE_PORT, litellm: bool
 {sites} {{
 	tls internal
 	# reverse_proxy forwards the raw path while `path` matches the cleaned one, so refuse any
-	# path that cleaning would change: /anthropic/../v1/models must not reach LiteLLM.
+	# path that cleaning would change: /anthropic/../v1/models must not reach the daemon.
 	@unclean expression `{UNCLEAN}`
 	handle @unclean {{
 		respond 400
@@ -89,7 +80,7 @@ def render_caddyfile(*, hosts: list[str], port: int = EXPOSE_PORT, litellm: bool
 			uri /auth/check
 			copy_headers X-Mst-App
 		}}
-{upstream}
+		reverse_proxy {DAEMON_HOST}:{DAEMON_PORT}
 	}}
 	handle {{
 		respond 404
@@ -98,73 +89,23 @@ def render_caddyfile(*, hosts: list[str], port: int = EXPOSE_PORT, litellm: bool
 """
 
 
-def render_litellm_config(models: list[Model]) -> str:
-    def route(name: str) -> dict:
-        return {"model_name": name,
-                "litellm_params": {"model": f"openai/{name}", "api_base": f"{daemon_url()}/v1",
-                                   "api_key": "os.environ/MXC_UPSTREAM_KEY"}}
-    config = {
-        # No wildcard route: LiteLLM would expand it into every OpenAI model it knows.
-        "model_list": [route(m.name) for m in models],
-        "general_settings": {"master_key": "os.environ/LITELLM_MASTER_KEY"},
-        "litellm_settings": {"drop_params": True},
-    }
-    return yaml.safe_dump(config, sort_keys=False)
-
-
-def refresh_if_running(store: Store | None = None) -> bool:
-    """Restart LiteLLM with the current model list, if `mxc expose` is running with it."""
-    if not status()["litellm"]:
-        return False
-    host = (expose_dir() / "host").read_text().strip()
-    start(host=host, litellm=True, store=store)
-    return True
-
-
 def expose_dir() -> Path:
     path = mxc_home() / "expose"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def write_configs(*, host: str, litellm: bool, store: Store | None = None) -> dict[str, Path]:
-    store = store or Store.open()
-    d = expose_dir()
-    caddyfile, litellm_yaml = d / "Caddyfile", d / "litellm.yaml"
-    caddyfile.write_text(render_caddyfile(hosts=list(dict.fromkeys([host, "localhost"])), litellm=litellm))
-    litellm_yaml.write_text(render_litellm_config(store.models()))
-    return {"caddyfile": caddyfile, "litellm": litellm_yaml}
-
-
-def _master_key() -> str:
-    path = expose_dir() / "litellm_master_key"
-    try:
-        key = path.read_text().strip()
-    except FileNotFoundError:
-        key = ""
-    if len(key) >= 32:
-        path.chmod(0o600)
-        return key
-    # Never fall back to an empty key: LiteLLM would run without auth.
-    key = "sk-" + secrets.token_urlsafe(32)
-    tmp = path.with_suffix(".tmp")
-    tmp.unlink(missing_ok=True)
-    fd = os.open(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    with os.fdopen(fd, "w") as f:
-        f.write(key)
-    os.replace(tmp, path)
-    return key
+def write_configs(*, host: str) -> dict[str, Path]:
+    caddyfile = expose_dir() / "Caddyfile"
+    caddyfile.write_text(render_caddyfile(hosts=list(dict.fromkeys([host, "localhost"]))))
+    return {"caddyfile": caddyfile}
 
 
 def _command(name: str, configs: dict[str, Path]) -> list[str]:
     override = env(f"{name.upper()}_CMD")
     if override:
         return shlex.split(override)
-    if name == "caddy":
-        return ["caddy", "run", "--adapter", "caddyfile", "--config", str(configs["caddyfile"])]
-    pixi_bin = Path(__file__).resolve().parents[1] / ".pixi" / "envs" / "gateway" / "bin" / "litellm"
-    exe = str(pixi_bin) if pixi_bin.exists() else "litellm"
-    return [exe, "--config", str(configs["litellm"]), "--host", "127.0.0.1", "--port", str(LITELLM_PORT)]
+    return ["caddy", "run", "--adapter", "caddyfile", "--config", str(configs["caddyfile"])]
 
 
 def _pid_file(name: str) -> Path:
@@ -193,33 +134,21 @@ def status() -> dict[str, bool]:
     return {name: _running_pid(name) is not None for name in PROCESSES}
 
 
-def start(*, host: str, litellm: bool = True, store: Store | None = None) -> dict[str, Path]:
-    """Write configs and (re)start Caddy and, unless disabled, LiteLLM as user processes."""
-    global _upstream_key_for_tests
+def start(*, host: str, store: Store | None = None) -> dict[str, Path]:
+    """Write the Caddyfile and (re)start Caddy as a user process."""
     store = store or Store.open()
     stop(store=store)
-    configs = write_configs(host=host, litellm=litellm, store=store)
+    configs = write_configs(host=host)
     (expose_dir() / "host").write_text(host)
-    # Only what the children need: a provider key in the shell (OPENAI_API_KEY…) must never
-    # become spendable through LiteLLM by any app key.
+    # Only what Caddy needs: no key in the shell (OPENAI_API_KEY…) belongs in a LAN-facing process.
     env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "TMPDIR")
            if k in os.environ}
-    env["LITELLM_MASTER_KEY"] = _master_key()
-    litellm_env = dict(env)
-    if litellm:
-        if not _port_free(LITELLM_PORT):
-            raise ExposeError(f"port {LITELLM_PORT} is already in use, so LiteLLM can't start there "
-                              "(set MXC_LITELLM_PORT to another port)")
-        litellm_env["MXC_UPSTREAM_KEY"] = keys.create_key(store, UPSTREAM_APP, rotate=True, internal=True)
-        _upstream_key_for_tests = litellm_env["MXC_UPSTREAM_KEY"]
     started = []
     for name in PROCESSES:
-        if name == "litellm" and not litellm:
-            continue
         log_path = expose_dir() / f"{name}.log"
         with open(log_path, "ab") as log:
             try:
-                proc = subprocess.Popen(_command(name, configs), env=litellm_env if name == "litellm" else env, stdout=log, stderr=subprocess.STDOUT,
+                proc = subprocess.Popen(_command(name, configs), env=env, stdout=log, stderr=subprocess.STDOUT,
                                         stdin=subprocess.DEVNULL, start_new_session=True)
             except FileNotFoundError as e:
                 stop(store=store)
@@ -234,43 +163,12 @@ def start(*, host: str, litellm: bool = True, store: Store | None = None) -> dic
                 tail = log_path.read_text(errors="replace")[-600:].strip()
                 raise ExposeError(f"{name} exited with code {proc.returncode}. Last log lines ({log_path}):\n{tail}")
         time.sleep(0.05)
-    if litellm:
-        _wait_for_port(LITELLM_PORT, next(p for n, p, _ in started if n == "litellm"),
-                       expose_dir() / "litellm.log", store)
     return configs
 
 
-def _port_free(port: int) -> bool:
-    """Only a live listener makes a port busy; TIME_WAIT leftovers don't stop LiteLLM (uvicorn reuses them)."""
-    with socket.socket() as s:
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            s.bind(("127.0.0.1", port))
-            s.listen()
-        except OSError:
-            return False
-    return True
-
-
-def _wait_for_port(port: int, proc: subprocess.Popen, log_path: Path, store: Store) -> None:
-    """LiteLLM takes seconds to import; report a later failure (e.g. port taken) instead of claiming success."""
-    deadline = time.monotonic() + float(env("LITELLM_BOOT_SECONDS", "60"))
-    while time.monotonic() < deadline:
-        if proc.poll() is not None:
-            stop(store=store)
-            tail = log_path.read_text(errors="replace")[-600:].strip()
-            raise ExposeError(f"litellm exited with code {proc.returncode}. Last log lines ({log_path}):\n{tail}")
-        with socket.socket() as s:
-            s.settimeout(0.2)
-            if s.connect_ex(("127.0.0.1", port)) == 0:
-                return
-        time.sleep(0.2)
-    stop(store=store)
-    raise ExposeError(f"litellm did not open port {port}. See {log_path}")
-
-
 def stop(timeout: float = 10.0, store: Store | None = None) -> None:
-    for name in PROCESSES:
+    """Stop Caddy (and a LiteLLM left running by an install from before F-063, revoking its key)."""
+    for name in PROCESSES + LEGACY_PROCESSES:
         pid = _running_pid(name)
         _pid_file(name).unlink(missing_ok=True)
         if pid is None:
@@ -286,7 +184,9 @@ def stop(timeout: float = 10.0, store: Store | None = None) -> None:
         if _start_time(pid) is not None:
             os.killpg(pid, signal.SIGKILL)
         _reap(pid)
-    keys.revoke_key(store or Store.open(), UPSTREAM_APP)
+    store = store or Store.open()
+    for app in LEGACY_KEYS:
+        keys.revoke_key(store, app)
 
 
 def _reap(pid: int) -> None:

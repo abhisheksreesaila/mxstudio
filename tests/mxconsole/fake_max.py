@@ -5,7 +5,9 @@ stream=true gives SSE chunks then `data: [DONE]`. FAKE_MAX_CHUNK_DELAY (s betwee
 FAKE_MAX_GZIP gzips JSON replies when the caller accepts gzip.
 Benchmark knobs (streamed replies): FAKE_MAX_TOKENS_OUT (chunks to stream, capped by max_tokens; unset keeps
 the three words), FAKE_MAX_TTFT_DELAY (s before the first chunk), FAKE_MAX_MODEL_DELAYS ("a=0.004,b=0.01":
-per-model chunk delay), FAKE_MAX_USAGE (end with a usage block when the caller asks for it)."""
+per-model chunk delay), FAKE_MAX_USAGE (end with a usage block when the caller asks for it).
+FAKE_MAX_STRICT validates each body with MAX's own request models (extra='forbid'), so an unknown field is a 400
+like the real `max serve`; FAKE_MAX_BODY_LOG appends each body as a JSON line."""
 import json
 import os
 import sys
@@ -47,6 +49,17 @@ class H(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
             return
+        if os.environ.get("FAKE_MAX_BODY_LOG"):
+            open(os.environ["FAKE_MAX_BODY_LOG"], "a").write(json.dumps(body) + "\n")
+        if os.environ.get("FAKE_MAX_STRICT"):
+            from max.serve.schemas import openai as schemas
+            schema = {"/v1/chat/completions": schemas.CreateChatCompletionRequest,
+                      "/v1/completions": schemas.CreateCompletionRequest,
+                      "/v1/embeddings": schemas.CreateEmbeddingRequest}[self.path]
+            try:
+                schema.model_validate(body)
+            except Exception as e:
+                return self._json({"detail": str(e)}, status=400)
         if self.path == "/v1/embeddings":
             return self._json({"object": "list", "model": model, "data": [
                 {"object": "embedding", "index": 0, "embedding": [0.1, 0.2]}]})
@@ -82,9 +95,9 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(b"data: [DONE]\n\n")
         self.wfile.flush()
 
-    def _json(self, obj):
+    def _json(self, obj, status=200):
         data = json.dumps(obj).encode()
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         if os.environ.get("FAKE_MAX_GZIP") and "gzip" in self.headers.get("Accept-Encoding", ""):
             import gzip

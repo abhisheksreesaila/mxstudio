@@ -348,7 +348,7 @@ def status_cmd(as_json: bool = JSON) -> None:
 
 @app.command("ps")
 def ps_cmd(as_json: bool = JSON) -> None:
-    """The crew: daemon, Caddy, LiteLLM and each `max serve`, with pid, port, memory and uptime. Works without the daemon."""
+    """The crew: daemon, Caddy and each `max serve`, with pid, port, memory and uptime. Works without the daemon."""
     from mxconsole import metrics, serve, system
     crew = system.collect(health=system.daemon_answers)
     if metrics.gpus():  # models get `vram_gb` (in --json) when there is an NVIDIA GPU to ask
@@ -547,7 +547,7 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
                 keep_alive: str = typer.Option(None, "--keep-alive", help="Unload after this idle time: 90s, 10m, 1h."),
                 no_wait: bool = typer.Option(False, "--no-wait", help="Register and start the daemon; load on first request.")) -> None:
     """Pull if needed, start the daemon, load the model and print how to call it."""
-    from mxconsole import expose, serve
+    from mxconsole import serve
     try:  # before any download: a typo shouldn't cost gigabytes first
         seconds = parse_duration(keep_alive) if keep_alive else None
     except ValueError:
@@ -562,11 +562,6 @@ def serve_model(model: str = typer.Argument(..., help="Short name (qwen2.5-0.5b)
         except resolve.ResolveError as e:
             _fail(str(e))
         typer.echo(f"pulled {found.name} ({found.repo_id}@{found.revision[:8]})")
-        try:
-            if expose.refresh_if_running(store):
-                typer.echo("restarted LiteLLM so the LAN endpoint lists it")
-        except expose.ExposeError as e:
-            typer.echo(f"warning: could not refresh the LAN endpoint ({e}). Run: mxc expose", err=True)
     name = found.name
     if pin or seconds is not None:
         store.set_lifecycle(name, pinned=pin, keep_alive=seconds)
@@ -611,26 +606,28 @@ def stop_model(model: str = typer.Argument(None, help="Model to unload"),
 
 @app.command("expose")
 def expose_cmd(host: str = typer.Option(None, help="Hostname clients use. Default: <this machine>.local"),
-               litellm: bool = typer.Option(True, "--litellm/--no-litellm", help="Route through LiteLLM."),
-               dry_run: bool = typer.Option(False, "--dry-run", help="Write the configs; start nothing."),
-               stop: bool = typer.Option(False, "--stop", help="Stop Caddy and LiteLLM.")) -> None:
-    """Serve your models on the LAN over HTTPS, with per-app keys."""
+               no_litellm: bool = typer.Option(False, "--no-litellm", hidden=True,
+                                               help="Deprecated no-op: LiteLLM was removed (F-063)."),
+               dry_run: bool = typer.Option(False, "--dry-run", help="Write the Caddyfile; start nothing."),
+               stop: bool = typer.Option(False, "--stop", help="Stop Caddy.")) -> None:
+    """Serve your models on the LAN over HTTPS, with per-app keys: Caddy in front of the daemon."""
+    if no_litellm:
+        typer.echo("note: --no-litellm is no longer needed: LiteLLM was removed and Caddy always "
+                   "proxies straight to the daemon. Drop the flag.", err=True)
     if stop:
         expose.stop()
-        typer.echo("stopped Caddy and LiteLLM")
+        typer.echo("stopped Caddy")
         return
     host = host or expose.default_host()
     try:
         if dry_run:
-            configs = expose.write_configs(host=host, litellm=litellm)
+            configs = expose.write_configs(host=host)
         else:
-            configs = expose.start(host=host, litellm=litellm)
+            configs = expose.start(host=host)
     except (expose.ExposeError, ValueError) as e:
         _fail(str(e))
     typer.echo(f"endpoint   https://{host}:{expose.EXPOSE_PORT}/v1")
-    typer.echo(f"configs    {configs['caddyfile']}  {configs['litellm']}")
-    if litellm:
-        typer.echo(f"litellm    http://127.0.0.1:{expose.LITELLM_PORT}/ui (this machine only)")
+    typer.echo(f"config     {configs['caddyfile']}")
     typer.echo("keys       mxc keys new <app>   (send it as: Authorization: Bearer <key>)")
     typer.echo(f"trust      copy {expose.ca_root_path()} to each client (this machine too) and trust it once")
     typer.echo("           Linux: sudo trust anchor root.crt · or pass it as the CA bundle (curl --cacert root.crt)")

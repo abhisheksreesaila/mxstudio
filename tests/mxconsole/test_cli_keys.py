@@ -38,6 +38,6 @@ def test_keys_ls_empty():
 def test_internal_keys_are_hidden_and_managed_by_mst():
     from mxconsole.store import Store
     from mxconsole import keys
-    keys.create_key(Store.open(), "_litellm", internal=True)
-    assert "_litellm" not in runner.invoke(app, ["keys", "ls"]).output
-    assert runner.invoke(app, ["keys", "revoke", "_litellm"]).exit_code == 1
+    keys.create_key(Store.open(), "_internal", internal=True)
+    assert "_internal" not in runner.invoke(app, ["keys", "ls"]).output
+    assert runner.invoke(app, ["keys", "revoke", "_internal"]).exit_code == 1
