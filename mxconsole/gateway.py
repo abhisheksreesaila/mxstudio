@@ -250,6 +250,7 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             return openai_error(400, "Request body must be JSON with a string `model` field.",
                                 "invalid_request_body")
         body, dropped = params.drop_unknown(body, path)  # max serve refuses fields it doesn't know
+        dropped_header = params.header_value(dropped)  # built here: nothing after the model is in use can fail on it
         if dropped:
             raw = json.dumps(body).encode()
         try:
@@ -276,12 +277,16 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
             note(app_name, name, route, 502, started)
             return openai_error(502, f"Model `{name}` is not answering: {e}", "bad_gateway", "server_error")
 
-        passthrough = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP_BY_HOP}
-        if dropped:
-            passthrough[params.HEADER] = ",".join(dropped)
-
-        streamed = "text/event-stream" in upstream.headers.get("content-type", "")
-        meter = metrics.StreamMeter() if streamed else metrics.JsonMeter()
+        try:
+            passthrough = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP_BY_HOP}
+            if dropped_header:
+                passthrough[params.HEADER] = dropped_header
+            streamed = "text/event-stream" in upstream.headers.get("content-type", "")
+            meter = metrics.StreamMeter() if streamed else metrics.JsonMeter()
+        except BaseException:  # until body_iter owns them, the upstream and the in-flight count are ours to release
+            await upstream.aclose()
+            await in_flight.aclose()
+            raise
 
         async def body_iter():
             first: float | None = None
@@ -306,7 +311,12 @@ def create_app(store: Store, supervisor: Supervisor, *, reap_interval: float = 1
                 note(app_name, name, route, upstream.status_code, started, meter=meter,
                      ttft_ms=(first - started) * 1000 if streamed and first is not None else None)
 
-        return StreamingResponse(body_iter(), status_code=upstream.status_code, headers=passthrough)
+        try:
+            return StreamingResponse(body_iter(), status_code=upstream.status_code, headers=passthrough)
+        except BaseException:  # e.g. a header that can't be encoded: body_iter never runs, so release here
+            await upstream.aclose()
+            await in_flight.aclose()
+            raise
 
     for path in PROXIED:
         app.route(path, methods=["POST"])(proxy_route)

@@ -1,4 +1,5 @@
 import asyncio
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -267,3 +268,101 @@ def test_without_a_readable_max_schema_the_body_passes_through(monkeypatch):
     monkeypatch.setattr(params, "accepted", lambda path: None)
     body = {**CHAT, "drop_me": 1}
     assert params.drop_unknown(body, "/v1/chat/completions") == (body, [])
+
+
+# -- F-063 review: the dropped-params header is safe, and nothing leaks the in-flight count ------------------
+def in_flight(sup, name="tiny"):
+    return next(s for s in sup.status() if s["name"] == name)["in_flight"]
+
+
+async def test_hostile_unknown_keys_never_reach_the_header_and_never_pin_the_model(http, key, sup, monkeypatch):
+    monkeypatch.setenv("FAKE_MAX_STRICT", "1")
+    hostile = {**CHAT, "naïve_ключ": 1, "x\r\nSet-Cookie: a=b": 1, "fine_extra": 1}
+    r = await http.post("/v1/chat/completions", headers=auth(key), content=json.dumps(hostile))
+    assert r.status_code == 200, r.text
+    header = r.headers["x-mxc-dropped-params"]
+    assert header == "fine_extra,+2 more" and "\r" not in header and "set-cookie" not in r.headers
+    assert in_flight(sup) == 0
+
+
+async def test_a_hundred_unknown_keys_give_a_bounded_header(http, key, sup, monkeypatch):
+    monkeypatch.setenv("FAKE_MAX_STRICT", "1")
+    body = {**CHAT, **{f"extra_{i:03d}": i for i in range(100)}}
+    r = await http.post("/v1/chat/completions", headers=auth(key), json=body)
+    assert r.status_code == 200, r.text
+    names = r.headers["x-mxc-dropped-params"].split(",")
+    assert len(names) == 21 and names[-1] == "+80 more" and names[0] == "extra_000"
+    assert in_flight(sup) == 0
+
+
+async def test_unprintable_names_are_only_counted(http, key, sup, monkeypatch):
+    monkeypatch.setenv("FAKE_MAX_STRICT", "1")
+    r = await http.post("/v1/chat/completions", headers=auth(key), content=json.dumps({**CHAT, "ключ": 1}))
+    assert r.status_code == 200 and r.headers["x-mxc-dropped-params"] == "+1 more"
+    assert in_flight(sup) == 0
+
+
+async def test_a_failure_after_the_upstream_answered_releases_the_model(http, key, sup, monkeypatch):
+    from mxconsole import metrics
+
+    def broken(*a, **kw):
+        raise RuntimeError("meter exploded")
+    monkeypatch.setattr(metrics, "JsonMeter", broken)
+    with pytest.raises(RuntimeError):
+        await http.post("/v1/chat/completions", headers=auth(key), json=CHAT)
+    assert in_flight(sup) == 0
+
+
+# -- F-063 review: semantic fields are never dropped ----------------------------------------------------------
+def test_semantic_fields_are_never_dropped_even_if_max_does_not_list_them(monkeypatch):
+    from mxconsole import params
+    monkeypatch.setattr(params, "accepted", lambda path: frozenset({"model", "input"}))
+    body = {"model": "tiny", "input": "hi", "tools": [], "tool_choice": "auto", "functions": [], "function_call": "auto",
+            "response_format": {"type": "json_object"}, "logprobs": True, "top_logprobs": 2, "n": 2, "seed": 1,
+            "stop": ["x"], "vendor_extra": 1}
+    out, dropped = params.drop_unknown(body, "/v1/embeddings")
+    assert dropped == ["vendor_extra"]
+    assert out == {k: v for k, v in body.items() if k != "vendor_extra"}
+
+
+async def test_a_semantic_field_max_refuses_comes_back_as_maxs_own_error(http, key, monkeypatch):
+    """`tools` on /v1/completions isn't something MAX can honour there: the client hears so instead of losing it."""
+    monkeypatch.setenv("FAKE_MAX_STRICT", "1")
+    r = await http.post("/v1/completions", headers=auth(key),
+                        json={"model": "tiny", "prompt": "hi", "tools": [], "vendor_extra": 1})
+    assert r.status_code == 400 and "tools" in r.text
+    assert r.headers["x-mxc-dropped-params"] == "vendor_extra"
+
+
+# -- F-063 review: MAX's schema location ---------------------------------------------------------------------
+@pytest.mark.skipif(importlib.util.find_spec("max") is None, reason="MAX is not installed")
+def test_maxs_request_schemas_are_where_params_reads_them():
+    """Fails when MAX moves or renames its request models: then params.py would silently stop dropping."""
+    from mxconsole import params
+    params.accepted.cache_clear()
+    for path in ("/v1/chat/completions", "/v1/completions", "/v1/embeddings"):
+        fields = params.accepted(path)
+        assert fields is not None and "model" in fields, path
+
+
+def test_an_unreadable_max_schema_warns_once(monkeypatch, caplog):
+    import builtins
+    import logging
+    from mxconsole import params
+    real_import = builtins.__import__
+
+    def no_max(name, *a, **kw):
+        if name.startswith("max.serve"):
+            raise ImportError("moved")
+        return real_import(name, *a, **kw)
+    monkeypatch.setattr(builtins, "__import__", no_max)
+    monkeypatch.setattr(params, "_warned", False)
+    params.accepted.cache_clear()
+    try:
+        with caplog.at_level(logging.WARNING, logger="mxconsole.params"):
+            for path in ("/v1/chat/completions", "/v1/completions", "/v1/embeddings"):
+                assert params.accepted(path) is None
+        assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
+    finally:
+        monkeypatch.undo()
+        params.accepted.cache_clear()
