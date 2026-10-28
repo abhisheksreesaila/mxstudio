@@ -488,3 +488,18 @@ Brief: docs/briefs/console-pages.md · Needs: F-058 (new screenshots)
 - [x] `docs/site/index.html`: hero, live demos, how a request travels, FAQ, available today; links to the tour as the user guide
 - [x] checked live on GitHub Pages after the push you approve (2026-10-25: the served home.png matches the new file)
 - Built: `docs/site/index.html` from draft A (`front.css`, `front.js`, omxqua components.css + omxqua.js v0.1.5 vendored in `docs/site/omxqua/`); copy updated for v5 (no switcher); all 13 `docs/assets/screens/*.png` retaken from the current console on a scratch install with real models (qwen2.5-0.5b and coder-1.5b running, real benchmark). Reviewer: round 1 NEEDS WORK (dead footer links, stale note, unlabelled example keys) → fixed; round 2 PASS, 1037 tests. Not pushed: waiting for the owner's yes. The console tour (`console.html`) still describes the blades: F-058.
+
+## Supply chain
+
+## F-063 Remove LiteLLM [doing]
+Why: LiteLLM had two supply-chain compromises on PyPI (1.82.7/1.82.8 in March 2026, 1.107.0 on 2026-10-21); omxconsole's locked 1.103.2 is clean, but LiteLLM was only a pass-through hop to the daemon, which already serves the OpenAI routes. Owner (2026-10-28): "Remove it (to be safe); we can add our own later." Research: mojo-ui-particles `docs/research/litellm-incident-omxconsole.md`. Needs: none
+- [ ] no `gateway` pixi environment and no `litellm` dependency in pixi.toml / pixi.lock; nothing in `mxconsole/`, `scripts/` or `deploy/` imports, launches or configures LiteLLM (a grep test guards it)
+- [ ] `mxc expose` starts only Caddy, which proxies the four OpenAI routes straight to the daemon (forward_auth, unclean-path refusal and the route allowlist unchanged); no LiteLLM config, master key, upstream key or port 4000
+- [ ] `--no-litellm` is accepted as a no-op with a deprecation note (nothing in the repo scripts it, but the docs taught it and old notes and habits may use it; a hidden option costs nothing); `--litellm` is gone
+- [ ] drop_params replacement: MAX's request models use `extra='forbid'`, so the daemon's /v1 routes drop top-level fields `max serve` doesn't accept (read from MAX's own schema) and name them in an `X-Mxc-Dropped-Params` header; tested against a fake max that validates like MAX
+- [ ] the console's Gateway page shows Caddy (HTTPS) and the daemon's routes, with Caddy's log; no LiteLLM status, log or restart; `/admin/litellm/*` routes are gone; `mxc ps` and System list no LiteLLM
+- [ ] ARCHITECTURE, CLI, USER_GUIDE, VERIFY and CHANGELOG say Caddy → daemon; full suite green
+
+## F-064 Our own router, if multi-provider routing is ever needed [todo]
+Brief: none yet (clarify first) · Needs: F-063
+- A placeholder, not planned work: if omxconsole ever needs to route one endpoint to several backends (another machine's daemon, a cloud provider), write a small in-house OpenAI-compatible router in `gateway.py` (a model-name → upstream table on the httpx forwarding it already has) instead of bringing LiteLLM back. Translating to non-OpenAI APIs (Anthropic, Bedrock) would be ours to write and maintain.
