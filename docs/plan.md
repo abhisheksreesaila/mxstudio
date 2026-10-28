@@ -491,15 +491,25 @@ Brief: docs/briefs/console-pages.md · Needs: F-058 (new screenshots)
 
 ## Supply chain
 
-## F-063 Remove LiteLLM [doing]
+## F-063 Remove LiteLLM [review]
 Why: LiteLLM had two supply-chain compromises on PyPI (1.82.7/1.82.8 in March 2026, 1.107.0 on 2026-10-21); omxconsole's locked 1.103.2 is clean, but LiteLLM was only a pass-through hop to the daemon, which already serves the OpenAI routes. Owner (2026-10-28): "Remove it (to be safe); we can add our own later." Research: mojo-ui-particles `docs/research/litellm-incident-omxconsole.md`. Needs: none
-- [ ] no `gateway` pixi environment and no `litellm` dependency in pixi.toml / pixi.lock; nothing in `mxconsole/`, `scripts/` or `deploy/` imports, launches or configures LiteLLM (a grep test guards it)
-- [ ] `mxc expose` starts only Caddy, which proxies the four OpenAI routes straight to the daemon (forward_auth, unclean-path refusal and the route allowlist unchanged); no LiteLLM config, master key, upstream key or port 4000
-- [ ] `--no-litellm` is accepted as a no-op with a deprecation note (nothing in the repo scripts it, but the docs taught it and old notes and habits may use it; a hidden option costs nothing); `--litellm` is gone
-- [ ] drop_params replacement: MAX's request models use `extra='forbid'`, so the daemon's /v1 routes drop top-level fields `max serve` doesn't accept (read from MAX's own schema) and name them in an `X-Mxc-Dropped-Params` header; tested against a fake max that validates like MAX
-- [ ] the console's Gateway page shows Caddy (HTTPS) and the daemon's routes, with Caddy's log; no LiteLLM status, log or restart; `/admin/litellm/*` routes are gone; `mxc ps` and System list no LiteLLM
-- [ ] ARCHITECTURE, CLI, USER_GUIDE, VERIFY and CHANGELOG say Caddy → daemon; full suite green
+- [x] no `gateway` pixi environment and no `litellm` dependency in pixi.toml / pixi.lock; nothing in `mxconsole/`, `scripts/` or `deploy/` imports, launches or configures LiteLLM (a grep test guards it)
+- [x] `mxc expose` starts only Caddy, which proxies the four OpenAI routes straight to the daemon (forward_auth, unclean-path refusal and the route allowlist unchanged); no LiteLLM config, master key, upstream key or port 4000
+- [x] `--no-litellm` is accepted as a no-op with a deprecation note (nothing in the repo scripts it, but the docs taught it and old notes and habits may use it; a hidden option costs nothing); `--litellm` is gone
+- [x] drop_params replacement: MAX's request models use `extra='forbid'`, so the daemon's /v1 routes drop top-level fields `max serve` doesn't accept (read from MAX's own schema) and name them in an `X-Mxc-Dropped-Params` header; tested against a fake max that validates like MAX
+- [x] the console's Gateway page shows Caddy (HTTPS) and the daemon's routes, with Caddy's log; no LiteLLM status, log or restart; `/admin/litellm/*` routes are gone; `mxc ps` and System list no LiteLLM
+- [x] ARCHITECTURE, CLI, USER_GUIDE, VERIFY and CHANGELOG say Caddy → daemon; full suite green
+- Built: `expose.py` runs Caddy only (`reverse_proxy` to the daemon; forward_auth, unclean-path refusal and the 4-route allowlist unchanged); `stop()` also stops a `litellm.pid` left by an older install and revokes the `_litellm` key. `settings.LITELLM_PORT`, the master/upstream keys, `refresh_if_running` (and its calls after pull/remove) and `/admin/litellm/{log,restart}` are gone; `/admin/expose` ignores an old `litellm` field. Gateway page: Caddy status and port, routes (model → its max serve), Caddy log; no Restart. `params.py` drops top-level fields not in MAX's `CreateChatCompletionRequest`/`CreateCompletionRequest`/`CreateEmbeddingRequest` (`extra='forbid'` in MAX 26.7; checked in `max/serve/schemas/openai.py`), names them in `X-Mxc-Dropped-Params`, and passes the body through untouched if MAX's schema can't be imported. pixi.lock: removals only (the gateway env's ~2.3k lines).
+- Decisions: `--no-litellm` kept as a hidden no-op that prints a note (cheap; habits and old notes use it). The legacy MX Studio Nucleus installer (`deploy/nucleus`, `--with-gateway`, pip-pinned litellm 1.74.3, clean) is not omxconsole and is left alone: F-065.
+- Checked live (scratch MXC_HOME, ports 11535/18443, own XDG_DATA_HOME, fake max in strict mode, real Caddy): `/v1/models` over HTTPS 200, bad key 401, `/admin/info` 404, chat with an unknown field 200 + `x-mxc-dropped-params`, streaming works, nothing on :4000; `mxc ps` lists daemon and Caddy only; the Gateway page screenshot shows Caddy, routes and Caddy log. `scripts/mxc_acceptance.py --host localhost` with real MAX on the 3090s (scratch home and ports): 11/11 PASS. 1036 tests pass.
+- Not done: the docs tour's `gateway.png`/`security.png` screenshots still show the LiteLLM row and Restart (text updated): retake with F-058's recipe.
 
 ## F-064 Our own router, if multi-provider routing is ever needed [todo]
 Brief: none yet (clarify first) · Needs: F-063
 - A placeholder, not planned work: if omxconsole ever needs to route one endpoint to several backends (another machine's daemon, a cloud provider), write a small in-house OpenAI-compatible router in `gateway.py` (a model-name → upstream table on the httpx forwarding it already has) instead of bringing LiteLLM back. Translating to non-OpenAI APIs (Anthropic, Bedrock) would be ours to write and maintain.
+
+## F-065 Legacy Nucleus installer: drop its LiteLLM gateway profile [todo]
+Needs: owner's call (delete `deploy/nucleus` with `notebooks/mxstudio`, or just the profile)
+- [ ] `deploy/nucleus/install.sh --with-gateway` no longer pip-installs litellm (`litellm-requirements.txt`, `litellm_config*.yaml`, `litellm-nucleus.service.in`, `Caddyfile.gateway`, preflight's gateway checks and their tests removed), or the whole legacy Nucleus deployment goes with the legacy core
+- Context: this is the old MX Studio appliance, not omxconsole; the profile is opt-in and pinned to litellm 1.74.3 (outside both compromised ranges), so it was left out of F-063.
+
