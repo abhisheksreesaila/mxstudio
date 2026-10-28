@@ -16,7 +16,7 @@ Status: approved
 - The core job: serve small models behind one secure local endpoint, then teach you about them.
 - v1 does:
   1. Serve: `mst serve <model>` resolves MAX catalog → Hugging Face (supported arch) → Modular's import-model skill (unsupported arch), and starts it. Several small models (≤3B) run at once.
-  2. Secure endpoint: one OpenAI-compatible endpoint, with LiteLLM routing by model name and Caddy in front for HTTPS and keys, plus a page listing endpoints and models.
+  2. Secure endpoint: one OpenAI-compatible endpoint, with the daemon routing by model name and Caddy in front for HTTPS and keys, plus a page listing endpoints and models. (Until F-063 LiteLLM did the routing; removed 2026-10-28 after its supply-chain incidents.)
   3. Learn: `mst learn <model>` opens a Jupyter notebook generated from Hugging Face API metadata (model card, config, architecture) with sample code against the live endpoint.
 - Out of scope for v1: hardware-fit advice, LoRA, the classifier conversion and other malleability, plugins, public installer, big models (>3B), non-Linux testing.
 
@@ -40,7 +40,7 @@ Status: approved
 - First user is Abhishek on Omarchy: daily real use; we accept that the public installer waits for v2.
 - v1 = endpoint + thin Learn: passes the acceptance test; we accept the classifier "wow" and dashboards waiting for v2.
 - Name is **mxconsole** (2026-10-03, ADR 0003, superseding Hotfire): it is a console, and "MX" ties it to MAX/Mojo. Command `mxc`; `hotfire` and `mst` stay as aliases for one release.
-- Security = LAN HTTPS + per-app keys: Caddy with its internal CA at https://<host>.local, revocable per-app keys in our own SQLite checked via Caddy forward_auth, LiteLLM routing on its master key only (no Postgres): other devices can use it safely; we accept trusting Caddy's CA once per client device.
+- Security = LAN HTTPS + per-app keys: Caddy with its internal CA at https://<host>.local, revocable per-app keys in our own SQLite checked via Caddy forward_auth, the daemon routing by model name (LiteLLM until F-063; no Postgres): other devices can use it safely; we accept trusting Caddy's CA once per client device.
 - Lifecycle = load on demand + idle unload (keep_alive-style, with pinning to stay on): register many models without filling RAM; we accept a cold-start wait (30s+) on the first call after idle.
 - Look = "Graphite" (Geist + Geist Mono, Lucide icons, near-monochrome with colour for live signal and per-section hues, dark-grey contrast chrome) with one signature moment per page (live tiles, pull cloud, patch bay, drag race, safeguards). Canvas: https://claude.ai/artifact/21NSyXKpzcrqanmqr8bEe5
 - Fresh core on fh-saas, porting useful modules (resolver, HF/MAX compat, downloads, notebooks, import-model wiring) from the old FastAPI code: matches the house stack and drops the single-model design and evidence-gate ceremony; we accept rework before new features ship and fh-saas tenancy that a local app barely needs (one local tenant).

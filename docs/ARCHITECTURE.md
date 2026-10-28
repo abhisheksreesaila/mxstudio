@@ -5,17 +5,21 @@ The moving parts, and how to develop on them. Using it: [user guide](USER_GUIDE.
 ## How a request travels
 
 ```
- your apps ──HTTPS──▶ Caddy :8443 ──▶ LiteLLM :4000 ──▶ mxc daemon :11435 ──▶ max serve (one per model)
- (LAN, after expose)   TLS, key check     routing          start on demand,     loopback ports
-                                                            unload when idle
- local apps ─────────────────────────────────────────────▶ (same daemon, http://127.0.0.1:11435)
+ your apps ──HTTPS──▶ Caddy :8443 ──▶ mxc daemon :11435 ──▶ max serve (one per model)
+ (LAN, after expose)   TLS, key check   routing by model,     loopback ports
+                                        start on demand,
+                                        unload when idle
+ local apps ───────────────────────▶ (same daemon, http://127.0.0.1:11435)
 ```
 
-- **Daemon** (`mxconsole/gateway.py`, `supervisor.py`): checks the key, starts the model if it's cold (concurrent
-  callers share one start), streams the answer back, and stops idle models, never in the middle of a request.
+- **Daemon** (`mxconsole/gateway.py`, `supervisor.py`): checks the key, routes by the request's `model`, starts the
+  model if it's cold (concurrent callers share one start), streams the answer back, and stops idle models, never in
+  the middle of a request. Top-level request fields `max serve` would refuse are dropped first and named in the
+  `X-Mxc-Dropped-Params` reply header (`params.py`, read from MAX's own request schema).
 - **Keys** (`keys.py`): `mst-…`, stored only as SHA-256 hashes, shown once.
-- **Expose** (`expose.py`): runs Caddy (its own certificate authority) and LiteLLM as your user. Only the four `/v1`
-  routes reach the daemon from the LAN.
+- **Expose** (`expose.py`): runs Caddy (its own certificate authority) as your user, proxying straight to the daemon.
+  Only the four `/v1` routes reach the daemon from the LAN. (LiteLLM used to sit between them; it was removed in
+  F-063 after its supply-chain incidents. If routing to several backends is ever needed, F-064 is our own router.)
 - **Port** (`port.py`, `port_auto.py`, `port_try.py`): a sandboxed Claude Code run, then omxconsole's own check
   against Hugging Face before anything is registered. [Step by step](https://abhisheksreesaila.github.io/mxstudio/site/porting.html) ·
   [PORTING.md](PORTING.md).

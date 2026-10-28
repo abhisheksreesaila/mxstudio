@@ -84,7 +84,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .rt-ctl { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .rt-ctl .play { margin-left: auto; }
 .rt-ctl .play .ico { width: 14px; height: 14px; fill: currentColor; stroke: none; }
-.rt-flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-top: 20px; position: relative; }
+.rt-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 20px; position: relative; }
 .rt-hop { position: relative; background: var(--oq-surface-2); border-radius: 12px; box-shadow: var(--oq-shadow-1); padding: 14px; transition: opacity .3s, box-shadow .25s, transform var(--oq-spring-dur) var(--oq-spring); min-width: 0; }
 .oq-light .rt-hop { background: var(--oq-surface-0); box-shadow: inset 0 0 0 1px var(--oq-line); }
 .rt-hop small { display: flex; align-items: center; gap: 6px; font: 11px var(--oq-font-mono); color: var(--oq-ink-2); }

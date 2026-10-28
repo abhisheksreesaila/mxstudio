@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **LiteLLM removed (F-063):** after LiteLLM's supply-chain incidents on PyPI (March and 21 October 2026; the version omxconsole locked, 1.103.2, was never affected), `mxc expose` runs Caddy straight to the daemon, which already served the OpenAI routes. The `gateway` pixi environment, port 4000, the LiteLLM master and internal keys, and the console's LiteLLM status, log and Restart are gone; the Gateway page shows Caddy and its log. `--no-litellm` still works but does nothing. Request fields `max serve` would refuse are dropped by the daemon and named in `X-Mxc-Dropped-Params` (what LiteLLM's `drop_params` did). After updating, run `pixi install`; `.pixi/envs/gateway` can be deleted.
+
 ## 0.2.0 — 2026-10-14
 
 mxconsole (`mxc`) replaces the MX Studio app: one OpenAI-compatible endpoint for every model on Modular MAX.

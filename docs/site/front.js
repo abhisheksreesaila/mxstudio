@@ -139,8 +139,7 @@
   const HOPS = [
     ["app", "your app", "OpenAI client", "Any SDK with base_url and a key from mxc keys new.", "var(--oq-data-2)"],
     ["caddy", ":8443 · LAN only", "Caddy", "HTTPS with its own certificate authority. Asks the daemon if the key is valid. Forwards only /v1.", "var(--oq-ok)"],
-    ["litellm", ":4000 · LAN only", "LiteLLM", "Routes by model name to the daemon with its own internal key. Its admin API never reaches the LAN.", "var(--oq-data-4)"],
-    ["daemon", ":11435", "mxc daemon", "Checks the key, starts the model if it's cold, counts tokens and latency for the console.", "var(--oq-data-1)"],
+    ["daemon", ":11435", "mxc daemon", "Checks the key, routes by model name, starts the model if it's cold, counts tokens and latency for the console.", "var(--oq-data-1)"],
     ["max", "loopback port", "max serve", "One MAX server per model. Stopped after keep_alive idle (default 5 min) unless pinned.", "var(--oq-data-3)"],
   ];
   function buildTravel(root) {
@@ -158,15 +157,14 @@
     let timer = null;
     const paint = () => {
       const lan = opts.from === "lan";
-      hops.forEach(h => { h.classList.remove("on"); h.classList.toggle("off", !lan && (h.dataset.hop === "caddy" || h.dataset.hop === "litellm")); });
-      root.querySelector(".rt-n").textContent = lan ? 5 : 3;
+      hops.forEach(h => { h.classList.remove("on"); h.classList.toggle("off", !lan && h.dataset.hop === "caddy"); });
+      root.querySelector(".rt-n").textContent = lan ? 4 : 3;
       root.querySelector(".rt-p").textContent = lan ? "https://box.local:8443" : "http://127.0.0.1:11435";
     };
     const script = () => {
       const lan = opts.from === "lan", cold = opts.state === "cold";
       const s = [["app", lan ? "POST https://box.local:8443/v1/chat/completions (Bearer mst-…)" : "POST http://127.0.0.1:11435/v1/chat/completions (Bearer mst-…)"]];
-      if (lan) s.push(["caddy", "TLS ok · forward_auth → /auth/check → <span class=ok>200, X-Mst-App: my-app</span>"],
-                      ["litellm", "qwen2.5-0.5b → http://127.0.0.1:11435/v1 with its internal key"]);
+      if (lan) s.push(["caddy", "TLS ok · forward_auth → /auth/check → <span class=ok>200, X-Mst-App: my-app</span> · → http://127.0.0.1:11435"]);
       s.push(["daemon", "key ok · qwen2.5-0.5b is " + (cold ? "<span class=warn>cold</span>" : "<span class=ok>ready</span>")]);
       if (cold) s.push(["max", "<span class=warn>starting max serve on a free loopback port …</span>"]);
       s.push(["max", "streaming tokens back"], ["daemon", "<span class=ok>200</span> · first token and tok/s recorded · idle timer restarts"]);

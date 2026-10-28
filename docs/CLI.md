@@ -236,7 +236,7 @@ The "Try it" cells need `MXC_API_KEY` set before Jupyter starts.
 
 ### `mxc ps`
 
-*No daemon needed.* Every process omxconsole runs (daemon, Caddy, LiteLLM, each `max serve`) with pid, port, memory and
+*No daemon needed.* Every process omxconsole runs (daemon, Caddy, each `max serve`) with pid, port, memory and
 uptime.
 
 | Option | |
@@ -296,8 +296,8 @@ mxc bench qwen2.5-0.5b smollm3-3b --runs 10
 
 ### `mxc expose`
 
-Serves your models on the LAN over HTTPS. It starts Caddy (TLS with its own certificate authority, port 8443) and
-LiteLLM as your user, so no password is needed. It prints the `https://<host>.local:8443/v1` address and the
+Serves your models on the LAN over HTTPS. It starts Caddy (TLS with its own certificate authority, port 8443) as
+your user, so no password is needed; Caddy checks each app key with the daemon and passes the request straight to it. It prints the `https://<host>.local:8443/v1` address and the
 certificate to trust on other devices. Each app needs its own key ([`mxc keys`](#api-keys)).
 
 ```bash
@@ -309,9 +309,9 @@ mxc expose --stop
 | Option | |
 |---|---|
 | `--host NAME` | The hostname clients use (default `<this machine>.local`). |
-| `--litellm` / `--no-litellm` | Route through LiteLLM (default) or straight to the daemon. |
-| `--dry-run` | Write the configs, but start nothing. |
-| `--stop` | Stop Caddy and LiteLLM. |
+| `--dry-run` | Write the Caddyfile, but start nothing. |
+| `--stop` | Stop Caddy. |
+| `--no-litellm` | Deprecated, does nothing: LiteLLM was removed (F-063), so Caddy always goes straight to the daemon. Prints a note asking you to drop it. |
 
 ---
 
@@ -407,7 +407,6 @@ The common ones:
 |---|---|
 | `MXC_HOME` | Where omxconsole keeps its state (default `~/.mxc`). |
 | `MXC_PORT` | The daemon's port (default 11435). |
-| `MXC_LITELLM_PORT` | LiteLLM's port when exposed (default 4000). |
 | `MXC_EXPOSE_PORT` | The HTTPS port when exposed (default 8443). |
 | `MXC_API_KEY` | Your key, for the notebook's "Try it" cells and the snippets `mxc serve` prints. |
 | `MXC_BASE_URL` | The endpoint the notebook calls, if not the local one. |

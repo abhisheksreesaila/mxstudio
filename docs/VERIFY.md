@@ -59,8 +59,8 @@ curl --cacert ~/.local/share/caddy/pki/authorities/local/root.crt \
   https://$(hostname).local:8443/v1/models -H "Authorization: Bearer $MXC_API_KEY"
 ```
 ✅ This lists your models. With a wrong key you get `401`, and
-`https://…:8443/model/info` gives `404`, because LiteLLM's admin API is never exposed.
-✅ LiteLLM's own UI is at http://127.0.0.1:4000/ui (this machine only).
+`https://…:8443/admin/info` gives `404`, because only the four `/v1` routes reach the daemon from the LAN.
+✅ `mxc ps` lists the daemon and Caddy, and nothing listens on port 4000.
 
 ### 6. The whole acceptance run in one script
 ```bash

@@ -39,11 +39,7 @@ Only for some features:
    pixi install
    ```
 
-3. If you'll put the endpoint on your LAN, also install the LiteLLM environment:
-
-   ```bash
-   pixi install -e gateway
-   ```
+3. If you'll put the endpoint on your LAN, install [Caddy](https://caddyserver.com/docs/install) (for example `sudo pacman -S caddy` or `brew install caddy`). Nothing else is needed.
 
 Run every command below from the repo, as `pixi run mxc …`.
 
@@ -162,7 +158,7 @@ The filter above the results shows All, Fits or Needs porting. The same labels i
 
 - **The Beacon:** what is happening now, in one pill: a pull or port in progress, a crashed model, a model starting, or the running models with live tokens per second. With nothing running it shows the GPU and memory in use. Click it for the details and a shortcut; cancelling a pull or port from it takes a second click.
 - **Keys:** every app key (prefix only), with **New key**, **Rotate** and **Revoke**. A new key is shown once.
-- **Gateway:** LiteLLM's status, the route for each model, the LiteLLM log, safeguard counts for today, recent requests (kept 7 days) and a link to the API reference at `/docs`. **Restart** restarts Caddy and LiteLLM and rotates their internal key; it is greyed out while LiteLLM is off.
+- **Gateway:** whether Caddy (HTTPS on your LAN) is running, the route for each model (the daemon sends each request to that model's `max serve`), Caddy's log, safeguard counts for today, recent requests (kept 7 days) and a link to the API reference at `/docs`.
 - **Security:** see [Securing it on your LAN](#-securing-it-on-your-lan).
 - **Settings:** light or dark (kept in this browser; until you pick one the console follows your system), when each model unloads, the daemon's info with **Stop daemon**, and every port and process omxconsole owns.
 
@@ -234,10 +230,11 @@ pixi run mxc expose --host box.local   # if other devices know this machine by a
 
 This applies to every model, not just one. It runs as your user, so no password is needed:
 
-- **Caddy** serves HTTPS on port 8443 with its own certificate authority, and checks each request's app key.
-- **LiteLLM** routes requests to the daemon by model name. It listens on `127.0.0.1:4000` only. `--no-litellm` skips it and Caddy goes straight to the daemon.
+- **Caddy** serves HTTPS on port 8443 with its own certificate authority, checks each request's app key with the daemon, and passes the request straight to the daemon, which routes it by model name.
 
-You get an address like `https://<host>.local:8443/v1`. Use it with the same keys and model names. Only the four `/v1` routes above are reachable; LiteLLM's admin API is not. Localhost keeps working over HTTP.
+You get an address like `https://<host>.local:8443/v1`. Use it with the same keys and model names. Only the four `/v1` routes above are reachable; the daemon's console and admin pages are not. Localhost keeps working over HTTP.
+
+If a client sends a request field `max serve` doesn't accept (a vendor extra from a client written for another server), the daemon drops it instead of letting the whole request fail, and names it in the `X-Mxc-Dropped-Params` reply header.
 
 ### Trust the certificate on other devices
 
@@ -269,7 +266,7 @@ Click **Stop exposing** on the Security page (it asks for a second click), or ru
 pixi run mxc expose --stop
 ```
 
-The Gateway page shows the same command. It stops Caddy and LiteLLM; the local endpoint keeps running.
+The Gateway page shows the same command. It stops Caddy; the local endpoint keeps running.
 
 ## 📓 Notebooks
 
@@ -309,7 +306,7 @@ Everything is under `~/.mxc/` (set `MXC_HOME` to move it):
 | `notebooks/` | generated notebooks |
 | `ports/` | porting workspaces and logs |
 | `skills/` | Modular's porting skills |
-| `expose/` | the Caddyfile, LiteLLM config and their logs |
+| `expose/` | the Caddyfile and Caddy's log (older installs may also hold `litellm.*` files from before LiteLLM was removed; they can be deleted) |
 | `webview/` | the `mxc app` window's saved preferences |
 
 Model weights stay in the normal Hugging Face cache. Keys are stored only as SHA-256 hashes, which is why each one is shown once.
@@ -320,7 +317,7 @@ Start with:
 
 ```bash
 pixi run mxc status   # is the daemon up, which models, LAN on or off
-pixi run mxc ps       # every process omxconsole runs: daemon, Caddy, LiteLLM, each max serve
+pixi run mxc ps       # every process omxconsole runs: daemon, Caddy, each max serve
 ```
 
 **The daemon isn't running.** The console says "omxconsole cannot reach the daemon", and CLI calls say "could not reach the omxconsole daemon". `mxc serve`, `mxc pull`, `mxc console` and `mxc app` start it for you. To run it in the foreground with logs on screen, use `pixi run mxc daemon`. If it won't start, the error shows the end of `~/.mxc/logs/daemon.log`.
@@ -356,10 +353,9 @@ pixi run mxc serve llama3.2-1b
 | Variable | Default | What |
 |---|---|---|
 | `MXC_PORT` | 11435 | the daemon and its endpoint |
-| `MXC_LITELLM_PORT` | 4000 | LiteLLM, when exposed |
 | `MXC_EXPOSE_PORT` | 8443 | HTTPS on your LAN |
 
-`mxc expose` names the port when LiteLLM's is taken. If the daemon's port is taken, the daemon doesn't start and `daemon.log` says why.
+If Caddy's port is taken, `mxc expose` shows the end of Caddy's log. If the daemon's port is taken, the daemon doesn't start and `daemon.log` says why.
 
 ## Full command reference
 

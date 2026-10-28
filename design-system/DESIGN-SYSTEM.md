@@ -93,7 +93,7 @@ Lucide (ISC), 16px in menus and buttons (15 in chips), stroke 1.6 (1.8 on colour
 - **⌘K palette** (660): input, grouped rows with icon + label + the CLI equivalent right-aligned, ↵ on the
   selected row, footer: ↑↓ move · ↵ run · ⌘C copy as CLI.
 - **Signature pages:** Pull (cloud rains shards into a churning cartridge + real steps) · Network (patch
-  bay: devices → Caddy → LiteLLM → daemon → a jack per model port, flowing cables) · Benchmarks (drag race
+  bay: devices → Caddy → daemon → a jack per model port, flowing cables) · Benchmarks (drag race
   with an optional synthesized "vroom" on click, speedometer, results table) · Gateway (six safeguards as
   solid friendly illustrations with counters + "the crew" of background processes with heartbeats) ·
   Metrics (bold colour blocks, "what you should care about", later the Ask mxconsole chat).
