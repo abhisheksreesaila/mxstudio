@@ -1,0 +1,17 @@
+omxconsole (this repository) is MIT licensed: see LICENSE.
+
+Third-party software it runs on, which is not included in this repository
+and keeps its own license:
+
+- MAX and Mojo, by Modular Inc. Installed by pixi from conda.modular.com
+  (the `modular` package in pixi.toml). Use is governed by the Modular
+  Community License: https://www.modular.com/legal/community
+  Parts of MAX published as source (for example the MAX pipelines and the
+  Mojo standard library) are under the Apache License 2.0 with LLVM
+  Exceptions: https://github.com/modular/modular/blob/main/LICENSE
+- Model architecture packages under ports/ are scaffolded for
+  `max serve --custom-architectures` following Modular's documented
+  pattern. Where a file adapts MAX pipeline source, that file stays under
+  Apache 2.0 with LLVM Exceptions.
+- Model weights are downloaded at run time and keep their publishers'
+  licenses.
