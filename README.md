@@ -1,4 +1,11 @@
-# omxconsole
+# omxconsole (archived: the earlier Python version)
+
+> **Archived.** This is the earlier Python version of omxconsole (`mxc`). The current omxconsole is a desktop app
+> built with [omxcode](https://github.com/abhisheksreesaila/omxcode):
+> **[see it](https://abhisheksreesaila.github.io/omxcode/omxconsole.html)** ·
+> [source](https://github.com/abhisheksreesaila/omxcode/tree/main/examples/console). This repository is read-only;
+> its old site pages are kept under [docs/archive-site](docs/archive-site/).
+
 
 **Local AI on Modular MAX, made easy.** One command gives you an OpenAI-compatible endpoint. Models load when
 they're called and unload when idle. If MAX can't run a model yet, omxconsole can port it for you.
